@@ -242,7 +242,7 @@ describe('mcp read-model tools', () => {
       brand: {
         availability: 'ready',
         identity: { mission: 'Make SEO simple', tagline: 'Grow with clarity' },
-        voice: { status: 'calibrated' },
+        voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 4, voiceVersion: 1 },
         voicePromptBlock: 'voice block — should NOT leak',
         voiceDnaBlock: 'voice DNA — should NOT leak',
         identityPromptBlock: 'IDENTITY: Make SEO simple',

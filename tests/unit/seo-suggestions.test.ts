@@ -238,10 +238,33 @@ describe('markApplied', () => {
     expect(mockPrepare).not.toHaveBeenCalled();
   });
 
-  it('calls DB update with provided suggestion ids', () => {
+  it('calls DB update with the ids whose current status legally transitions to applied', () => {
+    // The guard first SELECTs current statuses; both ids are pending → both legal.
+    mockAll.mockReturnValueOnce([
+      { id: 'sugg-1', status: 'pending' },
+      { id: 'sugg-2', status: 'pending' },
+    ]);
     markApplied('ws-1', ['sugg-1', 'sugg-2']);
     expect(mockPrepare).toHaveBeenCalled();
     expect(mockRun).toHaveBeenCalledWith('ws-1', 'sugg-1', 'sugg-2');
+  });
+
+  it('skips ids already applied (idempotent) and drops illegal moves without throwing', () => {
+    // sugg-1 pending → applied (legal); sugg-2 already applied (idempotent no-op);
+    // sugg-3 dismissed → applied (illegal, dropped). Only sugg-1 is written.
+    mockAll.mockReturnValueOnce([
+      { id: 'sugg-1', status: 'pending' },
+      { id: 'sugg-2', status: 'applied' },
+      { id: 'sugg-3', status: 'dismissed' },
+    ]);
+    expect(() => markApplied('ws-1', ['sugg-1', 'sugg-2', 'sugg-3'])).not.toThrow();
+    expect(mockRun).toHaveBeenCalledWith('ws-1', 'sugg-1');
+  });
+
+  it('does not write when no id is in a legal origin state', () => {
+    mockAll.mockReturnValueOnce([{ id: 'sugg-1', status: 'applied' }]);
+    markApplied('ws-1', ['sugg-1']);
+    expect(mockRun).not.toHaveBeenCalled();
   });
 });
 
@@ -252,10 +275,23 @@ describe('dismissSuggestions', () => {
   });
 
   it('dismisses specific suggestion ids when provided', () => {
+    // The guard SELECTs current statuses first; both pending → both legal.
+    mockAll.mockReturnValueOnce([
+      { id: 'sugg-1', status: 'pending' },
+      { id: 'sugg-2', status: 'pending' },
+    ]);
     mockRun.mockReturnValue({ changes: 2 });
     const count = dismissSuggestions('ws-1', ['sugg-1', 'sugg-2']);
     expect(count).toBe(2);
     expect(mockRun).toHaveBeenCalledWith('ws-1', 'sugg-1', 'sugg-2');
+  });
+
+  it('re-dismissing an already-dismissed id is a no-op that does not throw', () => {
+    mockAll.mockReturnValueOnce([{ id: 'sugg-1', status: 'dismissed' }]);
+    let count = -1;
+    expect(() => { count = dismissSuggestions('ws-1', ['sugg-1']); }).not.toThrow();
+    expect(count).toBe(0);
+    expect(mockRun).not.toHaveBeenCalled();
   });
 
   it('dismisses all pending suggestions when no ids provided', () => {

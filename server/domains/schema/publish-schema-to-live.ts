@@ -126,6 +126,10 @@ function recordSchemaOutcomeAction(workspaceId: string, pageId: string, pageUrl:
         rich_result_appearing: false,
       },
       attribution: 'platform_executed',
+      // R6 (B11): no `source` — a schema deploy is a PAGE-ref (sourceId = pageId) with no
+      // ephemeral titled producer. The generic label (clientActionLabel('schema_deployed'),
+      // shared/types/client-vocabulary.ts) is the honest display (FM-2: never fabricate a
+      // title). Columns stay NULL.
     });
     if (pageUrl) void captureBaselineFromGsc(schemaAction.id, workspaceId, pageUrl);
   } catch (err) {

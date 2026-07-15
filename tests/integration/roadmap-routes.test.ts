@@ -179,10 +179,22 @@ describe('PATCH /api/roadmap/item/:id', () => {
       status: 'done',
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { ok: boolean; item: { status: string; id: number } };
+    const body = await res.json() as { ok: boolean; item: { status: string; id: number; shippedAt?: string } };
     expect(body.ok).toBe(true);
     expect(body.item.status).toBe('done');
+    expect(body.item.shippedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(String(body.item.id)).toBe(ITEM_ID);
+  });
+
+  it('allows an explicit shippedAt only while the item is done', async () => {
+    const res = await patchJson(`/api/roadmap/item/${ITEM_ID}?sprintId=${SPRINT_ID}`, {
+      shippedAt: '2026-05-25',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; item: { status: string; shippedAt?: string } };
+    expect(body.ok).toBe(true);
+    expect(body.item.status).toBe('done');
+    expect(body.item.shippedAt).toBe('2026-05-25');
   });
 
   it('updates status to "in_progress" successfully', async () => {
@@ -190,9 +202,10 @@ describe('PATCH /api/roadmap/item/:id', () => {
       status: 'in_progress',
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { ok: boolean; item: { status: string } };
+    const body = await res.json() as { ok: boolean; item: { status: string; shippedAt?: string } };
     expect(body.ok).toBe(true);
     expect(body.item.status).toBe('in_progress');
+    expect(body.item.shippedAt).toBeUndefined();
   });
 
   it('updates status back to "pending" successfully', async () => {
@@ -205,6 +218,27 @@ describe('PATCH /api/roadmap/item/:id', () => {
     expect(body.item.status).toBe('pending');
   });
 
+  it('updates status to "deferred" successfully', async () => {
+    const res = await patchJson(`/api/roadmap/item/${ITEM_ID}?sprintId=${SPRINT_ID}`, {
+      status: 'deferred',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; item: { status: string } };
+    expect(body.ok).toBe(true);
+    expect(body.item.status).toBe('deferred');
+  });
+
+  it('updates status to "closed" without recording a shipment', async () => {
+    const res = await patchJson(`/api/roadmap/item/${ITEM_ID}?sprintId=${SPRINT_ID}`, {
+      status: 'closed',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; item: { status: string; shippedAt?: string } };
+    expect(body.ok).toBe(true);
+    expect(body.item.status).toBe('closed');
+    expect(body.item.shippedAt).toBeUndefined();
+  });
+
   it('updates notes field without touching status', async () => {
     const res = await patchJson(`/api/roadmap/item/${ITEM_ID}?sprintId=${SPRINT_ID}`, {
       notes: 'Integration test note',
@@ -215,14 +249,11 @@ describe('PATCH /api/roadmap/item/:id', () => {
     expect(body.item.notes).toBe('Integration test note');
   });
 
-  it('updates shippedAt field successfully', async () => {
+  it('rejects shippedAt for a non-done item', async () => {
     const res = await patchJson(`/api/roadmap/item/${ITEM_ID}?sprintId=${SPRINT_ID}`, {
       shippedAt: '2026-05-25',
     });
-    expect(res.status).toBe(200);
-    const body = await res.json() as { ok: boolean; item: { shippedAt: string } };
-    expect(body.ok).toBe(true);
-    expect(body.item.shippedAt).toBe('2026-05-25');
+    expect(res.status).toBe(400);
   });
 
   it('persisted status is reflected in subsequent GET /api/roadmap', async () => {

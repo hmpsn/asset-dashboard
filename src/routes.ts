@@ -1,6 +1,5 @@
 export type Page =
   | 'home'
-  | 'brief'
   | 'media'
   | 'seo-audit' | 'seo-editor'
   | 'links'

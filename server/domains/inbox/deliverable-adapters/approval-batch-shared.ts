@@ -41,6 +41,7 @@ import type {
 } from './types.js';
 import type { UpsertDeliverableItemInput } from '../../../client-deliverables.js';
 import type { ClientDeliverable, DeliverableType } from '../../../../shared/types/client-deliverable.js';
+import { auditWritableFieldForCheck } from '../../../../shared/types/seo-audit.js';
 import { createLogger } from '../../../logger.js';
 
 const log = createLogger('approval-batch-shared');
@@ -83,11 +84,6 @@ export type ApprovalBatchInput = ApprovalBatch;
 // to a writable page field; every other check is structural/technical/social and its
 // "proposed value" is recommendation prose, NOT a meta value — those are NON-applyable.
 
-/** Audit checks whose proposed value is a real SEO title. */
-const TITLE_CHECKS = new Set<string>(['title', 'duplicate-title']);
-/** Audit checks whose proposed value is a real meta description. */
-const META_DESCRIPTION_CHECKS = new Set<string>(['meta-description', 'duplicate-description']);
-
 /**
  * Resolve the SPECIFIC writable page field for an audit check, or null when the check
  * does not target a writable meta field. A non-null result is a meta field the apply
@@ -98,10 +94,7 @@ const META_DESCRIPTION_CHECKS = new Set<string>(['meta-description', 'duplicate-
  * future audit check we have not enumerated can never silently inherit `seoDescription`.
  */
 export function auditCheckField(check: string): string | null {
-  const normalized = (check || '').trim().toLowerCase();
-  if (TITLE_CHECKS.has(normalized)) return 'seoTitle';
-  if (META_DESCRIPTION_CHECKS.has(normalized)) return 'seoDescription';
-  return null;
+  return auditWritableFieldForCheck(check);
 }
 
 /**

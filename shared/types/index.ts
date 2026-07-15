@@ -15,11 +15,25 @@ export type * from './insights.ts';
 export type * from './intelligence.ts';
 export type * from './client-signals.ts';
 export type * from './business-priorities.ts';
-export type * from './meeting-brief.ts';
 export * from './keywords.ts';
 export type * from './keyword-command-center.ts';
 export * from './local-seo.ts';
 export type * from './brand-engine.ts';
+export {
+  BRAND_DELIVERABLE_TYPES,
+  RELEASED_BRAND_DELIVERABLE_TYPES,
+  isReleasedBrandDeliverableType,
+} from './brand-engine.ts';
+export * from './generation-evidence.ts';
+export * from './brand-intake.ts';
+export * from './brand-intake-schemas.ts';
+export * from './mcp-brand-intake-schemas.ts';
+export * from './brand-generation.ts';
+export * from './voice-finalization.ts';
+export * from './voice-finalization-schemas.ts';
+export * from './mcp-brand-voice-schemas.ts';
+export * from './matrix-generation.ts';
+export * from './brand-content-onboarding.ts';
 export type * from './outcome-tracking.ts';
 export type * from './copy-pipeline.ts';
 export type * from './diagnostics.ts';
@@ -37,7 +51,13 @@ export type * from './cms-images.ts';
 export type * from './page-join.ts';
 export type * from './briefing.ts';
 export * from './background-jobs.ts';
+export * from './action-catalog.ts';
+export * from './mcp-runtime.ts';
+export * from './mcp-matrix-schemas.ts';
 export * from './analytics-contract.ts';
 export type * from './platform-observability.ts';
+export type * from './workspace-overview.ts';
+export type * from './work-queue.ts';
 export type * from './keyword-strategy-ux.ts';
 export type * from './usage.ts';
+export * from './seo-audit.ts';

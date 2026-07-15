@@ -104,6 +104,10 @@ export function TopicClusters({ clusters, workspaceId, maxVisible }: TopicCluste
                           sourceType: 'topic_cluster',
                           sourceId: clusterSourceId,
                           targetKeyword: cluster.topic,
+                          // C4: "Keep" is a pure curation decision — no execution happened.
+                          // not_acted_on is the honest attribution (never ride the deprecated
+                          // default, which would let a kept cluster become a phantom "win").
+                          attribution: 'not_acted_on',
                         });
                       }
                     }}

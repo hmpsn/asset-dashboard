@@ -10,11 +10,16 @@ import { listBrandscripts } from './brandscript.js';
 import { listExtractions } from './discovery-ingestion.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { BRAND_DELIVERABLE_TRANSITIONS, validateTransition } from './state-machines.js';
 import type {
-  BrandDeliverable, DeliverableType, DeliverableTier,
+  BrandDeliverable, BrandDeliverableType, DeliverableTier,
+  ReleasedBrandDeliverableType,
   VoiceSampleContext,
 } from '../shared/types/brand-engine.js';
-import { DEFAULT_TIER_MAP } from '../shared/types/brand-engine.js';
+import {
+  DEFAULT_TIER_MAP,
+  isReleasedBrandDeliverableType,
+} from '../shared/types/brand-engine.js';
 import { rowToDeliverable, listDeliverables, getDeliverable, type DeliverableRow } from './brand-deliverable-read-model.js';
 import { isProgrammingError } from './errors.js';
 
@@ -26,10 +31,50 @@ const stmts = createStmtCache(() => ({
   getById: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE id = ? AND workspace_id = ?`),
   getByType: db.prepare(`SELECT * FROM brand_identity_deliverables WHERE workspace_id = ? AND deliverable_type = ? ORDER BY updated_at DESC LIMIT 1`),
   insert: db.prepare(`INSERT INTO brand_identity_deliverables (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at) VALUES (@id, @workspace_id, @deliverable_type, @content, @status, @version, @tier, @created_at, @updated_at)`),
-  updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`),
-  updateStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: brand deliverable status is not a platform state machine column
+  updateContent: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: content-edit always resets to 'draft' (a content-reset side-effect, not a lifecycle transition); the guarded lifecycle write is setDeliverableStatus()
+  updateContentIfVersion: db.prepare(`UPDATE brand_identity_deliverables SET content = @content, status = @status, version = @version, tier = @tier, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id AND version = @expected_version`), // status-ok: content-edit always resets to 'draft'; expected_version is the atomic optimistic-concurrency guard
+  updateStatusIfVersionAndStatus: db.prepare(`UPDATE brand_identity_deliverables SET status = @status, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id AND version = @expected_version AND status = @expected_status`), // status-ok: BRAND_DELIVERABLE_TRANSITIONS guard runs in setDeliverableStatusCasInTransaction() before this CAS write
   insertVersion: db.prepare(`INSERT INTO brand_identity_versions (id, deliverable_id, content, steering_notes, version, created_at) VALUES (@id, @deliverable_id, @content, @steering_notes, @version, @created_at)`),
 }));
+
+/**
+ * A caller attempted to update a deliverable from a stale durable version.
+ *
+ * Keep this domain error transport-neutral: HTTP/MCP adapters decide how to
+ * project the conflict while the write path carries the exact expected and
+ * actual versions needed for a safe re-read/retry.
+ */
+export class BrandDeliverableVersionConflictError extends Error {
+  readonly code = 'conflict' as const;
+  readonly expectedVersion: number;
+  readonly actualVersion: number;
+
+  constructor(
+    expectedVersion: number,
+    actualVersion: number,
+  ) {
+    super(`Brand deliverable version conflict: expected ${expectedVersion}, actual ${actualVersion}`);
+    this.name = 'BrandDeliverableVersionConflictError';
+    this.expectedVersion = expectedVersion;
+    this.actualVersion = actualVersion;
+  }
+}
+
+export class BrandDeliverableStatusConflictError extends Error {
+  readonly code = 'conflict' as const;
+  readonly expectedStatus: BrandDeliverable['status'];
+  readonly actualStatus: BrandDeliverable['status'];
+
+  constructor(
+    expectedStatus: BrandDeliverable['status'],
+    actualStatus: BrandDeliverable['status'],
+  ) {
+    super(`Brand deliverable status conflict: expected ${expectedStatus}, actual ${actualStatus}`);
+    this.name = 'BrandDeliverableStatusConflictError';
+    this.expectedStatus = expectedStatus;
+    this.actualStatus = actualStatus;
+  }
+}
 
 function buildBrandContext(workspaceId: string): string {
   const parts: string[] = [];
@@ -80,8 +125,8 @@ function buildBrandContext(workspaceId: string): string {
   return parts.join('\n\n');
 }
 
-export function getDeliverableInstructions(type: DeliverableType): string {
-  const instructions: Partial<Record<DeliverableType, string>> = {
+export function getDeliverableInstructions(type: BrandDeliverableType): string {
+  const instructions: Record<BrandDeliverableType, string> = {
     mission: 'Write a mission statement: 1-2 sentences explaining why this business exists. Start with an action verb. Specific to this business.',
     vision: 'Write a vision statement: 1-2 sentences describing where this business is headed in 5-10 years. Aspirational but grounded.',
     values: 'Write 3-5 core values. For each: value name (2-3 words), one sentence description that shows it in action. Format as a numbered list.',
@@ -99,11 +144,20 @@ export function getDeliverableInstructions(type: DeliverableType): string {
     objection_handling: 'List the top 5 objections prospects raise and on-brand responses to each. Keep responses conversational, not defensive.',
     emotional_triggers: 'Identify the primary emotional triggers for each persona: what motivates them to act, what fears hold them back, what outcomes they truly want.',
     tone_examples: 'Write tone of voice examples: 3 "do this" examples and 3 "not this" examples for each of these contexts: headlines, body copy, CTAs.',
+    naming: 'Develop 3-5 brand name directions as creative proposals grounded only in verified business facts, approved positioning, audience evidence, and the finalized voice. For each, provide the candidate, a concise rationale, and any evidence gap as [NEEDS CLIENT INPUT: ...]. Do not invent availability. Do not claim or imply trademark, domain, legal, cultural, or linguistic clearance; those require separate verified review.',
   };
   return instructions[type] || `Write a ${type.replace(/_/g, ' ')} for this brand. Be specific, not generic.`;
 }
 
-export async function generateDeliverable(workspaceId: string, deliverableType: DeliverableType): Promise<BrandDeliverable> {
+export async function generateDeliverable(
+  workspaceId: string,
+  deliverableType: ReleasedBrandDeliverableType,
+): Promise<BrandDeliverable> {
+  // Runtime defense for untyped/JavaScript callers. The MCP-owned `naming`
+  // target must not leak into this legacy paid path before B2 owns its gates.
+  if (!isReleasedBrandDeliverableType(deliverableType)) {
+    throw new Error(`Unsupported legacy brand deliverable type: ${deliverableType}`);
+  }
   const fullContext = await buildIntelPrompt(workspaceId, ['seoContext']);
   const brandContext = buildBrandContext(workspaceId);
   const instructions = getDeliverableInstructions(deliverableType);
@@ -197,6 +251,9 @@ export async function refineDeliverable(workspaceId: string, id: string, directi
   // version between the AI call and our write.
   const preload = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
   if (!preload) return null;
+  if (!isReleasedBrandDeliverableType(preload.deliverable_type)) {
+    throw new Error(`Unsupported legacy brand deliverable type: ${preload.deliverable_type}`);
+  }
 
   const userPrompt = `Refine this ${preload.deliverable_type.replace(/_/g, ' ')} based on the direction given.
 
@@ -241,10 +298,19 @@ export function updateDeliverableContent(
   workspaceId: string,
   id: string,
   content: string,
+  expectedVersion?: number,
 ): BrandDeliverable | null {
   const doUpdate = db.transaction((): BrandDeliverable | null => {
     const existing = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
     if (!existing) return null;
+
+    // The authoritative version check belongs inside the same IMMEDIATE
+    // transaction as the snapshot + write. An adapter-level pre-read cannot
+    // protect against an operator edit landing between that read and this
+    // mutation.
+    if (expectedVersion !== undefined && existing.version !== expectedVersion) {
+      throw new BrandDeliverableVersionConflictError(expectedVersion, existing.version);
+    }
 
     if (existing.content === content) {
       return rowToDeliverable(existing);
@@ -260,7 +326,7 @@ export function updateDeliverableContent(
       version: existing.version,
       created_at: now,
     });
-    stmts().updateContent.run({
+    const updateParams = {
       id,
       workspace_id: workspaceId,
       content,
@@ -268,7 +334,20 @@ export function updateDeliverableContent(
       version: newVersion,
       tier: existing.tier,
       updated_at: now,
-    });
+    };
+    const updateResult = expectedVersion === undefined
+      ? stmts().updateContent.run(updateParams)
+      : stmts().updateContentIfVersion.run({
+          ...updateParams,
+          expected_version: expectedVersion,
+        });
+
+    // The IMMEDIATE transaction serializes writers, so this is defensive
+    // against future trigger/statement changes rather than an expected race.
+    // Throwing rolls back the version snapshot above as well as the update.
+    if (updateResult.changes !== 1) {
+      throw new Error('Brand deliverable update did not affect exactly one workspace-scoped row');
+    }
     return { ...rowToDeliverable(existing), content, status: 'draft', version: newVersion, updatedAt: now };
   });
 
@@ -277,6 +356,78 @@ export function updateDeliverableContent(
 
 export function approveDeliverable(workspaceId: string, id: string): BrandDeliverable | null {
   return setDeliverableStatus(workspaceId, id, 'approved');
+}
+
+export interface BrandDeliverableStatusCasResult {
+  deliverable: BrandDeliverable;
+  autoSampleFrom: BrandDeliverableType | null;
+}
+
+/**
+ * Version/status-conditional brand status mutation for a caller-owned transaction.
+ *
+ * This deliberately performs no broadcast or cache invalidation. Review workflows
+ * compose it with their other source/mirror writes inside one outer IMMEDIATE
+ * transaction, then publish effects only after that transaction commits.
+ */
+export function setDeliverableStatusCasInTransaction(
+  workspaceId: string,
+  id: string,
+  expectedVersion: number,
+  expectedStatus: BrandDeliverable['status'],
+  status: 'approved' | 'draft',
+): BrandDeliverableStatusCasResult | null {
+  const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
+  if (!row) return null;
+  const priorStatus = row.status as BrandDeliverable['status'];
+  if (row.version !== expectedVersion) {
+    throw new BrandDeliverableVersionConflictError(expectedVersion, row.version);
+  }
+  if (priorStatus !== expectedStatus) {
+    throw new BrandDeliverableStatusConflictError(expectedStatus, priorStatus);
+  }
+
+  if (priorStatus !== status) {
+    validateTransition('brand_deliverable', BRAND_DELIVERABLE_TRANSITIONS, priorStatus, status);
+  }
+  const now = new Date().toISOString();
+  const updated = stmts().updateStatusIfVersionAndStatus.run({
+    id,
+    workspace_id: workspaceId,
+    status,
+    expected_version: expectedVersion,
+    expected_status: expectedStatus,
+    updated_at: now,
+  });
+  if (updated.changes !== 1) {
+    throw new BrandDeliverableVersionConflictError(expectedVersion, row.version);
+  }
+  log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
+
+  let autoSampleFrom: BrandDeliverableType | null = null;
+  if (status === 'approved' && priorStatus !== 'approved') {
+    const type = row.deliverable_type as BrandDeliverableType;
+    const voiceSampleMap: Partial<Record<BrandDeliverableType, VoiceSampleContext>> = {
+      tagline: 'headline',
+      elevator_pitch: 'body',
+      tone_examples: 'body',
+    };
+    const contextTag = voiceSampleMap[type];
+    if (contextTag) {
+      try {
+        addVoiceSample(workspaceId, row.content.slice(0, 500), contextTag, 'identity_approved');
+        log.info({ workspaceId, deliverableType: type }, 'auto-created voice sample from approved deliverable');
+        autoSampleFrom = type;
+      } catch (err) {
+        log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
+      }
+    }
+  }
+
+  return {
+    deliverable: { ...rowToDeliverable(row), status, updatedAt: now },
+    autoSampleFrom,
+  };
 }
 
 /**
@@ -309,54 +460,13 @@ export function setDeliverableStatus(
   const txResult = db.transaction(() => {
     const row = stmts().getById.get(id, workspaceId) as DeliverableRow | undefined;
     if (!row) return null;
-
-    // Capture the pre-update status BEFORE writing — we need to know whether
-    // this is a first-time approval (draft → approved) vs a re-approval
-    // (already approved, no-op on status). The auto-sample side effect must
-    // only run on the transition.
-    const priorStatus = row.status;
-    const now = new Date().toISOString();
-    stmts().updateStatus.run({ id, workspace_id: workspaceId, status, updated_at: now });
-    log.info({ workspaceId, deliverableType: row.deliverable_type, status }, 'deliverable status updated');
-
-    if (status !== 'approved') {
-      return { row, now, autoSampleFrom: null as DeliverableType | null };
-    }
-
-    // Re-approval of an already-approved deliverable must NOT duplicate the
-    // voice sample. Without this guard, every idempotent PATCH (e.g. a client
-    // retry, or an admin clicking "Approve" twice) inserts another copy of
-    // the same content into the voice samples table. The transaction makes
-    // this check race-free: two concurrent callers are serialized and only
-    // one sees `priorStatus === 'draft'`.
-    if (priorStatus === 'approved') {
-      return { row, now, autoSampleFrom: null as DeliverableType | null };
-    }
-
-    // Spec Addendum §5: auto-create voice sample for approved identity
-    // deliverables. `addVoiceSample` has its own transaction which becomes a
-    // nested SAVEPOINT here; if it throws we catch, log, and let the outer
-    // transaction commit — approval is the primary effect and must succeed
-    // even if the downstream sample insert fails.
-    const type = row.deliverable_type as DeliverableType;
-    const voiceSampleMap: Partial<Record<DeliverableType, VoiceSampleContext>> = {
-      tagline: 'headline',
-      elevator_pitch: 'body',
-      tone_examples: 'body',
-    };
-    const contextTag = voiceSampleMap[type];
-    if (!contextTag) {
-      return { row, now, autoSampleFrom: null as DeliverableType | null };
-    }
-
-    try {
-      addVoiceSample(workspaceId, row.content.slice(0, 500), contextTag, 'identity_approved');
-      log.info({ workspaceId, deliverableType: type }, 'auto-created voice sample from approved deliverable');
-      return { row, now, autoSampleFrom: type };
-    } catch (err) {
-      log.error({ err, workspaceId, deliverableType: type }, 'failed to auto-create voice sample');
-      return { row, now, autoSampleFrom: null as DeliverableType | null };
-    }
+    return setDeliverableStatusCasInTransaction(
+      workspaceId,
+      id,
+      row.version,
+      row.status as BrandDeliverable['status'],
+      status,
+    );
   }).immediate();
 
   if (!txResult) return null;
@@ -368,7 +478,7 @@ export function setDeliverableStatus(
     broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, { autoSampleFrom: txResult.autoSampleFrom });
   }
 
-  return { ...rowToDeliverable(txResult.row), status, updatedAt: txResult.now };
+  return txResult.deliverable;
 }
 
 export function exportDeliverables(workspaceId: string, tier?: DeliverableTier): string {

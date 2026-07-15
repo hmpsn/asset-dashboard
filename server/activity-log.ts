@@ -3,10 +3,12 @@
  * Entries are broadcast in real time via WebSocket.
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { getMcpToolExecutionContext } from './mcp/tool-execution-context.js';
+import { WS_EVENTS } from './ws-events.js';
 
 type WorkspaceBroadcastFn = (workspaceId: string, event: string, data: unknown) => void;
 let _broadcastFn: WorkspaceBroadcastFn | null = null;
@@ -117,10 +119,16 @@ export type ActivityType =
   | 'voice_refined'
   | 'voice_profile_created'
   | 'voice_profile_updated'
+  | 'brand_generation_started'          // admin-only: durable B2 run created
+  | 'brand_generation_resumed'          // admin-only: exact finalized voice unlocked dependents
+  | 'brand_generation_revision_started' // admin-only: review-directed revision job created
+  | 'brand_generation_completed'        // admin-only: automatic gates reached a truthful terminal outcome
   | 'brand_deliverable_generated'
   | 'brand_deliverable_refined'
   | 'brand_deliverable_approved'
   | 'brand_deliverable_reverted'
+  | 'brand_intake_submitted'
+  | 'brand_intake_evidence_resolved'
   | 'blueprint_created'
   | 'blueprint_updated'
   | 'blueprint_deleted'
@@ -168,6 +176,8 @@ export type ActivityType =
   | 'suggested_brief_dismissed'  // admin dismissed a suggested brief
   | 'suggested_brief_snoozed'    // admin snoozed a suggested brief
   | 'post_voice_scored'          // admin-only: voice score persisted for a post
+  | 'workspace_archived'         // admin-only: workspace hidden from default operator lists
+  | 'workspace_unarchived'       // admin-only: workspace restored to default operator lists
   // Strategy redesign P2 pre-commit (consumed in P3 Lane A) — managed keyword working-set
   // mutations (strategy_keyword_set table). Admin-only curation hygiene; deliberately NOT
   // in CLIENT_VISIBLE_TYPES — keyword-set add/remove/keep is an internal operator audit
@@ -239,6 +249,47 @@ function rowToEntry(row: ActivityRow): ActivityEntry {
   };
 }
 
+const CLIENT_PRIVATE_ACTIVITY_METADATA_KEYS = new Set([
+  'mcpCaller',
+  'brandGenerationReview',
+]);
+
+/** Remove internal execution/ledger identity before an activity crosses a client-visible seam. */
+function toClientSafeActivityEntry(entry: ActivityEntry): ActivityEntry {
+  const isBrandGenerationReview = entry.metadata?.brandGenerationReview != null;
+  if (!entry.metadata && !isBrandGenerationReview) return entry;
+  const clientSafeMetadata = Object.fromEntries(
+    Object.entries(entry.metadata ?? {}).filter(([key]) => !CLIENT_PRIVATE_ACTIVITY_METADATA_KEYS.has(key)),
+  );
+  if (
+    !isBrandGenerationReview
+    && Object.keys(clientSafeMetadata).length === Object.keys(entry.metadata ?? {}).length
+  ) return entry;
+  const clientSafeEntry = { ...entry };
+  if (isBrandGenerationReview) {
+    delete clientSafeEntry.actorId;
+    delete clientSafeEntry.actorName;
+  }
+  return {
+    ...clientSafeEntry,
+    metadata: Object.keys(clientSafeMetadata).length > 0 ? clientSafeMetadata : undefined,
+  };
+}
+
+/**
+ * Client and admin subscribers share the workspace channel. Only activities
+ * exposed by the client activity read boundary may include their entry data on
+ * that channel. Admin-only activity events are invalidation signals; operators
+ * can refetch the durable activity log through the admin read boundary.
+ */
+function toWorkspaceBroadcastActivityPayload(entry: ActivityEntry): ActivityEntry | Record<string, never> {
+  if (CLIENT_VISIBLE_TYPES.has(entry.type)) {
+    return toClientSafeActivityEntry(entry);
+  }
+
+  return {};
+}
+
 /** Activity types visible to clients — real team work only, no system/anomaly/internal entries */
 const CLIENT_VISIBLE_TYPES: Set<ActivityType> = new Set([
   'audit_completed', 'request_resolved', 'approval_sent', 'approval_applied', 'approval_reverted', 'seo_updated',
@@ -280,6 +331,16 @@ const stmts = createStmtCache(() => ({
         VALUES (@id, @workspace_id, @type, @title, @description, @metadata,
           @actor_id, @actor_name, @created_at)
       `),
+  insertIgnore: db.prepare(`
+        INSERT OR IGNORE INTO activity_log (
+          id, workspace_id, type, title, description, metadata,
+          actor_id, actor_name, created_at
+        ) VALUES (
+          @id, @workspace_id, @type, @title, @description, @metadata,
+          @actor_id, @actor_name, @created_at
+        )
+      `),
+  selectById: db.prepare('SELECT * FROM activity_log WHERE id = ?'),
   selectByWorkspace: db.prepare(
     'SELECT * FROM activity_log WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?',
   ),
@@ -328,13 +389,16 @@ const stmts = createStmtCache(() => ({
 // ── Public API ──
 
 export function addActivity(workspaceId: string, type: ActivityType, title: string, description?: string, metadata?: Record<string, unknown>, actor?: { id?: string; name?: string }): ActivityEntry {
+  const mcpExecutionContext = getMcpToolExecutionContext();
   const entry: ActivityEntry = {
     id: `act_${randomUUID()}`,
     workspaceId,
     type,
     title,
     description,
-    metadata,
+    metadata: mcpExecutionContext
+      ? { ...metadata, mcpCaller: mcpExecutionContext }
+      : metadata,
     actorId: actor?.id,
     actorName: actor?.name,
     createdAt: new Date().toISOString(),
@@ -352,10 +416,76 @@ export function addActivity(workspaceId: string, type: ActivityType, title: stri
     created_at: entry.createdAt,
   });
 
-  // Broadcast to subscribed workspace clients
-  _broadcastFn?.(workspaceId, 'activity:new', entry);
+  // Workspace broadcasts are shared with client subscribers. Keep every
+  // admin-only activity's details behind the admin read boundary.
+  _broadcastFn?.(workspaceId, WS_EVENTS.ACTIVITY_NEW, toWorkspaceBroadcastActivityPayload(entry));
 
   return entry;
+}
+
+export interface AddActivityOnceInput {
+  effectKey: string;
+  workspaceId: string;
+  type: ActivityType;
+  title: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  actor?: { id?: string; name?: string };
+  createdAt: string;
+}
+
+/**
+ * Persist one outbox-backed activity exactly once and broadcast it at least
+ * once. Retrying after an insert/broadcast crash reuses the deterministic row
+ * while emitting a fresh invalidation signal.
+ */
+export function addActivityOnce(input: AddActivityOnceInput): ActivityEntry {
+  const effectKey = input.effectKey.trim();
+  if (!effectKey || new TextEncoder().encode(effectKey).byteLength > 512) {
+    throw new Error('activity effect key must be between 1 and 512 UTF-8 bytes');
+  }
+  const entry: ActivityEntry = {
+    id: `act_bge_${createHash('sha256').update(effectKey).digest('hex')}`,
+    workspaceId: input.workspaceId,
+    type: input.type,
+    title: input.title,
+    description: input.description,
+    metadata: input.metadata,
+    actorId: input.actor?.id,
+    actorName: input.actor?.name,
+    createdAt: input.createdAt,
+  };
+  stmts().insertIgnore.run({
+    id: entry.id,
+    workspace_id: entry.workspaceId,
+    type: entry.type,
+    title: entry.title,
+    description: entry.description ?? null,
+    metadata: entry.metadata ? JSON.stringify(entry.metadata) : null,
+    actor_id: entry.actorId ?? null,
+    actor_name: entry.actorName ?? null,
+    created_at: entry.createdAt,
+  });
+  const storedRow = stmts().selectById.get(entry.id) as ActivityRow | undefined;
+  if (!storedRow) throw new Error('idempotent activity was not persisted');
+  const stored = rowToEntry(storedRow);
+  if (stored.workspaceId !== entry.workspaceId
+    || stored.type !== entry.type
+    || stored.title !== entry.title
+    || stored.description !== entry.description
+    || stored.actorId !== entry.actorId
+    || stored.actorName !== entry.actorName
+    || stored.createdAt !== entry.createdAt
+    || JSON.stringify(stored.metadata ?? null) !== JSON.stringify(entry.metadata ?? null)) {
+    throw new Error('activity effect key is bound to different activity inputs');
+  }
+  if (!_broadcastFn) throw new Error('activity broadcast is not initialized');
+  _broadcastFn(
+    input.workspaceId,
+    WS_EVENTS.ACTIVITY_NEW,
+    toWorkspaceBroadcastActivityPayload(stored),
+  );
+  return stored;
 }
 
 export function pruneActivityLogRetention(): number {
@@ -386,7 +516,7 @@ export function listActivityByType(workspaceId: string, type: ActivityType, limi
 
 export function listClientActivity(workspaceId: string, limit = 50, offset = 0): ActivityEntry[] {
   const rows = stmts().selectClientVisible.all(workspaceId, ...CLIENT_VISIBLE_TYPES, limit, offset) as ActivityRow[];
-  return rows.map(rowToEntry);
+  return rows.map(rowToEntry).map(toClientSafeActivityEntry);
 }
 
 /** Returns true if the workspace has any activity log entry within the last `withinDays` days. */

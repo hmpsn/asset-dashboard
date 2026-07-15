@@ -20,4 +20,14 @@ describe('CurationMeter', () => {
     const { container } = render(<CurationMeter sentThisCycle={0} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('uses the compact Engine support-row presentation without changing its copy', () => {
+    render(<CurationMeter sentThisCycle={4} presentation="engine-spine" />);
+
+    const meter = screen.getByTestId('curation-meter');
+    expect(meter).toHaveAttribute('data-presentation', 'engine-spine');
+    expect(meter).toHaveClass('px-2.5', 'py-1');
+    expect(meter).toHaveTextContent('4 sent');
+    expect(meter).toHaveTextContent('a healthy curated set');
+  });
 });

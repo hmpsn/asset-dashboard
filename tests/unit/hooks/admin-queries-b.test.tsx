@@ -63,7 +63,7 @@ vi.mock('../../../src/api/analytics', () => {
   };
 });
 
-// useAdminAssets → src/api/client (get, getSafe)
+// useAdminAssets → src/api/client (get)
 vi.mock('../../../src/api/client', () => ({
   get: vi.fn(),
   getSafe: vi.fn(),
@@ -212,6 +212,51 @@ describe('useAdminGA4', () => {
     expect(result.current.trend).toEqual([]);
     expect(result.current.error).toBeNull();
   });
+
+  it('preserves overview-only loading when no metric subset is supplied', async () => {
+    const overviewData = {
+      totalUsers: 100, totalSessions: 150, avgEngagementTime: 60,
+      bounceRate: 0.4, newUsers: 60, returningUsers: 40,
+      organicUsers: 80, organicSessions: 110,
+    };
+    mockGa4Overview.mockResolvedValue(overviewData);
+    mockGa4Trend.mockReturnValue(new Promise(() => {}));
+    vi.mocked(ga4.topPages).mockResolvedValue([]);
+    vi.mocked(ga4.sources).mockResolvedValue([]);
+    vi.mocked(ga4.devices).mockResolvedValue([]);
+    vi.mocked(ga4.countries).mockResolvedValue([]);
+    vi.mocked(ga4.comparison).mockResolvedValue(null);
+    vi.mocked(ga4.newVsReturning).mockResolvedValue([]);
+    vi.mocked(ga4.organic).mockResolvedValue(null);
+    vi.mocked(ga4.landingPages).mockResolvedValue([]);
+    vi.mocked(ga4.conversions).mockResolvedValue([]);
+
+    const { result } = renderHook(
+      () => useAdminGA4('ws-1', 28, true),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.overview).toEqual(overviewData));
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it('aggregates loading for an explicit GA4 metric subset', async () => {
+    const overviewData = {
+      totalUsers: 100, totalSessions: 150, avgEngagementTime: 60,
+      bounceRate: 0.4, newUsers: 60, returningUsers: 40,
+      organicUsers: 80, organicSessions: 110,
+    };
+    mockGa4Overview.mockResolvedValue(overviewData);
+    mockGa4Trend.mockReturnValue(new Promise(() => {}));
+
+    const { result } = renderHook(
+      () => useAdminGA4('ws-1', 28, true, ['overview', 'trend']),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.overview).toEqual(overviewData));
+    expect(result.current.isLoading).toBe(true);
+  });
 });
 
 // ── useAdminSearch ──────────────────────────────────────────────────────────
@@ -264,6 +309,54 @@ describe('useAdminSearch', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('preserves overview-only loading when no search metric subset is supplied', async () => {
+    const gscAdmin = (await import('../../../src/api/analytics')).gscAdmin;
+    const overviewData = {
+      totalClicks: 500, totalImpressions: 10000, avgCtr: 0.05,
+      avgPosition: 15, dateRange: { start: '2024-01-01', end: '2024-01-31' },
+      topQueries: [], topPages: [],
+    };
+    vi.mocked(gscAdmin.overview).mockResolvedValue(overviewData);
+    vi.mocked(gscAdmin.trend).mockReturnValue(new Promise(() => {}));
+    vi.mocked(gscAdmin.devices).mockResolvedValue([]);
+    vi.mocked(gscAdmin.countries).mockResolvedValue([]);
+    vi.mocked(gscAdmin.searchTypes).mockResolvedValue([]);
+    vi.mocked(gscAdmin.comparison).mockResolvedValue(null);
+
+    const { result } = renderHook(
+      () => useAdminSearch('ws-1', 'site-1', 'https://example.com', 28),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.overview).toEqual(overviewData));
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it('aggregates loading for an explicit search metric subset', async () => {
+    const gscAdmin = (await import('../../../src/api/analytics')).gscAdmin;
+    const overviewData = {
+      totalClicks: 500, totalImpressions: 10000, avgCtr: 0.05,
+      avgPosition: 15, dateRange: { start: '2024-01-01', end: '2024-01-31' },
+      topQueries: [], topPages: [],
+    };
+    vi.mocked(gscAdmin.overview).mockResolvedValue(overviewData);
+    vi.mocked(gscAdmin.trend).mockReturnValue(new Promise(() => {}));
+
+    const { result } = renderHook(
+      () => useAdminSearch(
+        'ws-1',
+        'site-1',
+        'https://example.com',
+        28,
+        { metrics: ['overview', 'trend'] },
+      ),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.overview).toEqual(overviewData));
+    expect(result.current.isLoading).toBe(true);
+  });
+
   it('keeps admin GSC query keys on the shared factory shape', async () => {
     const gscAdmin = (await import('../../../src/api/analytics')).gscAdmin;
     vi.mocked(gscAdmin.overview).mockResolvedValue(null);
@@ -298,11 +391,11 @@ describe('useWebflowAssets', () => {
       { wrapper: makeWrapper() },
     );
     expect(result.current.isLoading).toBe(false);
-    expect(mockGetSafe).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
   });
 
   it('enters loading state when enabled', () => {
-    mockGetSafe.mockReturnValue(new Promise(() => {}));
+    mockGet.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(
       () => useWebflowAssets('site-1', 'ws-1'),
       { wrapper: makeWrapper() },
@@ -312,13 +405,35 @@ describe('useWebflowAssets', () => {
 
   it('returns array of assets when API resolves', async () => {
     const assets = [{ id: 'a1', size: 1024, contentType: 'image/png' }];
-    mockGetSafe.mockResolvedValue(assets);
+    mockGet.mockResolvedValue(assets);
     const { result } = renderHook(
       () => useWebflowAssets('site-1', 'ws-1'),
       { wrapper: makeWrapper() },
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toEqual(assets);
+  });
+
+  it('surfaces asset read failures to the consuming error UI', async () => {
+    mockGet.mockRejectedValue(new Error('assets unavailable'));
+    const { result } = renderHook(
+      () => useWebflowAssets('site-1', 'ws-1'),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({ message: 'assets unavailable' });
+  });
+
+  it('treats a malformed asset payload as an error instead of an empty library', async () => {
+    mockGet.mockResolvedValue({ not: 'an array' });
+    const { result } = renderHook(
+      () => useWebflowAssets('site-1', 'ws-1'),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({ message: 'Asset response was not an array' });
   });
 });
 
@@ -432,6 +547,17 @@ describe('useAnalyticsAnnotations', () => {
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.data).toEqual(annotations);
+  });
+
+  it('exposes annotation read failures to the surface', async () => {
+    mockAnnotationsList.mockRejectedValue(new Error('annotations unavailable'));
+    const { result } = renderHook(
+      () => useAnalyticsAnnotations('ws-1'),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toMatchObject({ message: 'annotations unavailable' });
   });
 });
 

@@ -15,6 +15,7 @@ import {
   buildConversationContext,
   getSession as getChatSession,
   generateSessionSummary,
+  shouldAttemptSessionSummary,
   formatChatLimitError,
   refundReservedChatUsage,
   reserveChatUsageIfNeeded,
@@ -214,7 +215,10 @@ router.get('/api/public/insights/:workspaceId', async (req, res) => {
     const isAdmin = !!(payload?.role === 'admin' || payload?.role === 'owner') ||
       !!(adminToken && (adminToken === APP_PASSWORD || verifyAdminToken(adminToken)));
     const force = req.query.force === 'true' && isAdmin;
-    const insights = await getOrComputeInsights(ws.id, type, { force });
+    const insights = await getOrComputeInsights(ws.id, type, {
+      force,
+      broadcastOnCompute: true,
+    });
     res.json(insights);
   } catch (err) {
     log.error({ err }, 'Failed to compute insights');
@@ -481,6 +485,7 @@ router.post('/api/public/search-chat/:workspaceId', validate(chatSchema), async 
       const seoPrompt = await buildSeoPromptContext(ws.id, {
         slices: ['seoContext', 'insights', 'siteHealth', 'learnings'],
         includeRankMovers: false,
+        audience: 'client',
       });
       seoContextBlock = seoPrompt.seoPromptContext;
     } catch (err) {
@@ -645,8 +650,8 @@ ${hasGrounding ? seoContextBlock : '(No additional workspace intelligence is ava
       if (session && session.messages.length === 2) {
         addActivity(ws.id, 'chat_session', 'Client chat: ' + question.trim().slice(0, 80), `Client started a new Insights Engine conversation`); // client-visibility-ok: admin activity signal; intentionally not shown in client-visible activity feed
       }
-      // Auto-summarize after 6+ messages
-      if (session && session.messages.length >= 6 && !session.summary) {
+      // Refresh cross-session context at bounded milestones.
+      if (session && shouldAttemptSessionSummary(session.messages.length)) {
         generateSessionSummary(ws.id, sessionId).catch(() => {});
       }
     }

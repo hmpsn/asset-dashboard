@@ -75,8 +75,10 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
   const [expanded, setExpanded]           = useState(true);
   const [editMode, setEditMode]           = useState(false);
   const [editText, setEditText]           = useState(section.generatedCopy ?? '');
+  const [editAuthority, setEditAuthority] = useState<number | undefined>(undefined);
   const [showRegenInput, setShowRegenInput] = useState(false);
   const [regenNote, setRegenNote]         = useState('');
+  const [regenAuthority, setRegenAuthority] = useState<number | undefined>(undefined);
 
   const updateStatus   = useUpdateSectionStatus(workspaceId);
   const updateText     = useUpdateSectionText(workspaceId);
@@ -96,34 +98,79 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
   const Chevron = expanded ? ChevronDown : ChevronRight;
 
   function handleApprove() {
-    updateStatus.mutate({ sectionId: section.id, status: 'approved' });
+    if (section.generationRevision === undefined) return;
+    updateStatus.mutate({
+      sectionId: section.id,
+      status: 'approved',
+      expectedRevision: section.generationRevision,
+    });
   }
 
   function handleSendClientReview() {
-    updateStatus.mutate({ sectionId: section.id, status: 'client_review' });
+    if (section.generationRevision === undefined) return;
+    updateStatus.mutate({
+      sectionId: section.id,
+      status: 'client_review',
+      expectedRevision: section.generationRevision,
+    });
   }
 
-  function handleSaveEdit() {
-    updateText.mutate({ sectionId: section.id, copy: editText });
-    setEditMode(false);
+  async function handleSaveEdit() {
+    if (editAuthority === undefined
+      || section.generationRevision === undefined
+      || section.generationRevision !== editAuthority) return;
+    try {
+      await updateText.mutateAsync({
+        sectionId: section.id,
+        copy: editText,
+        expectedRevision: editAuthority,
+      });
+      setEditAuthority(undefined);
+      setEditMode(false);
+    } catch { // catch-ok -- the mutation hook already owns error feedback and cache reconciliation.
+      // The mutation hook owns error feedback. Keep the operator's text open so
+      // a revision conflict or transport failure remains explicitly retryable.
+    }
   }
 
   function handleCancelEdit() {
     setEditText(section.generatedCopy ?? '');
+    setEditAuthority(undefined);
     setEditMode(false);
   }
 
-  function handleRegenerate() {
-    if (!regenNote.trim()) return;
-    regenerate.mutate({ entryId, sectionId: section.id, note: regenNote.trim() });
-    setRegenNote('');
-    setShowRegenInput(false);
+  async function handleRegenerate() {
+    if (!regenNote.trim()
+      || regenAuthority === undefined
+      || section.generationRevision === undefined
+      || section.generationRevision !== regenAuthority) return;
+    try {
+      await regenerate.mutateAsync({
+        entryId,
+        sectionId: section.id,
+        note: regenNote.trim(),
+        expectedRevision: regenAuthority,
+      });
+      setRegenNote('');
+      setRegenAuthority(undefined);
+      setShowRegenInput(false);
+    } catch { // catch-ok -- the mutation hook already owns error feedback and cache reconciliation.
+      // Preserve the steering note for an explicit retry after the hook surfaces
+      // the conflict/failure and refreshes canonical section authority.
+    }
   }
 
   const isMutating =
     updateStatus.isPending ||
     updateText.isPending ||
     regenerate.isPending;
+  const hasRevisionAuthority = section.generationRevision !== undefined;
+  const editAuthorityConflict = editMode
+    && editAuthority !== undefined
+    && section.generationRevision !== editAuthority;
+  const regenAuthorityConflict = showRegenInput
+    && regenAuthority !== undefined
+    && section.generationRevision !== regenAuthority;
 
   return (
     <SectionCard
@@ -162,10 +209,15 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 aria-label={`Edit copy for ${sectionLabel}`}
                 disabled={updateText.isPending}
               />
+              {editAuthorityConflict && (
+                <p role="alert" className="t-caption text-red-400">
+                  This section changed while you were editing. Cancel and reopen it before saving.
+                </p>
+              )}
               <div className="flex gap-2">
                 <Button
-                  onClick={handleSaveEdit}
-                  disabled={updateText.isPending || !editText.trim()}
+                  onClick={() => { void handleSaveEdit(); }}
+                  disabled={updateText.isPending || !editText.trim() || !hasRevisionAuthority || editAuthorityConflict}
                   variant="primary"
                   size="sm"
                   icon={Save}
@@ -199,6 +251,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 <IconButton
                   onClick={() => {
                     setEditText(section.generatedCopy ?? '');
+                    setEditAuthority(section.generationRevision);
                     setEditMode(true);
                   }}
                   icon={Pencil}
@@ -290,13 +343,22 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                 className="w-full"
                 disabled={regenerate.isPending}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRegenerate();
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void handleRegenerate();
                 }}
               />
+              {regenAuthorityConflict && (
+                <p role="alert" className="t-caption text-red-400">
+                  This section changed while you were preparing the regeneration note. Cancel and reopen it before submitting.
+                </p>
+              )}
               <div className="flex gap-2">
                 <Button
-                  onClick={handleRegenerate}
-                  disabled={regenerate.isPending || !regenNote.trim()}
+                  onClick={() => { void handleRegenerate(); }}
+                  disabled={regenerate.isPending
+                    || !regenNote.trim()
+                    || !hasRevisionAuthority
+                    || regenAuthority === undefined
+                    || regenAuthorityConflict}
                   variant="primary"
                   size="sm"
                   icon={RefreshCw}
@@ -309,6 +371,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
                   onClick={() => {
                     setShowRegenInput(false);
                     setRegenNote('');
+                    setRegenAuthority(undefined);
                   }}
                   disabled={regenerate.isPending}
                   variant="ghost"
@@ -325,7 +388,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
             <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[var(--brand-border)]">
               <Button
                 onClick={handleApprove}
-                disabled={isMutating || section.status === 'approved'}
+                disabled={isMutating || section.status === 'approved' || !hasRevisionAuthority}
                 variant="primary"
                 size="sm"
                 icon={CheckCircle}
@@ -336,8 +399,11 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
               </Button>
 
               <Button
-                onClick={() => setShowRegenInput(true)}
-                disabled={isMutating}
+                onClick={() => {
+                  setRegenAuthority(section.generationRevision);
+                  setShowRegenInput(true);
+                }}
+                disabled={isMutating || !hasRevisionAuthority}
                 variant="secondary"
                 size="sm"
                 icon={RefreshCw}
@@ -348,7 +414,7 @@ function SectionItem({ section, workspaceId, blueprintId, entryId, index }: Sect
 
               <Button
                 onClick={handleSendClientReview}
-                disabled={isMutating || section.status === 'client_review'}
+                disabled={isMutating || section.status === 'client_review' || !hasRevisionAuthority}
                 variant="secondary"
                 size="sm"
                 icon={Send}
@@ -468,6 +534,12 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
   const total        = copyStatus?.totalSections ?? sections.length;
   const percentage   = copyStatus?.approvalPercentage ?? (total > 0 ? (approved / total) * 100 : 0);
   const draftCount   = copyStatus?.draftSections ?? sections.filter(s => s.status === 'draft').length;
+  const draftSectionRevisions = sections
+    .filter((section): section is CopySection & { generationRevision: number } => (
+      section.status === 'draft' && section.generationRevision !== undefined
+    ))
+    .map(section => ({ sectionId: section.id, expectedRevision: section.generationRevision }));
+  const hasCompleteDraftRevisionCensus = draftSectionRevisions.length === draftCount;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -489,8 +561,8 @@ function CopyReviewPanelInner({ workspaceId, blueprintId, entryId }: Props) {
           <div className="flex items-center gap-2">
             {draftCount > 0 && (
               <Button
-                onClick={() => sendToClient.mutate(entryId)}
-                disabled={sendToClient.isPending}
+                onClick={() => sendToClient.mutate({ entryId, sectionRevisions: draftSectionRevisions })}
+                disabled={sendToClient.isPending || !hasCompleteDraftRevisionCensus}
                 variant="primary"
                 size="sm"
                 icon={Send}

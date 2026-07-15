@@ -110,13 +110,17 @@ export function useRegenerateCopySection(wsId: string, blueprintId: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: ({ entryId, sectionId, note, highlight }: { entryId: string; sectionId: string; note: string; highlight?: string }) =>
-      copyGeneration.regenerateSection(wsId, blueprintId, entryId, sectionId, { note, highlight }),
+    mutationFn: ({ entryId, sectionId, note, highlight, expectedRevision }: { entryId: string; sectionId: string; note: string; highlight?: string; expectedRevision: number }) =>
+      copyGeneration.regenerateSection(wsId, blueprintId, entryId, sectionId, { note, highlight, expectedRevision }),
     onSuccess: (_data, { entryId }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySections(wsId, entryId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyStatus(wsId, entryId) });
     },
-    onError: () => { toast('Regeneration failed', 'error'); },
+    onError: (_error, { entryId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySections(wsId, entryId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyStatus(wsId, entryId) });
+      toast('Regeneration failed', 'error');
+    },
   });
 }
 
@@ -124,13 +128,20 @@ export function useSendEntryToClientReview(wsId: string, blueprintId: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: (entryId: string) => copyReview.sendEntryToClientReview(wsId, blueprintId, entryId),
+    mutationFn: ({ entryId, sectionRevisions }: {
+      entryId: string;
+      sectionRevisions: Array<{ sectionId: string; expectedRevision: number }>;
+    }) => copyReview.sendEntryToClientReview(wsId, blueprintId, entryId, sectionRevisions),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(wsId) });
       toast(`${data?.sent ?? 0} section${(data?.sent ?? 0) !== 1 ? 's' : ''} sent for client review`, 'success');
     },
-    onError: () => { toast('Failed to send for client review', 'error'); },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(wsId) });
+      toast('Failed to send for client review', 'error');
+    },
   });
 }
 
@@ -138,13 +149,17 @@ export function useUpdateSectionStatus(wsId: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: ({ sectionId, status }: { sectionId: string; status: CopySectionStatus }) =>
-      copyReview.updateSectionStatus(wsId, sectionId, status),
+    mutationFn: ({ sectionId, status, expectedRevision }: { sectionId: string; status: CopySectionStatus; expectedRevision: number }) =>
+      copyReview.updateSectionStatus(wsId, sectionId, status, expectedRevision),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(wsId) });
     },
-    onError: () => { toast('Failed to update status', 'error'); },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copyStatusAll(wsId) });
+      toast('Failed to update status', 'error');
+    },
   });
 }
 
@@ -152,12 +167,15 @@ export function useUpdateSectionText(wsId: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: ({ sectionId, copy }: { sectionId: string; copy: string }) =>
-      copyReview.updateSectionText(wsId, sectionId, copy),
+    mutationFn: ({ sectionId, copy, expectedRevision }: { sectionId: string; copy: string; expectedRevision: number }) =>
+      copyReview.updateSectionText(wsId, sectionId, copy, expectedRevision),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
     },
-    onError: () => { toast('Failed to update copy', 'error'); },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
+      toast('Failed to update copy', 'error');
+    },
   });
 }
 
@@ -165,12 +183,15 @@ export function useAddSuggestion(wsId: string) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: ({ sectionId, originalText, suggestedText }: { sectionId: string; originalText: string; suggestedText: string }) =>
-      copyReview.addSuggestion(wsId, sectionId, { originalText, suggestedText }),
+    mutationFn: ({ sectionId, originalText, suggestedText, expectedRevision }: { sectionId: string; originalText: string; suggestedText: string; expectedRevision: number }) =>
+      copyReview.addSuggestion(wsId, sectionId, { originalText, suggestedText, expectedRevision }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
     },
-    onError: () => { toast('Failed to add suggestion', 'error'); },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.copySectionsAll(wsId) });
+      toast('Failed to add suggestion', 'error');
+    },
   });
 }
 
@@ -235,4 +256,3 @@ export function useExtractPatterns(wsId: string) {
     },
   });
 }
-

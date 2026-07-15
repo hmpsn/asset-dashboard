@@ -41,6 +41,25 @@ vi.mock('../../server/activity-log.js', async () => {
   return { ...actual, addActivity: (...args: unknown[]) => addActivityMock(...args) };
 });
 
+// R4-PR1: the auto-send cron OBSERVES the typed dual-write MirrorResult and records a durable
+// admin-only activity on failure. Default: delegate to the real mirror; individual tests can force a
+// failure via mirrorResultOverride to exercise the observe-and-log path.
+let mirrorResultOverride: { ok: false; error: string } | null = null;
+const mirrorSpy = vi.fn();
+vi.mock('../../server/domains/inbox/recommendation-dual-write.js', async () => {
+  const actual = await vi.importActual<typeof import('../../server/domains/inbox/recommendation-dual-write.js')>(
+    '../../server/domains/inbox/recommendation-dual-write.js',
+  );
+  return {
+    ...actual,
+    mirrorRecommendationToDeliverable: (workspaceId: string, rec: unknown) => {
+      mirrorSpy(workspaceId, rec);
+      if (mirrorResultOverride) return mirrorResultOverride;
+      return actual.mirrorRecommendationToDeliverable(workspaceId, rec as never);
+    },
+  };
+});
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
@@ -168,6 +187,8 @@ describe('strategy-autosend-cron — auto-send on weekly push (The Issue, Phase 
     generateStrategyPovMock.mockResolvedValue({ situation: 'ok' });
     addActivityMock.mockReset();
     vi.mocked(broadcastToWorkspace).mockClear();
+    mirrorResultOverride = null; // default: real mirror
+    mirrorSpy.mockClear();
   });
 
   it('auto-sends the active quick_win rec for an EARNED + ENABLED policy (clientStatus→sent, autoSent=true)', async () => {
@@ -283,5 +304,31 @@ describe('strategy-autosend-cron — auto-send on weekly push (The Issue, Phase 
     const reloaded = reloadRec('qw-1');
     expect(reloaded?.autoSent).toBeUndefined(); // never auto-sent (it was already sent manually)
     expect(autoSentActivityCalls()).toHaveLength(0);
+  });
+
+  // R4-PR1: the previously-swallowed dual-write failure now produces an admin-only activity entry.
+  it('records a rec_status_updated mirror-failure activity when the dual-write mirror fails (no longer swallowed)', async () => {
+    saveRecs([makeRec(wsId, 'qw-1', 'strategy')]);
+    seedPolicy('quick_win', 3, true);
+    // Force the dual-write to report a failure — the send still stands (single-writer already ran).
+    mirrorResultOverride = { ok: false, error: 'simulated store write failure' };
+
+    const r = await runIssuePushForWorkspace(wsId);
+    expect(r.status).toBe('pushed');
+
+    // The mirror WAS attempted (observed), and the rec was still auto-sent.
+    expect(mirrorSpy).toHaveBeenCalled();
+    expect(reloadRec('qw-1')?.clientStatus).toBe('sent');
+
+    // The failure is OBSERVED: a durable admin-only rec_status_updated activity records the divergence.
+    const mirrorFailureCalls = addActivityMock.mock.calls.filter(
+      (c) => c[1] === 'rec_status_updated' && typeof c[2] === 'string' && (c[2] as string).includes('mirror failed'),
+    );
+    expect(mirrorFailureCalls).toHaveLength(1);
+    expect(mirrorFailureCalls[0][0]).toBe(wsId);
+    // metadata carries the error + the rec id for the operator + the sweep to reconcile.
+    expect(mirrorFailureCalls[0][4]).toEqual(
+      expect.objectContaining({ recId: 'qw-1', mirrorError: 'simulated store write failure' }),
+    );
   });
 });

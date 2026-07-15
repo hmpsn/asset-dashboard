@@ -31,7 +31,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { seedContentData } from '../fixtures/content-seed.js';
-import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import db from '../../server/db/index.js';
 import { randomUUID } from 'crypto';
 
@@ -382,9 +382,10 @@ describe('POST /api/public/content-request/:workspaceId/:id/decline', () => {
         reason: 'Not relevant',
       });
       expect(res.status).toBe(200);
-      const body = await res.json() as { status: string; declineReason: string };
+      const body = await res.json() as { status: string };
       expect(body.status).toBe('declined');
-      expect(body.declineReason).toBe('Not relevant');
+      expect(body).not.toHaveProperty('declineReason');
+      expect(getContentRequest(openWsId, req!.id)?.declineReason).toBe('Not relevant');
     } finally {
       db.prepare('DELETE FROM content_topic_requests WHERE id = ?').run(req!.id);
     }
@@ -610,7 +611,7 @@ describe('GET /api/public/content-performance/:workspaceId/:requestId/trend', ()
     const res = await api(`/api/public/content-performance/${openWsId}/no-such-req/trend`);
     expect(res.status).toBe(404);
     const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/request/i);
+    expect(body.error).toMatch(/item/i);
   });
 
   it('returns { trend: [] } when visible request has no targetPageSlug or GSC config', async () => {
@@ -618,7 +619,8 @@ describe('GET /api/public/content-performance/:workspaceId/:requestId/trend', ()
     try {
       const res = await api(`/api/public/content-performance/${openWsId}/${req!.id}/trend`);
       expect(res.status).toBe(200);
-      const body = await res.json() as { trend: unknown[] };
+      const body = await res.json() as { availability: string; trend: unknown[] };
+      expect(body.availability).toBe('gsc_not_configured');
       expect(body.trend).toEqual([]);
     } finally {
       db.prepare('DELETE FROM content_topic_requests WHERE id = ?').run(req!.id);
@@ -633,7 +635,7 @@ describe('GET /api/public/content-performance/:workspaceId/:requestId/trend', ()
         const res = await api(`/api/public/content-performance/${openWsId}/${req!.id}/trend`);
         expect(res.status).toBe(404);
         const body = await res.json() as { error: string };
-        expect(body.error).toMatch(/request/i);
+        expect(body.error).toMatch(/item/i);
       } finally {
         db.prepare('DELETE FROM content_topic_requests WHERE id = ?').run(req!.id);
       }
@@ -675,13 +677,13 @@ describe('POST /api/public/content-request/:workspaceId/from-audit', () => {
       id: string;
       priority: string;
       serviceType: string;
-      targetPageSlug: string;
       topKeywords: unknown[];
     };
     expect(body.id).toBeDefined();
     expect(body.priority).toBe('high');
     expect(body.serviceType).toBe('brief_only');
-    expect(body.targetPageSlug).toBe('/services/seo');
+    expect(body).not.toHaveProperty('targetPageSlug');
+    expect(getContentRequest(openWsId, body.id)?.targetPageSlug).toBe('/services/seo');
     expect(Array.isArray(body.topKeywords)).toBe(true);
     db.prepare('DELETE FROM content_topic_requests WHERE id = ?').run(body.id);
   });

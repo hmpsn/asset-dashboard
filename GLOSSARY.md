@@ -27,6 +27,8 @@ Terms are grouped into four **word classes**:
 
 ## canonical
 
+**Action Catalog** — A read-only metadata registry keyed by `(context, action)`, defined as `ACTION_CATALOG` in `shared/types/action-catalog.ts`. Spans five contexts — `outcome` (ActionType), `recommendation` (RecType), `client_action` (ClientActionSourceType), `keyword_command_center` (the 7 lifecycle verbs), and `mcp` (the MCP wire-level action verbs) — and attaches presentation/provenance metadata (`label`, `phase`, `outcomeActionType`, `clientVisible`) to every member of each source union. The catalog **imports** the five unions and never redefines or widens them; completeness is enforced at compile time via `satisfies Record<Union, Entry>` and at runtime by `tests/contract/action-catalog.test.ts`. See `docs/rules/action-catalog.md`.
+
 **ActionPlaybook** — A detected pattern of high-win-rate actions and their typical contexts, stored in the `outcome_playbooks` table and surfaced in `LearningsSlice.playbooks`. Playbooks are auto-detected weekly by `detectAllWorkspacePlaybooks()` in `server/outcome-playbooks.ts` and served via `GET /api/outcomes/:workspaceId/playbooks`. Used by the Outcomes dashboard "Playbooks" tab and injected into AI prompt context as strategy guidance.
 
 **Activity Log** — A chronological audit trail of significant platform operations, recorded via `addActivity()` in `server/activity-log.ts`. Covers audits, metadata changes, approvals, brief generation, schema publishing, and more. Distinct from the application error log (Pino/Sentry). Accessible in both admin and client portals. WS event: `WS_EVENTS.ACTIVITY_NEW`.
@@ -109,6 +111,8 @@ Terms are grouped into four **word classes**:
 
 **TierGate** — A UI primitive (`src/components/ui/TierGate.tsx`) that soft-gates features behind subscription tiers. Shows an upgrade prompt rather than hard-blocking. Features must be wrapped at the narrowest possible scope — never wrap a composite parent component. Tiers: `free`, `growth`, `premium`.
 
+**Tracked Action** — A single `tracked_actions` row recording that a platform or client action was taken, keyed by `actionType` (see `ActionType` in `shared/types/outcome-tracking.ts`). The single write entry point is `recordAction()` in `server/outcome-tracking.ts`. `topic_cluster_keep` / `content_gap_keep` are durable **keep-marker** action types — they record that an operator kept a managed-set item (Topic Clusters / Content Gaps) rather than an outcome to be scored; they are live producer paths, never phantom vocabulary. See **Action Catalog**.
+
 **Usage Tracking** — Per-workspace, per-calendar-month quota enforcement for specific features. Tracked in `server/usage-tracking.ts`. Current tracked features: `ai_chats` (3 / 50 / unlimited by tier) and `strategy_generations` (0 / 3 / unlimited). Content briefs and posts are paid add-ons, not tracked here.
 
 **Voice Profile** — A workspace-specific AI voice configuration managed by the Copy & Brand Engine. States: `draft → calibrating → calibrated`. When `calibrated`, `buildSystemPrompt()` automatically injects the voice DNA, writing samples, and guardrails into the system message of every AI call. The pre-formatted prompt block for voice context is `SeoContextSlice.effectiveBrandVoiceBlock` — inject this directly; never use the raw `brandVoice` field or a format helper. WS event: `WS_EVENTS.VOICE_PROFILE_UPDATED`.
@@ -117,7 +121,7 @@ Terms are grouped into four **word classes**:
 
 **`useWorkspaceEvents`** — The frontend React hook for receiving workspace-scoped WebSocket broadcasts. Must be used (not `useGlobalAdminEvents`) for all events emitted via `broadcastToWorkspace()`. The hook sends a `subscribe` action to the server so the workspace filter routes the message to the correct connection. `useGlobalAdminEvents` does not subscribe and will silently miss workspace-scoped events.
 
-**WinsSurface** — A client-facing module (gated by `client-wins-surface` feature flag) that surfaces a curated feed of verified positive outcomes from the `outcome_tracking` table. Shows only actions that scored `positive` outcome, paired with context about the change and its impact. Distinct from the full Outcomes dashboard (admin-only). Located in `src/components/client/wins/`.
+**WinsSurface** — A client-facing module (no feature flag gate) that surfaces a curated feed of verified positive outcomes from the `tracked_actions` / `action_outcomes` tables. Shows only actions whose latest outcome scored `win` or `strong_win` (see `WIN_SCORES` in `server/outcome-tracking.ts`), paired with context about the change and its impact. Distinct from the full Outcomes dashboard (admin-only). Located in `src/components/client/Briefing/WinsSurface.tsx`.
 
 **Work Order** — A billable deliverable unit associated with a workspace and optionally a Stripe payment. Tracked in the `work_orders` table. Active work orders are surfaced in `ContentPipelineSlice.workOrders`. WS event: `WS_EVENTS.WORK_ORDER_UPDATE`.
 

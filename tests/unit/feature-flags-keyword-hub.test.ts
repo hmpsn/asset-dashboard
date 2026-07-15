@@ -8,8 +8,11 @@ import {
 // Wave 4 — Keyword Hub Phase C cutover (2026-06-11). The `keyword-hub` umbrella flag
 // was RETIRED once the Hub became the only keyword surface (KCC + Rank Tracker deleted).
 // The `keyword-value-scoring` flag was also RETIRED (value-first scoring is now
-// unconditional), leaving `keyword-universe-full` as the sole surviving member of the
-// "Keyword Hub" group, with its own independent removal condition.
+// unconditional). `keyword-universe-full` — the sole surviving member of the "Keyword
+// Hub" group — was itself retired in flag-sunset Wave 2b (2026-07-02): it was globally
+// ON in prod, so the uncapped keyword-universe coverage path is now unconditional. The
+// "Keyword Hub" group is retained (empty) in FEATURE_FLAG_GROUPS/FEATURE_FLAG_GROUP_LABELS
+// for possible future Hub-scoped flags.
 describe('Keyword Hub feature-flag group (post-keyword-hub retirement)', () => {
   it('keyword-hub flag is fully retired (removed from defaults, catalog, and groups)', () => {
     expect('keyword-hub' in FEATURE_FLAGS).toBe(false);
@@ -20,14 +23,13 @@ describe('Keyword Hub feature-flag group (post-keyword-hub retirement)', () => {
     expect(groupsWithKey).toHaveLength(0);
   });
 
-  it('keyword-universe-full survives, defaults OFF, and stays in the Keyword Hub group', () => {
-    expect(FEATURE_FLAGS['keyword-universe-full']).toBe(false);
-    const entry = FEATURE_FLAG_CATALOG['keyword-universe-full'];
-    expect(entry.group).toBe('Keyword Hub');
-    expect(entry.lifecycle.owner).toBe('analytics-intelligence');
-    expect(entry.lifecycle.linkedRoadmapItemId).toBeTruthy();
-    const hubBucket = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
-    expect(hubBucket?.keys).toContain('keyword-universe-full');
+  it('keyword-universe-full is fully retired (removed from defaults, catalog, and groups)', () => {
+    expect('keyword-universe-full' in FEATURE_FLAGS).toBe(false);
+    expect('keyword-universe-full' in FEATURE_FLAG_CATALOG).toBe(false);
+    const groupsWithKey = FEATURE_FLAG_GROUPS.filter(g =>
+      (g.keys as readonly string[]).includes('keyword-universe-full'),
+    );
+    expect(groupsWithKey).toHaveLength(0);
   });
 
   it('keyword-value-scoring is fully retired (removed from defaults, catalog, and groups)', () => {
@@ -39,9 +41,9 @@ describe('Keyword Hub feature-flag group (post-keyword-hub retirement)', () => {
     expect(groupsWithKey).toHaveLength(0);
   });
 
-  it('the Keyword Hub group retains exactly the one surviving key', () => {
+  it('the Keyword Hub group is now empty — every flag it ever gated has been retired', () => {
     const hubBucket = FEATURE_FLAG_GROUPS.find(g => g.label === 'Keyword Hub');
-    expect(hubBucket?.keys).toEqual(['keyword-universe-full']);
+    expect(hubBucket?.keys).toEqual([]);
   });
 
   it('importing the module runs assertFeatureFlagGroupingConsistency() without throwing', () => {

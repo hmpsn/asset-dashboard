@@ -104,7 +104,7 @@ export async function assembleContentPipeline(
         if (key) keys.add(key);
       }
       for (const post of listPosts(workspaceId)) {
-        if (post.status === 'error') continue;
+        if (post.status === 'error' || post.status === 'needs_attention') continue;
         const key = keywordComparisonKey(post.targetKeyword);
         if (key) keys.add(key);
       }

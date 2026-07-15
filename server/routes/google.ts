@@ -1,7 +1,7 @@
 /**
  * google routes — extracted from server/index.ts
  */
-import { Router, type RequestHandler } from 'express';
+import { Router, type Request, type RequestHandler, type Response } from 'express';
 
 const router = Router();
 
@@ -40,13 +40,16 @@ import {
   fetchSearchCountries,
   fetchSearchTypes,
   fetchSearchComparison,
+  fetchBrandedDemandSplit,
 } from '../analytics-data.js';
 import {
+  gscDateRange,
   listGscSites,
 } from '../search-console.js';
+import { extractBrandTokens } from '../competitor-brand-filter.js';
 import { RICH_BLOCKS_PROMPT } from '../prompt-rich-blocks.js';
 import { buildSeoPromptContext } from '../intelligence/generation-context-builders.js';
-import { getWorkspace, getWorkspaceBySiteId } from '../workspaces.js';
+import { getWorkspace, getWorkspaceBySiteId, listWorkspaces } from '../workspaces.js';
 import { createLogger } from '../logger.js';
 import { createAnnotation, getAnnotations, updateAnnotation, deleteAnnotation } from '../analytics-annotations.js';
 import { validate, z } from '../middleware/validate.js';
@@ -56,8 +59,85 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { parsePositiveIntQuery } from '../query-param-parsers.js';
 import { sanitizeProviderError, sendSanitizedProviderError } from '../provider-error-sanitizer.js';
+import { parseDateRangeStrict } from '../utils/request-validation.js';
+import { invalidateMonthlyDigestCache } from '../monthly-digest-cache.js';
+import { clearIntelligenceCache } from '../intelligence/cache-clear.js';
 
 const log = createLogger('google-auth');
+
+function invalidateGoogleDependentWorkspaces(siteId?: string, explicitWorkspaceId?: string): void {
+  const candidates = explicitWorkspaceId
+    ? [getWorkspace(explicitWorkspaceId)].filter((ws): ws is NonNullable<typeof ws> => Boolean(ws))
+    : siteId && siteId !== GLOBAL_KEY
+      ? [getWorkspaceBySiteId(siteId)].filter((ws): ws is NonNullable<typeof ws> => Boolean(ws))
+      : listWorkspaces().filter(ws => Boolean(ws.gscPropertyUrl || ws.ga4PropertyId));
+
+  for (const ws of candidates) {
+    invalidateMonthlyDigestCache(ws.id);
+    clearIntelligenceCache(ws.id);
+    broadcastToWorkspace(ws.id, WS_EVENTS.WORKSPACE_UPDATED, {
+      googleConnectionChanged: true,
+    });
+  }
+}
+
+type AdminAnalyticsWindow = {
+  days: number;
+  dateRange?: import('../google-analytics.js').CustomDateRange;
+};
+
+function parseAdminAnalyticsWindow(req: Request, res: Response): AdminAnalyticsWindow | null {
+  const days = parsePositiveIntQuery(req.query.days, 28);
+  if (days == null) {
+    res.status(400).json({ error: 'days must be a positive integer' });
+    return null;
+  }
+  const parsed = parseDateRangeStrict(req.query);
+  if (parsed.error) {
+    res.status(400).json({ error: parsed.error });
+    return null;
+  }
+  return { days, dateRange: parsed.dateRange };
+}
+
+function previousGscDateRange(days: number, dateRange?: import('../google-analytics.js').CustomDateRange) {
+  const current = gscDateRange(days, dateRange);
+  const start = new Date(`${current.startDate}T00:00:00.000Z`);
+  const end = new Date(`${current.endDate}T00:00:00.000Z`);
+  const spanDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1);
+  const prevEnd = new Date(start);
+  prevEnd.setUTCDate(prevEnd.getUTCDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setUTCDate(prevStart.getUTCDate() - spanDays + 1);
+  return {
+    startDate: prevStart.toISOString().slice(0, 10),
+    endDate: prevEnd.toISOString().slice(0, 10),
+  };
+}
+
+function stringQuery(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+  return undefined;
+}
+
+function workspaceBrandTokens(workspaceId: string | undefined, fallbackUrl: string): string[] {
+  const tokens = new Set<string>();
+  const workspace = workspaceId ? getWorkspace(workspaceId) : null;
+  // Derive brand tokens only from the domain / Webflow site name / GSC property URL,
+  // each run through extractBrandTokens (protocol/TLD strip + dot/hyphen split → brand
+  // stem). We deliberately do NOT tokenize the human-friendly workspace.name by
+  // whitespace: a name like "Acme Dental" would add the generic industry noun "dental"
+  // as a brand token, and isBrandedQuery would then count a genuinely non-branded query
+  // ("dental implants near me") as branded — systematically inflating the branded-demand
+  // share for every workspace whose name contains an industry word. The domain is the
+  // higher-signal, lower-false-positive brand source.
+  for (const source of [workspace?.liveDomain, workspace?.webflowSiteName, fallbackUrl]) {
+    if (!source) continue;
+    for (const token of extractBrandTokens(source)) tokens.add(token);
+  }
+  return [...tokens];
+}
 
 function sendGoogleProviderError(
   res: import('express').Response,
@@ -116,6 +196,7 @@ router.get('/api/google/status', requireAdminAuth, (_req, res) => {
 
 router.post('/api/google/disconnect', requireAdminAuth, (_req, res) => {
   disconnectGlobal();
+  invalidateGoogleDependentWorkspaces(GLOBAL_KEY);
   res.json({ success: true });
 });
 
@@ -150,6 +231,7 @@ router.get('/api/google/callback', async (req, res) => {
   if (!code || !siteId) return res.status(400).send('Missing code or state');
   const result = await exchangeCode(code, siteId);
   if (result.success) {
+    invalidateGoogleDependentWorkspaces(siteId);
     // Redirect back to the app
     const redirectUrl = IS_PROD ? '/' : 'http://localhost:5173/';
     res.redirect(`${redirectUrl}?google=connected&siteId=${siteId}`);
@@ -167,6 +249,7 @@ router.post('/api/google/disconnect/:siteId', requireWorkspaceSiteAccess({
   site: { source: 'params', name: 'siteId' },
 }), (req, res) => {
   disconnect(req.params.siteId);
+  invalidateGoogleDependentWorkspaces(req.params.siteId, req.body.workspaceId);
   res.json({ success: true });
 });
 
@@ -244,12 +327,28 @@ ${JSON.stringify(context, null, 2)}`;
 
 router.get('/api/google/search-overview/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAdminAnalyticsWindow(req, res);
+  if (!window) return;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    const overview = await fetchSearchOverview(req.params.siteId, gscSiteUrl, days);
-    res.json(overview);
+    const overview = await fetchSearchOverview(req.params.siteId, gscSiteUrl, window.days, window.dateRange);
+    const workspaceId = stringQuery(req.query.workspaceId);
+    const brandTokens = workspaceBrandTokens(workspaceId, gscSiteUrl);
+    const brandedDemand = await fetchBrandedDemandSplit(
+      req.params.siteId,
+      gscSiteUrl,
+      window.days,
+      brandTokens,
+      window.dateRange,
+    ).catch((err) => {
+      log.warn({ err, siteId: req.params.siteId, workspaceId }, 'Failed to compute branded demand split');
+      return {
+        status: 'error' as const,
+        denominator: 'impressions' as const,
+        error: 'Unable to compute branded demand split. Search overview data is still shown.',
+      };
+    });
+    res.json({ ...overview, brandedDemand });
   } catch (err) {
     sendGoogleProviderError(res, err, 'Failed to fetch search overview', 'Unable to load Search Console overview. Please try again.', 'gsc');
   }
@@ -257,11 +356,14 @@ router.get('/api/google/search-overview/:siteId', requireWorkspaceSiteAccessFrom
 
 router.get('/api/google/performance-trend/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAdminAnalyticsWindow(req, res);
+  if (!window) return;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    const trend = await fetchPerformanceTrend(req.params.siteId, gscSiteUrl, days);
+    const trendRange = req.query.previous === 'true'
+      ? previousGscDateRange(window.days, window.dateRange)
+      : window.dateRange;
+    const trend = await fetchPerformanceTrend(req.params.siteId, gscSiteUrl, window.days, trendRange);
     res.json(trend);
   } catch (err) {
     sendGoogleProviderError(res, err, 'Failed to fetch performance trend', 'Unable to load Search Console trend. Please try again.', 'gsc');
@@ -270,11 +372,11 @@ router.get('/api/google/performance-trend/:siteId', requireWorkspaceSiteAccessFr
 
 router.get('/api/google/search-devices/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAdminAnalyticsWindow(req, res);
+  if (!window) return;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    res.json(await fetchSearchDevices(req.params.siteId, gscSiteUrl, days));
+    res.json(await fetchSearchDevices(req.params.siteId, gscSiteUrl, window.days, window.dateRange));
   } catch (err) {
     sendGoogleProviderError(res, err, 'Failed to fetch search devices', 'Unable to load Search Console devices. Please try again.', 'gsc');
   }
@@ -282,13 +384,13 @@ router.get('/api/google/search-devices/:siteId', requireWorkspaceSiteAccessFromQ
 
 router.get('/api/google/search-countries/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAdminAnalyticsWindow(req, res);
+  if (!window) return;
   const limit = parsePositiveIntQuery(req.query.limit, 20);
   if (limit == null) return res.status(400).json({ error: 'limit must be a positive integer' });
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    res.json(await fetchSearchCountries(req.params.siteId, gscSiteUrl, days, limit));
+    res.json(await fetchSearchCountries(req.params.siteId, gscSiteUrl, window.days, limit, window.dateRange));
   } catch (err) {
     sendGoogleProviderError(res, err, 'Failed to fetch search countries', 'Unable to load Search Console countries. Please try again.', 'gsc');
   }
@@ -296,11 +398,11 @@ router.get('/api/google/search-countries/:siteId', requireWorkspaceSiteAccessFro
 
 router.get('/api/google/search-types/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAdminAnalyticsWindow(req, res);
+  if (!window) return;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    res.json(await fetchSearchTypes(req.params.siteId, gscSiteUrl, days));
+    res.json(await fetchSearchTypes(req.params.siteId, gscSiteUrl, window.days, window.dateRange));
   } catch (err) {
     sendGoogleProviderError(res, err, 'Failed to fetch search types', 'Unable to load Search Console search types. Please try again.', 'gsc');
   }
@@ -308,11 +410,11 @@ router.get('/api/google/search-types/:siteId', requireWorkspaceSiteAccessFromQue
 
 router.get('/api/google/search-comparison/:siteId', requireWorkspaceSiteAccessFromQuery(), requireWorkspaceGscPropertyAccess, async (req, res) => {
   const gscSiteUrl = req.query.gscSiteUrl as string;
-  const days = parsePositiveIntQuery(req.query.days, 28);
-  if (days == null) return res.status(400).json({ error: 'days must be a positive integer' });
+  const window = parseAdminAnalyticsWindow(req, res);
+  if (!window) return;
   if (!gscSiteUrl) return res.status(400).json({ error: 'gscSiteUrl query param required' });
   try {
-    res.json(await fetchSearchComparison(req.params.siteId, gscSiteUrl, days));
+    res.json(await fetchSearchComparison(req.params.siteId, gscSiteUrl, window.days, window.dateRange));
   } catch (err) {
     sendGoogleProviderError(res, err, 'Failed to fetch search comparison', 'Unable to load Search Console comparison. Please try again.', 'gsc');
   }

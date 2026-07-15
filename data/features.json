@@ -243,7 +243,7 @@
     {
       "id": 25,
       "title": "Content Matrices",
-      "oneLiner": "Bulk content planning grids — define Service × City dimensions once and generate 50+ planned pages with keywords, URLs, and status tracking",
+      "oneLiner": "Blueprint-linked Service × City grids materialize once and run as bounded, grounded, audited page sets through MCP, with human review before publishing",
       "category": "content",
       "painPoints": ["content-production", "scale", "keyword-strategy"],
       "tier": "premium",
@@ -273,7 +273,7 @@
     {
       "id": 28,
       "title": "Competitive Intelligence Hub",
-      "oneLiner": "SEMRush-powered side-by-side domain comparison — traffic value, keyword gaps, backlink counts, and top competitor keywords in one view",
+      "oneLiner": "DataForSEO-powered side-by-side domain comparison — traffic value, keyword gaps, backlink counts, and top competitor keywords in one view",
       "category": "analytics",
       "painPoints": ["competitive-intel", "keyword-strategy"],
       "tier": "growth",
@@ -283,7 +283,7 @@
     {
       "id": 29,
       "title": "Backlink Profile Overview",
-      "oneLiner": "Domain-level backlink dashboard with referring domains, follow/nofollow ratio, and top 15 linking sites from SEMRush",
+      "oneLiner": "Domain-level backlink dashboard with referring domains, follow/nofollow ratio, and top linking sites from DataForSEO",
       "category": "analytics",
       "painPoints": ["competitive-intel", "reporting"],
       "tier": "growth",
@@ -653,7 +653,7 @@
     {
       "id": 66,
       "title": "Weekly AI Briefing",
-      "oneLiner": "Every Monday, an AI-curated 5-minute editorial briefing — wins, risks, opportunities, competitive intel — replaces the data dashboard with a tight magazine-rhythm layout. Admin-reviewed before reaching the client.",
+      "oneLiner": "Weekly curation of wins, risks, opportunities, and competitive intelligence, with admin review, a published client projection, and briefing metadata feeding workspace-intelligence client signals.",
       "category": "intelligence",
       "painPoints": ["client-engagement", "reporting", "client-retention"],
       "tier": "growth",
@@ -707,6 +707,26 @@
       "category": "client",
       "painPoints": ["approval-workflow", "client-transparency", "local-seo"],
       "tier": "growth",
+      "impact": "high",
+      "clientFacing": true
+    },
+    {
+      "id": 72,
+      "title": "Grounded Brand Suite Generation",
+      "oneLiner": "Turns an immutable brand intake into bounded, audited brand pieces, then routes them through grouped client review and an approved-only Brand dashboard summary",
+      "category": "content",
+      "painPoints": ["brand-voice", "content-quality", "client-collaboration"],
+      "tier": "premium",
+      "impact": "high",
+      "clientFacing": true
+    },
+    {
+      "id": 73,
+      "title": "Brand-to-Content Onboarding Pipeline",
+      "oneLiner": "Coordinates approved brand voice and identity into bounded, audited matrix page sets through MCP while preserving every human review and publication gate",
+      "category": "content",
+      "painPoints": ["onboarding", "brand-voice", "content-production", "scale"],
+      "tier": "premium",
       "impact": "high",
       "clientFacing": true
     }

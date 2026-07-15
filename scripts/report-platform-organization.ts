@@ -179,10 +179,10 @@ const CONTEXT_ALIASES: Record<string, Partial<GroupMatchers>> = {
     serverModules: [
       /server\/(?:google-|openai-|anthropic-|seo-data-provider|webflow|providers\/|requests\.ts$|search-console|semrush|dataforseo)/,
     ],
-    apiWrappers: [/src\/api\/seo\.ts$/, /src\/api\/meetingBrief\.ts$/],
-    hooks: [/src\/hooks\/admin\/(?:useAdminGA4|useAdminMeetingBrief|useAdminSearch)\.ts$/, /src\/hooks\/shared\/useGA4Base\.ts$/],
-    components: [/src\/components\/admin\/MeetingBrief\//],
-    tests: [/tests\/(?:integration|contract|component|unit)\/.*(?:webflow|google|ga4|semrush|dataforseo|meeting-brief|provider)/i],
+    apiWrappers: [/src\/api\/seo\.ts$/],
+    hooks: [/src\/hooks\/admin\/(?:useAdminGA4|useAdminSearch)\.ts$/, /src\/hooks\/shared\/useGA4Base\.ts$/],
+    components: [],
+    tests: [/tests\/(?:integration|contract|component|unit)\/.*(?:webflow|google|ga4|semrush|dataforseo|provider)/i],
     docs: [/docs\/workflows\/feature-integration\.md$/],
   },
   'platform-foundation': {

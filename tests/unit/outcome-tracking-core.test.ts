@@ -425,6 +425,7 @@ describe('recordAction (DB)', () => {
 
   it('returns a TrackedAction with the correct workspaceId', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -435,6 +436,7 @@ describe('recordAction (DB)', () => {
 
   it('returns a TrackedAction with a non-empty UUID id', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -448,6 +450,7 @@ describe('recordAction (DB)', () => {
 
   it('returns a TrackedAction with the correct actionType', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'content_published',
       sourceType: 'brief',
@@ -458,6 +461,7 @@ describe('recordAction (DB)', () => {
 
   it('sets context.seasonalTag with month as number 1-12', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -472,6 +476,7 @@ describe('recordAction (DB)', () => {
   it('sets context.seasonalTag.month matching current month', () => {
     const expectedMonth = new Date().getMonth() + 1;
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -482,6 +487,7 @@ describe('recordAction (DB)', () => {
 
   it('sets context.seasonalTag with quarter as number 1-4', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -506,6 +512,7 @@ describe('recordAction (DB)', () => {
 
   it('seasonalTag.quarter matches current month quarter', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -538,6 +545,7 @@ describe('recordAction (DB)', () => {
 
   it('stores and returns pageUrl when provided', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -549,6 +557,7 @@ describe('recordAction (DB)', () => {
 
   it('stores and returns targetKeyword when provided', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'strategy_keyword_added',
       sourceType: 'strategy',
@@ -558,8 +567,9 @@ describe('recordAction (DB)', () => {
     expect(action.targetKeyword).toBe('local seo services');
   });
 
-  it('defaults attribution to platform_executed when not provided', () => {
+  it('stores platform_executed attribution when explicitly passed', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -581,6 +591,7 @@ describe('recordAction (DB)', () => {
 
   it('action is retrievable via getActionsByWorkspace', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -594,6 +605,7 @@ describe('recordAction (DB)', () => {
 
   it('merges caller-provided context with seasonalTag', () => {
     const action = recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -623,15 +635,15 @@ describe('getActionsByWorkspace (DB)', () => {
   });
 
   it('returns all actions recorded for a workspace', () => {
-    recordAction({ workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
-    recordAction({ workspaceId: WS_DB, actionType: 'content_published', sourceType: 'brief', baselineSnapshot });
+    recordAction({ attribution: 'platform_executed', workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
+    recordAction({ attribution: 'platform_executed', workspaceId: WS_DB, actionType: 'content_published', sourceType: 'brief', baselineSnapshot });
     const actions = getActionsByWorkspace(WS_DB);
     expect(actions).toHaveLength(2);
   });
 
   it('does not return actions from other workspaces', () => {
-    recordAction({ workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
-    recordAction({ workspaceId: WS_DB_OTHER, actionType: 'content_published', sourceType: 'brief', baselineSnapshot });
+    recordAction({ attribution: 'platform_executed', workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
+    recordAction({ attribution: 'platform_executed', workspaceId: WS_DB_OTHER, actionType: 'content_published', sourceType: 'brief', baselineSnapshot });
 
     const actions = getActionsByWorkspace(WS_DB);
     expect(actions).toHaveLength(1);
@@ -639,7 +651,7 @@ describe('getActionsByWorkspace (DB)', () => {
   });
 
   it('each returned action has correct workspaceId', () => {
-    recordAction({ workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
+    recordAction({ attribution: 'platform_executed', workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
     const actions = getActionsByWorkspace(WS_DB);
     expect(actions[0].workspaceId).toBe(WS_DB);
   });
@@ -664,6 +676,7 @@ describe('getWorkspaceCounts (DB)', () => {
 
   it('returns total=1, scored=0, pending=1 after recording one action', () => {
     recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -676,21 +689,21 @@ describe('getWorkspaceCounts (DB)', () => {
   });
 
   it('total equals pending + scored', () => {
-    recordAction({ workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
-    recordAction({ workspaceId: WS_DB, actionType: 'content_published', sourceType: 'brief', baselineSnapshot });
+    recordAction({ attribution: 'platform_executed', workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
+    recordAction({ attribution: 'platform_executed', workspaceId: WS_DB, actionType: 'content_published', sourceType: 'brief', baselineSnapshot });
     const counts = getWorkspaceCounts(WS_DB);
     expect(counts.total).toBe(counts.pending + counts.scored);
   });
 
   it('counts do not include actions from other workspaces', () => {
-    recordAction({ workspaceId: WS_DB_OTHER, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
+    recordAction({ attribution: 'platform_executed', workspaceId: WS_DB_OTHER, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
     const counts = getWorkspaceCounts(WS_DB);
     expect(counts.total).toBe(0);
   });
 
   it('returns correct total after recording multiple actions', () => {
     for (let i = 0; i < 3; i++) {
-      recordAction({ workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
+      recordAction({ attribution: 'platform_executed', workspaceId: WS_DB, actionType: 'meta_updated', sourceType: 'insight', baselineSnapshot });
     }
     const counts = getWorkspaceCounts(WS_DB);
     expect(counts.total).toBe(3);
@@ -717,6 +730,7 @@ describe('getActionBySource (DB)', () => {
 
   it('returns the matching action when it exists', () => {
     recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -731,6 +745,7 @@ describe('getActionBySource (DB)', () => {
 
   it('does not return action for a different sourceType', () => {
     recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'recommendation',
@@ -743,6 +758,7 @@ describe('getActionBySource (DB)', () => {
 
   it('does not return action for a different sourceId', () => {
     recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -773,6 +789,7 @@ describe('getActionByWorkspaceAndSource (DB)', () => {
 
   it('returns matching action for correct workspace + sourceType + sourceId', () => {
     recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB,
       actionType: 'meta_updated',
       sourceType: 'insight',
@@ -786,6 +803,7 @@ describe('getActionByWorkspaceAndSource (DB)', () => {
 
   it('does not return action from different workspace even if sourceType+sourceId match', () => {
     recordAction({
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: WS_DB_OTHER,
       actionType: 'meta_updated',
       sourceType: 'insight',

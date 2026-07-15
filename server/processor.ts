@@ -209,7 +209,7 @@ async function handleOptimizedFile(
 
   // Upload to Webflow if workspace has a site configured (case-insensitive folder
   // match — no index helper for a lowercased folder comparison).
-  const workspaces = listWorkspaces();
+  const workspaces = listWorkspaces({ includeArchived: true }); // archived workspaces still resolve so queued asset uploads complete during the soft-archive grace period
   const wsLower = workspaceFolder.toLowerCase();
   const ws = workspaces.find(w => w.folder.toLowerCase() === wsLower); // list-workspaces-find-ok: case-insensitive folder match has no index helper
 

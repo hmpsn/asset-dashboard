@@ -1,0 +1,596 @@
+# MCP Matrix + Brand Generation — Cross-phase Contracts
+
+These contracts prevent the content, brand, MCP, Inbox, and client lanes from
+inventing incompatible identities, statuses, evidence shapes, or review rules.
+The controller updates this document and every unmerged dependent plan in the
+same commit as an approved contract amendment.
+
+## Program invariants
+
+- Implementation PRs start from then-current `origin/staging`; this planning
+  branch is not an implementation base once staging advances.
+- Shared contracts, migration numbers, event constants, feature flags, tool
+  registry changes, and roadmap/docs are controller-owned during parallel work.
+- Content source identity is `(workspaceId, matrixId, cellId,
+  MatrixSourceRevision)`.
+  Brand source identity is `(workspaceId, intakeRevisionId, deliverableType)`.
+- Keyword text, matrix position, display name, or tool handle is never a durable
+  generation identity.
+- A run consumes an immutable resolved-input snapshot. Source changes make it
+  stale; they do not silently alter remaining items.
+- Automatic generation never overwrites newer operator/client work, auto-
+  approves, auto-sends, or auto-publishes.
+- `ready_for_human_review` is the strongest automatic success verdict.
+- `ready_to_publish` is reachable only after explicit approval and existing
+  export/publish preconditions pass; it is not publication.
+- Unknown evidence remains unknown. Matrix dimensions are targeting, not proof.
+- One approved/finalized voice snapshot is injected exactly once for every item
+  in a page-set run.
+
+## Imported platform contracts
+
+### Generation quality program
+
+- G1/C2/C3 refer to the same-date
+  [`generation-quality-performance` plan](./2026-07-13-generation-quality-performance-program.md):
+  merged `genq-ai-execution-governance`, pending C2 phase B of
+  `genq-content-generation-integrity`, and pending `genq-content-context-v2`.
+- G1 is the sole owner of named-operation execution policy, provider-neutral
+  metadata, run IDs, and traces.
+- C1 owns strict content completeness and `needs_attention` semantics.
+- C2 must export content generation revisions, durable provenance,
+  resource-scoped job identity, and conditional saves before matrix generation
+  implementation begins.
+- C3 must export the budgeted exact-once voice/evidence context before matrix
+  generation begins. The new surface directly consumes the v2 implementation;
+  it does not add a second context implementation or feature flag.
+- Runtime quality governance owns cross-workflow budgets/reliability registry.
+  This program registers new operations; it does not create a parallel telemetry
+  system.
+
+### Existing domain authorities
+
+- `ContentBrief` + `GeneratedPost` are the matrix page artifacts.
+- Matrix/cell legal states remain owned by the existing matrix state machine.
+- `VoiceProfile` is the downstream voice authority after real finalization.
+- Approved `BrandDeliverable` rows are identity authority; draft run output is
+  not exposed through `BrandSlice`.
+- Unified `ClientDeliverable` owns client send/respond state. Brand source rows
+  do not grow a second client-review state machine.
+- `callAI()`/`callCreativeAI()` remain the only AI entry points; provider helpers
+  remain implementation details.
+
+## Shared semantic shapes
+
+These names are locked for the contract PR. Any amendment updates this file and
+every unmerged dependent plan in the same commit before implementation resumes.
+
+### Matrix source revision
+
+`MatrixSourceRevision` is:
+
+```ts
+interface MatrixSourceRevision {
+  matrixRevision: number;
+  templateRevision: number;
+  cellRevision: number;
+}
+```
+
+Each field is a monotonic integer. Matrices and templates gain additive revision
+columns; stored cells gain `revision`, with legacy absence interpreted as `0`.
+`matrixRevision` covers definition/selection inputs, not generation-owned cell
+projection. Conditional source writes validate and increment the revisions they
+own. A generation commit validates the common frozen matrix/template revisions
+plus only that item's cell revision, transactionally merges its projection into
+the latest cell array, and increments only that cell revision. It cannot
+self-invalidate sibling items from the same preview.
+
+### Resolved matrix targets
+
+`ResolvedMatrixStructuralTarget` contains:
+
+- workspace, matrix, template, and cell IDs plus `MatrixSourceRevision`;
+- variable values and deterministic slug/prose substitutions;
+- target keyword plus validation/evidence source;
+- planned URL, title, meta, page type, schema types;
+- `ResolvedPageBlockManifest`, `generationContractVersion`, and explicit
+  AEO/CTA requirements;
+- source-only structural fingerprint and structural blocking requirements.
+
+It deliberately excludes voice/identity selection, final evidence freshness,
+artifact revisions, canonical effective-input fingerprint, and paid estimates.
+M0 returns this structural target without claiming generation readiness.
+
+`MatrixGenerationPreviewTarget` contains the complete structural target plus:
+
+- identity/voice snapshot IDs and readiness;
+- evidence captured/freshness times;
+- exact expected brief and post generation revisions (one of each, never a
+  generic artifact array);
+- canonical effective-input fingerprint and blocking requirements.
+
+M1 is the first phase allowed to return this generation-ready target.
+A paid matrix run stores a non-empty tuple of those accepted preview selections;
+every item has a non-null preview fingerprint. Onboarding may retain a non-empty
+pre-preview selection with nullable preview fingerprints until authorization,
+but it cannot dispatch paid work from that looser shape.
+
+The resolver receives explicit IDs. The old keyword cross-reference may remain
+for legacy standalone generation but is forbidden in matrix-run code.
+
+`ResolvedPageBlockManifest` covers the complete page: stable
+`system:introduction`, ordered template/outline blocks, and
+`system:conclusion`. Each block has stable ID, source (`system|template`),
+generation role, heading contract, and AEO/CTA requirements.
+The manifest is a tuple with exactly one introduction first and one conclusion
+last; template blocks cannot use either reserved system ID.
+
+### Evidence requirement
+
+`GenerationEvidenceRequirement` distinguishes:
+
+- `verified`: durable source ref supports the fact;
+- `inferred`: an allowed interpretation, labeled and never promoted to fact;
+- `missing`: requires client/operator input;
+- `conflicting`: sources disagree and require resolution;
+- `creative_proposal`: non-factual option such as a tagline or name.
+
+This generic requirement status may describe structural inference. The tighter
+rendered-brand-output contract does not: every `BrandGeneratedClaim` classified
+as `factual` or `inferred` cites at least one fact-capable, non-structural
+accepted evidence key/source. Inferred prose remains an interpretation, never
+an established fact. Because a model can omit an assertion from its own claim
+ledger, every generated brand candidate keeps `no-hallucinations` human-
+required; `factual-accuracy` is also human-required when factual or inferred
+claims are present.
+
+Each requirement has a stable ID, field/claim, reason, source refs,
+`claimKind`, `requirementStage`, and optional client-safe prompt. Factual refs
+exclude structural-only `content_matrix`, `content_matrix_cell`, and
+`content_template` sources; normalized `content_matrix_cell_evidence` remains a
+valid durable factual source. `requirementStage` is:
+
+- `preflight`: blocks paid work (source identity, supported/locked template,
+  verified service availability, substantive location relevance, finalized
+  content voice);
+- `ready`: allows a typed placeholder draft but blocks review-ready/send/
+  publish-ready (required hours, prices, staff, credentials, statistics, CTA
+  details);
+- `optional_omit`: omits unsupported optional detail without a placeholder.
+
+`[NEEDS CLIENT INPUT: ...]` is rendered only for a typed `missing` + `ready`
+requirement. A local dimension label never satisfies evidence.
+
+`GenerationEvidenceResolution` contains requirement ID, typed value, durable
+source ref, resolver attribution, expected source/artifact revisions, and
+timestamps. Text edits never resolve it. Content resolutions live in normalized
+`content_matrix_cell_evidence`, advance the target cell revision, and require a
+fresh preview plus explicit retry/audit. Brand resolutions create/reuse a
+superseding immutable intake revision, making the older run stale.
+Content resolution is addressed by matrix/cell/requirement plus the full source
+revision; it never depends on a run/item that a preflight blocker may prevent.
+`ResolveMatrixGenerationEvidenceRequest` carries that owner identity directly.
+`RetryMatrixGenerationRequest` requires a non-empty item selection plus the
+run/item/source/artifact revisions. Replacement additionally requires explicit
+operator authorization; resume cannot carry replacement authorization.
+
+### Audit report
+
+`GenerationAuditReport` contains deterministic check results, structured model
+review, human-required checks, revision count, unresolved requirements, and a
+derived verdict:
+
+- `ready_for_human_review`;
+- `needs_attention`;
+- `blocked_missing_evidence`.
+
+`ready_for_human_review` requires an exact empty unresolved-requirement tuple
+and deterministic results limited to `passed|not_applicable`;
+`blocked_missing_evidence` requires at least one unresolved requirement.
+Human-required checks can be `needs_human_review|not_applicable`, never
+auto-passed. The shared automatic revision count is exactly `0|1` at the audit,
+brand-item, and matrix-item seams. The report never uses a single model boolean
+to override a deterministic failure or pass factual/no-hallucination checks.
+
+### Run outcomes
+
+Run status distinguishes:
+
+- `queued`, `running`, `awaiting_review`, `completed`,
+  `completed_with_errors`, `blocked`, `conflict`, `cancelled`, `failed`.
+
+Item status adds stage-specific states. A run is `completed` only when every
+selected item reached `ready_for_human_review`. Mixed ready/error items are
+`completed_with_errors`. Cancellation retains completed items and marks the
+remaining items honestly.
+
+Generic `BackgroundJobStatus` does not expand; it remains
+`pending|running|done|error|cancelled`. Its bounded terminal result is
+`{runId, counts, terminalStatus}` where `terminalStatus` is the rich domain-run
+status.
+
+P0 registers these shared status vocabularies but does not add lifecycle
+transition tables before their persisted writers exist. M0 adds matrix run/item
+tables and transitions together, B2 does the same for brand run/items, and O1
+owns onboarding transitions including conditional recovery from
+`needs_attention`. The brand voice pause is stage
+`awaiting_voice_finalization` while the run's truthful status is
+`awaiting_review`; it is not a tenth generic run outcome.
+
+### Brand/content onboarding run
+
+`BrandContentOnboardingRun` and `BrandContentOnboardingStatus` live in
+`shared/types/brand-content-onboarding.ts`. Status is exactly:
+
+`intake_ready | brand_generating | awaiting_voice_review |
+awaiting_voice_finalization | brand_generating_dependents |
+awaiting_operator_review | awaiting_client_review |
+awaiting_content_authorization | content_generating | awaiting_content_review |
+ready_to_publish |
+needs_attention | cancelled | failed`.
+
+Only durable explicit page approval plus passing export/publish preconditions
+may transition `awaiting_content_review` to `ready_to_publish`.
+
+`approveMatrixPageForPublishReadiness()` is the sole approval authority for a
+matrix-run item. It conditionally validates run/item/post revisions, requires
+`ready_for_human_review` with zero unresolved `ready` evidence, legally marks
+the post approved/exportable, and records approval evidence atomically. It never
+calls publish policy or a CMS job, even when auto-publish is configured. A
+content-request `delivered` status is not equivalent. Every selected page must
+have this evidence before the set advances.
+
+The run carries a monotonic revision, immutable intake/brand/voice/matrix source
+refs, child brand/page-review IDs, idempotency key, and durable gate evidence. Its
+idempotency scope is `(workspaceId, intakeRevisionId, idempotencyKey)`.
+Gate evidence is discriminated by gate. Voice proof contains the finalized
+snapshot; page proof maps every approval to matrix run/item/cell, the full
+matrix/template/cell source revision, the post revision, and a human approver.
+Content authorization carries a durable authorization ID plus a named
+operator/client actor; a system recorder is not the authorization proof. A
+generic string ID cannot satisfy a different gate.
+
+## Template and pSEO contracts
+
+- One deterministic renderer owns variable validation and substitution.
+- Slug mode is locale-safe, collision-checked, and never silently drops a value
+  into an empty segment. Prose mode preserves human-readable values.
+- All braces must resolve; unknown/missing variables fail preflight.
+- The complete `ResolvedPageBlockManifest` is frozen in the run snapshot.
+  Existing generator-owned introduction/conclusion blocks are explicit system
+  blocks; models may fill content only and may not create extra blocks.
+- New templates declare `generationContractVersion` and an explicit generation
+  role for every block. Structural preflight may propose a deterministic legacy
+  upgrade, but an operator must explicitly accept/save it. Ambiguous AEO/CTA
+  mappings block generation.
+- `acceptTemplateGenerationUpgrade()` requires the expected template revision
+  and exact proposal fingerprint. It persists only deterministic mappings; a
+  stale proposal conflicts, rejection is a no-op, and ambiguous roles stay
+  blocked. HTTP and MCP are thin adapters over this one mutation.
+- `ContentTemplate.pageType` values outside the current `BRIEF_PAGE_TYPES`
+  allow-list fail structural preflight with `unsupported_page_type` and an
+  actionable migration path. Existing non-matrix generation remains compatible.
+- Required AEO/CTA roles must exist in the locked plan before paid work. The
+  generator does not “fix” a deficient locked template by adding sections.
+- Primary keyword positions and metadata length are deterministic audit rules.
+- Duplicate planned URLs, duplicate source cells, and unresolved
+  cannibalization are blocking.
+- A location/service cell requires verified relevant service availability and
+  enough cell-specific evidence to avoid a variable-only page. Office presence,
+  landmarks, reviews, prices, licenses, and service-area claims require their
+  own evidence.
+- The pSEO creation bridge creates/links a validated matrix first. It does not
+  hide matrix creation inside `add_keyword_to_strategy`.
+
+## Brand and voice contracts
+
+- `BrandIntakePayload` is shared, Zod-validated, schema-versioned, immutable per
+  revision, and stored before compatibility projection.
+- Every intake evidence requirement has the stable identity
+  `brand-intake:<fieldPath>`. Resolution input must carry that exact identity
+  and matching finite field path; adapters never accept an arbitrary JSON path
+  or a requirement ID that addresses a different field.
+- A revision carries at most 22 evidence resolutions and at most 1 MiB of
+  UTF-8 evidence-snapshot JSON. The aggregate shared schema and database byte
+  constraint must remain aligned so every legal full-census snapshot persists.
+- The durable buying-stage field preserves `''` for omitted legacy/public input;
+  `mixed` means the client explicitly selected “All stages.” Evidence reads
+  therefore never infer submitted intent from a normalization default.
+- Resubmission creates or reuses one fingerprinted revision and updates legacy
+  projections idempotently; it never append-duplicates personas or labeled KB
+  blocks.
+- Each immutable revision snapshots compatibility-projection ownership for
+  competitor domains as disjoint preserved/manual and intake-owned sets. A
+  later resubmission may remove only the intake-owned set; payload coincidence
+  is never treated as proof that a pre-existing manual domain belongs to the
+  intake projection.
+- Client-portal submission retains `client_onboarding_submitted`; operator/MCP
+  intake submission uses admin-only `brand_intake_submitted`, and evidence
+  mutation uses admin-only `brand_intake_evidence_resolved`. The latter two do
+  not enter client-engagement metrics or client-visible activity.
+- Submission provenance is part of retry identity. Identical normalized answers
+  are a no-op only for the same source, actor type, and actor ID; an admin/MCP
+  pre-seed followed by client confirmation creates a new immutable revision.
+  Source/actor pairing is exact: client_portal/client, admin/operator, mcp/mcp,
+  and migration/system.
+- Authentic client examples and accepted source excerpts outrank generated
+  prose. Generated taglines/examples cannot silently calibrate their own source
+  model. Authentic-sample source refs exclude generated deliverables, profiles,
+  matrix structure, intelligence summaries, and templates; finalized anchors
+  additionally record the operator who selected them and when. A referenced
+  `voice_sample` also records an allowed authentic origin, exactly `manual` or
+  `transcript_extraction`; calibration-loop and approved generated-copy origins
+  cannot anchor final voice.
+- Voice-foundation bootstrap may consume accepted intake and authentic samples
+  without an already-finalized profile. A full-suite run generates only that
+  provisional foundation, then pauses at `awaiting_voice_finalization`.
+- An operator reviews the foundation, selects authentic anchors, and finalizes
+  the profile; the snapshot records that finalizing operator. Only
+  `resume_brand_deliverable_generation` with that durable
+  finalized version may start dependent identity/messaging/audience work.
+- `BrandGenerationAtomicTarget` is exactly
+  `'voice_foundation' | BrandDeliverableType`.
+  `BRAND_DELIVERABLE_TARGET_POLICY` exhaustively maps that union;
+  `voice_foundation` alone is `bootstrap` and every durable deliverable,
+  including `naming`, requires the exact finalized voice version. The
+  provisional foundation lives only in the brand run item/attempt ledger and is
+  never persisted as a `BrandDeliverable` or treated as final voice authority.
+  `BRAND_GENERATION_PRESET_POLICY` maps
+  bundles separately; `full_brand_system` alone is `bootstrap_then_resume` and
+  may start only its foundation before finalization. Other presets require
+  finalized voice at start. There is no direct/bundle bypass or deadlock.
+- Direct atomic selection contains exactly one `target`; arrays, empty
+  selections, duplicates, and mixed foundation/dependent starts are not valid
+  shared shapes. Preset policy separately freezes `initialTargets` and
+  `resumeTargets`, so full-suite initial dispatch is foundation-only.
+- Persisted selection and current dispatch targets are one discriminated shape.
+  An atomic foundation run can carry only the foundation tuple, and a foundation
+  item has permanently-null `deliverableId`/version fields.
+- A finalized voice snapshot requires a non-empty authentic-anchor evidence
+  tuple. Approved identity refs freeze approval time plus content/approval
+  fingerprints, not only the mutable source-row version.
+- Real finalization requires non-empty DNA, guardrails, and selected anchor
+  evidence, uses the voice state machine, and records calibration activity only
+  after commit.
+- `finalizedBy` is always a verified operator. An MCP master/workspace key is
+  recorded separately as the execution actor and cannot be reinterpreted as a
+  human. MCP finalization therefore consumes a short-lived, one-time bearer
+  authorization created through authenticated operator HTTP, bound to the
+  complete exact command and expected profile revision; only its digest is
+  durable. Expired or mismatched authorizations fail closed, while consumption
+  replay returns the already-created immutable finalization.
+- `naming` and `tagline` output are creative proposals. Naming never claims
+  trademark, domain, legal, or cultural clearance without verified external
+  evidence. Naming remains outside the released legacy paid-generator service,
+  API payload type, focus prop, and rendered generator census until B2.
+- Brand generation/refinement uses named structured operations and conditional
+  saves against the version read before the paid call.
+- The provisional foundation is a schema-validated structured
+  `BrandVoiceFoundationDraft`, never an opaque content string or a durable
+  `BrandDeliverable`. Foundation and durable item persistence shapes are
+  mutually exclusive.
+- Persisted brand runs retain the idempotency key and full explicit
+  `McpToolExecutionContext`; public run DTOs omit both and project MCP/system
+  creators to actor type only. Intake, original selection, effective input, and
+  resume-command fingerprints are separate immutable identities.
+- Every accepted start/resume/revision has one immutable command-ledger row with
+  its business-input snapshot, original result/job, actor, MCP context, and (for
+  revisions) prior review state. Attempts reference that command. Once revision
+  acceptance invalidates old audit/provenance lineage, cancellation preserves
+  content/version but returns `changes_requested`, never an unaudited ready
+  state. Business fingerprints exclude idempotency, attribution, and fresh
+  request IDs so an identical replay returns the original job/result. The stored
+  accepted result omits the transport-only replay marker; adapters add
+  `existing: true` only when projecting an idempotent replay.
+- Every hydrated frozen input recomputes its canonical snapshot self-hash and
+  verifies the fingerprints of all approved-input references before paid work.
+- B2 hard ceilings are 114 provider calls, 5,000,000 input tokens, 250,000 output
+  tokens, 100,000,000 estimated-cost micros, and concurrency 3. Caller budgets
+  must be explicit and no greater than those values; reservations happen before
+  each paid call. Provider instructions are capped at 40 KiB with a 512-byte
+  acceptance safety margin; base generation is capped at 24 KiB; the raw
+  candidate core and compact refine/audit prompt projection at 4 KiB; the
+  resolved durable candidate at 256 KiB; the related-candidate digest at 3 KiB;
+  and automatic audit-derived revision direction at 512 bytes.
+- B2 generate/refine/audit operations use completed-response cache policy
+  `none`. A CAS-losing candidate remains attributable in the attempt ledger but
+  never overwrites the durable artifact.
+- A provider call means one dispatcher invocation. B2 disables internal
+  dispatcher retries and reserves a pessimistic call/token/cost envelope before
+  every Claude/OpenAI invocation (including fallback); revisions/retries are
+  separate reserved dispatches.
+- Existing approved deliverables block generation until a human returns them to
+  draft. An MCP expected-version tuple is concurrency evidence, not replacement
+  authorization.
+- Existing `update_brand_deliverable.expectedVersion` stays optional for wire
+  compatibility during this program and logs omission as a deprecation. Every
+  new generation/revision mutation requires an expected revision. Legacy
+  enforcement is a later compatibility PR after consumer migration/telemetry.
+- Approved identity selection is page-type-specific. Service/landing content
+  may receive differentiators, objections, promise, and CTA principles;
+  location content receives only verified local proof; voice enters once via
+  prompt assembly.
+
+## Persistence and transaction contracts
+
+- Migrations are additive and allocated from current staging immediately before
+  their PR. No destructive migration is authorized.
+- Run/item tables are normalized. Attempts, errors, and per-item stage status do
+  not grow the matrix/intake JSON.
+- JSON snapshots use shared typed interfaces, Zod schemas matching the stored
+  shape, and the repository JSON validation helpers.
+- Command acceptance, artifact commit, and command completion transactionally
+  enqueue `command_accepted`, `artifact_committed`, and `command_completed`
+  effect events. Deterministic effect keys make activity writes and MCP paid-call
+  metering exactly-once; retryable workspace broadcasts and intelligence-cache
+  invalidation are at-least-once.
+- A successful item commit atomically records artifact content/status,
+  generation revision/provenance, run/item result, source link, and legal cell
+  projection. Conflicts change none of those writes.
+- Background work reads the expected artifact/source revisions before paid work
+  and compares them in the final transaction. A stale result records a conflict
+  and preserves the newer artifact.
+- Retry reuses successful stage checkpoints when their effective input
+  fingerprint matches. Explicit replacement is a separate authorized mode.
+- Generic job results contain `{runId, counts, terminalStatus}` only. Full items
+  and audit reports come from cursor-paged domain reads.
+- Matrix run/item/attempt persistence lands with structural resolution before
+  one-cell generation. Batch orchestration extends this proven ledger; it does
+  not introduce the first durable item store after generation already exists.
+- Structural resolution itself never creates a run. The M0 repository accepts
+  only a non-empty already-previewed `MatrixGenerationSelection`, so no M0 caller
+  may fabricate a preview fingerprint or imply paid readiness.
+- Internal persisted matrix runs carry an explicitly passed
+  `McpToolExecutionContext | null` plus their idempotency key. Public run DTOs
+  omit both fields. Their creator projection reduces MCP/system attribution to
+  `{ actorType }` while retaining operator/client IDs and optional labels for
+  human review history. Run uniqueness is `(workspace_id, matrix_id,
+  idempotency_key)`, with a same-fingerprint replay and different-fingerprint
+  conflict. Attempts are unique by item + stage + attempt number. Run snapshots
+  deliberately have no cascading matrix/template foreign key and survive
+  source deletion.
+- Matrix cell evidence is append-only/versioned, not one mutable row per
+  requirement. It snapshots stable requirement identity, exact source revision,
+  typed value/source/resolver attribution, idempotency identity, and
+  current/superseded linkage. M1 owns the first evidence mutation.
+- `brand_content_onboarding_runs` stores the shared orchestration lifecycle,
+  monotonic revision, idempotency identity, immutable source refs, child IDs,
+  and gate evidence. A waiting human gate never keeps a generic job running.
+
+## Background execution and budget contracts
+
+- `content-matrix-generation` and `brand-deliverable-generation` are registered
+  background job types with metadata and the test-matrix census.
+- One parent worker invokes extracted domain services directly. It never starts
+  nested brief/post/brand jobs.
+- Starts require a preflight fingerprint, expected source revision,
+  idempotency key, explicit selection, and configured maxima.
+- Batch starts carry the full `MatrixSourceRevision` envelope for every selected
+  cell. A single expected matrix revision is insufficient.
+- Before dispatch, the service enforces item, provider-call, token, estimated
+  cost, and concurrency limits. The current informational paid counter is not a
+  quota substitute.
+- Workers check cancellation between stages and items. Restart reconciliation
+  converts generic interrupted jobs to a resumable domain-run state rather than
+  losing item checkpoints.
+- Partial provider failure is isolated by item/source and never relabeled as
+  complete.
+- After item audits, batch runs execute deterministic set checks for duplicate
+  URLs, typed keyword overlap/cannibalization, block-manifest coverage,
+  structured claim/evidence conflicts, and configured overlap thresholds. They
+  then call the named, schema-validated `content-matrix-set-audit` operation for
+  cross-page factual consistency and substantive uniqueness. The model result
+  cannot certify factual truth; provenance-sensitive verdicts remain human-
+  required. Findings attach to the run and affected items. Structural issues
+  require source correction/retry. Prose issues may use only an item's remaining
+  one-pass allowance; total automatic revision remains one per item across both
+  audit levels, followed by rerunning both set gates.
+
+## MCP boundary contracts
+
+- New tools use snake_case workspace inputs and described top-level schemas.
+- M0 registers a dedicated `content-matrix-actions` family with four `json_v1`
+  tools. Matrix summaries use stable `updated_at DESC, id ASC` cursors bound to
+  the active template filter; cell cursors bind matrix ID, matrix revision, and
+  the exact cell-snapshot fingerprint. Limits are 25 default, 100 maximum, and
+  25 unique structural selections.
+- Accepted template upgrades durably bind the caller's idempotency key to the
+  exact proposal fingerprint and source template revision. Identical acceptance
+  replays; key reuse for a different proposal conflicts. Rejection does not
+  mutate the template.
+- Tool discovery, dispatch, unique-name census, input-schema census, and
+  declared-workspace-argument census derive from one canonical registry.
+- Registry construction snapshots immutable definitions, and a production
+  definition-to-handler census verifies exact family-handler identity plus
+  handled-name manifests for pre-dispatch validators, preventing early
+  workspace checks from masking a missing or wrong family branch.
+- Authorization validates the workspace field declared by the called tool.
+  Conflicting camel/snake aliases are rejected for master and scoped keys.
+- New mutations receive `McpToolExecutionContext` containing request/tool name,
+  key ID/label, and scope. Activity/run attribution records that identity.
+- Full admin activity may retain that caller attribution, but workspace
+  broadcasts and client-visible activity projections must remove MCP key IDs
+  and labels. Authentication identity is operational evidence, not client copy.
+- Request correlation is server-owned diagnostic metadata, never authority.
+  Generate the UUID before HTTP logging/response attachment and ignore every
+  caller-supplied `X-Request-ID`; arbitrary caller text cannot be proven safe by
+  a credential denylist. Registry rejections likewise log/return stable
+  classifications rather than raw unknown tool names or workspace arguments.
+- Request-local compatibility context may enrich existing activity writes, but
+  durable generation runs persist an explicit immutable execution-context
+  snapshot so restart/resume never depends on ambient process state.
+- Durable run IDs replace short-lived handles for long work.
+- Start returns quickly with job/run ID, selection count, estimate, dashboard
+  URL, and `existing` idempotency signal. Status/detail is paged.
+- Errors are stable JSON with code, message, retryable flag, and safe details;
+  no prompt, secret, stack, or raw private evidence is returned.
+- Error compatibility is per tool. Existing handlers retain legacy text while
+  registry-owned unknown/auth rejections use generic non-reflective text; a
+  `json_v1` tool's scope failures, returned errors, and thrown failures are all
+  enforced at the registry boundary, and an unvalidated handler error degrades
+  to a safe generic envelope.
+
+## Review, events, and client projection
+
+- Brand review uses one grouped `brand_generation` adapter with one typed item
+  per source `BrandDeliverable` and per-item `approve|changes_requested`.
+- Review persistence has its own `BRAND_REVIEW_CONTRACT_VERSION`. The private
+  parent/child payloads are strict runtime-validated discriminated unions:
+  `voice_foundation` has exactly one foundation item and no durable source;
+  `brand_suite` is non-empty and every item freezes a durable source ID/version.
+  Decision identity must equal its run/item/source envelope.
+- Review decisions require a human operator/client actor; automatic/system/MCP
+  approval is not a valid shared shape, and `changes_requested` requires a note.
+- Unresolved `ready` evidence prevents send. Each item freezes its generation
+  revision as well as its source version. Approval or changes requested commits
+  the source, generation item, run counts, and mirror child in one transaction;
+  no generic mirror-first response or whole-bundle decline is legal. The group
+  is `partial` until all items are terminal and is `approved` only when all
+  items are approved.
+- Review identity is `brand_generation:<reviewKind>:<runId>` and deliberately
+  excludes run revision. A same-run revision preserves already-approved child
+  decisions plus database-authoritative item IDs/timestamps and replaces only
+  the revised child; the foundation and suite remain distinct rows.
+- Voice foundation uses a separate review bundle/gate. Client approval never
+  finalizes voice or changes the B2 foundation item. It records typed durable
+  human-review evidence (including foundation item revision) for future O1;
+  operator anchor selection plus `finalize_brand_voice` owns authority.
+- Drafts, raw intake, internal evidence/audit, prompts, and provenance never
+  enter public/client serializers. Run/source IDs, expected revisions, actor
+  attribution, requirements, MCP identity, and private item payloads are also
+  stripped; only the explicit review content and safe target metadata remain.
+- `ClientBrandSummary` contains only approved/client-visible resolved fields and
+  a safe voice summary.
+- Every committed workspace mutation logs activity and broadcasts a canonical
+  event. Every new event has a matching `useWorkspaceEvents` invalidation in the
+  same PR.
+- B0 emits existing `WS_EVENTS.WORKSPACE_UPDATED` with typed intake-revision
+  metadata. All planned work reuses workspace, content/brief/post, brand/voice,
+  deliverable, and job events unless this contract is amended first.
+- Matrix/brief/post mutations invalidate existing content keys; brand/intake
+  mutations invalidate brand/voice/intelligence and client-safe workspace keys;
+  Inbox uses existing deliverable invalidation. Deliverable mutations also
+  invalidate the admin brand-run prefix and client brand summary; brand-identity
+  and voice-profile mutations invalidate the client summary as well.
+
+## Feature flags
+
+Only these new product flags are authorized:
+
+| Flag | Scope | Default | Gates | Does not gate |
+|---|---|---|---|---|
+| `content-matrix-generation` | server/workspace | OFF | paid matrix run start + start UI | preflight correctness, CAS, scope, failure truth |
+| `brand-deliverable-generation` | server/workspace | OFF | paid brand run start + start UI | intake validation, voice invariants, CAS, client safety |
+
+The final orchestration requires both. It does not add a composite flag. Client
+renderers are additive and data-driven; no plan assumes a workspace server
+override reaches the global frontend `useFeatureFlag` hook.
+
+## Amendment and verification rule
+
+Any change to identity, source revision, status, evidence classification,
+placeholder convention, voice authority, section census, operation name, job
+type, tool schema, event, client visibility, flag boundary, or budget must update
+this contract, the specification, and all unmerged dependent phase plans before
+implementation continues.

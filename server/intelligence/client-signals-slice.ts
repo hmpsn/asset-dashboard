@@ -13,9 +13,8 @@ import type { SafeClientUser } from '../../shared/types/users.js';
 import type { ClientRequest } from '../../shared/types/requests.js';
 import type { SessionSummary } from '../chat-memory.js';
 import { createLogger } from '../logger.js';
-import db from '../db/index.js';
-import { createStmtCache } from '../db/stmt-cache.js';
 import { buildKeywordFeedbackSignals } from '../keyword-feedback.js';
+import { listContentGapVoteSignals } from '../content-gap-votes.js';
 import {
   buildEffectiveBusinessPriorities,
   getRawClientBusinessPriorities,
@@ -25,12 +24,6 @@ import { loadRecommendations } from '../recommendations.js';
 import type { Recommendation } from '../../shared/types/recommendations.js';
 
 const log = createLogger('workspace-intelligence/client-signals');
-
-const stmts = createStmtCache(() => ({
-  contentGapVotes: db.prepare(
-    'SELECT keyword, COUNT(*) as cnt FROM content_gap_votes WHERE workspace_id = ? GROUP BY keyword ORDER BY cnt DESC',
-  ),
-}));
 
 const COMPOSITE_HEALTH_WEIGHTS = {
   retention: 40,
@@ -110,13 +103,7 @@ export async function assembleClientSignals(
     'assembleClientSignals: content gap votes table',
     workspaceId,
     [],
-    () => {
-      const rows = stmts().contentGapVotes.all(workspaceId) as {
-        keyword: string;
-        cnt: number;
-      }[];
-      return rows.map((r) => ({ topic: r.keyword, votes: r.cnt }));
-    },
+    () => listContentGapVoteSignals(workspaceId),
     { logger: log },
   );
 

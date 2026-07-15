@@ -7,9 +7,10 @@ import {
 } from '../../../shared/types/keyword-command-center.js';
 import { LOCAL_SEO_VISIBILITY_POSTURE, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
 import type { PageKeywordMap } from '../../../shared/types/workspace.js';
-import { buildLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
+import { buildLocalSeoKeywordCandidatesFromLoadedContext } from '../local-seo/candidate-service.js';
 import { buildLocalSeoKeywordVisibilitySummaryByKey } from '../local-seo/snapshot-store.js';
 import { createLogger } from '../../logger.js';
+import { listPublishedPostPagePaths } from '../../content-posts-db.js';
 import {
   filterMapByKeys,
   filterStrategyForKeys,
@@ -28,7 +29,6 @@ import {
   ensureLocalVisibilityRows,
   finalizeDraftRows,
   populateDraftRows,
-  safeLostVisibilityKeys,
 } from './read-model.js';
 import {
   filterNeedsLocalCandidates,
@@ -140,8 +140,10 @@ function buildFilteredBundle(input: {
   };
 }
 
-function localCandidatesForRows(workspaceId: string): LocalSeoKeywordCandidate[] {
-  const candidates = buildLocalSeoKeywordCandidates(workspaceId);
+function localCandidatesForRows(snapshot: KeywordCommandCenterSourceSnapshot): LocalSeoKeywordCandidate[] {
+  const candidates = snapshot.localCandidateContext
+    ? buildLocalSeoKeywordCandidatesFromLoadedContext(snapshot.localCandidateContext)
+    : [];
   const prioritized = [
     ...candidates.filter(candidate => !candidate.selected),
     ...candidates.filter(candidate => candidate.selected),
@@ -149,7 +151,7 @@ function localCandidatesForRows(workspaceId: string): LocalSeoKeywordCandidate[]
   if (prioritized.length > LOCAL_CANDIDATE_ROW_LIMIT) {
     log.warn(
       {
-        workspaceId,
+        workspaceId: snapshot.workspace.id,
         total: prioritized.length,
         kept: LOCAL_CANDIDATE_ROW_LIMIT,
         dropped: prioritized.length - LOCAL_CANDIDATE_ROW_LIMIT,
@@ -166,12 +168,16 @@ async function buildKeywordCommandCenterLocalCandidateRows(
   options: { includeLocalSeo?: boolean; sourceSnapshot?: KeywordCommandCenterSourceSnapshot },
 ): Promise<KeywordCommandCenterRowsResponse | null> {
   const startedAt = Date.now();
-  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
-    includeLocalSeo: options.includeLocalSeo,
-  });
+  const snapshot = options.sourceSnapshot?.localCandidateContext
+    ? options.sourceSnapshot
+    : buildKeywordCommandCenterSourceSnapshot(workspaceId, {
+        includeLocalSeo: options.includeLocalSeo,
+        includeScoring: true,
+        includeLocalCandidates: true,
+      });
   if (!snapshot) return null;
   const { workspace } = snapshot;
-  const localCandidates = localCandidatesForRows(workspace.id);
+  const localCandidates = localCandidatesForRows(snapshot);
   const candidateKeys = new Set(localCandidates.map(candidate => candidate.normalizedKeyword));
   const localVisibilityByKeyword = options.includeLocalSeo
     ? snapshot.localVisibilityByKeyword ?? new Map<string, LocalSeoKeywordVisibilitySummary>()
@@ -183,8 +189,11 @@ async function buildKeywordCommandCenterLocalCandidateRows(
     localVisibility: localVisibilityByKeyword,
   });
   const cappedBundle = filterBundleToKeys({ ...baseBundle, localCandidates }, candidateKeys);
-  const valueScoring = buildValueScoringConfig(workspace);
-  const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
+  const valueScoring = snapshot.scoringContext
+    ? { on: true, ctx: snapshot.scoringContext }
+    : buildValueScoringConfig(workspace);
+  const lostVisibilityKeys = new Set(snapshot.lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
+  const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, cappedBundle);
   ensureLocalVisibilityRows(rows, candidateVisibility);
@@ -194,6 +203,7 @@ async function buildKeywordCommandCenterLocalCandidateRows(
     activeLocalMarketCount: options.includeLocalSeo ? snapshot.activeLocalMarketCount ?? 0 : 0,
     lostVisibilityKeys,
     valueScoring,
+    publishedPagePaths,
   });
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES))
@@ -223,7 +233,8 @@ async function buildKeywordCommandCenterLocalCandidateRows(
       hasNextPage: page.hasNextPage,
       hasPreviousPage: page.hasPreviousPage,
     },
-    generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
+      generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
+      rankFreshness: snapshot.rankFreshness,
   };
 }
 
@@ -235,13 +246,16 @@ async function buildKeywordCommandCenterRowsSkinny(
   const startedAt = Date.now();
   const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
+    includeScoring: true,
   });
   if (!snapshot) return null;
   const { workspace } = snapshot;
   // Build the ScoringContext ONCE per request. The SAME config is threaded into
   // the candidate merge-back and the row finalize so both stages score identically
   // per key.
-  const valueScoring = buildValueScoringConfig(workspace);
+  const valueScoring = snapshot.scoringContext
+    ? { on: true, ctx: snapshot.scoringContext }
+    : buildValueScoringConfig(workspace);
   const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
   const localVisibilityByKeyword = localVisibilityByFilter(
     workspace.id,
@@ -266,7 +280,8 @@ async function buildKeywordCommandCenterRowsSkinny(
   const pageSelection = rowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query, valueScoring);
   const pagedBundle = filterBundleToKeys(bundle, pageSelection.keys);
   const pagedLocalVisibility = filterMapByKeys(localVisibilityByKeyword, pageSelection.keys);
-  const lostVisibilityKeys = safeLostVisibilityKeys(workspace.id);
+  const lostVisibilityKeys = new Set(snapshot.lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
+  const publishedPagePaths = listPublishedPostPagePaths(workspace.id);
   const rows = new Map<string, DraftRow>();
   await populateDraftRows(rows, pagedBundle);
   ensureLocalVisibilityRows(rows, pagedLocalVisibility);
@@ -276,6 +291,7 @@ async function buildKeywordCommandCenterRowsSkinny(
     activeLocalMarketCount,
     lostVisibilityKeys,
     valueScoring,
+    publishedPagePaths,
   });
   const filtered = finalized.rows
     .filter(row => matchesFilter(row, filter))
@@ -307,6 +323,7 @@ async function buildKeywordCommandCenterRowsSkinny(
       hasPreviousPage: pageSelection.page > 1,
     },
     generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
+    rankFreshness: snapshot.rankFreshness,
   };
 }
 

@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseContentBriefOutline,
   parseContentBriefSchema,
+  parseContentBriefUpdate,
   aiContentBriefOutlineSchema,
 } from '../../server/schemas/ai-content-brief.js';
 import {
@@ -41,8 +42,11 @@ const VALID_BRIEF = JSON.stringify({
   suggestedMetaDesc: 'Test meta',
   outline: [{ heading: 'Intro', notes: 'notes', wordCount: 200, keywords: [] }],
   secondaryKeywords: ['keyword1'],
+  wordCountTarget: 1200,
   intent: 'informational',
   audience: 'Developers',
+  competitorInsights: 'The current results favor practical implementation guides.',
+  internalLinkSuggestions: ['/guides/seo'],
 });
 
 const VALID_AEO_REVIEW = JSON.stringify({
@@ -135,9 +139,14 @@ describe('parseContentBriefSchema', () => {
     expect(result.secondaryKeywords).toEqual(['keyword1']);
   });
 
-  it('returns object with undefined optional fields when not present', () => {
+  it('rejects structurally incomplete initial-generation output', () => {
     const minimal = JSON.stringify({ suggestedTitle: 'Minimal' });
-    const result = parseContentBriefSchema(minimal);
+    expect(() => parseContentBriefSchema(minimal)).toThrow();
+  });
+
+  it('keeps partial update parsing separate for regeneration merges', () => {
+    const minimal = JSON.stringify({ suggestedTitle: 'Minimal' });
+    const result = parseContentBriefUpdate(minimal);
     expect(result.suggestedTitle).toBe('Minimal');
     expect(result.outline).toBeUndefined();
   });

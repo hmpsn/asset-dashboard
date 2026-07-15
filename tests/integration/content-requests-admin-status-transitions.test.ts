@@ -58,9 +58,11 @@ import {
   updateContentRequest,
   getContentRequest,
 } from '../../server/content-requests.js';
+import { getBrief, upsertBrief } from '../../server/content-brief.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import type { ContentBrief } from '../../shared/types/content.js';
 
 // ── Server setup ────────────────────────────────────────────────────────────
 
@@ -104,6 +106,26 @@ async function getJson(path: string): Promise<Response> {
 
 function unique(label: string): string {
   return `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function seedBrief(workspaceId: string): ContentBrief {
+  const brief: ContentBrief = {
+    id: unique('brief'),
+    workspaceId,
+    targetKeyword: unique('brief-keyword'),
+    secondaryKeywords: [],
+    suggestedTitle: 'Status transition brief',
+    suggestedMetaDesc: 'A persisted brief used to exercise review authority.',
+    outline: [],
+    wordCountTarget: 900,
+    intent: 'informational',
+    audience: 'operators',
+    competitorInsights: '',
+    internalLinkSuggestions: [],
+    createdAt: new Date().toISOString(),
+  };
+  upsertBrief(workspaceId, brief);
+  return brief;
 }
 
 /**
@@ -187,15 +209,25 @@ describe('PATCH /api/content-requests/:workspaceId/:id — status transitions', 
     expect(getContentRequest(wsAId, id)?.status).toBe('brief_generated');
   });
 
-  it('brief_generated → client_review: returns 200 with updated status', async () => {
+  it('brief_generated → client_review stores the optional message as client-visible, not internal', async () => {
     const { id } = seedRequest(wsAId, 'brief_generated');
+    const brief = seedBrief(wsAId);
+    updateContentRequest(wsAId, id, { briefId: brief.id });
 
-    const res = await patchJson(`/api/content-requests/${wsAId}/${id}`, { status: 'client_review' });
+    const res = await patchJson(`/api/content-requests/${wsAId}/${id}`, {
+      status: 'client_review',
+      clientNote: 'Please review the proposed outline.',
+      expectedBriefRevision: getBrief(wsAId, brief.id)!.generationRevision,
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json() as { status: string };
     expect(body.status).toBe('client_review');
-    expect(getContentRequest(wsAId, id)?.status).toBe('client_review');
+    expect(getContentRequest(wsAId, id)).toMatchObject({
+      status: 'client_review',
+      clientNote: 'Please review the proposed outline.',
+    });
+    expect(getContentRequest(wsAId, id)?.internalNote).toBeUndefined();
   });
 
   it('client_review → approved: returns 200 with updated status', async () => {

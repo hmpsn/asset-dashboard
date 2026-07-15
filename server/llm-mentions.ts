@@ -27,6 +27,7 @@ import { storeLlmMentionSnapshot } from './llm-mentions-store.js';
 import { assertCreditBudget, CreditBudgetError } from './credit-budget-gate.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { addActivity } from './activity-log.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { WS_EVENTS } from './ws-events.js';
 
 const log = createLogger('llm-mentions');
@@ -158,6 +159,7 @@ export async function runLlmMentionsRefreshJob(workspaceId: string, jobId: strin
       competitors: result.competitors,
       sourceDomains: result.sourceDomains,
     });
+    invalidateIntelligenceCache(workspaceId);
 
     const summary: LlmMentionsRefreshSummary = {
       mentions: result.mentions,

@@ -104,7 +104,9 @@ vi.mock('../../server/outcome-tracking.js', () => ({
 // ── Imports (after mocks) ───────────────────────────────────────────────────
 
 import db from '../../server/db/index.js';
-import { createContentRequest } from '../../server/content-requests.js';
+import { broadcastToWorkspace } from '../../server/broadcast.js';
+import { getBrief } from '../../server/content-brief.js';
+import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import {
   runContentBriefGenerationJob,
   type RequestContentBriefGenerationParams,
@@ -113,6 +115,9 @@ import {
 import { createJob } from '../../server/jobs.js';
 import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { callOpenAI } from '../../server/openai-helpers.js';
+import { invalidateContentPipelineIntelligence } from '../../server/intelligence-freshness.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -149,6 +154,7 @@ function makeMockBriefResponse() {
     wordCountTarget: 1200,
     intent: 'informational',
     audience: 'Test audience',
+    competitorInsights: 'Competitors provide introductory guides.',
     internalLinkSuggestions: [],
     ctaRecommendations: [],
     topicalEntities: [],
@@ -226,6 +232,9 @@ function makeRequest() {
     source: 'client',
     serviceType: 'brief_only',
     pageType: 'blog',
+    // Each case exercises a fresh request lifecycle. Reusing the deduped row
+    // would correctly fail after the first case advances it to brief_generated.
+    dedupe: false,
     // Note: ContentTopicRequest does not carry referenceUrls (no DB column).
     // The request path scrapes SERP + GA4 style-pages but not per-request ref URLs.
   });
@@ -340,6 +349,54 @@ describe('C1: request-driven brief — outcome recording', () => {
   });
 });
 
+describe('C2: request-driven brief — edit safety', () => {
+  it('rolls back the brief when the request changes during the provider call', async () => {
+    const request = createContentRequest(TEST_WS_ID, {
+      topic: 'C2 authority race',
+      targetKeyword: `authority race ${Date.now()}`,
+      intent: 'informational',
+      priority: 'high',
+      rationale: 'Verify request authority defeats stale generation',
+      source: 'client',
+      dedupe: false,
+    });
+    const beforeCount = (db.prepare(
+      'SELECT COUNT(*) AS count FROM content_briefs WHERE workspace_id = ?',
+    ).get(TEST_WS_ID) as { count: number }).count;
+    vi.mocked(callOpenAI).mockImplementationOnce(async () => {
+      await new Promise(resolve => setTimeout(resolve, 2));
+      updateContentRequest(TEST_WS_ID, request.id, { internalNote: 'Operator changed request' });
+      return {
+        text: JSON.stringify(makeMockBriefResponse()),
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      };
+    });
+    const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, {
+      workspaceId: TEST_WS_ID,
+      total: 1,
+      message: 'C2 request authority race',
+    });
+
+    await runContentBriefGenerationJob(job.id, {
+      source: 'request',
+      workspaceId: TEST_WS_ID,
+      requestId: request.id,
+      expectedRequestUpdatedAt: request.updatedAt,
+    });
+
+    const storedJob = db.prepare('SELECT status, error FROM jobs WHERE id = ?')
+      .get(job.id) as { status: string; error: string | null };
+    expect(storedJob.status).toBe('error');
+    expect(storedJob.error).toContain('content request changed');
+    const afterCount = (db.prepare(
+      'SELECT COUNT(*) AS count FROM content_briefs WHERE workspace_id = ?',
+    ).get(TEST_WS_ID) as { count: number }).count;
+    expect(afterCount).toBe(beforeCount);
+  });
+});
+
 describe('C1: FM-2 — scraper failure degrades gracefully', () => {
   it('brief still generates when scrapeUrls throws', async () => {
     mockScrapeUrls.mockRejectedValue(new Error('Scraper network error'));
@@ -405,6 +462,89 @@ describe('C1: FM-2 — recordAction failure does not crash the job', () => {
     // Brief should still be in the result
     const result = JSON.parse(storedJob?.result ?? '{}');
     expect(result.brief).toBeDefined();
+  });
+});
+
+describe('C2: committed brief post-commit effect truthfulness', () => {
+  it('keeps the brief and job successful when independent effects throw', async () => {
+    vi.mocked(broadcastToWorkspace).mockClear();
+    vi.mocked(invalidateContentPipelineIntelligence).mockClear();
+    vi.mocked(broadcastToWorkspace).mockImplementationOnce(() => {
+      throw new Error('injected request broadcast failure');
+    });
+    vi.mocked(invalidateContentPipelineIntelligence).mockImplementationOnce(() => {
+      throw new Error('injected intelligence invalidation failure');
+    });
+    const request = makeRequest();
+    const job = await runRequestJob(request.id);
+
+    const storedJob = db.prepare('SELECT status, result, error FROM jobs WHERE id = ?')
+      .get(job.id) as { status: string; result: string | null; error: string | null };
+    expect(storedJob.status).toBe('done');
+    expect(storedJob.error).toBeNull();
+    const result = JSON.parse(storedJob.result ?? '{}') as {
+      brief?: { id?: string };
+      briefId?: string;
+    };
+    expect(result.briefId).toBe(result.brief?.id);
+    expect(db.prepare(
+      'SELECT id FROM content_briefs WHERE workspace_id = ? AND id = ?',
+    ).get(TEST_WS_ID, result.briefId)).toEqual({ id: result.briefId });
+    // The failed request event does not suppress the later content-updated event.
+    expect(vi.mocked(broadcastToWorkspace).mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('preserves a committed brief and labels terminal bookkeeping failure truthfully', async () => {
+    const request = makeRequest();
+    const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, {
+      workspaceId: TEST_WS_ID,
+      total: 1,
+      message: 'C2 terminal truth job',
+    });
+    const triggerName = 'test_fail_content_brief_done_write';
+    db.exec(`DROP TRIGGER IF EXISTS ${triggerName}`);
+    db.exec(`
+      CREATE TEMP TRIGGER ${triggerName}
+      BEFORE UPDATE OF status ON jobs
+      WHEN NEW.id = '${job.id.replaceAll("'", "''")}' AND NEW.status = 'done'
+      BEGIN
+        SELECT RAISE(ABORT, 'injected brief completion persistence failure');
+      END
+    `);
+    mockRecordAction.mockClear();
+    vi.mocked(broadcastToWorkspace).mockClear();
+
+    try {
+      await runContentBriefGenerationJob(job.id, {
+        source: 'request',
+        workspaceId: TEST_WS_ID,
+        requestId: request.id,
+        expectedRequestUpdatedAt: request.updatedAt,
+      });
+    } finally {
+      db.exec(`DROP TRIGGER IF EXISTS ${triggerName}`);
+    }
+
+    const storedJob = db.prepare('SELECT status, message, error, result FROM jobs WHERE id = ?')
+      .get(job.id) as { status: string; message: string; error: string; result: string };
+    expect(storedJob.status).toBe('error');
+    expect(storedJob.message).toBe('Brief committed, but completion tracking failed');
+    expect(storedJob.error).toContain('completion persistence failure');
+    const result = JSON.parse(storedJob.result) as {
+      briefId: string;
+      code: string;
+      artifactCommitted: boolean;
+    };
+    expect(result).toMatchObject({
+      code: 'completion_tracking_failed',
+      artifactCommitted: true,
+    });
+    expect(getBrief(TEST_WS_ID, result.briefId)?.id).toBe(result.briefId);
+    expect(mockRecordAction).not.toHaveBeenCalled();
+    const successEvents = vi.mocked(broadcastToWorkspace).mock.calls.filter(([, event]) => (
+      event === WS_EVENTS.CONTENT_REQUEST_UPDATE || event === WS_EVENTS.CONTENT_UPDATED
+    ));
+    expect(successEvents).toEqual([]);
   });
 });
 

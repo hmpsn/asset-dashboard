@@ -47,6 +47,9 @@ import './recommendation.js';
 // Google Business Profile review response approval artifact. Source of truth remains
 // google_business_review_responses; this adapter only mirrors client decisions back to it.
 import './gbp-review-response.js';
+// Grounded brand-generation review bundles. Decisions are committed atomically by
+// the brand review service rather than the generic mirror-first response path.
+import './brand-generation.js';
 
 export {
   registerAdapter,

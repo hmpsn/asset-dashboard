@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Clock, Pencil } from 'lucide-react';
-import { Button, IconButton, Checkbox, FormInput, FormTextarea } from '../ui';
+import { Button, Icon, IconButton, Checkbox, FormInput, FormTextarea, Popover } from '../ui';
 import { CockpitSendPanel } from './CockpitSendPanel';
 import { CockpitThrottlePicker } from './CockpitThrottlePicker';
 import { CockpitStrikeConfirm } from './CockpitStrikeConfirm';
@@ -40,6 +40,12 @@ interface CockpitRowProps {
    */
   onStage?: (recId: string) => void;
   staged?: boolean;
+  /** The parent is a staging queue, but this lifecycle state cannot enter the sendable set. */
+  stageUnavailable?: boolean;
+  /** Optional detail workflow for consumers that own a recommendation drawer. */
+  onOpenDetails?: (recId: string) => void;
+  /** Opt-in row density for the compact Engine spine. Defaults to the existing row geometry. */
+  density?: 'default' | 'compact';
 }
 
 type RowMode = 'idle' | 'send' | 'throttle' | 'strike';
@@ -71,13 +77,26 @@ function resurfaceLabel(rec: Recommendation): string | null {
 /** Strategy v3 cockpit row — fixed [severity][value][lifecycle] tag slots + single-line-clamped
  *  why-line + left-edge lifecycle accent rail + the four row actions. NOT the shared
  *  admin/recommendations/RecommendationRow (3 consumers) — this is the v3 curation row. */
-export function CockpitRow({ rec, actions, selected, onToggleSelect, onEditWording, sendLabel = 'Send to client', onStage, staged = false }: CockpitRowProps) {
+export function CockpitRow({
+  rec,
+  actions,
+  selected,
+  onToggleSelect,
+  onEditWording,
+  sendLabel = 'Send to client',
+  onStage,
+  staged = false,
+  stageUnavailable = false,
+  onOpenDetails,
+  density = 'default',
+}: CockpitRowProps) {
   const [mode, setMode] = useState<RowMode>('idle');
   const [editingWording, setEditingWording] = useState(false);
   const model = toCockpitRow(rec);
   const isStruck = rec.lifecycle === 'struck';
   const cascadeNote = rec.cascade?.reversible ? 'removes from strategy — reversible' : undefined;
   const resurface = resurfaceLabel(rec);
+  const compact = density === 'compact';
 
   const close = () => setMode('idle');
 
@@ -95,93 +114,188 @@ export function CockpitRow({ rec, actions, selected, onToggleSelect, onEditWordi
 
   return (
     <div
-      className={`relative flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] py-3 pl-4 pr-3 ${
+      data-density={compact ? 'compact' : undefined}
+      className={`relative flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] ${compact ? 'py-2.5 pl-3 pr-2.5' : 'py-3 pl-4 pr-3'} ${
         isStruck ? 'opacity-60' : ''
       }`}
     >
       <span
-        className={`absolute left-0 top-0 h-full w-1 rounded-l-lg ${RAIL_CLASS[model.railTone]}`}
+        data-testid="cockpit-row-rail"
+        className={`absolute left-0 top-0 h-full rounded-l-lg ${compact && !staged ? 'w-0.5 opacity-50' : 'w-1'} ${RAIL_CLASS[model.railTone]}`}
         aria-hidden
       />
-      <div className="flex items-start justify-between gap-3">
-        {onToggleSelect && (
-          <Checkbox
-            checked={selected ?? false}
-            onChange={() => onToggleSelect(rec.id)}
-            label={`Select: ${rec.title}`}
-            srOnlyLabel
-            className="mt-0.5 shrink-0"
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="t-ui font-semibold text-[var(--brand-text)] truncate">{rec.title}</span>
-            {model.tags.map((t) => (
-              <span key={t.slot} className={`t-caption-sm ${TAG_TONE[t.tone]} shrink-0`}>
-                {t.label}
-              </span>
-            ))}
-            {resurface && <span className="t-caption-sm text-amber-400 shrink-0">{resurface}</span>}
+      <div
+        data-testid="cockpit-row-primary"
+        className={`flex flex-col items-stretch ${compact ? 'gap-2' : 'gap-3'} xl:flex-row xl:items-start xl:justify-between`}
+      >
+        <div className={`flex min-w-0 flex-1 items-start ${compact ? 'gap-2' : 'gap-3'}`}>
+          {onToggleSelect && (
+            <Checkbox
+              checked={selected ?? false}
+              onChange={() => onToggleSelect(rec.id)}
+              label={`Select: ${rec.title}`}
+              srOnlyLabel
+              className="mt-0.5 shrink-0"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="t-ui font-semibold text-[var(--brand-text)] truncate">{rec.title}</span>
+              {model.tags.map((t) => (
+                <span
+                  key={t.slot}
+                  data-testid={compact && t.slot === 'value' ? 'cockpit-row-value-tag' : undefined}
+                  className={`t-caption-sm ${TAG_TONE[t.tone]} shrink-0`}
+                >
+                  {t.label}
+                </span>
+              ))}
+              {resurface && <span className="t-caption-sm text-amber-400 shrink-0">{resurface}</span>}
+            </div>
+            <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">{model.whyLine}</p>
           </div>
-          <p className="t-caption-sm text-[var(--brand-text-muted)] truncate">{model.whyLine}</p>
         </div>
         {!isStruck && mode === 'idle' && (
-          <div className="flex items-center gap-1 shrink-0">
-            {canEditWording && (
-              <IconButton
-                icon={Pencil}
-                label={editingWording ? 'Done editing wording' : 'Edit wording'}
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditingWording((e) => !e)}
-              />
-            )}
-            {onStage ? (
-              // Blocker 5 staging: toggle membership in the staged set — NO client write. The header
-              // "Send issue" commits the staged set. CockpitSendPanel is never opened in this path.
-              <Button
-                size="sm"
-                variant={staged ? 'secondary' : 'primary'}
-                disabled={actions.isPending}
-                aria-pressed={staged}
-                onClick={() => onStage(rec.id)}
-              >
-                {staged ? 'Unstage' : sendLabel}
-              </Button>
+          <div
+            data-testid="cockpit-row-actions"
+            className="flex w-full flex-wrap items-center gap-1 xl:w-auto xl:shrink-0 xl:justify-end"
+          >
+            {compact ? (
+              <>
+                {onOpenDetails && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onOpenDetails(rec.id)}
+                    aria-label={`View details for ${rec.title}`}
+                  >
+                    <Icon name="eye" size="sm" />
+                    Details
+                  </Button>
+                )}
+                {stageUnavailable ? null : onStage ? (
+                  <Button
+                    size="sm"
+                    variant={staged ? 'secondary' : 'primary'}
+                    disabled={actions.isPending}
+                    aria-pressed={staged}
+                    onClick={() => onStage(rec.id)}
+                  >
+                    {staged ? 'Unstage' : sendLabel}
+                  </Button>
+                ) : (
+                  <Button size="sm" disabled={actions.isPending} onClick={() => setMode('send')}>
+                    {sendLabel}
+                  </Button>
+                )}
+                <Popover
+                  placement="bottom-end"
+                  trigger={(
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`More actions for ${rec.title}`}
+                      disabled={actions.isPending}
+                    >
+                      More
+                      <Icon name="chevronDown" size="sm" />
+                    </Button>
+                  )}
+                >
+                  {canEditWording && (
+                    <Popover.Item onClick={() => setEditingWording((editing) => !editing)}>
+                      <span className="flex items-center gap-2">
+                        <Icon name="pencil" size="sm" />
+                        {editingWording ? 'Done editing wording' : 'Edit wording'}
+                      </span>
+                    </Popover.Item>
+                  )}
+                  <Popover.Item disabled={actions.isPending} onClick={() => actions.fix(rec.id)}>
+                    <span className="flex items-center gap-2">
+                      <Icon name="check" size="sm" />
+                      Fix
+                    </span>
+                  </Popover.Item>
+                  <Popover.Item disabled={actions.isPending} onClick={() => setMode('throttle')}>
+                    <span className="flex items-center gap-2">
+                      <Icon name="clock" size="sm" />
+                      Park
+                    </span>
+                  </Popover.Item>
+                </Popover>
+              </>
             ) : (
-              <Button size="sm" disabled={actions.isPending} onClick={() => setMode('send')}>
-                {sendLabel}
-              </Button>
+              <>
+                {onOpenDetails && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onOpenDetails(rec.id)}
+                    aria-label={`View details for ${rec.title}`}
+                  >
+                    <Icon name="eye" size="sm" />
+                    Details
+                  </Button>
+                )}
+                {canEditWording && (
+                  <IconButton
+                    icon={Pencil}
+                    label={editingWording ? 'Done editing wording' : 'Edit wording'}
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingWording((e) => !e)}
+                  />
+                )}
+                {stageUnavailable ? null : onStage ? (
+                  // Blocker 5 staging: toggle membership in the staged set — NO client write. The header
+                  // "Send issue" commits the staged set. CockpitSendPanel is never opened in this path.
+                  <Button
+                    size="sm"
+                    variant={staged ? 'secondary' : 'primary'}
+                    disabled={actions.isPending}
+                    aria-pressed={staged}
+                    onClick={() => onStage(rec.id)}
+                  >
+                    {staged ? 'Unstage' : sendLabel}
+                  </Button>
+                ) : (
+                  <Button size="sm" disabled={actions.isPending} onClick={() => setMode('send')}>
+                    {sendLabel}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={actions.isPending}
+                  onClick={() => actions.fix(rec.id)}
+                >
+                  Fix
+                </Button>
+                <Button
+                  icon={Clock}
+                  size="sm"
+                  variant="ghost"
+                  disabled={actions.isPending}
+                  title="Park this recommendation for later"
+                  onClick={() => setMode('throttle')}
+                >
+                  Park
+                </Button>
+              </>
             )}
+          </div>
+        )}
+        {isStruck && (
+          <div data-testid="cockpit-row-actions" className="flex w-full xl:w-auto xl:shrink-0 xl:justify-end">
             <Button
               size="sm"
               variant="secondary"
               disabled={actions.isPending}
-              onClick={() => actions.fix(rec.id)}
+              onClick={() => actions.unstrike(rec.id)}
             >
-              Fix
-            </Button>
-            <Button
-              icon={Clock}
-              size="sm"
-              variant="ghost"
-              disabled={actions.isPending}
-              title="Park this recommendation for later"
-              onClick={() => setMode('throttle')}
-            >
-              Park
+              Undo
             </Button>
           </div>
-        )}
-        {isStruck && (
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={actions.isPending}
-            onClick={() => actions.unstrike(rec.id)}
-          >
-            Undo
-          </Button>
         )}
       </div>
 

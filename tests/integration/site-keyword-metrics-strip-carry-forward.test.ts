@@ -90,6 +90,7 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
       businessSection: 'A dental clinic.',
       keywordEvaluationContext: {},
       freshPageCount: 0,
+      executions: [],
     })),
   };
 });

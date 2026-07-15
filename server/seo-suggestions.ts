@@ -7,6 +7,44 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { parseJsonFallback } from './db/json-validation.js';
+import { SEO_SUGGESTION_TRANSITIONS, InvalidTransitionError } from './state-machines.js';
+import { createLogger } from './logger.js';
+
+const log = createLogger('seo-suggestions');
+
+/**
+ * Partition a set of suggestion ids for a bulk terminal-marking write into the ids
+ * whose CURRENT status legally transitions to `target`, filtering out both idempotent
+ * no-ops (already at `target`) and illegal moves (e.g. re-applying a dismissed
+ * suggestion). Bulk writes are skip-and-report: an illegal id is logged and dropped,
+ * never thrown, so one bad id can't abort the whole batch.
+ */
+function legalSuggestionIdsForTarget(
+  workspaceId: string,
+  ids: string[],
+  target: 'applied' | 'dismissed',
+): string[] {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db.prepare(
+    `SELECT id, status FROM seo_suggestions WHERE workspace_id = ? AND id IN (${placeholders})`,
+  ).all(workspaceId, ...ids) as Array<{ id: string; status: string }>;
+  const legal: string[] = [];
+  for (const row of rows) {
+    if (row.status === target) continue; // idempotent no-op — already terminal at target
+    const allowed = SEO_SUGGESTION_TRANSITIONS[row.status] ?? [];
+    if (allowed.includes(target)) {
+      legal.push(row.id);
+    } else {
+      // Illegal move (applied → dismissed, dismissed → applied). Skip-and-report.
+      log.warn(
+        { workspaceId, suggestionId: row.id, from: row.status, to: target },
+        new InvalidTransitionError('seo_suggestion', row.status, target).message,
+      );
+    }
+  }
+  return legal;
+}
 export interface SeoSuggestion {
   id: string;
   workspaceId: string;
@@ -155,27 +193,38 @@ export function getSelectedSuggestions(workspaceId: string): SeoSuggestion[] {
 /** Mark suggestions as applied after pushing to Webflow. */
 export function markApplied(workspaceId: string, suggestionIds: string[]): void {
   if (!suggestionIds.length) return;
-  const placeholders = suggestionIds.map(() => '?').join(',');
+  // Guard pending → applied per row (SEO_SUGGESTION_TRANSITIONS). Idempotent re-apply
+  // of an already-applied id is skipped; an illegal move (dismissed → applied) is
+  // logged and dropped — the batch never throws.
+  const legalIds = legalSuggestionIdsForTarget(workspaceId, suggestionIds, 'applied');
+  if (!legalIds.length) return;
+  const placeholders = legalIds.map(() => '?').join(',');
   db.prepare(`
-    UPDATE seo_suggestions SET status = 'applied', updated_at = datetime('now')
+    UPDATE seo_suggestions SET status = 'applied', updated_at = datetime('now') -- status-ok: legalSuggestionIdsForTarget() guards pending→applied before this write
     WHERE workspace_id = ? AND id IN (${placeholders})
-  `).run(workspaceId, ...suggestionIds);
+  `).run(workspaceId, ...legalIds);
 }
 
 /** Dismiss (discard) suggestions. */
 export function dismissSuggestions(workspaceId: string, suggestionIds?: string[]): number {
   if (suggestionIds?.length) {
-    const placeholders = suggestionIds.map(() => '?').join(',');
+    // Guard pending → dismissed per row. Re-dismissing an already-dismissed
+    // suggestion is a no-op (skipped, not thrown); applied → dismissed is illegal and
+    // dropped with a warning.
+    const legalIds = legalSuggestionIdsForTarget(workspaceId, suggestionIds, 'dismissed');
+    if (!legalIds.length) return 0;
+    const placeholders = legalIds.map(() => '?').join(',');
     // txn-ok — if-branch returns early; the two writes are in mutually exclusive paths
     const result = db.prepare(`
-      UPDATE seo_suggestions SET status = 'dismissed', updated_at = datetime('now')
+      UPDATE seo_suggestions SET status = 'dismissed', updated_at = datetime('now') -- status-ok: legalSuggestionIdsForTarget() guards pending→dismissed before this write
       WHERE workspace_id = ? AND id IN (${placeholders})
-    `).run(workspaceId, ...suggestionIds);
+    `).run(workspaceId, ...legalIds);
     return result.changes;
   }
-  // Dismiss all pending for workspace
+  // Dismiss all pending for workspace — the WHERE status = 'pending' filter IS the
+  // guard (only pending → dismissed rows are touched; no illegal origin is possible).
   const result = db.prepare(`
-    UPDATE seo_suggestions SET status = 'dismissed', updated_at = datetime('now')
+    UPDATE seo_suggestions SET status = 'dismissed', updated_at = datetime('now') -- status-ok: WHERE status = 'pending' structurally enforces the only legal origin (pending→dismissed)
     WHERE workspace_id = ? AND status = 'pending'
   `).run(workspaceId);
   return result.changes;

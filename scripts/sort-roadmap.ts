@@ -3,7 +3,8 @@
  * sort-roadmap.ts — Auto-sort roadmap.json
  *
  * Rules:
- *   1. Active sprints (have ≥1 pending/in_progress item) stay at the top, in their current order.
+ *   1. Non-shipped sprints stay at the top, in their current order. Deferred and
+ *      closed items are terminal planning dispositions, but never shipment evidence.
  *   2. Backlog always sits right after the last active sprint.
  *   3. Newly completed sprints (all items "done", not yet archived) get:
  *      - Name prefixed with "✅ SHIPPED —"
@@ -36,6 +37,8 @@ type Sprint = SprintData;
 type Roadmap = RoadmapData;
 
 function isFullyShipped(sprint: Sprint): boolean {
+  // Deliberately strict: a closed/superseded item may finish planning work, but it
+  // must not turn its sprint into shipped product history or inflate velocity.
   return sprint.items.length > 0 && sprint.items.every(i => i.status === 'done');
 }
 

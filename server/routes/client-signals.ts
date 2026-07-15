@@ -21,6 +21,7 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { notifyTeamClientSignal } from '../email.js';
 import { addActivity } from '../activity-log.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('client-signals-routes');
@@ -64,7 +65,15 @@ router.patch(
     const signal = getSignalById(req.params.id);
     if (!signal) return res.status(404).json({ error: 'Signal not found' });
     if (!requestUserCanAccessWorkspace(req, signal.workspaceId)) return sendWorkspaceAccessDenied(res);
-    const ok = updateSignalStatus(req.params.id, status);
+    let ok;
+    try {
+      ok = updateSignalStatus(req.params.id, status);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        return res.status(409).json({ error: err.message });
+      }
+      throw err;
+    }
     if (!ok) return res.status(500).json({ error: 'Update failed' });
     const updated = getSignalById(req.params.id);
     broadcastToWorkspace(signal.workspaceId, WS_EVENTS.CLIENT_SIGNAL_UPDATED, { signalId: req.params.id });

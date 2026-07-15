@@ -15,15 +15,21 @@ import {
   getJobCancellationError,
   registerAbort,
   hasActiveJob,
+  ActiveJobResourceConflict,
+  createResourceScopedJob,
   type Job,
 } from '../jobs.js';
 import { APP_PASSWORD, requireClientPortalAuth, signAdminToken } from '../middleware.js';
-import { requestUserCanAccessWorkspace, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
+import { requestUserCanAccessWorkspace, requestUserCanOmitWorkspaceScope, sendWorkspaceAccessDenied, workspaceOwnsWebflowSite } from '../auth.js';
 import { startLegacyJob } from '../legacy-jobs-runner-registry.js';
 import { runRecommendationGenerationJob } from '../recommendation-generation-job.js';
 import { getBrief } from '../content-brief.js';
-import { startContentBriefGenerationJob } from '../content-brief-generation-job.js';
-import { startContentBriefRegenerateJob, hasActiveBriefRegenerateJob } from '../content-brief-regenerate-job.js';
+import {
+  ContentRequestGenerationConflictError,
+  ContentRequestGenerationLifecycleError,
+  startContentBriefGenerationJob,
+} from '../content-brief-generation-job.js';
+import { startContentBriefRegenerateJob } from '../content-brief-regenerate-job.js';
 import { startAiReviewJob, startAiFixJob, startVoiceScoreJob, aiFixRequestSchema } from '../content-posts-ai-jobs.js';
 import type { StandaloneContentBriefGenerationParams } from '../content-brief-generation-job.js';
 import { getContentRequest } from '../content-requests.js';
@@ -68,10 +74,16 @@ import { getInsights } from '../analytics-insights-store.js';
 import { createDiagnosticReport, markDiagnosticFailed } from '../diagnostic-store.js';
 import { runDiagnostic } from '../diagnostic-orchestrator.js';
 import type { AnalyticsInsight, AnomalyDigestData } from '../../shared/types/analytics.js';
-import { BACKGROUND_JOB_TYPES, toPublicBackgroundJob } from '../../shared/types/background-jobs.js';
+import {
+  BACKGROUND_JOB_TYPES,
+  JOB_RESOURCE_TYPES,
+  isSystemJobType,
+  toPublicBackgroundJob,
+} from '../../shared/types/background-jobs.js';
 import { CONTENT_GENERATION_STYLES } from '../../shared/types/content.js';
 import type { ContentGenerationStyle } from '../../shared/types/content.js';
 import { isProgrammingError } from '../errors.js';
+import { GenerationRevisionConflictError } from '../generation-provenance.js';
 
 const log = createLogger('jobs');
 const router = Router();
@@ -123,13 +135,44 @@ function keywordStrategyJobResultSummary(
 }
 
 function isClientVisibleJob(job: Job, workspaceId: string): boolean {
-  return job.workspaceId === workspaceId && CLIENT_VISIBLE_JOB_TYPES.has(job.type);
+  // The allow-list opts a type IN to the client feed; isSystemJobType (derived from
+  // BACKGROUND_JOB_METADATA[type].class) is a second, independent gate that always
+  // wins — a cron-originated job (e.g. intelligence-recompute) must never reach a
+  // client's task panel even if a future edit mistakenly adds its type to the
+  // allow-list above. See docs/rules/background-generation.md #System Job Class.
+  return job.workspaceId === workspaceId
+    && CLIENT_VISIBLE_JOB_TYPES.has(job.type)
+    && !isSystemJobType(job.type);
 }
 
 function parseContentGenerationStyle(value: unknown): ContentGenerationStyle | undefined {
   return typeof value === 'string' && CONTENT_GENERATION_STYLES.includes(value as ContentGenerationStyle)
     ? value as ContentGenerationStyle
     : undefined;
+}
+
+function parseExpectedRevision(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+function jobConflictResponse(err: unknown): {
+  error: string;
+  code: string;
+  jobId?: string;
+  status?: string;
+} | null {
+  if (err instanceof GenerationRevisionConflictError || err instanceof ContentRequestGenerationConflictError) {
+    return { error: err.message, code: err.code };
+  }
+  if (err instanceof ContentRequestGenerationLifecycleError) {
+    return { error: err.message, code: err.code, status: err.status };
+  }
+  if (err instanceof ActiveJobResourceConflict) {
+    return { error: err.message, code: err.code, jobId: err.jobId };
+  }
+  return null;
 }
 
 // --- Background Job Endpoints ---
@@ -148,7 +191,11 @@ router.get('/api/jobs', (_req, res) => {
 router.get('/api/jobs/:id', (req, res) => {
   const job = getJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
-  if (job.workspaceId && !requestUserCanAccessWorkspace(req, job.workspaceId)) return sendWorkspaceAccessDenied(res);
+  if (job.workspaceId) {
+    if (!requestUserCanAccessWorkspace(req, job.workspaceId)) return sendWorkspaceAccessDenied(res);
+  } else if (!requestUserCanOmitWorkspaceScope(req)) {
+    return sendWorkspaceAccessDenied(res);
+  }
   res.json(job);
 });
 
@@ -189,7 +236,11 @@ router.delete('/api/jobs/completed', (_req, res) => {
 router.delete('/api/jobs/:id', (req, res) => {
   const existing = getJob(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Job not found' });
-  if (existing.workspaceId && !requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
+  if (existing.workspaceId) {
+    if (!requestUserCanAccessWorkspace(req, existing.workspaceId)) return sendWorkspaceAccessDenied(res);
+  } else if (!requestUserCanOmitWorkspaceScope(req)) {
+    return sendWorkspaceAccessDenied(res);
+  }
   const cancellationError = getJobCancellationError(existing);
   if (cancellationError) return res.status(409).json({ error: cancellationError, jobId: existing.id });
   const job = cancelJob(req.params.id);
@@ -226,22 +277,32 @@ router.post('/api/jobs', async (req, res) => {
       case BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION: {
         const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
         const briefId = typeof params.briefId === 'string' ? params.briefId.trim() : '';
+        const expectedBriefRevision = parseExpectedRevision(params.expectedBriefRevision);
+        const generationStyle = parseContentGenerationStyle(params.generationStyle);
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
         if (!briefId) return res.status(400).json({ error: 'briefId required' });
-        const activePostJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, wsId);
-        if (activePostJob) return res.status(409).json({ error: 'Content post generation is already running for this workspace', jobId: activePostJob.id });
+        if (expectedBriefRevision === undefined) return res.status(400).json({ error: 'expectedBriefRevision required' });
+        if (params.generationStyle !== undefined && !generationStyle) {
+          return res.status(400).json({ error: 'generationStyle must be one of standard, concise, hybrid' });
+        }
         const ws = getWorkspace(wsId);
         if (!ws) return res.status(404).json({ error: 'Workspace not found' });
         const brief = getBrief(wsId, briefId);
         if (!brief) return res.status(404).json({ error: 'Brief not found' });
 
-        const started = createContentPostGenerationJob(wsId, brief);
+        const started = createContentPostGenerationJob(
+          wsId,
+          brief,
+          generationStyle,
+          expectedBriefRevision,
+        );
         res.json({ jobId: started.jobId, postId: started.postId, post: started.post });
         runContentPostGenerationJob({
           workspaceId: wsId,
-          brief,
+          brief: started.brief,
           postId: started.postId,
           jobId: started.jobId,
+          expectedRevision: started.expectedRevision,
         });
         break;
       }
@@ -255,12 +316,16 @@ router.post('/api/jobs', async (req, res) => {
           return res.status(400).json({ error: 'generationStyle must be one of standard, concise, hybrid' });
         }
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
-        const activeBriefJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, wsId);
-        if (activeBriefJob) return res.status(409).json({ error: 'Content brief generation is already running for this workspace', jobId: activeBriefJob.id });
         const ws = getWorkspace(wsId);
         if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
         if (requestId) {
+          const expectedRequestUpdatedAt = typeof params.expectedRequestUpdatedAt === 'string'
+            ? params.expectedRequestUpdatedAt.trim()
+            : '';
+          if (!expectedRequestUpdatedAt) {
+            return res.status(400).json({ error: 'expectedRequestUpdatedAt required' });
+          }
           const request = getContentRequest(wsId, requestId);
           if (!request) return res.status(404).json({ error: 'Request not found' });
           const started = startContentBriefGenerationJob({
@@ -268,6 +333,7 @@ router.post('/api/jobs', async (req, res) => {
             workspaceId: wsId,
             requestId,
             generationStyle,
+            expectedRequestUpdatedAt,
           });
           res.json(started);
           break;
@@ -308,15 +374,20 @@ router.post('/api/jobs', async (req, res) => {
         if (entryIds.length === 0) return res.status(400).json({ error: 'entryIds required' });
         const blueprint = getBlueprint(wsId, blueprintId);
         if (!blueprint) return res.status(404).json({ error: 'Blueprint not found' });
-        const activeCopyBatchJob = hasActiveJob(BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION, wsId);
-        if (activeCopyBatchJob) return res.status(409).json({ error: 'Copy batch generation is already running for this workspace', jobId: activeCopyBatchJob.id });
+        if (new Set(entryIds).size !== entryIds.length) {
+          return res.status(400).json({ error: 'entryIds must be unique' });
+        }
         try {
           const started = createCopyBatchGenerationJob({ workspaceId: wsId, blueprintId, entryIds, mode, batchSize });
           res.json(started);
           setTimeout(() => {
-            void runCopyBatchGenerationJob({ workspaceId: wsId, blueprintId, entryIds, mode, batchSize, ...started });
+            void runCopyBatchGenerationJob({ workspaceId: wsId, blueprintId, entryIds, mode, batchSize, ...started }).catch(err => {
+              log.error({ err, jobId: started.jobId, batchId: started.batchId, workspaceId: wsId, blueprintId }, 'copy batch worker rejected after launch');
+            });
           }, 100);
         } catch (err) {
+          const conflict = jobConflictResponse(err);
+          if (conflict) return res.status(409).json(conflict);
           if (err instanceof Error && err.message === 'Blueprint not found') {
             return res.status(404).json({ error: 'Blueprint not found' });
           }
@@ -551,10 +622,15 @@ router.post('/api/jobs', async (req, res) => {
         if (!entryId) return res.status(400).json({ error: 'entryId required' });
         if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
         if (!getEntry(wsId, blueprintId, entryId)) return res.status(404).json({ error: 'Entry not found' });
-        const copyJob = createJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, { workspaceId: wsId });
+        const { job: copyJob } = createResourceScopedJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, {
+          workspaceId: wsId,
+          resources: [{ resourceType: JOB_RESOURCE_TYPES.COPY_ENTRY, resourceId: entryId }],
+        });
         res.json({ jobId: copyJob.id });
         setImmediate(() => {
-          void runCopyEntryGenerationJob({ jobId: copyJob.id, workspaceId: wsId, blueprintId, entryId, accumulatedSteering });
+          void runCopyEntryGenerationJob({ jobId: copyJob.id, workspaceId: wsId, blueprintId, entryId, accumulatedSteering }).catch(err => {
+            log.error({ err, jobId: copyJob.id, workspaceId: wsId, blueprintId, entryId }, 'copy entry worker rejected after launch');
+          });
         });
         break;
       }
@@ -623,16 +699,16 @@ router.post('/api/jobs', async (req, res) => {
         const briefId = typeof params.briefId === 'string' ? params.briefId.trim() : '';
         const mode = params.mode === 'outline' ? 'outline' : 'regenerate';
         const feedback = typeof params.feedback === 'string' ? params.feedback : undefined;
+        const expectedRevision = parseExpectedRevision(params.expectedRevision);
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
         if (!briefId) return res.status(400).json({ error: 'briefId required' });
+        if (expectedRevision === undefined) return res.status(400).json({ error: 'expectedRevision required' });
         if (mode === 'regenerate' && !feedback) return res.status(400).json({ error: 'feedback required' });
         if (!getWorkspace(wsId)) return res.status(404).json({ error: 'Workspace not found' });
         if (!getBrief(wsId, briefId)) return res.status(404).json({ error: 'Brief not found' });
-        const activeRegen = hasActiveBriefRegenerateJob(wsId);
-        if (activeRegen) return res.status(409).json({ error: 'A brief regeneration is already running for this workspace', jobId: activeRegen.id });
         const started = mode === 'outline'
-          ? startContentBriefRegenerateJob({ mode: 'outline', workspaceId: wsId, briefId, feedback })
-          : startContentBriefRegenerateJob({ mode: 'regenerate', workspaceId: wsId, briefId, feedback: feedback as string });
+          ? startContentBriefRegenerateJob({ mode: 'outline', workspaceId: wsId, briefId, feedback, expectedRevision })
+          : startContentBriefRegenerateJob({ mode: 'regenerate', workspaceId: wsId, briefId, feedback: feedback as string, expectedRevision });
         res.status(202).json(started);
         break;
       }
@@ -640,40 +716,40 @@ router.post('/api/jobs', async (req, res) => {
       case BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW: {
         const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
         const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        const expectedRevision = parseExpectedRevision(params.expectedRevision);
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
         if (!postId) return res.status(400).json({ error: 'postId required' });
+        if (expectedRevision === undefined) return res.status(400).json({ error: 'expectedRevision required' });
         if (!getPost(wsId, postId)) return res.status(404).json({ error: 'Post not found' });
-        const activeReview = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW, wsId);
-        if (activeReview) return res.status(409).json({ error: 'An AI review is already running for this workspace', jobId: activeReview.id });
-        res.status(202).json(startAiReviewJob({ workspaceId: wsId, postId }));
+        res.status(202).json(startAiReviewJob({ workspaceId: wsId, postId, expectedRevision }));
         break;
       }
 
       case BACKGROUND_JOB_TYPES.CONTENT_POST_FIX: {
         const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
         const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        const expectedRevision = parseExpectedRevision(params.expectedRevision);
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
         if (!postId) return res.status(400).json({ error: 'postId required' });
+        if (expectedRevision === undefined) return res.status(400).json({ error: 'expectedRevision required' });
         if (!getPost(wsId, postId)) return res.status(404).json({ error: 'Post not found' });
         const fixParsed = aiFixRequestSchema.safeParse(params.body);
         if (!fixParsed.success) return res.status(400).json({ error: 'Invalid ai-fix body' });
-        const activeFix = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, wsId);
-        if (activeFix) return res.status(409).json({ error: 'An AI fix is already running for this workspace', jobId: activeFix.id });
-        res.status(202).json(startAiFixJob({ workspaceId: wsId, postId, body: fixParsed.data as AiFixRequest }));
+        res.status(202).json(startAiFixJob({ workspaceId: wsId, postId, body: fixParsed.data as AiFixRequest, expectedRevision }));
         break;
       }
 
       case BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE: {
         const wsId = typeof params.workspaceId === 'string' ? params.workspaceId : '';
         const postId = typeof params.postId === 'string' ? params.postId.trim() : '';
+        const expectedRevision = parseExpectedRevision(params.expectedRevision);
         if (!wsId) return res.status(400).json({ error: 'workspaceId required' });
         if (!postId) return res.status(400).json({ error: 'postId required' });
+        if (expectedRevision === undefined) return res.status(400).json({ error: 'expectedRevision required' });
         const vsPost = getPost(wsId, postId);
         if (!vsPost) return res.status(404).json({ error: 'Post not found' });
         if (!getBrief(wsId, vsPost.briefId)) return res.status(404).json({ error: 'Brief not found' });
-        const activeVoice = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, wsId);
-        if (activeVoice) return res.status(409).json({ error: 'Voice scoring is already running for this workspace', jobId: activeVoice.id });
-        res.status(202).json(startVoiceScoreJob({ workspaceId: wsId, postId }));
+        res.status(202).json(startVoiceScoreJob({ workspaceId: wsId, postId, expectedRevision }));
         break;
       }
 
@@ -681,6 +757,8 @@ router.post('/api/jobs', async (req, res) => {
         return res.status(400).json({ error: `Unknown job type: ${type}` });
     }
   } catch (err) {
+    const conflict = jobConflictResponse(err);
+    if (conflict) return res.status(409).json(conflict);
     if (isProgrammingError(err)) log.warn({ err }, 'jobs: POST /api/jobs: programming error'); // url-fetch-ok
     else log.debug({ err }, 'jobs: POST /api/jobs: degrading gracefully');
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

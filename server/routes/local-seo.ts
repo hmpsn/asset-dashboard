@@ -18,6 +18,7 @@ import {
 } from '../client-locations.js';
 import db from '../db/index.js';
 import { createLogger } from '../logger.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import {
   countLocalVisibilitySnapshots,
   createLocalSeoRefreshPlan,
@@ -330,7 +331,13 @@ router.put('/api/local-seo/:workspaceId/locations/:locationId', requireWorkspace
   const { workspaceId, locationId } = req.params;
   const available = ensureLocalSeoLocationsAvailable(workspaceId);
   if (!available.ok) return res.status(available.status).json({ error: available.error });
-  const location = updateClientLocation(locationId, workspaceId, req.body);
+  let location;
+  try {
+    location = updateClientLocation(locationId, workspaceId, req.body);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
+    throw err;
+  }
   if (!location) return res.status(404).json({ error: 'Location not found' });
   recordLocationMutation(workspaceId, 'location_updated', location.name);
   const jobId = enqueueLocationBackfill(workspaceId);

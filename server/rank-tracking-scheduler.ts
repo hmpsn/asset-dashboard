@@ -21,6 +21,7 @@ import {
 import { fireBridge } from './bridge-infrastructure.js';
 import { runLostVisibilityBridge } from './bridge-lost-visibility.js';
 import { broadcastToWorkspace } from './broadcast.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { enqueueIntelligenceRecompute } from './intelligence-recompute-job.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -80,8 +81,15 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
       for (const [snapshotDate, dateQueries] of [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
         upsertDiscoveredQueries(ws.id, dateQueries, snapshotDate);
       }
-      detectLostVisibility(ws.id, date);
-      pruneDiscoveredQueries(ws.id, date);
+      try {
+        detectLostVisibility(ws.id, date);
+        pruneDiscoveredQueries(ws.id, date);
+      } finally {
+        // Provider-backed rank inputs feed the SEO context slice. Clear the
+        // workspace intelligence once after the complete snapshot batch lands,
+        // even if a derived discovery cleanup fails after the successful write.
+        invalidateIntelligenceCache(ws.id);
+      }
       fireBridge('bridge-lost-visibility', ws.id, async () => runLostVisibilityBridge(ws.id));
       // A4 review I2: new daily positions must reach open dashboards live — the
       // requested-keyword trend card (and any rank-history consumer) invalidates
@@ -91,8 +99,8 @@ export async function runRankTrackingSnapshots(workspaceIds?: string[]): Promise
         date,
         queryCount: queries.length,
       });
-      // Phase 5c: fresh rank data lands → refresh signals. No-ops unless the signal-auto-recompute
-      // flag is on; deduped via hasActiveJob (the lost_visibility bridge above owns its own insights).
+      // Phase 5c: fresh rank data lands → refresh signals. Deduped via hasActiveJob
+      // (the lost_visibility bridge above owns its own insights).
       enqueueIntelligenceRecompute(ws.id);
       log.info({ workspaceId: ws.id, count: queries.length, date }, 'Rank snapshot captured');
     } catch (err) {

@@ -175,13 +175,11 @@ function makeBackfillRecommendation(overrides: Partial<Recommendation> & { id?: 
   };
 }
 
+// R7 cutover: rows are the sole store, so the seeder writes recommendation_items via the
+// normalized write path (saveRecommendations) rather than the retired recommendations blob.
 function seedRecommendationSet(recommendations: Array<Partial<Recommendation> & { id?: string }>) {
-  const now = new Date().toISOString();
   const fullRecommendations = recommendations.map(makeBackfillRecommendation);
-  db.prepare(
-    `INSERT OR REPLACE INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
-     VALUES (?, ?, ?, ?)`,
-  ).run(testWsId, now, JSON.stringify(fullRecommendations), '{}');
+  seedSavedRecommendationSet(fullRecommendations);
 }
 
 function seedSavedRecommendationSet(recommendations: Recommendation[]): RecommendationSet {
@@ -503,20 +501,22 @@ describe('backfillCompletedRecommendations', () => {
     expect(action!.pageUrl).toBeNull();
   });
 
-  it('uses normalized row state over the stale legacy blob after row-only status updates', () => {
+  it('reads normalized row state after a row-only status update; the blob stays the archive placeholder', () => {
     const recId = randomUUID();
     const rec = makeBackfillRecommendation({ id: recId, status: 'pending' });
     seedSavedRecommendationSet([rec]);
 
-    const legacyBefore = (db.prepare(
+    // R7 cutover: saveRecommendations writes '[]' to the archive-placeholder blob and the recs
+    // to recommendation_items. A row-only status update never touches the blob.
+    expect((db.prepare(
       'SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?',
-    ).get(testWsId) as { recommendations: string }).recommendations;
+    ).get(testWsId) as { recommendations: string }).recommendations).toBe('[]');
 
     const updated = updateRecommendationStatus(testWsId, recId, 'completed');
     expect(updated?.status).toBe('completed');
     expect((db.prepare(
       'SELECT recommendations FROM recommendation_sets WHERE workspace_id = ?',
-    ).get(testWsId) as { recommendations: string }).recommendations).toBe(legacyBefore);
+    ).get(testWsId) as { recommendations: string }).recommendations).toBe('[]');
 
     const count = backfillCompletedRecommendations(testWsId);
 

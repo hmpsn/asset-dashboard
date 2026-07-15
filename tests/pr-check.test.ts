@@ -38,8 +38,10 @@ import {
   findJsonArrayColumnSites,
   extractDbPrepareArg,
   findUnrenderedSliceFields,
+  findMissingDeliverableAdapters,
   compareStudioConstants,
   getChangedFiles,
+  getFiles,
   getUntrackedFiles,
   mergeChangedFiles,
   resolveRelevantChangedFilesForCheck,
@@ -52,6 +54,7 @@ import {
   type CustomCheckMatch,
 } from '../scripts/pr-check.js';
 import { renderAutomatedRulesDoc } from '../scripts/generate-rules-doc.js';
+import { DELIVERABLE_TYPES } from '../shared/types/client-deliverable.js';
 
 let TMPDIR: string;
 
@@ -96,6 +99,22 @@ function uniqPath(ruleId: string, name: string): string {
   counter += 1;
   return `${ruleId}/case-${counter}/${name}`;
 }
+
+describe('pr-check repository file walking', () => {
+  it('throws when find cannot execute instead of returning a false-empty scan', () => {
+    const originalPath = process.env.PATH;
+    try {
+      process.env.PATH = '';
+      expect(() => getFiles(TMPDIR, '*.ts')).toThrow(/getFiles\(.+\) failed/);
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it('treats a missing optional directory as an empty scan', () => {
+    expect(getFiles(path.join(TMPDIR, 'missing'), '*.ts')).toEqual([]);
+  });
+});
 
 interface RuleFixtureCase {
   name: string;
@@ -273,7 +292,7 @@ describe('Rule: Retired feature flag key used in flag API', () => {
     const file = write(
       uniqPath('rule-retired-feature-flags', 'negative.tsx'),
       lines(
-        "const active = isFeatureEnabled('keyword-universe-full');",
+        "const active = isFeatureEnabled('national-serp-tracking');",
         `const historicalNote = '${retiredKey} was retired';`,
         `fireBridge('${bridgeSource}', workspaceId, fn);`,
       ),
@@ -2900,6 +2919,7 @@ describe('Regression: pathFilter can opt into an EXCLUDED_DIRS directory', () =>
     // filtered out so a rule with pathFilter:'tests/' doesn't accidentally
     // start scanning vendor code nested underneath tests/.
     write('pathfilter-sanity/tests/node_modules/vendor.ts', `${TOKEN}\n`);
+    write('pathfilter-sanity/tests/playwright/.cache/generated.ts', `${TOKEN}\n`);
     write('pathfilter-sanity/tests/real.ts', `${TOKEN}\n`);
     const scanDir = path.join(TMPDIR, 'pathfilter-sanity', 'tests');
     const fakeCheck: Check = {
@@ -2913,6 +2933,21 @@ describe('Regression: pathFilter can opt into an EXCLUDED_DIRS directory', () =>
     const matches = checkDirectory(scanDir, fakeCheck);
     expect(matches.some((m) => m.includes('real.ts'))).toBe(true);
     expect(matches.some((m) => m.includes('node_modules'))).toBe(false);
+    expect(matches.some((m) => m.includes('.cache'))).toBe(false);
+  });
+
+  it('diff filtering rejects ignored cache artifacts at any nesting depth', () => {
+    const fakeCheck: Check = {
+      name: '__regression_cache_filter__',
+      pattern: PATTERN,
+      fileGlobs: ['*.ts'],
+      message: 'test',
+      severity: 'error',
+    };
+    expect(resolveRelevantChangedFilesForCheck([
+      'src/real.ts',
+      'playwright/.cache/generated.ts',
+    ], fakeCheck)).toEqual(['src/real.ts']);
   });
 });
 
@@ -5941,10 +5976,30 @@ describe('Meta: customCheck rule name registry', () => {
     // Reconcile A1 (2026-07-01) — a migration must never DROP TABLE directly; see
     // docs/rules/destructive-migrations.md for the rename-to-archive contract.
     'New migration DROP TABLE without rename-to-archive contract',
+    // Reconcile B10/R11-T7 (2026-07-02) — an ALTER on tracked_actions/action_outcomes
+    // must ALTER the matching archive twin in the same migration file; see
+    // server/db/archive-twin.ts and docs/rules/destructive-migrations.md.
+    'Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)',
     // Reconcile R1-PR2 (2026-07-01) — the diff-time analogues of
     // scripts/lexicon-registry.ts's verify:lexicon full-scan checks.
     'Duplicate exported domain type name',
     'ActivityType minting guard',
+    // Reconcile R3-PR2 (2026-07-02) — converted from a single-line regex to a
+    // customCheck to close three structural escape classes (literal writes,
+    // mid-clause `, status =`, and lifecycle columns like resolution_status).
+    'Unguarded SET status = ? (state machine transition)',
+    // Reconcile C1/R11-T5 (2026-07-02) — a migration that CREATEs a *_snapshots
+    // table must register it in server/db/snapshot-registry.ts in the same PR;
+    // see docs/rules/snapshot-envelope.md.
+    'New migration creates a _snapshots table without a matching registry entry',
+    // UI Rebuild F2a (2026-07-03) — @ds-rebuilt-scoped strict gates (Phase D, D2/D7).
+    'ds-raw-hex-anywhere',
+    'ds-tailwind-palette-bypass',
+    'ds-per-view-css-block',
+    'ds-token-theme-parity',
+    'ds-icon-discipline',
+    'ds-deep-import',
+    'ds-motion-token',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -6077,7 +6132,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       out = execFileSync(tsxBin, ['scripts/pr-check.ts', '--all'], {
         cwd: repoRoot,
         encoding: 'utf-8',
-        timeout: 360_000,
+        timeout: 600_000,
         maxBuffer: 10 * 1024 * 1024,
       });
     } catch (err: unknown) {
@@ -6085,8 +6140,26 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
       // still attached to the error object. pr-check exits 1 when errors
       // exist — swallow that; we only care about the status lines in
       // stdout.
-      const e = err as { stdout?: Buffer | string; stderr?: Buffer | string; status?: number; message?: string };
+      const e = err as {
+        stdout?: Buffer | string;
+        stderr?: Buffer | string;
+        status?: number;
+        signal?: NodeJS.Signals | null;
+        killed?: boolean;
+        message?: string;
+      };
       out = e.stdout ? e.stdout.toString() : '';
+      if (e.signal || e.killed || /timed out/i.test(e.message ?? '')) {
+        const stderrStr = e.stderr ? e.stderr.toString() : '';
+        throw new Error(
+          `pr-check --all timed out before producing a complete status table.\n` +
+          `  signal: ${e.signal ?? 'none'}\n` +
+          `  killed: ${String(e.killed ?? false)}\n` +
+          `  message: ${e.message}\n` +
+          `  stdout tail:\n${out.split('\n').slice(-30).join('\n')}\n` +
+          `  stderr tail:\n${stderrStr.split('\n').slice(-30).join('\n')}`,
+        );
+      }
       if (!out.trim()) {
         const stderrStr = e.stderr ? e.stderr.toString() : '';
         throw new Error(
@@ -6199,7 +6272,7 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     if (errors.length > 0) {
       throw new Error(errors.join('\n\n─────\n\n'));
     }
-  }, 390_000);
+  }, 660_000);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -6912,6 +6985,44 @@ describe('Pattern rule: Hand-rolled trend badge', () => {
 // ════════════════════════════════════════════════════════════════════════════
 // Rule: styleguide-token-parity
 // ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Legacy surface token in new code
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Legacy surface token in new code', () => {
+  const RULE = 'Legacy surface token in new code';
+
+  it('flags deprecated --brand-bg-* aliases in component styles', () => {
+    const file = write(
+      uniqPath('rule-legacy-surface-token', 'src/components/Probe.tsx'),
+      lines(
+        'export function Probe() {',
+        '  return <div style={{ background: "var(--brand-bg-card)" }}>x</div>;',
+        '}',
+      ),
+    );
+    const check = CHECKS.find(c => c.name === RULE);
+    expect(check).toBeDefined();
+    const hits = checkDirectory(path.dirname(file), check!);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain('--brand-bg-card');
+  });
+
+  it('accepts the canonical surface token family', () => {
+    const file = write(
+      uniqPath('rule-legacy-surface-token', 'src/components/Probe.tsx'),
+      lines(
+        'export function Probe() {',
+        '  return <div style={{ background: "var(--surface-2)" }}>x</div>;',
+        '}',
+      ),
+    );
+    const check = CHECKS.find(c => c.name === RULE);
+    expect(check).toBeDefined();
+    expect(checkDirectory(path.dirname(file), check!)).toHaveLength(0);
+  });
+});
 
 // ════════════════════════════════════════════════════════════════════════════
 // Rule: radius-signature-lg used outside SectionCard
@@ -10731,16 +10842,24 @@ describe('Rule: no-direct-insert-to-client_deliverable-outside-store', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Rule: every-active-type-has-an-adapter (warn, phase-aware)
+// Rule: every-active-type-has-an-adapter (error, canonical census)
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('Rule: every-active-type-has-an-adapter', () => {
   const RULE = 'every-active-type-has-an-adapter';
 
-  it('returns no hits in Phase 0 (all phase-group flags default false)', () => {
-    // The customCheck ignores its file args and reads FEATURE_FLAGS from disk; with every
-    // unified-deliverables-* flag false, no type is active so nothing is required yet.
+  it('returns no hits when every canonical type has an adapter', () => {
     expect(runRule(RULE, [])).toHaveLength(0);
+  });
+
+  it('uses the canonical deliverable type census, including newer review families', () => {
+    const emptyAdaptersDir = path.join(TMPDIR, 'empty-deliverable-adapters');
+    mkdirSync(emptyAdaptersDir, { recursive: true });
+
+    expect(findMissingDeliverableAdapters(emptyAdaptersDir)).toEqual([...DELIVERABLE_TYPES]);
+    expect(findMissingDeliverableAdapters(emptyAdaptersDir)).toEqual(
+      expect.arrayContaining(['gbp_review_response', 'brand_generation']),
+    );
   });
 });
 
@@ -11911,10 +12030,18 @@ describe('Rule: ActivityType minting guard', () => {
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('does not flag an unrelated activity-log.ts edit (no union touched)', () => {
+  it('does not flag an unrelated activity-log.ts edit (union present, unchanged; only a function edited)', () => {
+    // customCheck reads the full current file off disk (not a diff), so
+    // modeling "an unrelated edit" means the union anchor and its registered
+    // members are still present and untouched — unlike a fixture that omits
+    // the union entirely, which (correctly, post-fix) now reads as a format
+    // drift and is covered by the dedicated "missing anchor" test below.
     const file = write(
       uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
       lines(
+        "export type ActivityType =",
+        "  | 'audit_completed';",
+        "",
         "export function addActivity(workspaceId: string) {",
         "  return workspaceId;",
         "}",
@@ -11942,6 +12069,51 @@ describe('Rule: ActivityType minting guard', () => {
     const hits = runRule(RULE, [file]);
     expect(hits).toHaveLength(1);
     expect(hits[0].line).toBe(3);
+  });
+
+  it('flags BOTH unregistered members when two share a single union line', () => {
+    // Regression guard: the extraction regex used to be non-global, so
+    // `line.match(...)` only ever returned the FIRST `| 'x'` on a line —
+    // a second member sharing that line (e.g. `| 'a' | 'b';`) was silently
+    // never inspected, even though it's a genuine new mint. The regex is now
+    // global and the rule uses matchAll so every member on the line is
+    // checked independently.
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType =",
+        "  | 'audit_completed'",
+        "  | 'brand_new_unregistered_a' | 'brand_new_unregistered_b';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].line).toBe(3);
+    expect(hits[1].line).toBe(3);
+    expect(hits.map((h) => h.text)).toEqual([
+      "| 'brand_new_unregistered_a' | 'brand_new_unregistered_b';",
+      "| 'brand_new_unregistered_a' | 'brand_new_unregistered_b';",
+    ]);
+  });
+
+  it('fails loudly when the union anchor is not found in a changed activity-log.ts (no silent pass)', () => {
+    // "No match must mean unknown, skip" — but only when the FILE itself is
+    // out of scope. Here server/activity-log.ts IS the changed file being
+    // scanned; if the `export type ActivityType =` anchor line is missing
+    // (renamed, reformatted, reindented), the rule must not silently return
+    // zero hits — that would let every future mint in this file pass
+    // uninspected. It must emit a hit forcing the guard itself to be fixed.
+    const file = write(
+      uniqPath('rule-activity-type-mint', 'server/activity-log.ts'),
+      lines(
+        "export type ActivityType",           // anchor format drifted — no trailing ' ='
+        "  = | 'audit_completed'",
+        "  | 'brand_new_unregistered_activity_type_member';",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].text).toMatch(/anchor not found/i);
   });
 });
 
@@ -11977,17 +12149,603 @@ describe('Meta: ActivityType minting-guard baseline parity', () => {
     const unionMembers: string[] = [];
     for (let i = unionStart + 1; i < srcLines.length; i++) {
       const line = srcLines[i];
-      const match = line.match(ACTIVITY_TYPE_MEMBER_LINE_RE);
       // Mirror the rule's terminal detection exactly: strip the trailing
       // `//…` comment before the `;`-at-end-of-code test.
       const codePortion = line.replace(/\/\/.*$/, '');
       const terminal = /;\s*$/.test(codePortion);
-      if (match) unionMembers.push(match[1]);
+      // Mirror the rule's extraction exactly: global regex + matchAll so every
+      // member on the line is captured, not just the first.
+      for (const match of line.matchAll(ACTIVITY_TYPE_MEMBER_LINE_RE)) {
+        unionMembers.push(match[1]);
+      }
       if (terminal) break;
     }
 
     // Deterministic order for a readable diff on failure.
     const unionSet = new Set(unionMembers);
     expect([...unionSet].sort()).toEqual([...ACTIVITY_TYPE_LEXICON_BASELINE].sort());
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// B10 (Reconcile R11-T7): tracked_actions/action_outcomes each have a hand-
+// maintained archive twin (tracked_actions_archive / action_outcomes_archive).
+// ALTER TABLE always appends at the end of a table, and the twin already has a
+// trailing archived_at column the live table lacks, so a migration ALTERing the
+// live table without ALTERing the twin in the SAME FILE silently produces a
+// drifted twin — exactly what assertArchiveTwinParity() (server/db/archive-twin.ts)
+// rejects at boot, and what migrations 106/116 had to fix by hand before this
+// rule existed. Four scenarios per docs/rules/pr-check-rule-authoring.md: trigger,
+// hatch-inline, hatch-above (must still trigger — this rule follows the same
+// inline-only convention as the DROP TABLE rule, since a drifted twin is a
+// destructive-adjacent hazard), negative.
+
+describe('Rule: Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)', () => {
+  const RULE = 'Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)';
+
+  it('flags a live-table ALTER ADD COLUMN with no matching twin ALTER in the same file', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep', 'server/db/migrations/999-twin-fixture.sql'),
+      lines(
+        'ALTER TABLE tracked_actions ADD COLUMN risk_score REAL;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('tracked_actions');
+    expect(hits[0].text).toContain('risk_score');
+    expect(hits[0].text).toContain('tracked_actions_archive');
+  });
+
+  it('allows a live-table ALTER when the matching twin ALTER is present in the same file (the migration 116 shape)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-paired', 'server/db/migrations/999-twin-paired.sql'),
+      lines(
+        'ALTER TABLE tracked_actions ADD COLUMN risk_score REAL;',
+        'ALTER TABLE tracked_actions_archive ADD COLUMN risk_score REAL;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('allows a live-table ALTER with an inline hatch comment on the same line', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-hatch', 'server/db/migrations/999-twin-hatched.sql'),
+      lines(
+        'ALTER TABLE tracked_actions ADD COLUMN internal_debug_flag INTEGER; -- twin-alter-ok: operational-only column, never archived',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT honour a hatch comment placed on the line above (inline-only contract)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-hatch-above', 'server/db/migrations/999-twin-hatch-above.sql'),
+      lines(
+        '-- twin-alter-ok: operational-only column, never archived',
+        'ALTER TABLE tracked_actions ADD COLUMN internal_debug_flag INTEGER;',
+      ),
+    );
+
+    // The hatch is on the line ABOVE, not the ALTER line itself — must still flag.
+    expect(runRule(RULE, [file])).toHaveLength(1);
+  });
+
+  it('does not flag an ALTER on the archive twin itself as if it were a live-table ALTER (negative control)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-negative-twin-only', 'server/db/migrations/999-twin-only.sql'),
+      lines(
+        'ALTER TABLE tracked_actions_archive ADD COLUMN backfilled_note TEXT;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag unrelated tables (negative control)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-negative-unrelated', 'server/db/migrations/999-unrelated.sql'),
+      lines(
+        'ALTER TABLE workspaces ADD COLUMN some_new_flag INTEGER;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags action_outcomes independently of tracked_actions (both tables covered)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-action-outcomes', 'server/db/migrations/999-outcomes-fixture.sql'),
+      lines(
+        'ALTER TABLE action_outcomes ADD COLUMN confidence_band TEXT;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('action_outcomes');
+    expect(hits[0].text).toContain('confidence_band');
+    expect(hits[0].text).toContain('action_outcomes_archive');
+  });
+
+  it('matches the real migration 106 shape (paired live+twin ALTERs for action_outcomes) with zero hits', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-106-shape', 'server/db/migrations/999-outcomes-paired.sql'),
+      lines(
+        'ALTER TABLE action_outcomes ADD COLUMN attributed_value REAL;',
+        'ALTER TABLE action_outcomes ADD COLUMN value_basis TEXT;',
+        '',
+        'ALTER TABLE action_outcomes_archive ADD COLUMN attributed_value REAL;',
+        'ALTER TABLE action_outcomes_archive ADD COLUMN value_basis TEXT;',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags each un-paired column independently when a migration has a mix of paired and unpaired ALTERs', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-mixed', 'server/db/migrations/999-mixed.sql'),
+      lines(
+        'ALTER TABLE tracked_actions ADD COLUMN paired_col TEXT;',
+        'ALTER TABLE tracked_actions_archive ADD COLUMN paired_col TEXT;',
+        'ALTER TABLE tracked_actions ADD COLUMN unpaired_col TEXT;',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toContain('unpaired_col');
+  });
+
+  it('ignores migrations with no ALTER on tracked_actions/action_outcomes (negative control)', () => {
+    const file = write(
+      uniqPath('rule-twin-lockstep-no-alter', 'server/db/migrations/999-no-alter.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS fresh_table (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// Rule: New migration creates a _snapshots table without a matching registry entry
+// ════════════════════════════════════════════════════════════════════════════
+//
+// C1 (Reconcile R11-T5): server/db/snapshot-registry.ts is the machine-readable
+// census of every *_snapshots table (docs/rules/snapshot-envelope.md). A migration
+// that CREATEs a new _snapshots table without registering it repeats the exact gap
+// that let audit_snapshots/performance_snapshots/redirect_snapshots silently
+// accumulate as unregistered, unscoped tables for years before migration 167.
+//
+// This rule reads the REAL server/db/snapshot-registry.ts from the repo root (not a
+// fixture) to build its registered-name set, so these tests assert against whatever
+// is actually registered right now — 'audit_snapshots' et al. are expected to be
+// registered (real, unaffected fixtures), while synthetic '*_snapshots' table names
+// are guaranteed NOT to be registered.
+
+describe('Rule: New migration creates a _snapshots table without a matching registry entry', () => {
+  const RULE = 'New migration creates a _snapshots table without a matching registry entry';
+
+  it('flags a CREATE TABLE for a new, unregistered _snapshots table', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry', 'server/db/migrations/999-fixture-unregistered.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS totally_fake_pr_check_fixture_snapshots (',
+        '  id TEXT PRIMARY KEY,',
+        '  workspace_id TEXT NOT NULL',
+        ');',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+    expect(hits[0].text).toContain('totally_fake_pr_check_fixture_snapshots');
+    expect(hits[0].text).toContain('SNAPSHOT_TABLE_REGISTRY');
+  });
+
+  it('does not flag a CREATE TABLE for a table that IS registered (audit_snapshots, real registry entry)', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-registered', 'server/db/migrations/999-fixture-registered.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS audit_snapshots (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('allows an unregistered table with an inline hatch comment on the CREATE TABLE line', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-hatch', 'server/db/migrations/999-fixture-hatched.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS pr_check_fixture_bookkeeping_snapshots ( -- snapshot-registry-ok: test-only bookkeeping table',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a _snapshots table ending in _orphaned (migration-bookkeeping exclusion)', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-orphaned', 'server/db/migrations/999-fixture-orphaned.sql'),
+      lines(
+        'CREATE TABLE pr_check_fixture_snapshots_orphaned (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a _snapshots table ending in _r11_old (migration-bookkeeping exclusion)', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-r11old', 'server/db/migrations/999-fixture-r11old.sql'),
+      lines(
+        'ALTER TABLE pr_check_fixture_snapshots RENAME TO pr_check_fixture_snapshots_r11_old;',
+        'CREATE TABLE pr_check_fixture_snapshots_r11_old (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does not flag a CREATE TABLE for a non-snapshot table (negative control)', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-negative', 'server/db/migrations/999-fixture-unrelated.sql'),
+      lines(
+        'CREATE TABLE IF NOT EXISTS totally_unrelated_widgets (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('matches the real migration 167 shape (rename-to-_r11_old + rebuilt live table + _orphaned bookkeeping table) with zero hits', () => {
+    const file = write(
+      uniqPath('rule-snapshot-registry-167-shape', 'server/db/migrations/999-fixture-167-shape.sql'),
+      lines(
+        'ALTER TABLE audit_snapshots RENAME TO audit_snapshots_r11_old;',
+        'CREATE TABLE audit_snapshots (',
+        '  id TEXT PRIMARY KEY,',
+        '  workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE',
+        ');',
+        'CREATE TABLE audit_snapshots_orphaned (',
+        '  id TEXT PRIMARY KEY',
+        ');',
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// R3-PR2 Rule: Unguarded SET status = ? (state machine transition)
+// The rule was converted from a single-line regex to a customCheck to close three
+// verified structural escape classes: (1) literal writes SET status = 'x', (2)
+// mid-clause writes `, status = @x`, (3) other lifecycle columns (resolution_status).
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Rule: Unguarded SET status = ? (state machine transition)', () => {
+  const RULE = 'Unguarded SET status = ? (state machine transition)';
+
+  it('flags a bound-parameter write: SET status = @status (baseline, unchanged)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/foo-store.ts'),
+      lines(
+        "const stmt = db.prepare(",
+        "  `UPDATE foos SET status = @status WHERE id = @id`,",
+        ");",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map(h => h.line)).toEqual([2]);
+  });
+
+  it('GAP 1 — flags a LITERAL write: SET status = \'applied\' (old [?@] regex missed this)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/bar-store.ts'),
+      lines(
+        "db.prepare(`UPDATE bars SET status = 'applied' WHERE id = ?`).run(id);",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map(h => h.line)).toEqual([1]);
+  });
+
+  it('GAP 2 — flags a MID-CLAUSE write: `, status = @status` (not the first column after SET)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/baz-store.ts'),
+      lines(
+        "const stmt = db.prepare(`",
+        "  UPDATE bazzes SET name = @name, status = @status, updated_at = @now",
+        "  WHERE id = @id`);",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map(h => h.line)).toEqual([2]);
+  });
+
+  it('GAP 3 — flags the resolution_status lifecycle column', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/insight-store.ts'),
+      lines(
+        "db.prepare(`UPDATE insights SET resolution_status = ? WHERE id = ?`).run(s, id);",
+      ),
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits.map(h => h.line)).toEqual([1]);
+  });
+
+  it('does NOT flag a line that also calls validateTransition (guarded inline)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/guarded-store.ts'),
+      lines(
+        "const next = validateTransition('foo', FOO_TRANSITIONS, from, to); db.prepare(`UPDATE foos SET status = @status`).run({ status: next });",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an inline // status-ok hatch (JS comment)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/hatched-store.ts'),
+      lines(
+        "db.prepare(`UPDATE foos SET status = 'done' WHERE id = ?`).run(id); // status-ok: non-lifecycle column",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an inline -- status-ok hatch (SQL comment inside a template literal)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/sql-hatched-store.ts'),
+      lines(
+        "const stmt = db.prepare(`",
+        "  UPDATE foos SET status = 'stale', updated_at = @now -- status-ok: WHERE clause enforces origin",
+        "  WHERE status = 'pending'`);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects a preceding-line -- status-ok hatch (for SET on its own line)', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/preceding-hatched-store.ts'),
+      lines(
+        "const stmt = db.prepare(`",
+        "  UPDATE foos",
+        "  -- status-ok: guarded in the caller before this write",
+        "  SET status = @status",
+        "  WHERE id = @id`);",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('negative control — does NOT flag an unrelated SET or a non-status column', () => {
+    const file = write(
+      uniqPath('rule-unguarded-status', 'server/unrelated-store.ts'),
+      lines(
+        "db.prepare(`UPDATE foos SET name = @name, priority = @priority WHERE id = @id`).run(p);",
+        "const s = { status: 'ok' }; // object literal, not a SQL SET",
+      ),
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+// ── UI Rebuild (F2a): @ds-rebuilt-scoped ds-* gates ─────────────────────────
+// Each rule fires ONLY on files carrying the @ds-rebuilt marker (Phase D, D2).
+// Three cases per rule: (a) violation WITH marker → flagged; (b) same WITHOUT
+// marker → not flagged; (c) violation WITH marker + inline hatch → not flagged.
+describe('Rule: UI Rebuild @ds-rebuilt-scoped gates (F2a)', () => {
+  const MARKER = '// @ds-rebuilt';
+
+  // runRule() invokes customCheck directly and (by design) skips the runner's
+  // excludeLines post-filter. This replicates it for the hatch case: the hatch
+  // token lives in hit.text because these rules set text = the source line.
+  function runFiltered(name: string, files: string[]): CustomCheckMatch[] {
+    const check = CHECKS.find(c => c.name === name);
+    if (!check) throw new Error(`Rule not found: "${name}"`);
+    const hatches = check.excludeLines ?? [];
+    return runRule(name, files).filter(h => !hatches.some(tok => h.text.includes(tok)));
+  }
+
+  describe('Rule: ds-raw-hex-anywhere', () => {
+    const RULE = 'ds-raw-hex-anywhere';
+    it('flags a raw hex in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Rebuilt.tsx'),
+        lines(MARKER, "export const c = '#ff0000';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same hex without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Legacy.tsx'),
+        lines("export const c = '#ff0000';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a hex carrying the inline // raw-hex-ok hatch', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Hatched.tsx'),
+        lines(MARKER, "export const c = '#ff0000'; // raw-hex-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a hex-shaped PR reference inside a comment (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Commented.tsx'),
+        lines(MARKER, '// motion unification landed in PR #1472 — see the review'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag an href="#…" anchor (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Anchor.tsx'),
+        lines(MARKER, 'const a = <a href="#abc123">jump</a>;'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('still flags a hex that precedes a trailing comment on the same line', () => {
+      const file = write(uniqPath('ds-raw-hex', 'src/Trailing.tsx'),
+        lines(MARKER, "export const c = '#ff0000'; // brand red"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+  });
+
+  describe('Rule: ds-tailwind-palette-bypass', () => {
+    const RULE = 'ds-tailwind-palette-bypass';
+    it('flags a raw Tailwind palette class in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-palette', 'src/Rebuilt.tsx'),
+        lines(MARKER, "const cls = 'text-zinc-400 bg-blue-500';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same class without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-palette', 'src/Legacy.tsx'),
+        lines("const cls = 'text-zinc-400 bg-blue-500';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a palette class carrying the inline // palette-ok hatch', () => {
+      const file = write(uniqPath('ds-palette', 'src/Hatched.tsx'),
+        lines(MARKER, "const cls = 'text-zinc-400'; // palette-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('Rule: ds-motion-token', () => {
+    const RULE = 'ds-motion-token';
+    it('flags a literal duration in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-motion', 'src/Rebuilt.tsx'),
+        lines(MARKER, 'const cls = "transition-all duration-[300ms]";'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the same duration without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-motion', 'src/Legacy.tsx'),
+        lines('const cls = "transition-all duration-[300ms]";'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a duration carrying the inline // motion-ok hatch', () => {
+      const file = write(uniqPath('ds-motion', 'src/Hatched.tsx'),
+        lines(MARKER, 'const cls = "duration-[300ms]"; // motion-ok'));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+    it('accepts var(--dur-*) motion tokens (not flagged even with the marker)', () => {
+      const file = write(uniqPath('ds-motion', 'src/Tokened.tsx'),
+        lines(MARKER, 'const cls = "transition-all"; // uses var(--dur-base) in CSS'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('Rule: ds-per-view-css-block', () => {
+    const RULE = 'ds-per-view-css-block';
+    it('flags a template-literal CSS block in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-css', 'src/Rebuilt.tsx'),
+        lines(MARKER, 'const panelCss = `.panel { color: red; }`;'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('flags a <style> tag in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-css', 'src/Styled.tsx'),
+        lines(MARKER, 'const el = <style>{`.x{}`}</style>;'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag a React style-map OBJECT (review CP4 — the standard inline-style pattern)', () => {
+      // The prior [`{] regex mis-flagged this — every ported primitive writes
+      // `const xStyles = { … }` style maps (kit props include style?: CSSProperties).
+      const file = write(uniqPath('ds-css', 'src/StyleMap.tsx'),
+        lines(MARKER, "const rootStyles = { color: 'var(--brand-text)' };"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag the template-literal block without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-css', 'src/Legacy.tsx'),
+        lines('const panelCss = `.panel { color: red; }`;'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a block carrying the inline // view-css-ok hatch', () => {
+      const file = write(uniqPath('ds-css', 'src/Hatched.tsx'),
+        lines(MARKER, 'const panelCss = `.panel { color: red; }`; // view-css-ok'));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('Rule: ds-token-theme-parity', () => {
+    const RULE = 'ds-token-theme-parity';
+    it('flags a themeable :root token with no .dashboard-light override', () => {
+      const file = write(uniqPath('ds-parity', 'src/theme.css'),
+        lines('/* @ds-rebuilt */', ':root { --brand-foo: #111827; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag when the token has both scopes', () => {
+      const file = write(uniqPath('ds-parity', 'src/theme.css'),
+        lines('/* @ds-rebuilt */', ':root { --brand-foo: #111827; }', '.dashboard-light { --brand-foo: #ffffff; }'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag theme-neutral families (--space-) or files without the marker', () => {
+      const neutral = write(uniqPath('ds-parity', 'src/neutral.css'),
+        lines('/* @ds-rebuilt */', ':root { --space-99: 4px; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [neutral])).toHaveLength(0);
+      const legacy = write(uniqPath('ds-parity', 'src/legacy.css'),
+        lines(':root { --brand-foo: #111827; }', '.dashboard-light { }'));
+      expect(runRule(RULE, [legacy])).toHaveLength(0);
+    });
+    it('unions tokens across multiple :root / .dashboard-light blocks (review, PR #1473)', () => {
+      // Both tokens are themed across two split blocks each — the single-match
+      // parser wrongly flagged the token in the 2nd :root as light-only.
+      const file = write(uniqPath('ds-parity', 'src/split.css'),
+        lines('/* @ds-rebuilt */',
+          ':root { --brand-teal: #0d9488; }',
+          ':root { --brand-blue: #3b82f6; }',
+          '.dashboard-light { --brand-teal: #0f766e; }',
+          '.dashboard-light { --brand-blue: #2563eb; }'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+  });
+
+  describe('Rule: ds-icon-discipline', () => {
+    const RULE = 'ds-icon-discipline';
+    it('does NOT flag a Font Awesome class in a @ds-rebuilt file (D5 reversed — FA Sharp Regular is the icon system)', () => {
+      const file = write(uniqPath('ds-icon', 'src/Rebuilt.tsx'),
+        lines(MARKER, 'const i = <i className="fa-sharp fa-regular fa-house" />;'));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag an emoji carrying the inline // icon-ok hatch', () => {
+      const file = write(uniqPath('ds-icon', 'src/Hatched.tsx'),
+        lines(MARKER, "const i = '🔥'; // icon-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag dingbat string glyphs like ✓ ⚠ ★ (review, PR #1473)', () => {
+      const file = write(uniqPath('ds-icon', 'src/Glyphs.tsx'),
+        lines(MARKER, "const label = '✓ Saved — ⚠ pending review ★';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('still flags a true emoji used as an icon', () => {
+      const file = write(uniqPath('ds-icon', 'src/Emoji.tsx'),
+        lines(MARKER, "const icon = '🔥';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+  });
+
+  describe('Rule: ds-deep-import', () => {
+    const RULE = 'ds-deep-import';
+    it('flags a deep import into components/ui/internal/ in a @ds-rebuilt file', () => {
+      const file = write(uniqPath('ds-deep', 'src/Rebuilt.tsx'),
+        lines(MARKER, "import { X } from '../components/ui/internal/Foo';"));
+      expect(runRule(RULE, [file]).map(h => h.line)).toEqual([2]);
+    });
+    it('does NOT flag the deep import without the @ds-rebuilt marker', () => {
+      const file = write(uniqPath('ds-deep', 'src/Legacy.tsx'),
+        lines("import { X } from '../components/ui/internal/Foo';"));
+      expect(runRule(RULE, [file])).toHaveLength(0);
+    });
+    it('does NOT flag a deep import carrying the inline // deep-import-ok hatch', () => {
+      const file = write(uniqPath('ds-deep', 'src/Hatched.tsx'),
+        lines(MARKER, "import { X } from '../components/ui/internal/Foo'; // deep-import-ok"));
+      expect(runFiltered(RULE, [file])).toHaveLength(0);
+    });
   });
 });

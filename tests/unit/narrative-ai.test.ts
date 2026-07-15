@@ -61,11 +61,11 @@ describe('narrative-ai', () => {
 
     await expect(callNarrativeAI({
       workspaceId: 'ws_1',
-      operation: 'meeting-brief',
+      operation: 'strategy-pov',
       systemPrompt: 'system',
       prompt: 'prompt',
       schema,
-      parserContext: 'meeting-brief',
+      parserContext: 'strategy-pov',
       maxTokens: 2000,
       normalize: parsed => ({ ...parsed, title: parsed.title.toUpperCase() }),
       logger,
@@ -76,7 +76,7 @@ describe('narrative-ai', () => {
 
     expect(callAIMock).toHaveBeenCalledTimes(2);
     expect(callAIMock).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      operation: 'meeting-brief',
+      operation: 'strategy-pov',
       messages: [
         { role: 'user', content: 'prompt' },
         { role: 'assistant', content: '{"title":42}' },
@@ -152,14 +152,10 @@ describe('narrative-ai', () => {
   });
 
   it('keeps narrative AI retry/cache mechanics out of feature generators', () => {
-    const meetingBrief = readFileSync('server/meeting-brief-generator.ts', 'utf-8'); // readFile-ok — source contract for narrative AI extraction.
     const strategyPov = readFileSync('server/strategy-pov-generator.ts', 'utf-8'); // readFile-ok — source contract for narrative AI extraction.
 
-    expect(meetingBrief).not.toMatch(/\bcallAI\(/);
-    expect(meetingBrief).not.toContain('parseStructuredAIOutput');
     expect(strategyPov).not.toMatch(/\bcallAI\(/);
     expect(strategyPov).not.toContain('parseStructuredAIOutput');
-    expect(meetingBrief).toContain('callNarrativeAI');
     expect(strategyPov).toContain('callNarrativeAI');
   });
 });

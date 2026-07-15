@@ -4,6 +4,8 @@ import { createStmtCache } from './db/stmt-cache.js';
 import type { AnalyticsInsight, InsightType, InsightSeverity, InsightDomain, InsightDataMap, AnomalyDigestData } from '../shared/types/analytics.js';
 import { parseJsonFallback, parseJsonSafe } from './db/json-validation.js';
 import { INSIGHT_DATA_SCHEMA_MAP } from './schemas/insight-schemas.js';
+import { INSIGHT_RESOLUTION_TRANSITIONS, validateTransition } from './state-machines.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
 
 // ── SQLite row shape ──
 
@@ -77,6 +79,7 @@ const stmts = createStmtCache(() => ({
     `SELECT * FROM analytics_insights WHERE workspace_id = ? AND domain = ? ORDER BY impact_score DESC`,
   ),
   updateResolution: db.prepare(
+    // status-ok: INSIGHT_RESOLUTION_TRANSITIONS guard runs in resolveInsight() before this write (null→in_progress→resolved, resolved↔in_progress reopen)
     `UPDATE analytics_insights SET resolution_status = ?, resolution_note = ?, resolution_source = ?, resolved_at = ? WHERE id = ? AND workspace_id = ?`,
   ),
   selectUnresolved: db.prepare(
@@ -198,6 +201,7 @@ export function upsertInsight<T extends InsightType>(params: UpsertInsightParams
 
   // Fetch back to get the actual row (id may differ on conflict-replace)
   const row = stmts().selectOne.get(params.workspaceId, params.pageId, params.insightType) as InsightRow;
+  invalidateMonthlyDigestCache(params.workspaceId);
   // Cast is sound: selectOne filters by insight_type = params.insightType, so T is correct.
   return rowToInsight(row) as AnalyticsInsight<T>;
 }
@@ -222,6 +226,7 @@ export function getInsight<T extends InsightType>(
 
 export function deleteInsightsForWorkspace(workspaceId: string): number {
   const info = stmts().deleteByWorkspace.run(workspaceId);
+  if (info.changes > 0) invalidateMonthlyDigestCache(workspaceId);
   return info.changes;
 }
 
@@ -236,6 +241,7 @@ export function deleteStaleInsightsByType(
   olderThan: string,
 ): number {
   const info = stmts().deleteStaleByType.run(workspaceId, insightType, olderThan);
+  if (info.changes > 0) invalidateMonthlyDigestCache(workspaceId);
   return info.changes;
 }
 
@@ -294,10 +300,29 @@ export function resolveInsight(
   note?: string,
   resolutionSource?: string,
 ): AnalyticsInsight | undefined {
+  // Read the current resolution_status BEFORE writing so the transition can be
+  // guarded. A freshly computed insight has resolution_status NULL (838 rows in
+  // dev) — NULL is coerced to the synthetic `unresolved` origin so a null-origin
+  // never crashes validateTransition. Not found → undefined (route sends 404).
+  const existing = getInsightById(insightId, workspaceId);
+  if (!existing) return undefined;
+
+  const currentStatus = existing.resolutionStatus ?? 'unresolved';
+  // Idempotent replay (resolved → resolved, in_progress → in_progress) is a no-op
+  // that must NOT throw — the guard only runs on an actual status change. Re-running
+  // the UPDATE with the same status is harmless (it re-stamps note/source/resolvedAt).
+  if (currentStatus !== status) {
+    // Throws InvalidTransitionError on an illegal move. Callers translate it:
+    // the resolve route → 409, the MCP single tool → tool error, the MCP bulk loop
+    // → per-item skip-and-report (never crashes the whole batch).
+    validateTransition('insight_resolution', INSIGHT_RESOLUTION_TRANSITIONS, currentStatus, status);
+  }
+
   const resolvedAt = status === 'resolved' ? new Date().toISOString() : null;
   const changes = stmts().updateResolution.run(status, note ?? null, resolutionSource ?? null, resolvedAt, insightId, workspaceId);
   // If workspace_id didn't match, UPDATE affects 0 rows — return undefined so the route sends 404
   if (changes.changes === 0) return undefined;
+  invalidateMonthlyDigestCache(workspaceId);
   return getInsightById(insightId, workspaceId);
 }
 
@@ -321,7 +346,9 @@ export function suppressInsights(workspaceId: string, ids: string[]): number {
     }
     return deleted;
   });
-  return run();
+  const deleted = run();
+  if (deleted > 0) invalidateMonthlyDigestCache(workspaceId);
+  return deleted;
 }
 
 /**

@@ -27,6 +27,7 @@ vi.mock('../../server/db/json-validation.js', () => ({
 }));
 
 import {
+  ContentMatrixPatternRenderError,
   getSchemaTypesForTemplate,
   computeStats,
   generateCells,
@@ -47,6 +48,17 @@ function makeCell(status: MatrixCellStatus): MatrixCell {
 
 function makeDim(variableName: string, values: string[]): MatrixDimension {
   return { variableName, values };
+}
+
+function capturePatternError(run: () => unknown): ContentMatrixPatternRenderError {
+  let caught: unknown;
+  try {
+    run();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(ContentMatrixPatternRenderError);
+  return caught as ContentMatrixPatternRenderError;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -413,14 +425,32 @@ describe('generateCells', () => {
     expect(cells[0].plannedUrl).toBe('/austin-dentist');
   });
 
-  it('URL substitution: special/accented chars are stripped (San José → san-jose)', () => {
+  it('URL substitution: accents are transliterated (San José → san-jose)', () => {
     const cells = generateCells(
       [makeDim('location', ['San José'])],
       '/{location}-dentist',
       '{location} dentist',
     );
-    // é is non-ascii — stripped by /[^a-z0-9-]/g
-    expect(cells[0].plannedUrl).toBe('/san-jos-dentist');
+    expect(cells[0].plannedUrl).toBe('/san-jose-dentist');
+  });
+
+  it('uses canonical rendering for Unicode service × location cells', () => {
+    const cells = generateCells(
+      [
+        makeDim('location', ['São Paulo']),
+        makeDim('service', ['Children’s Dentistry']),
+      ],
+      '/{location}/{service}',
+      '{service} in {location}',
+    );
+    expect(cells[0]).toMatchObject({
+      plannedUrl: '/sao-paulo/children-s-dentistry',
+      targetKeyword: 'Children’s Dentistry in São Paulo',
+      variableValues: {
+        location: 'São Paulo',
+        service: 'Children’s Dentistry',
+      },
+    });
   });
 
   it('URL substitution: punctuation and symbols stripped', () => {
@@ -518,42 +548,49 @@ describe('generateCells', () => {
     ]);
   });
 
-  it('unresolved placeholder remains in URL if no matching dimension', () => {
-    const cells = generateCells(
+  it('fails closed when the URL references an unknown dimension', () => {
+    const error = capturePatternError(() => generateCells(
       [makeDim('location', ['Austin'])],
       '/{location}/{other}',
       '{location} dentist',
-    );
-    // {other} has no matching dimension so it stays as-is
-    expect(cells[0].plannedUrl).toContain('{other}');
+    ));
+    expect(error).toMatchObject({
+      field: 'urlPattern',
+      issues: [{ code: 'unknown_variable', variableName: 'other' }],
+    });
   });
 
-  it('unresolved placeholder remains in keyword if no matching dimension', () => {
-    const cells = generateCells(
+  it('fails closed when the keyword references an unknown dimension', () => {
+    const error = capturePatternError(() => generateCells(
       [makeDim('location', ['Austin'])],
       '/{location}',
       '{location} {other} dentist',
-    );
-    expect(cells[0].targetKeyword).toContain('{other}');
+    ));
+    expect(error).toMatchObject({
+      field: 'keywordPattern',
+      issues: [{ code: 'unknown_variable', variableName: 'other' }],
+    });
   });
 
-  it('case-insensitive placeholder substitution in URL: {Location} matches dimension "location"', () => {
-    const cells = generateCells(
+  it('treats URL placeholder names as exact durable identifiers', () => {
+    const error = capturePatternError(() => generateCells(
       [makeDim('location', ['Austin'])],
       '/{Location}-dentist',
       '{location} dentist',
-    );
-    // regex uses gi flag so {Location} is replaced
-    expect(cells[0].plannedUrl).toBe('/austin-dentist');
+    ));
+    expect(error.issues).toEqual([{ code: 'unknown_variable', variableName: 'Location' }]);
   });
 
-  it('case-insensitive placeholder substitution in keyword: {LOCATION} matches dimension "location"', () => {
-    const cells = generateCells(
+  it('treats keyword placeholder names as exact durable identifiers', () => {
+    const error = capturePatternError(() => generateCells(
       [makeDim('location', ['Austin'])],
       '/{location}',
       '{LOCATION} dentist',
-    );
-    expect(cells[0].targetKeyword).toBe('Austin dentist');
+    ));
+    expect(error).toMatchObject({
+      field: 'keywordPattern',
+      issues: [{ code: 'unknown_variable', variableName: 'LOCATION' }],
+    });
   });
 
   it('expectedSchemaTypes: when provided, each cell carries the types', () => {
@@ -655,14 +692,28 @@ describe('generateCells', () => {
     expect(cells[0].plannedUrl).toMatch(/^\/202[45]-report$/);
   });
 
-  it('value with only special chars produces empty slug segment', () => {
-    const cells = generateCells(
+  it('fails closed when a non-empty value normalizes to an empty URL slug', () => {
+    const error = capturePatternError(() => generateCells(
       [makeDim('tag', ['!!!'])],
       '/{tag}',
       '{tag}',
-    );
-    // all chars stripped → empty segment
-    expect(cells[0].plannedUrl).toBe('/');
+    ));
+    expect(error).toMatchObject({
+      field: 'urlPattern',
+      issues: [{ code: 'empty_slug_value', variableName: 'tag' }],
+    });
+  });
+
+  it('fails closed when the rendered URL is not a safe absolute path', () => {
+    const error = capturePatternError(() => generateCells(
+      [makeDim('location', ['Austin'])],
+      'https://example.com/{location}',
+      '{location}',
+    ));
+    expect(error).toMatchObject({
+      field: 'urlPattern',
+      issues: [{ code: 'full_url' }],
+    });
   });
 
   it('large cartesian product (4×4) produces 16 cells', () => {

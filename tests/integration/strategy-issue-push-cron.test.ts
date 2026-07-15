@@ -28,6 +28,8 @@ const generateStrategyPovMock = vi.fn();
 vi.mock('../../server/strategy-pov-generator.js', () => ({
   generateStrategyPov: (...args: unknown[]) => generateStrategyPovMock(...args),
   POV_UNCHANGED: 'POV_UNCHANGED',
+  POV_REFRESH_AVAILABLE: 'POV_REFRESH_AVAILABLE',
+  POV_GENERATION_SUPERSEDED: 'POV_GENERATION_SUPERSEDED',
 }));
 
 const addActivityMock = vi.fn();
@@ -169,6 +171,44 @@ describe('strategy-issue-cron / runIssuePushForWorkspace (The Issue, Phase 3)', 
     expect(getWorkspace(wsId)?.lastIssuePushedWeekOf).toBe(r.weekOf);
     // Still rings the doorbell (the draft is already ready).
     expect(addActivityMock).toHaveBeenCalledTimes(1);
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('changed evidence preserves an edited POV, still counts as ready, and records truthful refresh metadata', async () => {
+    generateStrategyPovMock.mockRejectedValueOnce(new Error('POV_REFRESH_AVAILABLE'));
+
+    const r = await runIssuePushForWorkspace(wsId);
+
+    expect(r.status).toBe('unchanged');
+    expect(r.reason).toBe('operator edit preserved; refresh available');
+    expect(getWorkspace(wsId)?.lastIssuePushedWeekOf).toBe(r.weekOf);
+    expect(addActivityMock).toHaveBeenCalledWith(
+      wsId,
+      'strategy_issue_pushed',
+      expect.stringContaining('drafted and ready to curate'),
+      'Evidence or voice changed — the operator-edited draft was preserved and can be refreshed explicitly',
+      expect.objectContaining({ weekOf: r.weekOf, unchanged: true, editPreserved: true }),
+    );
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('a competing generation counts as unchanged without falsely claiming an operator edit was preserved', async () => {
+    generateStrategyPovMock.mockRejectedValueOnce(new Error('POV_GENERATION_SUPERSEDED'));
+
+    const r = await runIssuePushForWorkspace(wsId);
+
+    expect(r.status).toBe('unchanged');
+    expect(r.reason).toBeUndefined();
+    expect(getWorkspace(wsId)?.lastIssuePushedWeekOf).toBe(r.weekOf);
+    expect(addActivityMock).toHaveBeenCalledWith(
+      wsId,
+      'strategy_issue_pushed',
+      expect.stringContaining('drafted and ready to curate'),
+      'No change since last cycle — the draft was already up to date',
+      expect.objectContaining({ weekOf: r.weekOf, unchanged: true }),
+    );
+    const activityMetadata = addActivityMock.mock.calls[0]?.[4] as Record<string, unknown>;
+    expect(activityMetadata).not.toHaveProperty('editPreserved');
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 

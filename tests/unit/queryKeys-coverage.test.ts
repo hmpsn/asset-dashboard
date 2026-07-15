@@ -51,6 +51,7 @@ describe('queryKeys.admin content keys', () => {
 
   it('brief key includes briefId', () => {
     expect(queryKeys.admin.brief(WS, ID)).toEqual(['admin-brief', WS, ID]);
+    expect(queryKeys.admin.briefsDetailAll(WS)).toEqual(['admin-brief', WS]);
   });
 
   it('posts key shape', () => {
@@ -77,6 +78,18 @@ describe('queryKeys.admin content keys', () => {
 
   it('contentPipeline key shape', () => {
     expect(queryKeys.admin.contentPipeline(WS)).toEqual(['content-pipeline', WS]);
+  });
+
+  it('content performance read and trend keys share a workspace prefix', () => {
+    const all = queryKeys.admin.contentPerformanceAll(WS);
+    const read = queryKeys.admin.contentPerformance(WS, 90);
+    const trend = queryKeys.admin.contentPerformanceTrend(WS, ID);
+
+    expect(all).toEqual(['admin-content-performance', WS]);
+    expect(read).toEqual(['admin-content-performance', WS, 'read', 90]);
+    expect(trend).toEqual(['admin-content-performance', WS, 'trend', ID]);
+    expect(read.slice(0, all.length)).toEqual([...all]);
+    expect(trend.slice(0, all.length)).toEqual([...all]);
   });
 
   it('roi key shape', () => {
@@ -137,6 +150,12 @@ describe('queryKeys.admin SEO keys', () => {
     const summary = queryKeys.admin.keywordCommandCenterSummary(WS);
     const detail = queryKeys.admin.keywordCommandCenterDetail(WS, 'x');
     expect(detail.slice(0, summary.length - 1)).toEqual(summary.slice(0, -1));
+  });
+
+  it('keeps the one-shot initial transport outside canonical KCC invalidation', () => {
+    const canonical = queryKeys.admin.keywordCommandCenter(WS);
+    const initial = queryKeys.admin.keywordCommandCenterInitial(WS, { page: 1 });
+    expect(initial.slice(0, canonical.length)).not.toEqual([...canonical]);
   });
 
   it('localSeoVariant uses the legacy summary and snapshot suffixes', () => {
@@ -262,9 +281,6 @@ describe('queryKeys.admin intelligence keys', () => {
     expect(queryKeys.admin.insightFeed(WS)).toEqual(['admin-insight-feed', WS]);
   });
 
-  it('meetingBrief key shape', () => {
-    expect(queryKeys.admin.meetingBrief(WS)).toEqual(['admin-meeting-brief', WS]);
-  });
 });
 
 // ── Admin — Outcomes ───────────────────────────────────────────────────────────

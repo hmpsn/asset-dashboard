@@ -4,6 +4,11 @@ import { usePageRewriteChatShell } from '../../src/components/page-rewrite-chat/
 
 const mockPost = vi.fn();
 const mockGet = vi.fn();
+const downloadDocx = vi.hoisted(() => vi.fn());
+
+vi.mock('../../src/components/page-rewrite-chat/pageRewriteDocxExport', () => ({
+  downloadPageRewriteDocx: (...args: unknown[]) => downloadDocx(...args),
+}));
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: vi.fn(() => ({ data: [] })),
@@ -19,6 +24,8 @@ describe('usePageRewriteChatShell', () => {
     vi.clearAllMocks();
     mockPost.mockReset();
     mockGet.mockReset();
+    downloadDocx.mockReset();
+    downloadDocx.mockResolvedValue(undefined);
     mockPost.mockResolvedValue({ answer: 'ok' });
   });
 
@@ -94,6 +101,64 @@ describe('usePageRewriteChatShell', () => {
     expect(print).toHaveBeenCalledOnce();
     expect(document.body.classList.contains('page-rewrite-printing')).toBe(false);
     expect(document.getElementById('page-rewrite-print-root')?.innerHTML).toBe('');
+  });
+
+  it('loads the legacy DOCX exporter on demand with the preserved profile and filename', async () => {
+    const toast = vi.fn();
+    mockPost.mockResolvedValueOnce({
+      title: 'Dental Implants',
+      slug: '/services/implants',
+      bodyText: '',
+      html: '',
+      sections: [],
+      issues: [],
+    });
+    const { result } = renderHook(() =>
+      usePageRewriteChatShell({
+        workspaceId: 'ws-docx-export',
+        initialPageUrl: 'https://acme.com/services/implants',
+        toast,
+      })
+    );
+    await waitFor(() => expect(result.current.pageData?.slug).toBe('/services/implants'));
+    const docBody = document.createElement('div');
+    act(() => result.current.docBodyRefCallback(docBody));
+    docBody.innerHTML = '<h1>Click-time draft</h1>';
+    act(() => result.current.toggleExportOpen());
+
+    act(() => result.current.handleExport('docx'));
+    docBody.innerHTML = '<h1>Later editor state</h1>';
+
+    await waitFor(() => expect(downloadDocx).toHaveBeenCalledOnce());
+    expect(downloadDocx).toHaveBeenCalledWith({
+      docBody: expect.any(HTMLElement),
+      pageData: expect.objectContaining({ slug: '/services/implants' }),
+      fileName: 'services-implants-brief.docx',
+      profile: 'legacy',
+    });
+    const exportedBody = downloadDocx.mock.calls[0]?.[0]?.docBody as HTMLElement;
+    expect(exportedBody).not.toBe(docBody);
+    expect(exportedBody.innerHTML).toBe('<h1>Click-time draft</h1>');
+    await waitFor(() => expect(result.current.exportOpen).toBe(false));
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy DOCX failures on the existing error toast', async () => {
+    const toast = vi.fn();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    downloadDocx.mockRejectedValueOnce(new Error('packing failed'));
+    const { result } = renderHook(() =>
+      usePageRewriteChatShell({ workspaceId: 'ws-docx-failure', toast })
+    );
+
+    act(() => result.current.handleExport('docx'));
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith('DOCX export failed. Please try again.', 'error');
+    });
+    expect(downloadDocx).toHaveBeenCalledOnce();
+    expect(result.current.exportOpen).toBe(false);
+    consoleError.mockRestore();
   });
 
   it('prevents duplicate sendMessage calls while request is in flight', async () => {

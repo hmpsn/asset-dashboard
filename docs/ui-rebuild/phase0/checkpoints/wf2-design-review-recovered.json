@@ -1,0 +1,890 @@
+[
+ {
+  "agentId": "a11a0d7b8b16fcef7",
+  "promptHead": "You are part of an ADVISORY design review of the proposed hmpsn.studio platform rebuild (undefined). No code changes ever \u2014 findings only.\nRepo: /Users/joshuahampson/CascadeProjects/asset-dashboard. The UI Rebuild Kit (the proposed new platform) lives at \"/Users/joshuahampson/CascadeProjects/asset-dashboard/hmpsn studio Design System\" \u2014 the hi-fi prototype is mockup/*.js view modules; HTML docs ex",
+  "structuredOutput": {
+   "topic": "Business fit: is the proposed UI Rebuild Kit the right build for hmpsn.studio (solo-founder SEO agency, tiered monetization, Issue-led retention)?",
+   "keyFindings": [
+    {
+     "finding": "Client-side monetization machinery (TierGate, 14-day trial, Plans/ROI, cart-checkout, per-item content purchase, upgrade moments) has no designed home anywhere in the kit \u2014 absent from the 18-surface map, the Platform Parity Ledger, the client mockup, and the Content & Access permissions matrix, despite being the business's revenue model.",
+     "evidence": "Platform Parity Ledger.html: zero matches for cart/checkout/purchase/'Client portal'/Plans/trial (only admin-side Stripe rows: Settings config, Revenue dashboard, pipeline.js:476-539 subscription plans). Client Dashboard Mockup.html: only monetization artifact is a static 'Growth plan' badge. Content & Access Conventions: role-only matrix (Operator/Admin/Client), no tier axis, one locked-microcopy example. MONETIZATION.md defines the 3-tier + per-item + trial model; FEATURE_AUDIT.md #522 shows tier gating is live and server-authoritative (computeEffectiveTier).",
+     "severity": "blocker"
+    },
+    {
+     "finding": "The client mockup renders Premium-tier service semantics under a Growth badge \u2014 'Your turn: 2 approvals', 'Curated by your strategist', 'Ask your strategist' shown for a 'Growth plan' client \u2014 contradicting MONETIZATION.md where Growth is explicitly zero-human-touch (no approvals, no requests) and approvals/strategist touch are the $999 Premium proposition. Built as-is it over-promises solo-founder labor at $249/mo or silently redefines the tiers.",
+     "evidence": "Client Dashboard Mockup.html header ('Bayview Dental \u2026 Growth plan', 'Ask your strategist') and renderOverview() strings ('Your turn', '2 approvals', 'Curated by your strategist'); MONETIZATION.md Growth tier: 'pure SaaS margin with zero human touch\u2026 No requests, no approvals, no team hours'; 'SEO change approvals' listed under Premium.",
+     "severity": "major"
+    },
+    {
+     "finding": "Three conflicting client IAs coexist in the kit: the shipped, owner-ratified Issue four-tab shell (Overview\u00b7Inbox\u00b7Results\u00b7Deep Dive) which the kit's own Client Surface Sweep calls 'the current, correct design \u2014 the current one already won, finish the cutover, don't redesign'; the Client Dashboard Plan's Overview\u00b7Performance\u00b7Strategy\u00b7Inbox; and the Mockup's five tabs adding Brand. A fresh third IA risks repeating the exact build-beside-never-retire disease the Sweep diagnoses (CL1\u2013CL5) and relitigating a ratified decision.",
+     "evidence": "Client Surface Sweep.html \u00a701/\u00a705 ('The current design is the right one\u2026 finish the switch to the one that already won'); Client Dashboard Plan.html \u00a703 (four tabs); Client Dashboard Mockup.html placeholder() map (performance/deepdive/inbox/brand); Handoff Brief Phase 0 gate acknowledges the decision is open.",
+     "severity": "major"
+    },
+    {
+     "finding": "The client-dashboard decision would be signed off on one designed screen: only Overview is real in the mockup; Performance, Deep Dive, Inbox, and Brand are placeholder stubs \u2014 yet the retention thesis's non-negotiable decision queue, the trust guards around approvals/reviews, and most pay-more moments live in those undesigned tabs.",
+     "evidence": "Client Dashboard Mockup.html placeholder(k) function returns stub cards ('Building this next \u2014 the Overview sets the pattern'); Issue spec \u00a7G non-negotiable #3 (what-needs-ME queue) and \u00a7D expansion levers map to Inbox/Strategy/Performance surfaces.",
+     "severity": "major"
+    },
+    {
+     "finding": "Scope truth the plan must name: retention lives off-dashboard. The Issue spec mandates 'do not design for habitual logins' \u2014 the return hooks are event-driven push and the forwardable export. The kit covers the export (shareable PDF in the mockup) but no notification/email design, and the pending roadmap items in that loop (email preference center + CAN-SPAM, named-record reconciliation \u2014 the #1 trust guard) are untouched. The rebuild polishes the room clients visit once a month.",
+     "evidence": "Issue spec \u00a7F ('the dashboard is where you land from a notification, not a destination'); data/roadmap.json 'The Issue (Client) \u2014 Verdict-First Trust Spine' pending items; mockup string 'Generating a shareable PDF of your results'.",
+     "severity": "major"
+    },
+    {
+     "finding": "Free-tier and trial client experiences are undesigned \u2014 the mockup assumes a fully-populated Growth workspace; the funnel top (Free) and the conversion window (trial) have no client view, despite the admin side getting a designed cold-start ('Cold start = onboarding, not empty').",
+     "evidence": "Surface Model.html cold-start section is admin-cockpit only; Client Dashboard Plan A5 names the free-tier empty-tab problem but the mockup does not address it; MONETIZATION.md free-tier strategy.",
+     "severity": "minor"
+    },
+    {
+     "finding": "Opportunity-cost sequencing: the rebuild is by mandate 're-presentation, not reduction' (zero new capability) across 18 surfaces while revenue features pend \u2014 Strategy v3 paid-topic monetization spine (deferred), the entire Self-Service & Growth sprint (5/5 pending), Premium hours tracking, post-subscription welcome moment.",
+     "evidence": "UI Rebuild Handoff Brief Phase 0 mandate; data/roadmap.json pending sprints 'Self-Service & Growth', 'Client Dashboard Followups', Strategy v3 deferred monetization spine.",
+     "severity": "minor"
+    },
+    {
+     "finding": "The admin IA is a genuine solo-operator design, not ceremony: Today home replaces 9 stat cards + four triage systems with one cross-client work queue including an explicit 'monetization plays' stream and provenance-aware money; the scope\u00d7audience grid + send boundary + graduation path matches the shipped Issue curation workflow; Keywords 2\u21921 and Site Audit 3\u21921 reduce operator surface area.",
+     "evidence": "mockup/home.js header comment ('WHAT SHOULD I WORK ON TODAY?\u2026 What monetization plays can grow revenue'; provenance chips estimate\u2192measured\u2192actual); Surface Model.html grid and graduation path.",
+     "severity": "praise"
+    },
+    {
+     "finding": "The client Overview mockup is a faithful build of the Issue spec spine \u2014 dollarized verdict vs retainer with dated baseline, human-unit outcome counts, 'Your turn' queue leading, outcome-tagged shipped work, estimate labeling (~/\u2248), forwardable PDF \u2014 and the 18-surface map aligns with the pending roadmap (Local Presence, AI Visibility, Recommendations, Competitors, Outcomes surfaces all exist).",
+     "evidence": "Mockup code comment '\u2550\u2550 OVERVIEW = THE ISSUE \u2550\u2550'; strings '~$18,400 /mo \u00b7 4.6\u00d7 your retainer', '41 calls \u00b7 12 form fills \u00b7 6 bookings', 'up from 21 since we started'; mockup/local*.js, aivis.js, recs.js, outcomes.js vs data/roadmap.json pending sprints.",
+     "severity": "praise"
+    }
+   ],
+   "recommendations": [
+    "Design the tier layer before any client surface is built: add a tier\u00d7trial axis to the Content & Access permissions matrix and to Handoff Brief template field 5; add parity-ledger rows for TierGate/trial/Plans-ROI/cart-checkout/per-item purchase; design the 'upgrade at the ceiling' moment and the included/priced/locked act-on states as design-system components.",
+    "Resolve the Growth-badge vs strategist-touch/approvals contradiction explicitly \u2014 fix the mockup's tier semantics or deliberately revise MONETIZATION.md; never hand the ambiguity to a build agent.",
+    "Make the Phase 0 client-dashboard decision default to the kit's own Client Surface Sweep recommendation \u2014 finish the ratified Issue IA cutover and evolve it with the mockup's additive ideas (hero verdict band, Request-this move cards, Brand trust panel); a net-new parallel shell must prove it won't recreate CL1\u2013CL5.",
+    "Do not close the client-dashboard gate on Overview alone \u2014 require Inbox (action loop + trust guards) and at least one designed pay-more moment first.",
+    "Name the retention scope boundary in the plan: the rebuild is the landing surface; event-driven push, the email preference center, and named-record reconciliation are the actual return/trust loop and stay prioritized independently.",
+    "Design the Free-tier and 14-day-trial client states (soft-gated view, trial moment, post-subscription welcome) as part of the client proposal, not after.",
+    "Sequence the surface fan-out revenue-first (Client portal, Recommendations, Pipeline early) so monetization-adjacent surfaces land before long-tail admin tools and the rebuild never freezes revenue work."
+   ],
+   "ledgerFile": "/Users/joshuahampson/CascadeProjects/asset-dashboard/docs/ui-rebuild/phase0/design-review/strategy-business-fit.md"
+  }
+ },
+ {
+  "agentId": "a3edb274dd66ef8bb",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: Multi-location/franchise operator (15-40 clinics, one P&L, one agency relationship). Ops-bred; buys triage and a decision, not SEO.\nDISTRUST TRIGGERS: Per-location spelunking; no portfolio triage; averages hiding outliers.\n\nYOUR OWN PRIOR SPEC: in June you an",
+  "structuredOutput": null
+ },
+ {
+  "agentId": "a4aea58a3f320b801",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: Marketing lead at a ~40-partner professional-services consulting firm. Non-technical; sits between the agency and managing partners; judges everything by whether it defends the retainer in front of partners.\nDISTRUST TRIGGERS: Anything I cannot forward upward",
+  "structuredOutput": {
+   "persona": "Marketing lead at a ~40-partner professional-services consulting firm. Non-technical; sits between the agency and the managing partners; judges everything by whether it defends the retainer in front of partners who'd rather fund a conference booth.",
+   "resolved": [
+    "The spine inversion I demanded is now the whole platform's religion, not a patch: VERDICT \u2192 VALUE \u2192 PROOF opens every client surface, and the raw SEO cockpit (impressions, rank tables, health gauge) is demoted to a collapsed 'Under the hood' drawer. I can open this for ninety seconds before a partner meeting and lead with a conclusion.",
+    "My homework is first-class and up top: the 'Your turn' strip, '1 guide awaiting your OK', and the conversation thread with Approve/Request-a-change make the dashboard my to-do list with the agency \u2014 the only return hook that reliably works on me.",
+    "The forwardable one-pager finally EXISTS: 'Share this as a one-pager \u2014 a clean PDF of your results, forward it to a partner or your accountant' (Client Dashboard Mockup). That is verbatim the single feature I said would make me log in every month on purpose.",
+    "Named leads with a privacy guard ('Sarah K. \u2014 called from the emergency-dentist page' \u00b7 'Only you can see this') \u2014 the shape of my trust linchpin (actual inquiries I can point a partner at) is designed, plus the honest only-when-provable variant ('lead tracking connects once your form is wired up') instead of a fabricated number.",
+    "Provenance honesty is systemic: estimate/measured/actual chips, banded dollars, 'agency estimate' badges on every client-facing hero, methodology disclosure ('not a promise of future revenue'), and 'exact once reconciled against your booked revenue.' This is the anti-spin posture I said buys trust.",
+    "Credibility protection is substantially wired into the content loop: topic approval before writing, briefs and drafts gated on client sign-off ('awaiting client'), and an AI review where factual-accuracy and hallucination gates NEVER auto-pass \u2014 a human always checks before anything ships under our name. That's most of my 'I'd churn over one embarrassing partner-bylined piece' guard.",
+    "The work log is outcome-tagged in language I can forward: 'What we did this month' rows with a plain-English what/why and a value, not 'fixed 14 broken links.' And my requests become strategy signals ('Promote to signal'), so what I ask for visibly shapes the plan."
+   ],
+   "stillMissing": [
+    "My #1 credibility ask, again: the topic-vs-named-competitor authority slot \u2014 'are we page-one for the 15-20 topics partners get hired for, vs the two firms we lose deals to.' The portal shows generic 'page-one terms'; the dashboard's competitor block is 'they have 3\u00d7 your Google reviews' buried under the hood; the real Competitors view is admin-side. Third review in a row where the screen my managing partner actually Googles doesn't exist client-facing.",
+    "Qualified-inbound QUALITY: no title/firm/topic tagging and no junk filter. 'Enquiries from search' is still a raw count \u2014 students, vendors, and competitor-snoops inflate it exactly as I warned. Named leads are a fixture gesture, not a designed 'right kind of prospect' contract.",
+    "Event-driven nudges \u2014 the entire return-hook layer from my spec ('new qualified inquiry from [topic]', 'competitor overtook you on a deal-driving term', 'partner piece waiting for your 5-min review' pushed to email/Slack) is absent. The portal's hook is 'since your last visit', which still requires me to remember to visit.",
+    "Segment adaptivity is nowhere: every fixture is a dentist or a kitchen retailer, and the money arithmetic is visits \u00d7 2.1% CVR \u00d7 $705 avg order \u2014 e-commerce math. My firm sells seven-figure engagements on 9-month cycles; my segment's pipeline-altitude money frame (promised in the P0 review as P1) hasn't materialized in this redesign at all.",
+    "Brand/reputation-mention monitoring (being cited in the outlets that get us hired) \u2014 not present anywhere. AI-answer visibility exists but as an admin workbench only; nothing in MY portal tells me whether ChatGPT names us or Competitor X for our expertise areas \u2014 the thing I said I'd pay a premium for.",
+    "No period anchor: the portal is one scrolling page with no monthly framing, no history, and \u2014 critically \u2014 NO export; the one-pager lives only in the OTHER client design. My cadence is the monthly partner update; 'since your last visit' doesn't map to it."
+   ],
+   "distrustTriggers": [
+    "The portal's flagship verdict fixture is 'You're climbing \u2014 traffic's up 34% this quarter.' A TRAFFIC-led verdict is the exact vanity-dressed-as-a-win I said would start me interviewing replacements. The digest says copy is placeholder, but the verdict template itself hardcodes trajectory = sessions delta \u2014 the rule, not just the copy, leads with traffic instead of inquiries.",
+    "TWO competing client-facing designs ship in the same kit with the decision explicitly unresolved. My indispensable features are split between them: the one-pager export and named leads live only in the tabbed dashboard (4 of 5 tabs placeholder); the approve/reply loop and story spine live in the portal. Whichever one loses the gate, I lose something I was promised \u2014 and 'we haven't decided what your portal is' is not a sentence I can take to partners.",
+    "'$18,400/mo \u00b7 4.6\u00d7 your retainer' as the headline, with '\u2248 9,600 missed visits \u00d7 2.1% \u00d7 $705 avg order' spelled out beneath it. My managing partners would mock '$705 average order' in a consulting context within seconds, and the first mocked number poisons every other number on the page. Aggressive dollarization with e-commerce arithmetic is a jargon wall in dollar clothing \u2014 I cannot forward this upward unedited.",
+    "One-tap 'Yes \u2014 write this' commissions content straight into the pipeline from the portal. For a firm where content ships under a partner's byline, a one-tap greenlight with no named reviewer or byline step visible at the moment of commitment makes me nervous \u2014 the dashboard's 'your strategist scopes and confirms first' framing is the right one; the portal's isn't.",
+    "The kit's own internal inconsistencies (Site Audit '3\u21921' while Performance and Links still ship separately; a declared-but-empty book zone; purple tinting a nav group against its own color law). None of it is client-facing, but if the agency's spec contradicts itself, I discount the promises made in it \u2014 including the ones made to me."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "wouldImprove": [
+    "Resolve the two-design decision NOW, and whichever shell wins, contractually carry over my three non-negotiables: the zero-edit one-pager export, named/clickable inbound records, and the approve-before-ship loop. Don't make me discover post-launch that my export died with the losing prototype.",
+    "Change the verdict RULE, not the fixture: the client verdict must lead with the outcome noun (inquiries/leads), never a traffic percentage. Traffic may appear as supporting proof, never as the headline sentence. Write that into the handoff brief as a hard law like the color laws.",
+    "Build the authority slot for my segment: my 15-20 expertise topics vs 2-3 NAMED competitor firms, page-one yes/no plus movement ('you passed Competitor X on [topic]'). It's a table with maybe 40 rows \u2014 the data exists in your Competitors and Keywords surfaces; it's a projection, not a new engine. This is the third review where I've asked.",
+    "Make the money frame segment-aware: for professional services, kill visits \u00d7 CVR \u00d7 AOV and show 'SEO-influenced inquiries \u2192 estimated pipeline' at deal-band altitude, reconciled against the named-inquiry list. An honest smaller number I can defend beats a big number partners can mock.",
+    "Turn the one-pager from a button into a monthly push: auto-generate it on my reporting cadence and email it to me with a two-line summary. The export I must remember to click is the export I forget; the one that arrives the week of my partner update is the reason I renew.",
+    "Tag inbound with title/firm/topic and split 'right-kind' from junk explicitly (even manually by the strategist at first). And put the partner-byline review into my 'Your turn' strip by name: 'Partner piece under [Partner]'s byline awaiting your 5-minute review' \u2014 fuse the credibility gate into my decision loop as my spec asked.",
+    "Ship a client-visible AI-answers line ('when a prospect asks ChatGPT who to hire for [topic], you are named / Competitor X is named') graduated from the AI Visibility workbench \u2014 you already built the engine; give me the one sentence from it I can repeat to partners, because nobody else is selling me that."
+   ],
+   "verbatim": "You finally built the honest, decision-first briefing I asked for and even the forwardable one-pager I said would keep me renewing \u2014 but until you kill the traffic-led verdict, translate the $705-average-order math into pipeline language, and show me us-versus-the-named-firms-we-lose-deals-to, I still can't walk into the partner meeting and win the budget argument with it, and that's the only job this dashboard has."
+  }
+ },
+ {
+  "agentId": "a562aecee9c7c69a6",
+  "promptHead": "You are part of an ADVISORY design review of the proposed hmpsn.studio platform rebuild (undefined). No code changes ever \u2014 findings only.\nRepo: /Users/joshuahampson/CascadeProjects/asset-dashboard. The UI Rebuild Kit (the proposed new platform) lives at \"/Users/joshuahampson/CascadeProjects/asset-dashboard/hmpsn studio Design System\" \u2014 the hi-fi prototype is mockup/*.js view modules; HTML docs ex",
+  "structuredOutput": {
+   "topic": "Visual design & accessibility soundness of the hmpsn studio UI Rebuild Kit",
+   "keyFindings": [
+    {
+     "finding": "The mandated 'tabular numerals on all data' is physically impossible with the shipped font: D-DIN-PRO OTFs have no tnum OpenType feature and proportional digit widths, so every font-variant-numeric: tabular-nums on DIN-set values (MetricTile, GroupBlock, Meter, mockup .num class) is a silent no-op \u2014 rank/volume columns will misalign and live stats will jitter.",
+     "evidence": "Parsed assets/fonts/D-DIN-PRO-700-Bold.otf: GSUB features = dlig/frac/liga/ordn/sups only; digit advances '1'=348 vs '8'=525 units (Regular '1'=329 vs '8'=512). Handoff Brief house rule 6 mandates tabular numerals; MetricTile.jsx:31, GroupBlock.jsx:43, Meter.jsx:16 request tnum on var(--font-display). DataTable/KeyValueRow work only because they inherit Inter (which has tnum).",
+     "severity": "blocker"
+    },
+    {
+     "finding": "Purple reaches client-facing surfaces through the spec itself, violating the fourth law ('purple = admin-AI only, never client-facing'): the client portal mockup uses purple for next-step dots/pills/rec icons, IntentTag maps the 'local' intent to purple, and the new Badge reintroduces the purple tone the current platform deliberately removed from its Badge color union.",
+     "evidence": "mockup/portal.js lines 23, 155, 158, 201-207 (hard-coded #7c3aed in the client portal); components/feedback/IntentTag.jsx:15 (local \u2192 purple); components/feedback/Badge.jsx:11 (purple tone) vs root CLAUDE.md Four Laws \u00a74 ('Purple removed from Badge.tsx color union').",
+     "severity": "blocker"
+    },
+    {
+     "finding": "The flagship interaction (table row \u2192 detail drawer) is keyboard-inaccessible in the core primitives every surface will assemble from: DataTable clickable rows are div onClick with no tabIndex/role/key handler and no table semantics; Drawer/Modal/Popover have zero focus trap, focus return, or Escape handling; and a closed Drawer's off-screen content remains in the tab order inside an aria-hidden region.",
+     "evidence": "components/data/DataTable.jsx:35-48 (div rows, JS-only hover); components/layout/Drawer.jsx (translateX-only close, aria-hidden with focusable children); grep across Drawer/Modal/Popover: no onKeyDown/Escape/.focus( anywhere. Reference Screen - Keywords.html builds its primary flow on exactly these components.",
+     "severity": "blocker"
+    },
+    {
+     "finding": "MetricRing's score bands contradict the platform's settled score-color law: \u226580 renders teal while platform canon is emerald, with a doc comment falsely claiming it 'Matches the app's scoreColor' \u2014 a client-facing health-score meaning change the brief forbids, and a regression of a fix the platform already made once.",
+     "evidence": "components/data/MetricRing.jsx:4-8 (score>=80 \u2192 var(--teal)) vs src/components/ui/constants.ts:15 (#34d399 emerald) and constants.ts:54 comment 'FOUR-LAWS FIX: the \u226410 band is emerald (success), NOT teal (actions)'.",
+     "severity": "major"
+    },
+    {
+     "finding": "--brand-text-dim (#71717a) fails WCAG AA on every surface it sits on (3.67:1 on surface-2, 3.08:1 on surface-3) yet is a sanctioned text tier used for small real text: 10px DataTable headers, t-micro, drawer eyebrows, 9px NavItem meta.",
+     "evidence": "Computed contrast ratios from tokens/colors.css values; consumers at guidelines/type-scale.css:23, DataTable.jsx:28-29, Drawer.jsx eyebrow, NavItem.jsx meta.",
+     "severity": "major"
+    },
+    {
+     "finding": "Light-mode text contrast fails exactly where the Handoff Brief warned: light mint #0d9488 on white is 3.74:1 (below AA for the 10-13.5px text it colors) and --brand-text-faint #94a3b8 is 2.56:1, used for real text in the client portal (Powered-by line, rank meta, timestamps) \u2014 the client trust surface has the worst contrast in the kit.",
+     "evidence": "Computed from tokens/colors.css light scope; portal.js pt-power (10.5px), .rmeta (11px), .when using the faint value; Handoff Brief house rule 7 explicitly demands the light-mode accent recheck.",
+     "severity": "major"
+    },
+    {
+     "finding": "The brief's \u226544px hit-target floor is contradicted by every shipped control except Toggle (Button lg\u224842px/md\u224835px/sm\u224827px, IconButton 28-40px, NavItem\u224831px, close buttons 30px), making the CI-gated floor either fail everything or be ignored.",
+     "evidence": "components/buttons/Button.jsx:21-25 size paddings, IconButton.jsx:15 box sizes, NavItem.jsx padding, Drawer/Modal 30px close buttons vs Handoff Brief house rule 7 ('\u226544px hit targets').",
+     "severity": "major"
+    },
+    {
+     "finding": "Badge/Toast accent tints are frozen dark-mode rgba literals that don't re-key under .dashboard-light, breaking 'theme-neutral by construction' inside the most-used primitive; and overlay components ignore the z-index token scale with raw values (Popover 59/60, Tooltip 70, Drawer 90/95, Modal 100) so a Toast at the documented --z-toast:60 renders beneath open drawers/modals, hiding mutation feedback.",
+     "evidence": "components/feedback/Badge.jsx:3-13 and Toast.jsx:3-8 (hard-coded rgba + '#0a1f1b'); tokens/effects.css --z-modal:50/--z-toast:60 vs raw zIndex values in Popover.jsx:15-19, Tooltip.jsx:29, Drawer.jsx (90/95), Modal.jsx (100).",
+     "severity": "major"
+    },
+    {
+     "finding": "No responsive contract exists: AppShell is a fixed 232px+1fr grid at all viewports with no collapse breakpoint, layout.css breakpoints are unconsumed 'reference values', and nothing states which surfaces are mobile-required \u2014 despite the client portal being the surface clients will open from email on phones.",
+     "evidence": "components/layout/AppShell.jsx (fixed gridTemplateColumns, manual rail prop only); tokens/layout.css:28-31; mockup shell overflow:hidden with zero @media; only portal.js and AppShell declare container-type.",
+     "severity": "major"
+    },
+    {
+     "finding": "Internal law drift in semantic components will be cloned 18-wide: StatusBadge maps live\u2192teal while the readme lists 'Live' pills under emerald; Meter (a data/progress display) defaults to mint/mint\u2192emerald against the 'blue = progress bars' law and the Reference Screen renders the Opportunity data column as mint meters; cockpit's flight meter hard-codes purple #a78bfa as a pipeline-stage color.",
+     "evidence": "components/feedback/StatusBadge.jsx:12; components/data/Meter.jsx defaults; Reference Screen - Keywords.html:80 (Meter gradient on Opportunity column); mockup/cockpit.js:213 (raw hex stage dots incl. #a78bfa); readme.md four-laws section.",
+     "severity": "major"
+    },
+    {
+     "finding": "The Reference Screen \u2014 the declared structural target \u2014 violates the kit's own icon rule (hand-rolled Lucide paths, no FA kit loaded; Toast docs also recommend Lucide) and hand-rolls the eyebrow micro-label inline 3\u00d7, the exact defect the readme says to flag in review; the mockup also ships 'retired' Fira Code in 35 of 40 views.",
+     "evidence": "Reference Screen - Keywords.html:28-40 (Lucide glyphs) and three inline uppercase-mono section labels; components/feedback/Toast.jsx doc comment; tokens/fonts.css ('Fira Code is retired') vs grep counts (editor.js 34 uses, pipeline.js 19, mockup shell <link>s Fira Code).",
+     "severity": "minor"
+    },
+    {
+     "finding": "The token architecture and theming discipline are genuinely strong and worth protecting: the light theme is engineered (darkened accents computing 5.0-5.5:1 on white, inverted zinc scale), a global keyboard-only mint focus ring plus prefers-reduced-motion kill switch ships in base.css, Toggle/Checkbox use native-button semantics (Toggle with a documented 44px target), TrendBadge triple-encodes direction (sign+arrow+color), primary buttons hit 9.2:1 contrast via dark ink on mint, and the density posture (1180px dense column, 13.5px rows, verdict-first cockpit) is operator-grade rather than whitespace-over-utility.",
+     "evidence": "tokens/colors.css light scope (computed ratios: amber 5.02, blue 5.17, emerald 5.48 on white); tokens/base.css:30-58; forms/Toggle.jsx (minHeight 44, role=switch); data/TrendBadge.jsx; --button-primary-text #0a1f1b on #2dd4bf = 9.21:1; tokens/layout.css + Reference Screen table structure.",
+     "severity": "praise"
+    }
+   ],
+   "recommendations": [
+    "Before the pilot surface, resolve the numeral strategy (license a DIN cut with tnum, or mandate Inter/JetBrains Mono for all data columns and reserve DIN for headings/hero stats), and add an adherence-lint rule forbidding font-display + tabular-nums co-occurrence.",
+    "Purge client-facing purple at the source: recolor portal.js, re-map IntentTag 'local' to a non-law hue, remove purple from Badge's public tone union, and add a lint gate mirroring the platform's existing client-path purple grep.",
+    "Fix keyboard accessibility once in the four core primitives (DataTable keyboard rows + table semantics; shared focus-trap/Escape/inert utility for Drawer/Modal/Popover) and gate the pilot on a keyboard-only walkthrough of the Reference Screen.",
+    "Apply the one-line law fixes and document them in the Which-Primitive guide: MetricRing \u226580 \u2192 emerald, StatusBadge live \u2192 emerald, Meter default fill \u2192 blue, no purple pipeline-stage dots.",
+    "Run a token pass: brighten or reclassify --brand-text-dim, make light-mode mint text-safe (#0f766e for text), replace frozen rgba tints with color-mix on tokens, and re-point all overlay z-indexes at the --z-* scale so toasts sit above modals.",
+    "Write the two missing contracts: a hit-target policy (e.g. 24px desktop / 44px touch+client, stated explicitly) and a responsive contract (shell collapse behavior below --bp-md; portal and recommendations declared mobile-required).",
+    "Clean the reference artifacts before fan-out: FA icons + .eyebrow utility in the Reference Screen, Fira Code on the lint blacklist, and publish a mockup\u2192sanctioned-type-scale remap table so agents don't guess.",
+    "Declare the missing data-viz contracts: one canonical score-band function, one categorical multi-series color ramp, and a rule that sparklines never appear without an adjacent numeric delta."
+   ],
+   "ledgerFile": "docs/ui-rebuild/phase0/design-review/craft-visual-a11y.md"
+  }
+ },
+ {
+  "agentId": "a5c40ddcdab4f4c4e",
+  "promptHead": "You are part of an ADVISORY design review of the proposed hmpsn.studio platform rebuild (undefined). No code changes ever \u2014 findings only.\nRepo: /Users/joshuahampson/CascadeProjects/asset-dashboard. The UI Rebuild Kit (the proposed new platform) lives at \"/Users/joshuahampson/CascadeProjects/asset-dashboard/hmpsn studio Design System\" \u2014 the hi-fi prototype is mockup/*.js view modules; HTML docs ex",
+  "structuredOutput": null
+ },
+ {
+  "agentId": "a6ec552a3ca8fe11f",
+  "promptHead": "You are part of an ADVISORY design review of the proposed hmpsn.studio platform rebuild (undefined). No code changes ever \u2014 findings only.\nRepo: /Users/joshuahampson/CascadeProjects/asset-dashboard. The UI Rebuild Kit (the proposed new platform) lives at \"/Users/joshuahampson/CascadeProjects/asset-dashboard/hmpsn studio Design System\" \u2014 the hi-fi prototype is mockup/*.js view modules; HTML docs ex",
+  "structuredOutput": {
+   "topic": "Flows, interactions & state design soundness (UI Rebuild Kit prototype review)",
+   "keyFindings": [
+    {
+     "finding": "The product's central ritual \u2014 sending the client update \u2014 has no designed flow anywhere: 'Send update to {first}' is the dead primary topbar button on 6+ views, 'Edit POV' is dead, and there is no composer, preview, confirm, sent-state, or history.",
+     "evidence": "mockup/app.js:5-51 (no onclick on any 'Send update' primary), mockup/strategy.js:403 (Edit POV dead) and :408 ('edited by you before send' claim)",
+     "severity": "blocker"
+    },
+    {
+     "finding": "The flagship keyword-decision flow is a navigation stub: 'Stage into Insights Engine' from the keyword drawer stages nothing \u2014 window.stageIntoIssue() only calls gotoView('issue'), carrying no state and giving no feedback.",
+     "evidence": "mockup/keywords.js:408 \u2192 mockup/strategy.js:475 (function(){ window.gotoView('issue'); })",
+     "severity": "blocker"
+    },
+    {
+     "finding": "Client-originated intake requests can be dismissed silently \u2014 no confirm, no toast, no undo, no record \u2014 destroying a client's portal ask with one accidental click.",
+     "evidence": "mockup/pipeline.js:1165-1168 (dismissIntake splices with no feedback); pipeline.js:461 (intake item is 'Dana asked in the portal')",
+     "severity": "blocker"
+    },
+    {
+     "finding": "The prototype systematically violates its own mutation contract: zero confirm dialogs exist in any flow view \u2014 cancel plan, single/bulk publish, bulk AI fixes written to Webflow, every send-to-client, and the review queue's 'P' keyboard publish are all one-click, while Build Conventions \u00a702 mandates pessimistic+confirm for exactly these. Undo (also mandated) is delivered exactly once (recs dismiss).",
+     "evidence": "pipeline.js:1099 (subDelete), editor.js:1687/1694/1552 (publish, bulk publish, P-key), audit.js:649-652 (bulkAccept 'written to Webflow'), recs.js:248; grep confirms no confirm/Modal in flow views; Build Conventions.html \u00a702",
+     "severity": "major"
+    },
+    {
+     "finding": "Review gates don't gate: 'factual accuracy and hallucination checks never auto-pass \u2014 they always route to you' is copy only; 'Approve & schedule' advances past failing human-required gates with no friction, and the pipeline lifecycle has no backward transitions at all (editor has request-changes\u2192draft \u2014 the two lifecycle surfaces disagree).",
+     "evidence": "pipeline.js:953,1132-1151; draft-workspace.js:508,563-567; editor.js:1731 (backward move exists only here)",
+     "severity": "major"
+    },
+    {
+     "finding": "Cross-surface handoffs are toasts, not state: graduate\u2192Insights Engine mutates nothing (re-clickable), rec approval claims 'queued into Content Pipeline' but pipeline receives nothing, the recs flow ribbon advertises a 'Stage into Insights Engine' step that has no control on the surface, and unstaging a strategy move orphans its projected work orders with no reconciliation.",
+     "evidence": "pipeline.js:1154 (graduate), recs.js:161,214-222,253; strategy.js:435,468 + static KTARGETS/WORDERS at strategy.js:339-349",
+     "severity": "major"
+    },
+    {
+     "finding": "The four-state matrix (loading/empty/error/locked) exists only as prose: zero skeletons, zero error/retry states, and zero locked states in any core flow view; empty states are inconsistent (strategy has none; keywords no-match renders a bare header); the Keywords reference screen also renders only the populated state \u2014 so ~54 states across 18 surfaces will be invented from prose by parallel agents.",
+     "evidence": "grep: loading/skeleton only in brand-modal/portal/palette; retry/failed only in local-reviews.js; keywords.js:270-304; Reference Screen - Keywords.html (populated only); Build Conventions.html \u00a701",
+     "severity": "major"
+    },
+    {
+     "finding": "The prototype introduces four new status vocabularies with colliding words ('published' means three things, 'approved' two) and no shared envelope or transition tables \u2014 re-creating the exact 'pile B' fracture the kit's own States & Lifecycle Sweep diagnoses and prescribes fixing with a canonical Lifecycle envelope.",
+     "evidence": "keywords.js:152-158, pipeline.js:401-408, editor.js:674, recs.js:107, pipeline.js:711 (matrix); States & Lifecycle Sweep.html ST3/target section",
+     "severity": "major"
+    },
+    {
+     "finding": "Interaction inconsistency in the same component class: Escape closes brief/draft workspaces and palette but not the keywords drawer, pipeline drawer, subscription drawer, or keyword picker; view navigation force-closes only 2 of 4 drawer families, leaving orphaned overlays.",
+     "evidence": "brief-workspace.js:681, draft-workspace.js:693 (Escape handlers) vs none in keywords.js/pipeline.js drawers; app.js:99 (cleanup list covers kdrawer/pk-dr only)",
+     "severity": "major"
+    },
+    {
+     "finding": "PROTECT: the pipeline lifecycle (intake\u2192brief\u2192draft\u2192review\u2192published\u2192graduate, with the decay loop re-entering the same lifecycle), the dual-pane 'Your desk / What Acme sees' curation pattern, the editor review queue with keyboard shortcuts and dirty-state tracking, and the strategy regenerate/'What changed' diff loop are genuinely strong, operator-grade flow designs \u2014 the connective sendToPipeline pattern (editor\u2192pipeline) proves real cross-surface wiring exists and just wasn't applied to the failing handoffs.",
+     "evidence": "pipeline.js:1108-1114 (queueRefresh), recs.js:224-243, editor.js:1095-1112/1550/1727, strategy.js:299-337/473, pipeline.js:1177-1185 (sendToPipeline)",
+     "severity": "praise"
+    }
+   ],
+   "recommendations": [
+    "Design the send-client-update flow end-to-end before any build fan-out (POV composer, client preview reusing the recs dual-pane, pessimistic confirm, sent-state + history) \u2014 it is the product's spine and currently a dead button on six screens.",
+    "Publish a mutation classification table alongside the Action Registry (optimistic / optimistic+undo / pessimistic+confirm per action), make it a required field of the per-surface handoff template, and fix the prototype's four worst offenders (cancel plan, bulk publish, bulk AI-fix, dismiss intake) so agents copy compliant examples instead of contract violations.",
+    "Make review gates real state-machine transitions (block review\u2192scheduled while human-required gates fail, with an explicit named-override confirm) and add backward transitions (review\u2192draft, unschedule) to the pipeline, mirroring the editor.",
+    "Adopt one Lifecycle envelope with explicit transition tables for the five new stage vocabularies (keywords, pipeline, editor, recs, matrix) and run a word-collision pass ('published'/'approved'/'live') before agents fan out.",
+    "Render the four states (skeleton, nothing-yet vs nothing-matches empty, error-with-stale-data, locked) for the Keywords reference screen so the ~54 unillustrated surface-states have a pixel-level source of truth.",
+    "Resolve the three phantom handoffs as state, not toasts \u2014 stage-into-Issue creates a move, graduate creates a client story, rec approval creates a pipeline card \u2014 following the working sendToPipeline pattern.",
+    "Specify unstage/recall reconciliation: withdrawing a curated move must confront its in-flight work orders (block, cascade-with-confirm, or orphan-with-flag); recalling a sent rec must model client visibility.",
+    "Sweep every dead control in the prototype: each button either gets a specified flow (target state + one sentence) or is cut from the spec \u2014 a prototype that is 'the UX spec' cannot contain unspecified primary actions.",
+    "Unify drawer behavior once in the Drawer primitive: Escape-to-close, focus trap/return, and self-registering navigation cleanup."
+   ],
+   "ledgerFile": "/Users/joshuahampson/CascadeProjects/asset-dashboard/docs/ui-rebuild/phase0/design-review/craft-flows.md"
+  }
+ },
+ {
+  "agentId": "aaf9709ac256ed167",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: Account manager the studio hires at 40 workspaces. Inherits the platform cold next year.\nYOUR JOB ON THIS PLATFORM: Portfolio triage across 40 workspaces: which client is on fire, which is due, which is fine \u2014 without opening each one.\nDISTRUST/FRUSTRATION TR",
+  "structuredOutput": {
+   "persona": "Account manager hired at 40 workspaces; inherits the platform cold and lives in book-level triage \u2014 which client is on fire, which is due, which is fine \u2014 without opening each one.",
+   "resolved": [
+    "A real cross-client home finally exists: the Command Center (home.js) is ONE unified work queue across the whole book, organized by Optimizations / To send / Monetization \u2014 explicitly replacing the current platform's per-workspace 9-stat home and four separate triage systems. This is the single biggest thing the current admin (navRegistry.tsx) lacks for my job.",
+    "The workspace switcher popover carries a book roll-up header \u2014 total open requests, N at risk, N in setup \u2014 plus a health dot (on track / at risk / setting up) and open-item badge per client. That's a 5-second 'who's on fire' read I don't have today.",
+    "'From your clients' is a separate, protected stream at the top of the rail \u2014 humans waiting on me (approvals, replies, requests) never get buried under machine-generated work items. Correct instinct against alert fatigue.",
+    "Book-level Site Health is a client \u00d7 issue-type matrix with batch-fix framing \u2014 systemic problems (missing alt text across the book) become one action, not 40 visits. Book-level Action Results gives me a winners-vs-laggards read and feeds a 'Send book recap'.",
+    "The verdict header tells me where to start ('Start with Acme's dead links and July update, unblock Northwind \u2014 they replied\u2026') instead of making me derive it from stat cards.",
+    "\u2318K palette jumps across all surfaces AND workspaces with persisted recents \u2014 at 40 clients keyboard-first switching is how I'll actually move.",
+    "Cold-start coherence: a new client routes to Onboarding, not a broken dashboard \u2014 so 'is this client set up yet?' is legible at the switcher, which matters when I inherit the book cold."
+   ],
+   "stillMissing": [
+    "No concept of DUE anywhere on the operator side. I grepped every operator surface: no due dates, no overdue state, no SLA, no 'monthly update due', no renewal countdown. 'Which client is due today' \u2014 half my job \u2014 has no data model. Ironically the client-side mockup has a '3 pages \u2014 9d pending' staleness chip; the operator gets nothing equivalent.",
+    "Nothing is designed for 40. The work queue is a flat list (11 fixture items, 4 clients) grouped by stream, not by client \u2014 at 40 workspaces that's 100+ undifferentiated rows with no per-client rollup, no severity sort, no pagination, no snooze/dismiss. The switcher is a popover list of 4 with no search or sort.",
+    "No portfolio table: a sortable 40-row grid (health, open items, days since last client update, next due deliverable, plan/retainer, last-touched) simply doesn't exist. The switcher roll-up is the closest thing and it's three numbers in a popover.",
+    "No aging on operator work items \u2014 timestamps exist on client messages ('22m ago') but work-queue rows have no 'sitting for 9 days' signal, so stale items silently rot.",
+    "The book-wide Inbox (requests.js, ~9KB, the smallest core view) is where clients wait on me, and it has no waiting-time markers, no filters, no per-client grouping.",
+    "No multi-operator model: no assignment, ownership, or handoff notes anywhere. The studio is hiring ME \u2014 the platform still assumes one operator who already knows every client's story.",
+    "The verdict narrative and per-client cockpit verdicts are hand-authored fixtures; nothing shows how 'start with Acme' gets generated or stays trustworthy at 40 clients.",
+    "Book calendar view: content Calendar is per-client only \u2014 no cross-book view of what publishes/is owed this week."
+   ],
+   "distrustTriggers": [
+    "The BOOK zone rail is literally empty (nav.js: const book = [];) \u2014 Command Center, book Site Health, and Action Results are reachable only via a logo click or \u2318K. My primary workspace has no navigation presence; that tells me book-level triage was designed second.",
+    "Everything is dollarized as 'estimate' \u2014 40 clients \u00d7 3 monetization 'Propose' rows each is pitch spam, and headline dollar figures I can't verify on day one make me numb to the queue fast. Provenance chips help, but in the fixtures nearly everything is 'e'.",
+    "Controls that look interactive but do nothing (Keywords' intent/stage filter chips, 'Auto-share rules', calendar prev/next) \u2014 once I hit two dead controls I stop trusting every filter on the platform.",
+    "Consolidation claims contradict the shipped nav (Site Audit badged 3\u21921 while Performance and Links remain separate destinations) \u2014 as the person inheriting this cold, an IA that lies about itself costs me weeks.",
+    "Four hardcoded demo clients everywhere: not one screen demonstrates the flat work queue, the popover switcher, or the verdict paragraph surviving 10\u00d7 the data. I've been burned by 'it demoed great at 4'."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "wouldImprove": [
+    "Put the book in the rail: pin Command Center, Inbox (with badge), Site Health, and Action Results as permanent BOOK-zone entries above the client block \u2014 my home shouldn't hide behind a logo click.",
+    "Add a due/SLA layer to the data model: every to-send item, content-subscription deliverable, and monthly update gets a due date; the Command Center opens with a 'Due today / Overdue' band above the three streams.",
+    "Build the portfolio table: all 40 clients, one row each, sortable by health, open items, days since last client-facing send, next due deliverable, and retainer \u2014 that page IS my morning.",
+    "Group the work queue by client with per-client caps and severity ordering, plus snooze/dismiss with a reason \u2014 a triage queue I can't clear is an anxiety generator, not a tool.",
+    "Put aging chips on every operator work item and inbox row ('waiting 6d'), mirroring the client-side '9d pending' pattern \u2014 staleness must be visible on my side of the glass.",
+    "Add owner/assignment to work items now, even if it's a single-select with one name \u2014 the studio hiring me is proof the single-operator assumption is already wrong.",
+    "Seed one demo book with 40 realistic workspaces and make the Command Center, switcher, and Site Health matrix pass review AT that scale before any build fan-out."
+   ],
+   "verbatim": "Give me the Command Center in the rail with a 'due today' band and a sortable 40-client table behind it, and this is the first agency platform I wouldn't have to fight \u2014 right now it's a brilliant morning briefing written for someone who only has four clients and no deadlines."
+  }
+ },
+ {
+  "agentId": "ab383e50715c82fea",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: Busy in-house B2B SaaS marketing lead. Owns the demand number, lives in GA4/HubSpot/Ahrefs, hired the agency for pipeline capacity without headcount.\nDISTRUST TRIGGERS: Being managed by dashboard; vanity metrics; anything I cannot reconcile with my own analyt",
+  "structuredOutput": null
+ },
+ {
+  "agentId": "ab51597c049dd9041",
+  "promptHead": "You are part of an ADVISORY design review of the proposed hmpsn.studio platform rebuild (undefined). No code changes ever \u2014 findings only.\nRepo: /Users/joshuahampson/CascadeProjects/asset-dashboard. The UI Rebuild Kit (the proposed new platform) lives at \"/Users/joshuahampson/CascadeProjects/asset-dashboard/hmpsn studio Design System\" \u2014 the hi-fi prototype is mockup/*.js view modules; HTML docs ex",
+  "structuredOutput": {
+   "topic": "Information architecture & navigation soundness of the proposed hmpsn.studio platform rebuild",
+   "keyFindings": [
+    {
+     "finding": "The ratified two-zone rail (Model B) is not what the prototype implements: the Book zone is empty (`const book = []`), Command Center is reachable only via a logo click, Inbox is demoted to a footer icon, and book Site Health / Action Results have no persistent nav affordance at all (palette + home-cards only). The prototype's own palette advertises a 'Your book' group the rail never renders \u2014 internal drift inside the mockup itself.",
+     "evidence": "mockup/nav.js lines 13-14 (empty book array) vs Navigation Model Options.html \u00a73A (recommends Today/Requests/Site Health\u00b7book/Action Results\u00b7book in a visible Book zone); mockup/palette.js NAV list 'Your book' group; host HTML ccLogo\u2192gotoView('home')",
+     "severity": "blocker"
+    },
+    {
+     "finding": "The Handoff Brief's '18-surface map \u2014 the full front end' silently omits ~10 shipped views (Command Center, Inbox, book Site Health, book Action Results, Roadmap, Business, Settings, Workspace settings, Onboarding, Diagnostics interior), so the fan-out plan has no tickets, ledgers, or definitions-of-done for them. Five HEAD global-admin surfaces (Prospect, AI Usage, Features, Revenue, Team Outcomes) are marked 'untouched' but have no home in the new shell.",
+     "evidence": "UI Rebuild Handoff Brief.html Part 2 (18 client-zone surfaces only) vs mockup/app.js VIEWS (28 views); nav.js admin popover holds only Roadmap/Business/Settings; src/lib/navRegistry.tsx lines 165-184 for the unhomed admin surfaces",
+     "severity": "blocker"
+    },
+    {
+     "finding": "The kit contains two competing IA end-states: the IA Consolidation Map prescribes 24\u2192~9 destinations (Recommendations/Editor/Schema/Rewriter fold into signals/actions; Brand & AI moves to Settings) while the prototype rail keeps all of them as 18 cold destinations \u2014 and the Handoff Brief blesses the prototype as spec without reconciling the drift.",
+     "evidence": "IA Consolidation Map.html (fold list, 'The Issue THE SPINE') vs mockup/nav.js lines 17-46 (Recommendations, SEO Editor, Schema, Page Rewriter, Brand & AI all rail items)",
+     "severity": "major"
+    },
+    {
+     "finding": "'Site Audit 3\u21921' is misleading: the absorbed Performance and Links surfaces remain as sibling rail destinations two rows below the merge badge, CWV/link data renders in two places, and the client zone is 18 destinations vs HEAD's 19 \u2014 the rail is not actually consolidated; the real win is coherence, not count.",
+     "evidence": "mockup/audit.js header comment ('Absorbs Performance... and Links') vs nav.js lines 31-33 (Performance, Links still rail items); navRegistry.tsx workspace-entry count",
+     "severity": "major"
+    },
+    {
+     "finding": "Silent workspace switching is baked into the prototype's flows (navigating to a scoped view while a 'new' client is active silently swaps the active client; switching clients bounces you to Cockpit unless you're on one of only 6 whitelisted views) \u2014 a wrong-client-data trust landmine if the 'flows are load-bearing spec' rule is followed literally.",
+     "evidence": "mockup/app.js lines 84-97 (silent hmpsnActive swap); mockup/workspace.js lines 87-89 (partial 'stay' list)",
+     "severity": "major"
+    },
+    {
+     "finding": "Keywords 2\u21921 merge is sound but collapses two different primary axes: the merged surface is keyword-first (lens tabs + drawer) and nowhere names preservation of Page Intelligence's page-first workflow as a requirement.",
+     "evidence": "Coverage Ledger 'Keywords \u2190 Keyword Hub + Page Intelligence'; mockup/keywords.js (keyword-first table); navRegistry.tsx line 139 (page-intelligence: 'Per-page keyword analysis')",
+     "severity": "minor"
+    },
+    {
+     "finding": "'Search & Site Health' is becoming the junk-drawer group (6 items, AI Visibility shoehorned in), and the kit has no stated rule for when a new feature earns a rail item vs docking into the Insights Engine as a signal/lens \u2014 growth headroom is contingent on adopting the Consolidation Map's mechanism.",
+     "evidence": "mockup/nav.js lines 28-35; IA Consolidation Map 'inline for the 80%, hand off the 20%'",
+     "severity": "minor"
+    },
+    {
+     "finding": "Navigation Model Options and the Surface Model are exemplary IA reasoning worth protecting: the Model B+C hybrid switcher (client list with health/open counts, derived book roll-up), the scope\u00d7audience grid, the send-boundary graduation path, cold-start-as-onboarding, and scope-in-the-URL (/your-book, /acme/keywords) are all correct and materially better than HEAD's /ws/:id routing.",
+     "evidence": "Navigation Model Options.html \u00a73A; Surface Model.html (grid, graduation path, deep-linking table); mockup/workspace.js lines 27-45",
+     "severity": "praise"
+    },
+    {
+     "finding": "Admin/client IA separation is structurally sound: Client-facing rail cluster, Client portal as in-admin preview, the gated client-dashboard decision, purple=admin-AI-only law, and 'no client-facing all-clients view' all hold.",
+     "evidence": "UI Rebuild Handoff Brief Phase 0 gate; Surface Model send boundary; nav.js lines 42-45, 112-117",
+     "severity": "praise"
+    }
+   ],
+   "recommendations": [
+    "Resolve the Book-zone contradiction before any shell code: populate the rail's Book zone per the ratified Model B (Today, Inbox, Site Health\u00b7book, Action Results\u00b7book) or formally amend Navigation Model Options \u2014 do not let fan-out agents inherit the empty-zone state as spec",
+    "Extend the 18-surface map to the true full front end (~28 views): add book-scope, global/admin, onboarding, and interior surfaces with the same nine-field template, and declare explicit fates for Prospect, AI Usage, Features, Revenue, and Team Outcomes",
+    "Reconcile the IA Consolidation Map with the prototype rail: mark each fold-in adopted/deferred/rejected, and adopt its lens-vs-rail-item rule as the standing convention for where future features go",
+    "Add a 'flows that are NOT spec' note to the Handoff Brief covering the mockup's silent client-switch guards and partial stay-list; production scope changes must be explicit and symmetric across all scoped views",
+    "Express the triage-vs-workbench relationship between Site Audit and Performance/Links in the rail (hierarchy or copy) and drop or re-scope the misleading 3\u21921 badge",
+    "Carry HEAD's nav-registry pattern forward as a hard requirement: one source of truth feeding rail, palette, and breadcrumbs with a completeness contract test \u2014 the mockup has already re-created the triplication drift the registry was built to kill",
+    "Add 'page-first pivot preserved' to the Keywords 2\u21921 definition of done; make breadcrumb segments interactive; fix dead nav ids (home/sitehealth/outcomes/diagnostics highlight nothing)"
+   ],
+   "ledgerFile": "docs/ui-rebuild/phase0/design-review/craft-ia-nav.md"
+  }
+ },
+ {
+  "agentId": "abe07075eb0ff794c",
+  "promptHead": "You are part of an ADVISORY design review of the proposed hmpsn.studio platform rebuild (undefined). No code changes ever \u2014 findings only.\nRepo: /Users/joshuahampson/CascadeProjects/asset-dashboard. The UI Rebuild Kit (the proposed new platform) lives at \"/Users/joshuahampson/CascadeProjects/asset-dashboard/hmpsn studio Design System\" \u2014 the hi-fi prototype is mockup/*.js view modules; HTML docs ex",
+  "structuredOutput": {
+   "topic": "Outside view \u2014 benchmark of the UI Rebuild prototype against modern SEO suites, agency client-reporting tools, and Linear/Notion-grade operator tools",
+   "keyFindings": [
+    {
+     "finding": "Client portal is a narrative trust-spine (VERDICT\u2192VALUE\u2192PROOF, 'since your last visit' hook, two-way approve/request/greenlight loop, honest negative-quarter branch) \u2014 categorically ahead of AgencyAnalytics/Looker-style read-only widget dashboards and the strongest differentiator in the kit.",
+     "evidence": "mockup/portal.js lines 1\u201313 (design intent), 385\u2013415 (hook + value band), 604\u2013645 (PortalView.approve/request/addRec wired back to the operator store); dir:-1 branch renders 'We're defending your rankings \u2014 here's the plan' (lines 387\u2013391).",
+     "severity": "praise"
+    },
+    {
+     "finding": "Provenance-labelled money (estimate\u2192measured\u2192actual chips, 'agency estimate' basis chip on the client's hero value card) is a trust feature no mainstream SEO tool ships and is wired to the backend Reconcile provenance ladder.",
+     "evidence": "mockup/home.js .prov.e/.m/.a chip CSS + comment 'the reconcile ladder, surfaced'; cockpit.js prov() line 139; portal.js line 73 + 401 (basis chip, 'projected' labels).",
+     "severity": "praise"
+    },
+    {
+     "finding": "Verdict-first cross-book operator home (one unified work queue replacing 4 triage systems, 'Across your book' cross-client views) applies Linear-grade triage to SEO ops \u2014 neither Ahrefs, Semrush, nor AgencyAnalytics has any cross-project work queue.",
+     "evidence": "mockup/home.js lines 1\u201311 (replaces 9 stat cards + FOUR triage systems), lines 327\u2013366 (work queue + 'Across your book' \u2192 sitehealth/outcomes); Surface Model.html scope\u00d7audience grid + send boundary.",
+     "severity": "praise"
+    },
+    {
+     "finding": "Command palette parity with HEAD is kept and slightly improved (visible topbar trigger + workspace/action items); \u2318K, fuzzy match, recents, and grouping all mirror src/components/CommandPalette.tsx.",
+     "evidence": "mockup/palette.js lines 1\u20136 ('Mirrors the real CommandPalette'), hotkey at 175\u2013178 vs CommandPalette.tsx line 107; app.js setTopbar() renders a persistent \u2318K search affordance HEAD lacks.",
+     "severity": "praise"
+    },
+    {
+     "finding": "No background-job/notification affordance anywhere in the new shell \u2014 a regression against HEAD's NotificationBell/useBackgroundTasks on a heavily async platform (crawls, audits, AI generation), and behind Semrush-style crawl-progress table stakes.",
+     "evidence": "mockup/app.js setTopbar() = breadcrumb + \u2318K + action buttons only; nav.js foot = Inbox + admin gear; grep across all 40 mockup modules finds no bell/job tray, while topbar actions like 'Re-crawl' and 'Re-generate all' start long jobs; src/App.tsx line 16 mounts BackgroundTaskProvider at HEAD.",
+     "severity": "blocker"
+    },
+    {
+     "finding": "Client portal has no memory: no archive of past updates, no date range, no PDF/export \u2014 clients cannot verify past claims or forward an artifact upward, undercutting the portal's own proof claim; table stakes for agency reporting tools.",
+     "evidence": "mockup/portal.js \u2014 grep for history/archive/previous/export returns nothing; portal renders only the current story plus live conversation.",
+     "severity": "major"
+    },
+    {
+     "finding": "Date-range control is thinner than HEAD: the only range control in the entire mockup is a 30d/90d toggle in traffic.js, while HEAD ships a shared DateRangeSelector used by TrafficDetail/AnalyticsOverview/SearchDetail and every suite offers arbitrary ranges + period comparison.",
+     "evidence": "mockup/traffic.js line 198 (let range='90d') + toggles at 706/738; src/components/ui/DateRangeSelector.tsx consumed by 3 HEAD surfaces.",
+     "severity": "major"
+    },
+    {
+     "finding": "Keyboard-first and bulk flows stop at \u2318K: the flagship Keywords table has no column sorting, no multi-select, no row keyboard navigation \u2014 below both rank-tracker table stakes and the 'Linear-grade' bar the review targets.",
+     "evidence": "mockup/keywords.js wireRows() line 356 (click-only rows); grep for sort/bulk/select/checkbox/shift in keywords.js returns only lens/row click wiring.",
+     "severity": "major"
+    },
+    {
+     "finding": "AI chat surfaces (AdminChat + client ChatPanel at HEAD) have no visible home in the prototype \u2014 referenced only as consumers ('both Insights chatbots') in brand.js/settings.js with no launcher in shell or portal; a capability-with-no-home stop-and-ask under the kit's own Phase 0 rules, while the category moves toward embedded copilots.",
+     "evidence": "mockup/brand.js lines 157, 405; settings.js lines 99, 158, 164; no chat affordance in app.js topbar, nav.js, or portal.js; HEAD ships src/components/AdminChat.tsx and ChatPanel.tsx.",
+     "severity": "major"
+    },
+    {
+     "finding": "Prototype navigation contradicts the kit's own URL-state mandate: gotoView() + localStorage, no routes/query params for lens/drawer/filters \u2014 a drift hazard since 'the prototype is the spec' and agents will copy the anti-pattern.",
+     "evidence": "mockup/app.js gotoView + localStorage 'hmpsn_mockup_view'; Handoff Brief Wiring Layer \u00a76 mandates URL state for drawers/lenses/filters.",
+     "severity": "minor"
+    },
+    {
+     "finding": "White-label is absent ('powered by hmpsn studio' hard-rendered) \u2014 correct for an owner-operated agency, but should be a logged decision given it is a core tier feature across the agency-platform category.",
+     "evidence": "mockup/portal.js line 501 + footer branding.",
+     "severity": "minor"
+    },
+    {
+     "finding": "Mobile behavior of operator surfaces is undemonstrated: portal and home carry container queries but the keywords table grid and the two-zone rail have no responsive rules, despite the platform's mobile-first mandate.",
+     "evidence": "grep -c '@container|@media': portal.js 2, home.js 2, keywords.js 0, nav.js 0.",
+     "severity": "minor"
+    }
+   ],
+   "recommendations": [
+    "Add a background-job/notification affordance (bell or job tray) to the shell spec before surface fan-out, wired to existing useBackgroundTasks/NotificationBell semantics \u2014 one component now vs a retrofit across 18 shipped surfaces.",
+    "Make portal memory an explicit Phase-0 decision: past-updates archive (sent Insights Engine issues are already persisted artifacts) plus per-update PDF/export, or a signed-off decision not to build them.",
+    "Write date-range + period-comparison into the Search & Traffic / Performance / AI Visibility surface templates as preserved-from-HEAD capabilities, naming DateRangeSelector as the primitive.",
+    "Extend Build Conventions with a shell-level table interaction contract: column sort, multi-select + bulk action bar, and Esc/arrow-key behavior \u2014 defined once, not per surface.",
+    "Resolve the AI chat homes (AdminChat and client ChatPanel) as a Phase-0 stop-and-ask before build: name where each lives in the 18-surface IA and the portal.",
+    "Require concrete route/query params in every surface ticket's data-contract field (e.g. /ws/:id/keywords?lens=opps&kw=123) so the mockup's localStorage navigation is not copied literally; extend the tab-deep-link contract test to lens/drawer params.",
+    "Protect the differentiators as named parity-ledger rows so they cannot be simplified away: provenance chips on every money figure, the negative-quarter portal narrative, the client keyword-feedback panel, and command-palette action parity."
+   ],
+   "ledgerFile": "docs/ui-rebuild/phase0/design-review/strategy-benchmark.md"
+  }
+ },
+ {
+  "agentId": "ad0a60df49994a591",
+  "promptHead": "You are part of an ADVISORY design review of the proposed hmpsn.studio platform rebuild (undefined). No code changes ever \u2014 findings only.\nRepo: /Users/joshuahampson/CascadeProjects/asset-dashboard. The UI Rebuild Kit (the proposed new platform) lives at \"/Users/joshuahampson/CascadeProjects/asset-dashboard/hmpsn studio Design System\" \u2014 the hi-fi prototype is mockup/*.js view modules; HTML docs ex",
+  "structuredOutput": null
+ },
+ {
+  "agentId": "ad128b972fa4e5932",
+  "promptHead": "You are part of an ADVISORY design review of the proposed hmpsn.studio platform rebuild (undefined). No code changes ever \u2014 findings only.\nRepo: /Users/joshuahampson/CascadeProjects/asset-dashboard. The UI Rebuild Kit (the proposed new platform) lives at \"/Users/joshuahampson/CascadeProjects/asset-dashboard/hmpsn studio Design System\" \u2014 the hi-fi prototype is mockup/*.js view modules; HTML docs ex",
+  "structuredOutput": {
+   "topic": "Content, copy & comprehension soundness of the hmpsn.studio UI Rebuild Kit",
+   "keyFindings": [
+    {
+     "finding": "Purple is used throughout the client portal (What's next status dots/chips, entire 'Opportunities we spotted' section) \u2014 violates both the repo Four Laws and the kit's own hard rule that purple/admin-AI never reaches a client-facing view; the mockup is the spec agents will copy across 18 surfaces.",
+     "evidence": "mockup/portal.js:155,158,201,203,207 (C.purple #7c3aed in client-visible .pt-next and .pt-recsec styles) vs Content & Access Conventions \u00a703 'never reaches a client-facing view' and repo CLAUDE.md Four Laws",
+     "severity": "blocker"
+    },
+    {
+     "finding": "The mockups violate the microcopy kit's own forbidden empty-state phrasing ('Nothing here'), with no recovery path \u2014 the spec's demo files contradict its rules, and agents copy demos.",
+     "evidence": "requests.js:123 'Nothing here yet.', home.js:282 'Nothing here right now.' vs Content & Access Conventions \u00a701 NOT-column listing 'Nothing here'",
+     "severity": "major"
+    },
+    {
+     "finding": "Client-triggered toasts speak raw operator jargon and deep-link to admin surfaces: 'Logged as a proof point in Action Results', 'promotable to a strategy signal', 'added to your content pipeline as a client-requested brief' \u2014 internal lexicon leaking across the send boundary, recreating the ad-hoc translation failure the Terminology sweep diagnoses at HEAD.",
+     "evidence": "portal.js:617-636 (approve/request/addRec toast copy with go-links to pipeline/requests views)",
+     "severity": "major"
+    },
+    {
+     "finding": "The number/format contract contradicts its own example (rule 'compact \u2265 $10k' vs example '$8.9k'), and the mockups implement three different currency/count formatters (outcomes compacts at \u2265$1k, portal mixes $4,900 with $14.2k, fmt() compacts counts at \u22651k vs the contract's '12,847') \u2014 defeating the shared format.ts goal.",
+     "evidence": "Content & Access Conventions \u00a702 currency row; outcomes.js:88 money(); portal.js:333 fmt() and DATA values",
+     "severity": "major"
+    },
+    {
+     "finding": "Primary send action drifts from repo canon: 'Share with client' vs canonical 'Send to client' (pr-check-enforced at HEAD); nav uses 'Client portal' which ui-vocabulary explicitly forbids ('portal' on DO-NOT list); three different approve-CTA idioms across client surfaces.",
+     "evidence": "recs.js:154 'Share with client', nav.js:44 'Client portal', recs.js:196 'Approve & go' vs docs/workflows/ui-vocabulary.md action-verb and noun tables",
+     "severity": "major"
+    },
+    {
+     "finding": "The kit's Terminology sweep prescribes a single explicit admin\u2192client translation map, but Content & Access Conventions ships without one, and the kit never references HEAD's existing locked client-copy infrastructure (shared/types/client-vocabulary.ts, evergreenCopy.ts pattern) \u2014 the ROI/Results-fork failure mode is being structurally repeated.",
+     "evidence": "Terminology & Lexicon Sweep \u00a705 'Make admin\u2192client translation a single explicit map' vs Content & Access Conventions (no term map present)",
+     "severity": "major"
+    },
+    {
+     "finding": "Client-visible footer inside the client card reads 'you're seeing the curated story, not the workbench behind it' \u2014 a trust landmine admitting spin to the client; it renders in full-screen client view mode.",
+     "evidence": "portal.js:594 (footer inside .pt-card, which the ribbon defines as 'what the client sees')",
+     "severity": "major"
+    },
+    {
+     "finding": "Client metrics (impressions, clicks, sessions, health) carry zero source attribution anywhere \u2014 provenance chips cover money estimates well but measured numbers never say 'Google Search Console/GA4', leaving the agency grading its own homework; plus an unsourced '15-20% CTR lift' industry claim presented to the client as fact.",
+     "evidence": "portal.js proof sections (no source labels in any pt-sec header); recs.js:130 'typically lifts click-through by 15\u201320%'",
+     "severity": "major"
+    },
+    {
+     "finding": "Zero error, loading, or locked states are demonstrated in any mockup view despite Build Conventions demanding four states per surface \u2014 ~54 pieces of state copy will be invented per-surface by agents, and the demos already override the kit's empty-state table.",
+     "evidence": "All mockup views read (portal/recs/cockpit/home/outcomes/requests) render only happy-path; Content & Access Conventions \u00a701 gives only one-line patterns",
+     "severity": "major"
+    },
+    {
+     "finding": "Client 'What's next' chips use internal pipeline jargon (briefed, proposed, drafting, ambiguous 'review'); bare unlabeled '~2.4k/mo' chips on client recs; cockpit verdict says '3 things need you' above tiles summing to 6; hardcoded 'hmpsn studio'/'your SEO team' strings against the STUDIO_NAME rule; 'Insights Engine' label rides on the legacy 'issue' view id with the five most load-bearing new terms (Insights Engine, graduate, proof point, staged move, the book) missing from GLOSSARY's proposed intake.",
+     "evidence": "portal.js next[] stat values and :458 rreach chip; cockpit.js:64 vs streams{3,2,1}; portal.js:501/617; nav.js:20; GLOSSARY.md ## proposed section (covers thread kinds/rails only)",
+     "severity": "minor"
+    },
+    {
+     "finding": "The client-portal voice is the best client copy in the project's history and must be protected: 'Found in Google', 'was #10 \u00b7 now #4', consequence-framed fixes ('shoppers were hitting dead ends'), an accountable declining-client narrative, and an exemplary honest degraded state (em dash + 'lead tracking connects once your form is wired up').",
+     "evidence": "portal.js:250-262, 386-396, 297 (hook/fixes/leads copy)",
+     "severity": "praise"
+    },
+    {
+     "finding": "The provenance ladder ('agency estimate' basis chip on hero value, 'projected' micro-tags, operator estimate\u2192measured\u2192actual chips) is a designed system for money-claim honesty \u2014 the correct answer to client distrust of unsourced numbers; and recs.js's dual-register authoring (whyOp vs cliWhy with live 'What Acme sees' preview) structurally forces the admin/client translation at write time.",
+     "evidence": "portal.js:401 basis chip, home.js:46-51 prov chips, recs.js:109-138 whyOp/cliWhy pairs + preview pane",
+     "severity": "praise"
+    }
+   ],
+   "recommendations": [
+    "Before any client surface is built: strip purple from the portal client card, move the 'curated story' footer out of the client-visible card, and rewrite client-triggered toasts in client vocabulary with no admin deep-links.",
+    "Fix the format contract before format.ts exists: resolve the \u2265$10k rule vs $8.9k example contradiction, add a count-compaction threshold, and mark the mockups' inline formatters as non-normative.",
+    "Add the missing admin\u2192client term map to Content & Access Conventions (proof point\u2192win, staged move\u2192improvement, Action Results\u2192never shown, etc.), inheriting shared/types/client-vocabulary.ts and the locked-copy pattern rather than re-inventing.",
+    "Ratify or revert label drift explicitly: 'Share with client'\u2192'Send to client' (or amend ui-vocabulary deliberately), decide 'portal' vs 'Client Dashboard', and unify the three approve-CTA idioms.",
+    "Demo all four states (error/loading/locked/empty) with real copy on the reference screen before fan-out, and fix the two forbidden 'Nothing here' strings.",
+    "Add source attribution to client proof sections ('data from Google Search Console / GA4') and estimate tags on derived client visitor numbers.",
+    "Complete GLOSSARY's proposed-intake for Insights Engine, graduate, proof point, staged move, backing move, and 'the book'; reconcile the kit's 'mint' vs repo 'teal' action-hue naming in one sentence."
+   ],
+   "ledgerFile": "docs/ui-rebuild/phase0/design-review/craft-content-copy.md"
+  }
+ },
+ {
+  "agentId": "ad3f84ea07bef2e96",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: Non-marketing SMB owner-operator (commercial HVAC, ~18 employees, ~$3M). The check-signer, not the daily user. Revenue-literate, jargon-illiterate by choice, burned by a beautiful-PDF agency before.\nDISTRUST TRIGGERS: A number with no baseline; activity dress",
+  "structuredOutput": null
+ },
+ {
+  "agentId": "ad431c4a68d6ecd53",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: Churned, skeptical ex-agency client on a monthly SEO retainer, burned by a previous agency that drowned \"did you get me customers?\" in a fog of charts. Trust is the gate.\nDISTRUST TRIGGERS: Spin, self-grading, fabricated or unverifiable numbers.\n\nYOUR OWN PRI",
+  "structuredOutput": {
+   "persona": "Churned, skeptical ex-agency client \u2014 SMB owner/operator on a monthly SEO retainer, burned by a previous agency that drowned \"did you get me customers?\" in a fog of charts. Trust is the gate; spin, self-grading, and unverifiable numbers end the relationship.",
+   "resolved": [
+    "The verdict finally leads and it's in my units with my baseline: '59 new-patient actions this month, up from 21 since we started' \u2014 one sentence, real number, dated against when I started paying. That's the exact ask I wrote in June.",
+    "The money frame isn't afraid of the comparison anymore: '~$18,400/mo \u00b7 4.6\u00d7 your retainer' with my monthly investment ($4,000) printed right next to the value in the ROI ledger. They put my check on the same screen as what it bought.",
+    "Named human leads \u2014 'Sarah K. \u2014 called from the emergency dentist page,' marked 'Only you can see this.' Actual inquiries I can check against my phone log is the single strongest trust move in the whole kit. And when tracking isn't connected, it shows an honest dash + 'connects once your form is wired up' instead of faking it.",
+    "Methodology said out loud, on my screen: 'tracked conversions \u00d7 your average new-patient value ($310)... banded while it's an estimate, exact once reconciled against your booked revenue' \u2014 and the estimate \u2192 measured \u2192 actual provenance chips run through the whole system. An agency volunteering the limits of its own number is what earns the rest.",
+    "'Your turn' strip at the very top with the approvals waiting on me, including a shaming '9d pending' stale chip. Tells me if the ball's in my court before anything else.",
+    "All the SEO machinery \u2014 impressions, avg position, site-health stat bar, competitor stack \u2014 collapsed under 'Under the hood' where I open it only when I want to audit them.",
+    "The forwardable one-pager export exists ('a clean PDF \u2014 forward it to a partner or your accountant'). That's my no-hostage-situation ask.",
+    "A real two-way lane: approve the plan, request a change, one-tap 'Yes \u2014 write this,' and my messages actually land on the operator's desk. Last agency, my replies went into a void."
+   ],
+   "stillMissing": [
+    "Reconciliation to MY reality \u2014 still an IOU, two reviews running. The copy admits the number is a GA4-derived estimate, but there's no 'our count vs. your phone/inbox, here's why they differ' guard anywhere in the kit. This was my #1 stated churn trigger and the deferred half of my non-negotiable, again.",
+    "The clickable work log. 'Refreshed your velvet armchair page +$1,500/mo projected' \u2014 great, WHERE'S THE LINK? Not one 'what we did' row clicks through to the live page. Verifiable proof-of-work is the literal reason I fired the last agency, and it's still missing from the design itself, not just the build.",
+    "The return hook. Nothing in the kit does SMS/email push \u2014 no 'a lead came in,' no 'we caught a problem before it cost you.' By my own admission I'll open this once a month when the invoice hits; a 'since your last visit' header only works after I've already shown up.",
+    "Call tracking/recording and lead-quality scoring \u2014 the thing I said I'd pay MORE for \u2014 is still just an 'ask your strategist' affordance, not a surface.",
+    "Garbage filtering: nothing shows spam calls, tire-kickers, or existing customers being excluded from my lead count. Inflated counts are the fastest way to lose me.",
+    "A decision. The kit ships TWO client-facing designs \u2014 the portal microsite and the tabbed dashboard \u2014 with different verdicts and different honesty levels, and the one built to my spec is one finished tab out of five. Which one do I actually get?"
+   ],
+   "distrustTriggers": [
+    "Dollar fog replacing chart fog: nearly every line item across every surface carries an agency-authored dollar estimate ('+$1,500/mo projected,' '$14,200/mo at stake,' '\u2248$2,900/mo'). Twenty unverifiable estimates stacked up feels exactly like the old wall of charts, just denominated in money I can't check.",
+    "False precision on estimated data: '$18,400/mo' and '4.6\u00d7' to a decimal, when the methodology itself says it's a banded estimate. My prior build banded to '~$12,000' \u2014 this mockup un-learned that. Precision I can't verify reads as fabrication.",
+    "Self-grading: a '90-day scorecard' where the agency scores its own work 'Win rate 68%,' with Win/Strong-win badges it awards itself and no shown formula. Who decided those were wins? A number you control with no formula is an instant trust kill \u2014 I wrote that verbatim in June.",
+    "The 94/100 site-health ring sits in the portal's main proof column \u2014 the invented composite score we just spent a redesign demoting is back on the first screen of the OTHER client design.",
+    "Down months spun as strategy: the portal verdict flips to 'We're defending your rankings \u2014 here's the plan' when things decline. That's a euphemism. Show me the dip and the number; rebranding a decline as 'defending' is the exact spin that made me leave.",
+    "The portal's headline verdict is 'traffic's up 34% this quarter' \u2014 traffic is the metric I trust LEAST, because I've watched it climb while my phone stayed dead. Leading my page with it tells me you're measuring your work, not my customers."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "wouldImprove": [
+    "Pick ONE client design and make it the tabbed dashboard's Overview \u2014 the one with my verdict, named leads, and retainer math \u2014 and kill the portal's traffic-led hook and its 94/100 ring before either ships to a paying client.",
+    "Make every 'what we did' row a link to the live page. If you shipped it, I can click it. No link, no credit \u2014 that single change converts the work log from a claim into proof.",
+    "Band every estimated dollar (~$18k, not $18,400) and drop the one-decimal ROI multiple; keep exact figures only for 'measured/actual' provenance. You already built the ladder \u2014 make the formatting obey it.",
+    "Replace the self-scored win rate with outcome-scored: a 'win' is defined by a movement in MY numbers (calls, inquiries, booked work), the formula printed next to it \u2014 or move the scorecard to your side of the glass entirely.",
+    "Put the reconciliation guard in the design now, not P-whatever: our count and your count side by side, with a plain-English line explaining any gap, and show me the $-per-lead value you plugged in ($310) with a 'confirm or correct this' button on MY screen.",
+    "Design the notification layer \u2014 'a lead came in from search today,' 'we caught a problem,' 'one approval waiting' by text/email \u2014 because without it this thing gets opened exactly once a month, at the moment I'm deciding whether to fire you.",
+    "When a month is down, say 'down,' with the number and the plan \u2014 never 'defending.' An honest red month is what makes me believe your green ones."
+   ],
+   "verbatim": "You finally lead with my customers, my baseline, and your bill on the same screen \u2014 now give me the link to click and the number that matches my phone, and stop grading your own homework, because the day your estimate drifts from my front desk with no way to check it, I'm gone the same as last time."
+  }
+ },
+ {
+  "agentId": "adbc6daf1895329b6",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: VC backer / board member. Thinks in CAC, payback, durability \u2014 sees this dashboard maybe once a quarter as a screenshot. One question: is organic becoming our cheapest durable channel or are we funding a treadmill?\nDISTRUST TRIGGERS: Invented 0-100 scores, ra",
+  "structuredOutput": {
+   "persona": "VC backer / board member \u2014 sees this dashboard once a quarter as a screenshot in a board deck; thinks in CAC, payback, and durability; one question: is organic our cheapest durable channel or a treadmill we're funding?",
+   "resolved": [
+    "Dollars lead everywhere \u2014 the VERDICT \u2192 VALUE \u2192 PROOF trust spine is now the organizing law of every client-facing narrative, and the headline unit is a dollar figure, not a visibility score. That was my hardest cultural demand from P0 and the kit institutionalizes it.",
+    "The board one-pager export finally exists in design \u2014 the Client Dashboard Mockup has an explicit 'Share this as a one-pager (PDF)' row on the hero. That was my deferred-P1 anti-lock-in guard and my operators' half-day-a-quarter tax.",
+    "A provenance ladder (estimate \u2192 measured \u2192 actual chips, 'agency estimate' basis badges, spelled-out arithmetic like '\u2248 9,600 visits \u00d7 2.1% \u00d7 $705 AOV') \u2014 visible methodology on every money figure is the attribution-transparency guard I demanded, now a system-level primitive instead of one hard-coded string.",
+    "The denominator is at least on the page: the ROI ledger shows 'your monthly investment $4,000/mo' next to value \u2014 P0 only used retainer as an invisible ratio divisor.",
+    "Real reconciliation gestures: named leads ('Sarah K. \u2014 called from the emergency-dentist page'), a bonus-leads tile that renders a dash + 'connect tracking' when unproven instead of a fabricated number, and a leads breakdown with an honest 'names available with call & CRM tracking' upsell. Refusing to show the unprovable is exactly the restraint that buys my belief.",
+    "Time-over-time is back: 'since your last visit' deltas, 12-month charts, 6-month action sparklines, a verdict that flips to 'We're defending your rankings' on bad trajectory \u2014 the evergreen no-baseline stance that I flagged as recreating all-green-in-spirit has been abandoned.",
+    "Anti-feature burial mostly holds in the dashboard mockup: raw visitors/clicks/impressions, site health, and the competitor stack live in a collapsed 'Under the hood' with a 'not a promise of future revenue' disclaimer."
+   ],
+   "stillMissing": [
+    "Organic CAC vs blended/paid CAC \u2014 my stated indispensable, the entire reason this line item survives budget review \u2014 appears nowhere in either client design. The ROI ledger's 'equivalent ad spend $21,300/mo' is the cost-to-buy-traffic proxy I explicitly said is not my frame; it tells me what the traffic would cost to rent, not what a customer costs to acquire.",
+    "Payback in months \u2014 absent from every surface.",
+    "The defensibility slope \u2014 organic as a share of total new pipeline over 4\u20136 quarters. A 12-month traffic chart is not pipeline share; one anchor point plus a traffic line still cannot answer 'treadmill or moat'.",
+    "The compounding-asset view \u2014 the thing I underwrote. Ironically the ingredients now exist operator-side (Published mode tracks clicks-since-publish per piece; Content Health tracks decay), but nobody assembled the board sentence: 'pages shipped \u22652 quarters ago are still earning $X/mo at zero incremental spend.' It's an assembly job away and still not designed.",
+    "An honest all-in denominator \u2014 'your monthly investment' is retainer-only, while the same kit sells content subscriptions at $600\u2013$2,400/mo as a separate line. If content spend and internal time never enter the denominator, the 4.6\u00d7 is structurally flattering.",
+    "My quarterly two-line push (the only reason I ever open the thing) \u2014 the kit designs a destination, not a notification spine; no board-cadence hook is specified anywhere.",
+    "Closed-loop CRM reconciliation \u2014 value is still modeled (visits \u00d7 CVR \u00d7 AOV), not pipeline/closed-won; nothing I can paste into an LP conversation as ROI."
+   ],
+   "distrustTriggers": [
+    "A client-facing 94/100 site-health ring in the portal's PROOF column \u2014 an invented 0\u2013100 composite the agency controls, my named instant trust kill, back on the first screen after P0 correctly buried it.",
+    "The portal's PROOF section leads with impressions/clicks vitals, sparklines, and rank-gain rows ('was #24 \u00b7 now #12') \u2014 rankings-and-impressions-as-results, which all seven of us named as the metric we trust least.",
+    "Two coexisting client designs with different value methodologies (portal: 'recovered $4,900 of $14.2k targeted' story vs dashboard: '~$18,400/mo \u00b7 4.6\u00d7 retainer' ledger). If the number in my screenshot depends on which surface the operator opened, that IS the silent-restatement hazard \u2014 inconsistent methodology across surfaces is indistinguishable from a moving definition.",
+    "Aggressive dollarization as the default register (the digest's own tension #5): modeled arithmetic as the hero figure on nearly every surface, including 'pipeline value at stake $14,200/mo'. Labeled estimates everywhere is honest; estimate-stacked heroes everywhere is a spin gradient \u2014 false precision at scale, and it invites my marketing lead to paste a modeled number into the deck as ROI.",
+    "The graduation rule is structurally a highlight-reel filter: wins 'graduate' into the client story, losses stay in the workbench. Combined with a self-graded '90-day scorecard: win rate 68%' where the agency assigns its own Win/Early/Flat verdicts, the client narrative has a built-in all-green bias unless dips are forced onto the surface by rule.",
+    "'Since your last visit' is a floating comparison window \u2014 the cherry-picked-window manipulation my co-panelists flagged; windows must be locked to fixed baselines.",
+    "Segment/altitude still appears to be an operator-configured choice \u2014 a hand-pickable framing that flatters the number remains a future spin lever until it's derived and locked."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "somewhat",
+   "wouldImprove": [
+    "Resolve the two-client-design fork BEFORE building anything client-facing (the handoff brief's own gate) and lock ONE value methodology, so the number in my quarterly screenshot is the same number regardless of which surface produced it \u2014 then version the methodology and show a change-log when it moves.",
+    "Add my altitude as a first-class segment rendering of the existing verdict slot: 'Organic CAC $X this quarter, down Y% QoQ, Z% below blended paid; payback N months.' The ROI ledger's 'equivalent ad spend' line is the raw material \u2014 reframe it as a CAC comparison instead of a traffic-rental price.",
+    "Make the denominator all-in and make it visible: retainer + content subscription + a stated internal-time estimate, itemized in the ledger. Ship the honest denominator BEFORE the first CAC number ever renders, so the first CAC I see never has to be restated downward.",
+    "Assemble the compounding-asset view from data the kit already collects: per-piece clicks-since-publish (Published mode) minus decay (Content Health) \u2192 one board card: 'work shipped before this quarter is still earning ~$X/mo at zero new spend, N of M pieces holding.' That card is my moat proof and my renewal argument in one.",
+    "Add the 4\u20136 quarter organic-share-of-pipeline slope to the export and the hero \u2014 even three points of honest slope beats twelve months of traffic.",
+    "Kill the client-facing 94/100 health ring (translate it to the humanized fix list it already sits next to); either provenance-chip the self-graded win-rate scorecard with its scoring rules or drop it.",
+    "Ship the quarterly two-line push and wire the one-pager export to whichever client design wins \u2014 for the board persona the push and the export ARE the product; the dashboard is just where I go to check the math.",
+    "Lock all comparison windows to fixed baselines (engagement start, quarter boundaries); 'since your last visit' can be an additional lens, never the only one.",
+    "Put a bad quarter in the design fixtures: show me a red verdict, a down ledger, and an honest 'here's the plan' rendered end-to-end. A trust instrument that has never demonstrated bad news is untested where it matters most."
+   ],
+   "verbatim": "You've built a genuinely honest estimate machine and a beautiful workbench, but until I can see organic CAC next to paid CAC, a payback figure, and proof that last quarter's pages are still earning this quarter, my one question \u2014 treadmill or moat \u2014 remains unanswered, so I'll keep funding but I won't argue to expand."
+  }
+ },
+ {
+  "agentId": "aec5f3d21db567b67",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: Junior SEO in their first agency job, second week on the platform.\nYOUR JOB ON THIS PLATFORM: Complete assigned tasks (review keywords, prep a brief, run an audit) without breaking anything or asking constantly.\nDISTRUST/FRUSTRATION TRIGGERS: Tribal-knowledge",
+  "structuredOutput": {
+   "persona": "Junior SEO, second week at the agency \u2014 completes assigned tasks (keyword reviews, brief prep, audits) and is terrified of breaking something client-facing or having to ask a senior how to find a screen.",
+   "resolved": [
+    "Keywords 2\u21921 consolidation ends my daily 'which of three screens has this keyword?' problem \u2014 one surface, five lenses, and a Lifecycle kanban that teaches the workflow visually",
+    "Cockpit verdict header ('3 things need you today') + three stream tiles tell me what to do without asking anyone",
+    "'Replaces Keyword Hub \u00b7 Page Intelligence' headers and 'was:' badges map the old platform to the new one during my transition",
+    "Pipeline cards have exactly one stage-advance CTA (Generate brief \u2192 Write draft \u2192 \u2026) so I can't pick the wrong next step",
+    "AI review gates where factual-accuracy and hallucination checks NEVER auto-pass \u2014 protects a junior from publishing a bad claim",
+    "Recommendations have real recall ('Waiting on Acme to approve \u00b7 recall') and undo-on-dismiss \u2014 I verified the handlers exist in recs.js",
+    "'What Acme sees' side-by-side preview means I can see the client-facing wording before anything ships",
+    "Client-declined keywords shown WITH the client's stated reasons \u2014 teaches me account preferences without tribal knowledge",
+    "Onboarding flow replaces the broken-dashboard cold start, so a new client isn't a trap for a new hire",
+    "\u2318K palette with fuzzy jump + recents is a real escape hatch once I know it exists"
+   ],
+   "stillMissing": [
+    "Loading, error, and permission/locked states \u2014 the brief mandates them but the prototype shows none, so I can't distinguish 'broken' from 'loading' and will interrupt seniors",
+    "Any in-app explanation of the platform's own vocabulary: 'graduate', 'stage into Insights Engine', 'provenance', 'backing move' \u2014 no tooltips, glossary, or first-run coach marks",
+    "A confirmation step (with recall-window semantics) on 'Send update to {client}' and 'Share with client' \u2014 sends are one click + toast, and I can't tell if the client already got an email",
+    "Rail entries for Command Center / book Site Health / Action Results \u2014 the BOOK zone array is literally empty; logo-click and \u2318K are the only paths",
+    "Any role/permission model or reviewer step \u2014 nothing stops a week-two junior from sending directly to a client with no senior look",
+    "A key legend + undo for the SEO Editor A/R/S/P keyboard review queue \u2014 single-key reject with no visible legend is an accident machine",
+    "Working Intent/Stage filter chips on Keywords (currently inert) and the unreachable Pipeline matrix mode",
+    "Guidance on how defensible the dollar estimates are before I repeat one to a client \u2014 methodology exists in some spots but not consistently at point of use"
+   ],
+   "distrustTriggers": [
+    "Logo-click-only access to book-level views \u2014 pure tribal knowledge; I wouldn't find Command Center for weeks",
+    "One-click client sends with no confirm dialog and unclear recall semantics (does recall work after the client's email went out?)",
+    "Dead controls that look live \u2014 Intent/Stage filter chips, History, Export; one inert button makes me doubt every button, and doubt whether my table is secretly filtered",
+    "Cockpit 'Fix' buttons that all route to Content Pipeline even for dead-link issues \u2014 following the UI lands me in the wrong tool and makes me think I misread the workflow",
+    "No visual difference between an error and an empty/loading state \u2014 I'll either ship on bad data or ping a senior every time",
+    "Purple tinting the whole Optimization nav group while the stated law is 'purple = admin-AI only' \u2014 I'd copy the pattern and get corrected",
+    "Two coexisting client-facing designs (portal vs tabbed dashboard) \u2014 I'd learn one story to tell clients, then be told it's the other one"
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "wouldImprove": [
+    "Fill the BOOK zone rail with Command Center, Inbox, and book Site Health \u2014 don't make the logo a secret button",
+    "Put a confirm dialog on every Send/Share that shows the client-view preview and states plainly whether it can still be recalled ('Dana hasn't opened this yet')",
+    "Add first-run coach marks and hover '?' definitions for graduate/stage/provenance/backing-move \u2014 the GLOSSARY exists in the repo, wire it into the UI",
+    "Make every visible control work or delete it \u2014 inert filter chips are worse than no chips",
+    "Route Fix buttons by issue type (dead links \u2192 Links, schema \u2192 Schema), not everything \u2192 Pipeline",
+    "Ship the mandated loading/error/locked states before pilot, with distinct visuals for 'fetching' vs 'failed'",
+    "Give the Editor keyboard queue an on-screen key legend and an undo-last-action, so a stray 'R' isn't a silent rejection",
+    "Add a junior/reviewer role where my client sends queue for a senior's one-click approval instead of firing immediately"
+   ],
+   "verbatim": "Honestly, the Keywords merge and the one-button pipeline cards would make my second week so much easier \u2014 I just need the send buttons to double-check me and the important screens to actually be in the sidebar, because I'm not going to guess that the logo is a door."
+  }
+ },
+ {
+  "agentId": "aff37b2244f635dd4",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: 47-year-old owner-dentist, single-location family practice. Chairside 8-5, not a marketer. Pays a retainer to fill empty chairs and wants proof in plain English \u2014 calls, bookings, reviews, dollars \u2014 matching what the front desk actually saw.\nDISTRUST TRIGGERS",
+  "structuredOutput": null
+ },
+ {
+  "agentId": "aff65080d3de6fbb6",
+  "promptHead": "Stay fully in character. Answer ONLY from this persona's perspective and self-interest. Advisory review \u2014 no files written, no git.\nPERSONA: Solo founder-operator of hmpsn.studio itself. Runs every client workspace personally, AI-assisted, a few hours per week per client. The admin side of this platform is your daily cockpit.\nYOUR JOB ON THIS PLATFORM: Get through all workspaces fast: triage what ",
+  "structuredOutput": {
+   "persona": "Solo founder-operator of hmpsn.studio \u2014 I personally run every client workspace a few hours a week, AI-assisted; the admin side is my daily cockpit and context-switching cost is everything.",
+   "resolved": [
+    "The Command Center is finally MY home: one cross-client work queue organized by the three questions I actually ask each morning (what to fix, what to send, what grows revenue) \u2014 it replaces my current ritual of clicking into every workspace to find what needs me. That alone pays for the redesign.",
+    "The per-client Cockpit answers 'what needs me today for THIS client' in one screen \u2014 verdict sentence, work queue with impact figures, portal replies, content-in-flight \u2014 instead of today's Home + Requests + Pipeline + Analytics tab-hop.",
+    "Keywords 2\u21921 genuinely consolidates my Keyword Hub + Page Intelligence split into one table with five lenses and a detail drawer; that's a real click-count reduction on a surface I live in.",
+    "The SEO Editor keyboard review queue (A/R/S/P, arrow keys) and sticky bulk bar are built for volume clearing \u2014 that's exactly how I want to burn down approval stacks.",
+    "The Recommendations dual pane (operator jargon left, 'What Acme sees' right, same rec) kills my most tedious step: re-authoring internal findings into client language before every send.",
+    "The send boundary + graduation rule means I always know what's client-visible without double-checking \u2014 technical noise stays in my workbench, only provable stories reach the client.",
+    "Promotable requests closing the loop (portal reply \u2192 cockpit \u2192 strategy signal \u2192 backing move) is the wiring today's platform half-has; here it's a first-class spine.",
+    "Cold-start onboarding replacing a broken empty dashboard for new clients \u2014 today I explain the empty states to myself; this turns setup into the surface.",
+    "\u2318K palette with fuzzy workspace jump and persisted recents keeps my fastest switch path alive.",
+    "Pipeline's Published mode as a results read-back with 'Add to Insights' graduation, and Content Health's queue-refresh decay loop \u2014 those are the two loops I currently run manually across three screens."
+   ],
+   "stillMissing": [
+    "The BOOK zone is EMPTY (nav.js line 14: const book = [];) \u2014 Command Center, book Site Health, and Action Results, the surfaces my whole job runs on, are reachable only via logo-click or \u2318K. My most-used destination has no nav entry.",
+    "Zero loading, error, or degraded-connection states in the prototype. Half my real operating days are 'GSC token expired' or 'SEMRush quota hit'. An empty work queue that is actually a failed fetch means I skip a client who needed me \u2014 and nothing here distinguishes the two.",
+    "Verdict sentences carry no data-freshness or provenance of their own. Dollar figures get estimate/measured/actual chips, but the auto-generated 'Acme is on track' headline \u2014 the thing I'd act on first \u2014 shows nothing about how stale its inputs are.",
+    "Recommendations is a 4-card flat list with no filters, search, aging sort, or volume handling. Across a full book with audits generating recs, that queue is 50+ items in week one; the money surface is the thinnest view in the kit.",
+    "Inbox/Requests is the smallest core module (~9KB) despite being the entire two-way client boundary \u2014 no bulk actions, no per-client grouping, no snooze/triage. It's where my mornings start.",
+    "No fast book-walk mechanic: no next/prev client cycling, no cockpit-by-cockpit sweep. \u2318K is good for targeted jumps but my job is a serial sweep of 10+ workspaces.",
+    "The consolidation story is internally inconsistent \u2014 Site Audit badged 3\u21921 and documented as absorbing Performance and Links, yet both still ship as separate rail items. I need to learn ONE map, not a claimed one and a shipped one.",
+    "No visible background-job/notification equivalent to today's NotificationBell \u2014 I run crawls, audits, and generations all day and need job status in the chrome, not per-surface.",
+    "Pipeline's Matrix bulk-planning mode is built but has no button to reach it, and the Keywords Intent/Stage filter chips are inert \u2014 in a 'prototype is the spec' regime, those are spec holes on my highest-volume surfaces.",
+    "The two client-facing designs (portal microsite vs tabbed dashboard) are unresolved and that decision gates everything client-side \u2014 until I make that call the whole 'send boundary' half of my loop is provisional."
+   ],
+   "distrustTriggers": [
+    "Logo-click as the only rail path to the Command Center \u2014 adding a hidden, unlabeled hop to the loop I run twenty times a day is exactly the 'redesign adds clicks' failure mode.",
+    "Cockpit 'Fix' buttons ALL route to the Content Pipeline, including dead-link fixes that belong in Links \u2014 one button that lands me in the wrong room and I stop trusting every button.",
+    "Mint-for-teal palette swap plus a fully regrouped rail breaks years of muscle memory at once, and the purple tint on the whole Optimization nav group violates my own purple-is-admin-AI-only law inside the same kit.",
+    "Inert chrome shipping as designed (filter chips with no handlers, History, Auto-share rules, calendar arrows) \u2014 dead controls teach me to distrust live ones.",
+    "Silently switching me to a DIFFERENT client when I navigate a scoped view on a cold-start client \u2014 a silent client-context swap is a mis-send incident waiting to happen.",
+    "Auto-generated verdict prose and headline dollarization (visits \u00d7 CVR \u00d7 AOV as the hero everywhere, including client-facing) with no per-client control \u2014 if a client challenges a number I didn't author and can't defend, the whole trust spine backfires on me.",
+    "No empty-vs-error distinction anywhere \u2014 a queue that says 'nothing needs you' over a broken data connection is the single most dangerous screen this design could ship."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "wouldImprove": [
+    "Fill the BOOK rail zone it already declares: Command Center, Site Health, Action Results as permanent top-of-rail items with badges \u2014 my home should never be a logo Easter egg.",
+    "Give me a book-sweep mechanic: \u2318]/\u2318[ next/previous client cycling and a j/k walk through cockpits, so my morning is a keyboard pass, not thirty clicks.",
+    "Route every cockpit Fix button to the surface that actually fixes that issue type \u2014 links to Links, alt text to Assets, schema to Schema \u2014 never a blanket redirect to Pipeline.",
+    "Put a connection/freshness strip on every verdict header ('GSC 2h ago \u00b7 GA4 stale 3d \u2014 verdict may be stale') and make the verdict inherit its worst input's provenance chip, same ladder as the dollars.",
+    "Make empty-vs-error a design-system law: every empty queue must state data freshness and degrade loudly when a source is down, with a reconnect CTA inline.",
+    "Beef up Recommendations to match its job: status filters, client filter, aging sort ('waiting on Acme 9d'), bulk triage \u2014 it will hold 50+ items, design for that day one.",
+    "Resolve the 3\u21921 Site Audit claim before build \u2014 either Performance and Links truly fold in or the badge goes; I refuse to learn a nav map that lies about itself.",
+    "Keep teal as the action hue (or prove the mint swap buys something), and strip the purple group tint \u2014 don't break the Four Laws in the artifact that restates them.",
+    "Wire a global background-job bell into the bottom utility bar next to Inbox \u2014 crawls, audits, and generations need one status home across the whole book.",
+    "Give me a per-client dollarization dial and mandatory edit-before-send on any auto-generated client-facing verdict or dollar hero \u2014 I sign every number that leaves this building.",
+    "Ship the Matrix mode button and the filter-chip handlers, or cut them from the spec \u2014 no dead chrome crosses into production."
+   ],
+   "verbatim": "This is the first design that actually understands my job is a daily sweep of the whole book, not a tour of pretty per-client pages \u2014 now put my home in the rail, make every button land where it says, and tell me loudly when the data underneath a verdict is broken, because I run this alone and a confident screen lying to me costs me a client."
+  }
+ },
+ {
+  "agentId": "a0ce1dfac3cfa7383",
+  "promptHead": "recovered from gapfill run 1",
+  "structuredOutput": {
+   "persona": "47-year-old owner-dentist, single-location family practice. Chairside 8\u20135, not a marketer. I pay a retainer to fill empty chairs and want proof in plain English \u2014 calls, bookings, reviews, dollars \u2014 that matches what my front desk actually saw.",
+   "resolved": [
+    "The verdict is finally MY number in MY units: the Client Dashboard hero leads with '59 new-patient actions this month, up from 21' broken into 41 calls / 12 form fills / 6 bookings \u2014 that's slots 1 and 2 of the spine I dictated, word for word.",
+    "The money frame sits right where I asked: '~$18,400/mo \u00b7 4.6\u00d7 your retainer' up top, and an ROI ledger that puts 'your monthly investment $4,000/mo' on the same card as the value \u2014 the read-it-aloud-to-my-spouse sentence I asked for, with the estimate methodology disclosed instead of dressed up as booked revenue.",
+    "NAMED LEADS \u2014 my #1 trust test, previously deferred: 'Sarah K. \u2014 called from the emergency dentist page, 2h ago', 'Ana R. booked a cleaning', marked 'Only you can see this'. And when tracking isn't connected it honestly shows a dash plus 'Names available with call & CRM tracking \u2014 ask your strategist' instead of faking it. That's the reconcile-to-my-front-desk mechanic I said I'd trust everything else more for.",
+    "The 'Your turn' strip leads the page with approval chips and there's an explicit nothing-waiting empty state \u2014 the ball-in-my-court queue all seven of us demanded.",
+    "The kitchen is hidden: impressions, clicks, visitors, avg position, site health all collapsed 'Under the hood'. No confetti, no keyword grids up top, provenance chips (estimate/measured/actual) everywhere. The anti-feature discipline held.",
+    "The review-reply pipeline lets ME approve the reply to a Google review before it posts under my practice's name \u2014 that's a real action I can take between patients, and it even handles publish failures honestly.",
+    "The work log is outcome-tagged and BELOW results ('What we did this month' with plain-language what/why), and there's a 'Share this as a one-pager' export. Activity is reassurance, not the headline \u2014 exactly the placement law we set."
+   ],
+   "stillMissing": [
+    "The map pack and my Google reviews status are STILL not on my first screen. I said the map pack is 90% of how patients find me and reviews are the one thing I can act on today; this was 'deferred-P1' in the last review and in the new design it's an OPERATOR view (Local Presence) \u2014 on my side, reviews only show up as a competitor jab buried under the hood. Second consecutive review where my #1 local ask is missing.",
+    "The return hook doesn't exist. Section F of our spec said nobody builds a login habit \u2014 text/email me when there's a new 2-star review or missed calls, plus a monthly 2-minute recap. The mockup has a decorative bell icon and nothing else. This whole design still assumes I'll remember to visit.",
+    "The missed-call flag \u2014 'you missed 6 callable new patients, ~$X lost' \u2014 the one upsell I said I'd pay for immediately. Nothing anywhere.",
+    "No junk filter shown on the call count. 41 calls with no note about spam, robocalls, or existing-patient reschedules being excluded. My front desk will say 12; the gap is where trust dies.",
+    "There are TWO client-facing designs (the portal story page and the tabbed dashboard) with different money framings, and the kit doesn't pick one. Which one do I get?",
+    "4 of the dashboard's 5 tabs are placeholders \u2014 including Inbox, which is where my 'Your turn' chips route. My decision queue points at a 'building this next' sign."
+   ],
+   "distrustTriggers": [
+    "Dollar signs on everything. Nearly every card carries a projected-$ chip ('est. added value \u2248 $2,900/mo \u00b7 confidence: High') including work you haven't done yet. One honest estimated number I can check is trust; a dollar figure on every row reads like a timeshare brochure and cheapens the real one.",
+    "The two client surfaces tell me different money stories \u2014 portal says 'revenue recovered $4,900/mo of $14.2k targeted', the dashboard says 'worth ~$18,400/mo, 4.6\u00d7 your retainer'. If both framings ever reach me, that's a shifting methodology, and I stop believing both.",
+    "The portal's headline verdict flips on TRAFFIC ('You're climbing \u2014 traffic's up 34% this quarter'). Traffic is the metric I trust least \u2014 I've watched it go up while my phone stayed quiet. The dashboard gets the verdict right (patient actions); the portal gets it wrong.",
+    "A 94/100 site-health ring sits on the portal's first scroll \u2014 an invented score the agency controls, which our spec named an instant trust kill, and here it isn't even buried.",
+    "An unfiltered '41 calls' the day my front desk counted a dozen \u2014 the single fastest way to lose me, and nothing in the design shows me what's being excluded."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "wouldImprove": [
+    "Pick ONE client design and make it the tabbed dashboard's Overview \u2014 it matches my spine (verdict \u2192 patient actions \u2192 money-vs-retainer \u2192 your turn \u2192 work log \u2192 under the hood). Retire or rewrite the portal's traffic-led hook so the verdict is always patients, never traffic.",
+    "Put a map-pack + reviews card above the fold for local clients: 'dentist near me' map position with movement, star rating, new reviews this month, unanswered/negative flagged with a Respond button wired to the review-approval flow you already built operator-side. It's one card and it's my whole world.",
+    "Design the push layer before launch: SMS/email for new negative review, missed-call cluster, decision waiting on me, plus a monthly plain-English recap. Never 'your report is ready'.",
+    "Label the call count's hygiene: '41 calls (9 spam/robocalls and 6 existing-patient reschedules excluded)' \u2014 say what's counted even before call tracking is connected.",
+    "One money number, one methodology. Keep the hero and the ROI ledger; strip the per-card dollar chips on proposals, or at minimum make projected visually unmistakable from measured.",
+    "Add the dollarized missed-call loss card as the call-tracking upsell moment \u2014 that's the transparent ROI-math upsell we all said works.",
+    "Don't ship my dashboard while Inbox is a placeholder \u2014 the 'Your turn' strip deep-links into it."
+   ],
+   "verbatim": "You finally built the top of the page I asked for \u2014 now put my map pack and my reviews on it, text me when something needs me, and make sure your 41 calls survives a conversation with my front desk, because that's the day I decide whether to keep paying you."
+  }
+ },
+ {
+  "agentId": "a1bfa986ec83e7bec",
+  "promptHead": "recovered from gapfill run 1",
+  "structuredOutput": {
+   "persona": "Non-marketing SMB owner-operator \u2014 commercial HVAC + facilities maintenance, ~18 employees, ~$3M revenue. The check-signer, not the daily user. Revenue-literate, jargon-illiterate by choice, burned once by a beautiful-PDF agency. Distrust triggers: a number with no baseline; activity dressed up as results.",
+   "resolved": [
+    "My verdict-first spine is now platform DOCTRINE, not a one-off fix: every client-facing narrative opens VERDICT -> VALUE -> PROOF. The thing I begged for in June is baked into the design system itself.",
+    "The tabbed Client Dashboard Mockup is nearly my spec verbatim: 'What your SEO is worth ~$18,400/mo, 4.6x your retainer' up top, '59 actions this month, up from 21' (a real baseline!), a calls/forms/bookings breakdown in units my office understands, and the SEO kitchen collapsed 'Under the hood'.",
+    "NAMED LEADS. 'Sarah K. \u2014 called from the emergency dentist page.' That is the sanity-check-against-my-front-desk half of my indispensable ask \u2014 the thing P0 punted to P1 \u2014 and it's designed onto the first screen. If it ships real (not fixture), this is what makes me never cancel.",
+    "The 'only when provable' leads tile in the portal: shows '18 enquiries from search' only when tracking is wired, otherwise a dash and an honest 'connects once your form is wired up'. That's the exact believe-it-or-don't-show-it discipline I demanded \u2014 apply it everywhere.",
+    "The provenance ladder (estimate -> measured -> actual chips) plus 'agency estimate' badges on dollar heroes \u2014 the honest-labeling posture that earned my trust in P0 survives the rebuild.",
+    "'Your turn' strip with the nothing-needed empty state, and a one-pager export row \u2014 my homework surfaced, my close-the-tab permission kept.",
+    "The upsell is finally ROI math, not a pitch: 'Request this' shows est. added value and 'your strategist scopes and confirms before any work or charge'. That's how you get expansion dollars out of me.",
+    "Clients approve review replies before they hit Google, and the content plan sits below the money \u2014 activity stayed demoted where it belongs (in the dashboard version, anyway)."
+   ],
+   "stillMissing": [
+    "The push/text hook \u2014 STILL nowhere, in either client design. I told you in June I open this once a month when the invoice hits; the portal's 'Since your last visit' hook only works if I visit. You rebuilt the whole destination and still didn't build the thing that brings me to it. 'Leads up 35%' or 'leads dipped, here's why' in my texts is the product for me.",
+    "Real call tracking, recording, and junk filtering. 'Sarah K.' is a hand-typed fixture; the actions count is still estimate-provenance underneath. 20 real in-area jobs beats 200 tire-kickers \u2014 the quality gate that makes the count believable is still an IOU from the last review.",
+    "The bad-month state. The portal verdict flips between two flavors of good news ('You're climbing' vs 'We're defending your rankings \u2014 here's the plan'). Where's the mockup of a genuinely down month with an honest number and a plan? A dashboard that can't render bad news is a marketing artifact \u2014 show me the red state before I trust the green ones.",
+    "Closed-loop 'these 6 leads became $40K' attribution \u2014 my biggest expansion lever, still not designed anywhere I can see.",
+    "A decision. The kit ships TWO different client-facing designs with different value framings, and the brief admits the choice is ungated. Until you pick, I don't actually know what I'll be looking at \u2014 and one of the two options backslides on my spec."
+   ],
+   "distrustTriggers": [
+    "The portal's verdict is a TRAFFIC sentence: 'You're climbing \u2014 traffic's up 34% this quarter.' Traffic is the metric I trust LEAST \u2014 I fired my last agency while traffic went up and my phones stayed dead. Putting traffic back in the verdict slot undoes the single most important thing the June rebuild fixed.",
+    "The portal's 'PROOF' section leads with impressions ('Found in Google') and clicks with sparklines, plus a 94/100 site-health ring in the right rail. Impressions are not proof of anything I can bill, and a 94/100 score is an invented number the agency controls \u2014 both were on my explicit bury list, and here they are promoted to 'the proof'.",
+    "'Revenue recovered $4,900/mo of $14.2k/mo targeted' \u2014 who set the $14.2k? You did. Grading your own homework against a denominator you invented, then celebrating 35% of it, is exactly the shape of the beautiful PDF that burned me.",
+    "Dollarization everywhere. Nearly every surface leads with a revenue estimate built from visits x conversion-rate x order-value. One honest labeled estimate bought my trust in P0; a dollar guess on every card of every page spends it. Stacked estimates start reading as manufactured money.",
+    "'3 improvements shipped' sitting in the since-you-last-visited chips, and 'Fixed 3 broken links' inside the proof column \u2014 activity is creeping back up toward the headline. Activity is reassurance BELOW results, never evidence beside them.",
+    "The 'defending' verdict variant has no number and no baseline at all \u2014 a vibes sentence. A number with no baseline is a number I can't judge; a sentence with no number is worse."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "somewhat",
+   "wouldImprove": [
+    "Pick the tabbed Client Dashboard and ratify it as THE client surface \u2014 it's my spec within arm's reach. Retire the portal's traffic-led framing entirely; the verdict slot must always be leads-or-dollars vs a dated baseline, never a traffic percentage.",
+    "Rewrite the portal 'PROOF' section: proof = calls, form fills, named leads, and dollars vs retainer. Impressions, clicks, sparklines, and the health ring go under the hood with the rest of the kitchen.",
+    "Make the leads-tile rule ('only shown when provable, dash otherwise') the governing law for EVERY dollar figure on a client surface. One money frame per page; everything else shows its provenance chip or doesn't show a dollar.",
+    "If you keep 'recovered $X of $Y targeted', show me where $Y came from and when it was set \u2014 a dated, locked target with its arithmetic \u2014 or drop the framing.",
+    "Design the bad-month portal state now, in the mockup, with real honest-dip copy \u2014 prove the instrument can say 'down, here's why, here's the plan' before you polish another green state.",
+    "Build the SMS/email push (verdict line + the one thing you need from me) before any more surface polish \u2014 it's worth more to my renewal than all 18 operator screens combined.",
+    "Ship 'Sarah K.' for real: call tracking + in-area/junk flagging so the named-lead list reconciles to what my office actually answered."
+   ],
+   "verbatim": "Half this kit is the dashboard I asked for and the other half is the beautiful PDF that burned me \u2014 pick the right half, wire the phone that rings to the number on the screen, and text me when it moves, because I sign checks for leads, not for 'traffic's up 34%.'"
+  }
+ },
+ {
+  "agentId": "a7b994922ada5823e",
+  "promptHead": "recovered from gapfill run 1",
+  "structuredOutput": {
+   "persona": "Busy in-house B2B SaaS marketing lead \u2014 I own the demand number, live in GA4/HubSpot/Ahrefs, and hired this agency for pipeline capacity without headcount. I open the dashboard about once a month, before a review, to grab one defensible number. Allergic to vanity metrics and to being managed by dashboard.",
+   "resolved": [
+    "The headline ROI line I asked for finally exists as the hero: the Client Dashboard Mockup opens on '~$18,400/mo \u00b7 4.6\u00d7 your retainer' with an outcome count ('59 actions, up from 21'), a methodology disclosure, and a 'Curated by your strategist' byline \u2014 money first, screenshot-able, exactly my slot 1.",
+    "The board one-pager export \u2014 my literal return hook and the biggest P0 gap from my last review \u2014 is now designed: a 'Share this as a one-pager' PDF row sits right under the hero. Even as a gesture, it's finally on the surface instead of a defined-but-unused type.",
+    "Dollarized next bets, the P0 item I flagged as 'quietly dropped' last time, is back: the content plan shows three recommended moves each with an est. added value (\u2248$2,900/mo), a confidence chip, and 'Request this' with 'strategist scopes and confirms before any charge' \u2014 that's the transparent-ROI-math upsell all seven of us asked for.",
+    "'What needs me' survives the rebuild: a 'Your turn' strip at slot 0 (with a stale-item chip \u2014 '3 pages, 9d pending' \u2014 that's honest pressure on THEM, which I like), plus an Inbox tab for decisions/reviews/conversations.",
+    "The vanity exile is preserved: raw visitors/clicks/impressions/position/health all live in a collapsed 'Under the hood,' and the ROI ledger shows my monthly investment ($4,000/mo) in the same table as the value \u2014 the denominator is visible, which is the honest-money framing I demanded.",
+    "Named records appear for the first time: 'Sarah K. \u2014 called from the emergency dentist page,' marked private, with 'Names available with call & CRM tracking \u2014 ask your strategist to connect it' when unprovable. Wrong segment noun (calls, not deals) but the clickable-to-actual-humans pattern I said would make me trust everything else is now in the design.",
+    "The provenance ladder (estimate \u2192 measured \u2192 actual chips on every dollar figure) is a real trust structure \u2014 it's the scaffolding my HubSpot-reconciled number will eventually hang on, and it stops anyone from quietly implying booked revenue.",
+    "AI-answer visibility \u2014 the pay-more frontier I volunteered \u2014 now exists as a full operator surface (AI Answer Monitor, per-model citation tracking), so the capability is being built even if I can't see it yet.",
+    "A 90-day scorecard (win rate 68%, 37 scored, 9 still in measurement) that admits some work is unscored \u2014 the anti-all-green discipline is holding."
+   ],
+   "stillMissing": [
+    "HubSpot/CRM reconciliation \u2014 my indispensable ask, the number that survives a CFO \u2014 is still absent everywhere. The 4.6\u00d7 hero is traffic-value-and-estimated-conversion math, not pipeline $ or influenced revenue. The provenance ladder reserves 'measured/actual' but nothing in the kit wires a CRM. This is now two reviews running where my expand trigger is signposted rather than built.",
+    "The push return hook is still nowhere. I told you verbatim: I'm a once-a-month user, the dashboard is where I land from a notification. There is no monthly email/Slack with the ROI line + 'X items need your approval' anywhere in this kit. A beautiful dashboard I forget to open is a half-win, again.",
+    "The segment layer isn't demonstrated. Every client fixture is dental/local \u2014 my B2B altitude (pipeline noun, commercial-intent keyword movement with a so-what, share-of-voice vs the 2-3 competitors I name) never appears on a client surface. The under-the-hood competitor stack-up is 'they have 3\u00d7 your Google reviews' \u2014 a local framing that means nothing to me.",
+    "4 of 5 client dashboard tabs are placeholders \u2014 including Performance, which is the merged search+analytics surface where my GA4 reconciliation would actually live, and Inbox, where my two-minute approval clearing happens. The one built tab sets a good pattern; the shell is mostly intent statements.",
+    "No client-visible 'counted how' \u2014 which events/definitions feed the hero dollar. If my CFO asks 'counted how?' I still can't answer from the surface, and a wrong-but-confident estimate is scarier than an honest gap.",
+    "AI-answer visibility has no client-facing expression \u2014 it's operator-only, so the premium I said I'd pay isn't sellable to me from my own portal yet."
+   ],
+   "distrustTriggers": [
+    "The kit ships TWO competing client designs and the wrong one leads with the exact pattern I fired an agency over: portal.js's verdict is literally 'You're climbing \u2014 traffic's up 34% this quarter,' and its PROOF band opens on impressions ('Found in Google') with sparklines. Traffic-up-while-pipeline-flat is the number I have to apologize for. If the decision gate picks the portal, this rebuild is a regression for me.",
+    "The portal's trajectory-flip copy \u2014 a bad period gets rebranded as 'We're defending your rankings \u2014 here's the plan' \u2014 is spin-adjacent. I asked for 'flat month, honest plan,' not a euphemism engine. Show me the down arrow.",
+    "Aggressive dollarization everywhere: visits \u00d7 2.1% CVR \u00d7 $705 AOV as the headline arithmetic on nearly every surface. The 'agency estimate' chips are honest, but a wall of projected dollars I cannot reconcile against my own GA4/HubSpot is its own kind of being managed by dashboard \u2014 one bad reconciliation and I stop believing every chip.",
+    "A 94/100 site-health ring sits on the client portal's first screen \u2014 an invented composite the agency controls, the thing the spec (and I) said must never be a client-facing citizen.",
+    "The 4.6\u00d7 ratio is computed off an ad-spend-equivalent traffic proxy dressed as ROI. I'll forward an honestly-labeled estimate; I will not forward a proxy ratio my CFO can unpick in one question.",
+    "Internal inconsistencies (Site Audit '3\u21921' while Performance and Links still ship separately; purple tinting a whole nav group against their own color law) \u2014 none client-facing, but sloppiness in the spec makes me wonder what else drifts between claim and build."
+   ],
+   "wouldImprove": [
+    "Kill the fork now, in my favor: adopt the Client Dashboard Mockup's spine as THE client surface, and if portal.js survives as the microsite, its verdict must be outcome-led ('pipeline/leads up X since baseline'), never 'traffic's up 34%' \u2014 and pull the health ring off it.",
+    "Build one B2B SaaS fixture client before writing any client-facing code: pipeline $ as the outcome noun, a HubSpot-reconciled (even manually-entered) pipeline line on the hero, and commercial-intent SOV vs named competitors as a real above-the-fold secondary section \u2014 prove the segment dictionary works, don't just assert it.",
+    "Wire the one-pager export to a real PDF in the first client-facing phase \u2014 it's currently a toast. That single feature is my monthly reason to log in; treat it as P0, not polish.",
+    "Ship the push in the same phase as the dashboard: monthly email/Slack with the one ROI line, the trend, and 'N items need your approval' one-click deep-linked to the Your-turn strip. The kit designed the destination and skipped the doorbell, again.",
+    "Add a client-visible 'counted how' affordance on the hero dollar \u2014 which events, which values, which window \u2014 so the number I forward is one I can defend.",
+    "Rename the hero honestly until CRM lands: '~$18,400/mo estimated value' beats a 4.6\u00d7 ratio built on a traffic proxy; graduate to the ratio when the provenance chip says 'measured.'",
+    "Lock the comparison windows (vs last period AND vs baseline, always the same) \u2014 'since your last visit' chips are cute but a moving window is how spin starts."
+   ],
+   "builtToMySpec": "partially",
+   "matters": "a lot",
+   "verbatim": "You finally put the money, the export, and the priced next-bets on my first screen \u2014 now pick the dashboard over that traffic-verdict microsite, wire the number to my HubSpot and the summary to my inbox, and I'll stop auditing you and start expanding."
+  }
+ }
+]

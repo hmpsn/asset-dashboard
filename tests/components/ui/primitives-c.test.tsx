@@ -360,9 +360,9 @@ describe('ConfirmDialog', () => {
 
   it('calls onCancel when backdrop is clicked', () => {
     const onCancel = vi.fn();
-    const { container } = render(<ConfirmDialog {...dialogDefaults} onCancel={onCancel} />);
-    // click the outermost fixed overlay
-    const overlay = container.firstChild as HTMLElement;
+    render(<ConfirmDialog {...dialogDefaults} onCancel={onCancel} />);
+    const overlay = document.querySelector('[data-modal-backdrop="true"]') as HTMLElement;
+    fireEvent.mouseDown(overlay);
     fireEvent.click(overlay);
     expect(onCancel).toHaveBeenCalledOnce();
   });
@@ -377,19 +377,17 @@ describe('ConfirmDialog', () => {
   });
 
   it('default variant uses primary button', () => {
-    const { container } = render(<ConfirmDialog {...dialogDefaults} variant="default" />);
-    const buttons = container.querySelectorAll('button');
-    const confirmBtn = Array.from(buttons).find(b => b.textContent === 'Confirm');
+    render(<ConfirmDialog {...dialogDefaults} variant="default" />);
+    const confirmBtn = screen.getByRole('button', { name: 'Confirm' });
     // primary variant has teal gradient
-    expect(confirmBtn?.className).toContain('from-[var(--teal)]');
+    expect(confirmBtn.className).toContain('from-[var(--teal)]');
   });
 
   it('destructive variant uses danger button style', () => {
-    const { container } = render(<ConfirmDialog {...dialogDefaults} variant="destructive" confirmLabel="Delete" />);
-    const buttons = container.querySelectorAll('button');
-    const confirmBtn = Array.from(buttons).find(b => b.textContent === 'Delete');
+    render(<ConfirmDialog {...dialogDefaults} variant="destructive" confirmLabel="Delete" />);
+    const confirmBtn = screen.getByRole('button', { name: 'Delete' });
     // danger variant has --red background
-    expect(confirmBtn?.className).toContain('bg-[var(--red)]');
+    expect(confirmBtn.className).toContain('bg-[var(--red)]');
   });
 
   it('Enter key triggers onConfirm when non-button is focused', () => {
@@ -485,7 +483,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full">
+        <FeatureFlag flag="national-serp-tracking">
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -497,7 +495,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     const { container } = render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full">
+        <FeatureFlag flag="national-serp-tracking">
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -511,7 +509,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full" fallback={<span>Coming soon</span>}>
+        <FeatureFlag flag="national-serp-tracking" fallback={<span>Coming soon</span>}>
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -524,7 +522,7 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full" fallback={<span>Coming soon</span>}>
+        <FeatureFlag flag="national-serp-tracking" fallback={<span>Coming soon</span>}>
           <span>Feature content</span>
         </FeatureFlag>,
       ),
@@ -537,19 +535,19 @@ describe('FeatureFlag', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(false);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full">
+        <FeatureFlag flag="national-serp-tracking">
           <span>X</span>
         </FeatureFlag>,
       ),
     );
-    expect(useFeatureFlag).toHaveBeenCalledWith('keyword-universe-full');
+    expect(useFeatureFlag).toHaveBeenCalledWith('national-serp-tracking');
   });
 
   it('renders multiple children when enabled', () => {
     vi.mocked(useFeatureFlag).mockReturnValue(true);
     render(
       withQueryClient(
-        <FeatureFlag flag="keyword-universe-full">
+        <FeatureFlag flag="national-serp-tracking">
           <span>First</span>
           <span>Second</span>
         </FeatureFlag>,

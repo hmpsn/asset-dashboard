@@ -28,7 +28,7 @@ function seedScoredAction(attribution: Attribution, score: OutcomeScore, idx: nu
     pageUrl: `/p-${attribution}-${idx}`,
     targetKeyword: `kw-${idx}`,
     baselineSnapshot: { captured_at: '2026-01-01T00:00:00Z', position: 18, clicks: 5, impressions: 200 },
-    attribution,
+    attribution, // B14: parameterized — this test asserts attribution-based filtering in the learnings summary
     sourceFlag: 'live',
     baselineConfidence: 'exact',
   });

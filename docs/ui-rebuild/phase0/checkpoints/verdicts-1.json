@@ -1,0 +1,1190 @@
+[
+ {
+  "claim": "Page Rewriter: initialPageUrl deep-link auto-load (prop + auto-load path, no non-null caller at HEAD)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: src/App.tsx:186,438 (rewritePageUrl state threaded as initialPageUrl; only setter call is setRewritePageUrl(null) on back \u2014 grep confirms no non-null caller) + usePageRewriteChatShell.ts:89-92 mount auto-load. Prototype: rewrite.js has only a manual picker (pick() toast 'Search the sitemap or paste a URL'), no deep-link/auto-load entry.",
+  "note": "Latent capability at HEAD exactly as claimed; genuinely unhomed in prototype."
+ },
+ {
+  "claim": "Page Rewriter: inline edit of AI rewrite text before applying (contentEditable chat bubble + msgEdits feeding Apply and Copy)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageRewriteChatPane.tsx:86-100 (contentEditable bubble, msgEdits[i] ?? extractRewriteOnly fed to onApplyToSection) + usePageRewriteChatShell.ts:44. Prototype: rewrite.js chat messages are NOT editable (msgHtml line 134 renders Apply/Copy only); only doc-pane blocks are contentEditable post-apply.",
+  "note": "Mockup allows editing after apply in the doc, but the pre-apply bubble edit feeding Apply/Copy has no home."
+ },
+ {
+  "claim": "Page Rewriter: apply-to-arbitrary-section (data-section slug match, replace under heading, highlight, fallback insert-at-end + toast)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: usePageRewriteChatShell.ts:248-253 (applyRewriteToSection + 'Section not found \u2014 content inserted at end' toast), pageRewriteChatActions.ts exists, PageRewriteChatPane.tsx:98-107 ('Apply to {msg.sectionTarget}'). Prototype: rewrite.js apply() (line 205-209) hardcodes replacement of doc.blocks[0] ('Apply to intro') \u2014 no arbitrary-section matching or fallback.",
+  "note": ""
+ },
+ {
+  "claim": "Page Rewriter: audit issue chips strip on loaded document (first 20, severity-coded)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageRewriteDocumentPane.tsx:128-145 (issues.slice(0,20) chip strip) fed by server/routes/rewrite-chat.ts:193-201 (snapshot audit page issues). Prototype: rewrite.js has no audit-issue rendering at all (grep issue/severity/chip: only playbook chips).",
+  "note": ""
+ },
+ {
+  "claim": "Page Rewriter: clear-formatting toolbar action (removeFormat + reset block to <p>)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageRewriteDocumentPane.tsx:176-178 (onClearFormatting button) + clearFormattingSelection in pageRewriteChatActions.ts. Prototype: rewrite.js toolbar (lines 173-179) has only B / I / H2 / H3 \u2014 no clear-formatting.",
+  "note": ""
+ },
+ {
+  "claim": "Page Rewriter: open live page in new tab (target=_blank on loaded slug)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageRewriteDocumentPane.tsx:77-85 (a target=_blank rel=noopener on pageUrl). Prototype: rewrite.js picker shows URL as plain <em> text (line 155); no link, no target=_blank anywhere in the file.",
+  "note": ""
+ },
+ {
+  "claim": "Page Rewriter: DOCX export (docx lib, styled H1-H4, letter-size)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: usePageRewriteChatShell.ts:283-335 (new Document(...), DOCX failure toast) + pageRewriteChatDocument.ts:118 serializeDocToDocx. Prototype: rewrite.js export() is a toast 'Copy as HTML, Markdown, or push to a new draft' (line 214) \u2014 no DOCX.",
+  "note": ""
+ },
+ {
+  "claim": "Page Rewriter: PDF export (hidden print root, scoped print CSS, window.print, afterprint cleanup)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: usePageRewriteChatShell.ts:257-281 (page-rewrite-print-root, PDF failure toast) + pageRewriteChatDocument.ts:100 buildPrintableDocHtml; FEATURE_AUDIT.md entry 449. Prototype: rewrite.js export toast mentions HTML/Markdown/draft only \u2014 no PDF/print path.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: 'Send issue' \u2014 the ONE client commit (header button + docked send bar; atomic bulk send clearing staged set)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:553-560 (handleSendIssue sends staged set then clears), 636-645 (IssueHeader onSendIssue), 696-716 (sticky staged bar); IssueHeader.tsx:44-57. Prototype: strategy.js has stage toggles (_toggleMove line 468) and POV footer text 'edited by you before send' but NO send-issue action/button; recs.js only has per-card 'Share with client'.",
+  "note": "Atomic staged-set commit has no prototype home; per-card send in recs.js is a different (non-atomic) model."
+ },
+ {
+  "claim": "Engine: cockpit lifecycle facet buckets Active/Sent/Approved/Throttled with counts",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: StrategyCockpit.tsx:28-33 (LIFECYCLE_TABS incl. throttled) + 126-143 render. Prototype: recs.js models statuses new|internal|sent|approved|dismissed (line 107) but has NO facet tab bar with counts and NO throttled state at all.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: category chips (Content/Technical/Quick wins) + sort Value/Impact/Age",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: StrategyCockpit.tsx:41-45 (SORTS value/impact/age) + 146-182 (ACT_CATEGORIES chips). Prototype: no category chips or sort controls in recs.js/strategy.js (grep category|sort: none).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: fix-now pin (capped, by value, cross-facet)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: StrategyCockpit.tsx:75-78 (isFixNow filter, FIX_NOW_CAP, sorted by value) + 116-123 render. Prototype: no fix-now concept (grep fix.?now: none in recs/strategy mockups).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: NeedsAttentionStrip (stale_sent/superseded/new_reply) + jump-to-rec",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: NeedsAttentionStrip.tsx:4-14 (AttentionKind union) + StrategyCockpit.tsx:63,113. Prototype: no attention strip (grep attention: none).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: CurationMeter over-send coach",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CurationMeter.tsx:8-14 (sentThisCycle threshold coachmark). Prototype: no curation meter (grep curat/meter: none in strategy.js/recs.js).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: bulk curation \u2014 select-all-in-filter predicate + sticky bulk bar \u2192 Send / Throttle 7-30-90d / Strike(confirm) via atomic POST /bulk",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: StrategyCockpit.tsx:93-103,230-243; CurationBulkActionBar.tsx:4-16; server/routes/recommendations.ts:595 (/bulk). Prototype: no multi-select or bulk bar anywhere in recs.js/strategy.js.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: per-row verbs \u2014 send-with-note, strike+confirm, unstrike, throttle picker, mark-fixed, undismiss",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CockpitRow.tsx:145-232 + recommendations.ts routes :send(884) :strike(925) :unstrike(943) :throttle(961) :fix(984) :undismiss(543). Prototype: recs.js covers send ('Share with client'), dismiss, undo-restore, recall \u2014 but NO note-on-send, NO throttle picker, NO strike confirm, NO mark-fixed.",
+  "note": "Partial prototype coverage (send/dismiss/undo); the full verb catalog is not homed."
+ },
+ {
+  "claim": "Engine: per-rec discussion thread (client replies; GET/POST /discussion + RECOMMENDATIONS_DISCUSSION_UPDATED)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: recommendations.ts:1031,1038 + ws-events.ts:155. Prototype: recs.js client card has a static 'Discuss' button (line 197) with no thread UI and no admin-side reply surface.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: operator wording override (inline title/insight edit, regen-durable, display-boundary applied)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CockpitRow.tsx:23-26 (onEditWording pencil \u2192 inline FormInput/FormTextarea) + recommendations.ts:851 (/wording). Prototype: strategy.js has 'Edit POV' (line 403) which edits the narrative POV, not per-rec wording; recs.js has no rec-edit affordance.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: add a rec the system missed (AddRecommendationModal \u2192 POST /manual-rec, regen-retained)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AddRecommendationModal.tsx:1-14 + recommendations.ts:806 (/manual-rec). Prototype: no add-recommendation affordance (grep manual: none).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: client running-order reorder endpoint (UI already cut at HEAD; endpoint live)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: recommendations.ts:757 (/reorder) live. Prototype: no reorder anywhere.",
+  "note": "Endpoint-only capability at HEAD \u2014 record as such so the rebuild doesn't silently orphan or delete it."
+ },
+ {
+  "claim": "Engine: cut\u2192sentence contract (cutting a backing move strikes its POV sentence live)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:191,680 (struckRecIds + onCut) + DraftedPovEditor.tsx:11,161-162 (leadMoveRecId in struckRecIds strikes lead sentence). Prototype: strategy.js stage toggle does not touch the static POV copy.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: POV-staleness nudge (cut/edited moves diverged \u2192 regenerate)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:574-580 (povMayBeStale from struckRecIds/wording overrides) + 657-673 (warning band + regenerate). Prototype: strategy.js only has a local-data-newer-than-strategy nudge (line 310) \u2014 nothing driven by cut/edited moves.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: weekly Issue push cron operator doorbell \u2014 bell consumer + deep-link target (issue.ready \u2192 seo-strategy)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: server/strategy-issue-cron.ts:12-29 (doorbell via useNotifications from workspace-overview issue.ready, deep-links to seo-strategy) + cron-registry.ts:310-312. Prototype: no cron/doorbell/notification-rail concept in strategy.js or nav.js.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: trust ladder per-archetype auto-send (earned toggles, 3-cycle streak, GET/PATCH /api/auto-send-policy, dark-launch flag)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: TrustLadderPanel.tsx:1-40 (earned-gated toggles, consecutiveCycles/threshold) + server/routes/auto-send-policy.ts:4-5. Prototype: no auto-send/trust-ladder concept (grep auto.?send|trust: none).",
+  "note": "Cited line range 170-181 exceeds the 136-line file, but the panel + routes fully substantiate the capability."
+ },
+ {
+  "claim": "Engine: IssueSetupReadiness checklist (ga4/value/segment/events/webflow/POV rollup + ?tab= deep-links)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: IssueSetupReadiness.tsx:1-13 + KeywordStrategy.tsx:628-635 + the-issue-conversion-tracking.ts:46. Prototype: no setup-readiness checklist (grep readiness: none).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: AdminLeadsReadout (captured named leads, PII admin-only, Load more, connect CTA)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AdminLeadsReadout.tsx:1-28 + KeywordStrategy.tsx:726-748 (disclosure-leads) + the-issue-conversion-tracking.ts:91-155 (/form-submissions, /form-sources). Prototype: no leads readout (grep leads: none).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: outcome-value AI enrich proposer (POST /outcome-value-enrich, never persists)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: server/routes/the-issue-admin.ts:28-46. Prototype: no enrich affordance (grep enrich: none).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: full vs incremental generation modes (two header actions)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:274-279 (onIncremental/onFullRefresh/onGenerate) + useStrategyGeneration.ts:60,84. Prototype: strategy.js has a single _regenStrategy() action (line 473) \u2014 no full/incremental split.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: RefreshOrderingPrompt (refresh local SEO data before regenerating \u2014 data-ordering guard)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:319-337 (localSync.localNeedsRefresh gate) + RefreshOrderingPrompt.tsx exists. Prototype: strategy.js line 310 has the INVERSE nudge (local data newer \u2192 regenerate) but no refresh-first ordering guard before regeneration.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: ?tab= deep-link continuity for seo-strategy?tab=rankings|content|competitive (contract-tested)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:74-111 (StrategyInteriorTab + searchParams sync) + tests/contract/tab-deep-link-wiring.test.ts exists. Prototype: mockups have no URL model at all (hash view switching via gotoView).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: StrategyHowItWorks explainer (seoDataMode + ranking caveats)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:286-288,505 (StrategyHowItWorks with displayedSeoDataMode/hasAnyRanking). Prototype: no how-it-works/provenance explainer in strategy.js or recs.js (grep: none).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: AIContextIndicator pre-generation trust surface",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:339-341 (AIContextIndicator feature='strategy' when no real strategy). Prototype: no pre-generation context indicator (grep context: none).",
+  "note": ""
+ },
+ {
+  "claim": "Engine: feedback-newer-than-strategy nudge",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordStrategy.tsx:354-359 (StrategyFeedbackNudge from metrics.feedbackNewerThanStrategy). Prototype: strategy.js nudge (line 310) is about local SEO data freshness, not client keyword feedback \u2014 the feedback-driven nudge has no home.",
+  "note": ""
+ },
+ {
+  "claim": "Engine: CannibalizationTriage sub-verbs (KeeperSelector regen-durable override, mark-resolved, fix-in-editor)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CannibalizationTriage.tsx:1-11 + KeeperSelector.tsx:1-13 + KeywordStrategy.tsx:482-486,795. Prototype: only keywords.js line 401 shows a passive 'Cannibalization: None detected' detail row \u2014 no triage verbs, keeper picker, or resolution flow anywhere.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: search assets by filename/alt text (Browse)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetBrowser.tsx:118,170-175 (search state matches displayName/originalFileName/altText). Prototype: assets.js has NO search input \u2014 only filter pills All/Oversized/Missing-alt/Unused (lines 189-194).",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: filters images/svg/used + multi-select OR combination",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetBrowser.tsx:41-44 (FilterType incl. images/svg/used), 119 (useToggleSet multi), 188-197 (OR semantics via .some). Prototype: assets.js filter is a SINGLE string ('all|over|noalt|unused', line 94) \u2014 no images/svg/used facets and no multi-select OR.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: sort Newest/Name/Size",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetBrowser.tsx:139,199-203 (createdOn/fileName/fileSize sorts). Prototype: no sort control in assets.js.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: manual inline alt-text edit (click-to-edit, save to Webflow)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetBrowser.tsx:213-228 (handleSaveAlt) + AssetCard.tsx:184-210 ('Save alt text', 'Click to add alt text'). Prototype: assets.js only has AI genAlt (line 163-164) \u2014 no manual click-to-edit path.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: delete \u2014 single asset, bulk delete selected, Delete-All-Unused with confirm",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetBrowser.tsx:485-492 (bulk delete confirm), AssetAudit.tsx:172-208 (single + delete-all-unused), server/routes/webflow.ts:81,116. Prototype: assets.js has an Unused filter but NO delete verb anywhere (bulk bar = Compress/Generate alt/Smart rename only, lines 197-202).",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: Organize into Folders (preview foldersToCreate/moves \u2192 execute \u2192 moved/failed)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetBrowser.tsx:442-483,541-551 + server/routes/webflow-organize.ts:27,143 + OrganizePreview.tsx. Prototype: no folder/organize concept (grep folder/organize: none).",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: CMS image scan (Image/MultiImage/RichText fields across collections; per-asset usage map)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: useAdminAssets.ts:57 (useCmsImages) + server/routes/webflow-cms-images.ts:66 + FEATURE_AUDIT.md:1678. Prototype: assets.js asserts compress 'updates every CMS reference automatically' (as-note) but exposes NO CMS scan or usage-map UI.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: CMS filters (CMS Images / CMS Missing Alt) mutually exclusive with non-CMS filters",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetBrowser.tsx:41-44 (CMS_FILTERS/NON_CMS_FILTERS sets), 121-138 (mutual-exclusion toggle), 167-187 (sourceList switch). Prototype: no CMS filters at all.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: CMS field selector with smart defaults gating filter + which CMS refs are patched on compress",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetBrowser.tsx:87-99,302-304,404-406 (selectedCmsFields gating cmsUsages) + CmsFieldSelector.tsx:37 (buildDefaultSelectedFields),55. Prototype: absent.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: CMS usage badges per card + RichText-only compress-disabled state",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetCard.tsx:145 (Used-in-CMS tooltip), 243-252 (compressDisabled 'unavailable for inline RichText images') + AssetBrowser.tsx:79-85,709 (richTextOnlyIds). Prototype: absent.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: per-card open-original-in-new-tab",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetCard.tsx:262 ('Open in new tab'). Prototype: assets.js cards have Compress/Alt-text actions only; no open-original.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: asset audit scan mode (Run Asset Audit entry state, 30-60s pages+CMS+CSS scan, re-scan)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetAudit.tsx:65-77,226-253 (hasRun entry state),498-506 (Re-scan) + server/routes/webflow-audit.ts:20. Prototype: no asset-audit mode in assets.js; audit.js (Site Audit) detects only oversized/missing-alt and deep-links 'Fix in Asset Manager' (audit.js:451-452) \u2014 the dedicated usage-scan mode has no home.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: asset health score (0-100 with color tiers)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetAudit.tsx:257-273 (score calc + emerald/amber/red tiers). Prototype: assets.js shows stats (weight/oversized/savings/missing-alt) but no health score.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: 5 extra audit issue classes (low-quality-alt, duplicate-alt, duplicate, unoptimized-png, legacy-format) + filter pills",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: server/routes/webflow-audit.ts:81-101 (all five classes pushed),136-138 (counts) + AssetAudit.tsx:37-46 (ISSUE_LABELS),321-344 (filter pills). Prototype: only over/noalt/unused exist.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: issue lightbox modal (full preview, badges, used-on list, inline generate-alt/compress/delete/copy-URL)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetAudit.tsx:626-721 (lightboxIssue modal). Prototype: no lightbox/modal in assets.js.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: audit search (name/page) + sort (Most Issues/Largest/Name)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetAudit.tsx:210-221 (filter+sort),384-409 (search+sort UI). Prototype: absent.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: export audit as CSV",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetAudit.tsx:127-148 (handleExportCSV),488-497 (Export button). Prototype: no export anywhere in assets.js.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: used-on page NAMES per issue (not just count)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AssetAudit.tsx:565-571 (issue.usedIn.join(', ') names in tooltip + cell). Prototype: assets.js shows only 'in N pages' count (line 172).",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: dual DropZones \u2014 Assets (AVIF, SVG minify) vs Meta/OG (optimized JPEG) with distinct server profiles",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: MediaTab.tsx:51-60 + DropZone.tsx:13-134 + server/routes/misc.ts:35 (/upload) and 53 (/upload/meta). Prototype: assets.js upload() is a single generic toast \u2014 no dual-zone or meta/OG profile.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: clipboard paste upload (global cmd-V, HDPI 2x sharp downscale, toast)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: App.tsx:267-304 (global paste handler),470-472 (clipboardStatus band) + server/routes/misc.ts:210-253 (/upload/:id/clipboard with sharp). Prototype: no paste-upload concept.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: processing queue optimizing\u2192generating-alt\u2192uploading\u2192done/error live via WS queue:update",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ProcessingQueue.tsx + useQueue.ts:9 + App.tsx:323,355-357 (QUEUE_UPDATE handler) + server/processor.ts + ws-events.ts:195,201. Prototype: no processing-queue surface; mockup compress resolves instantly via toast.",
+  "note": ""
+ },
+ {
+  "claim": "Asset Manager: AI alt-text monthly quota UI (429 'Monthly AI generation limit reached'; bulk stream halts with status)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: server/routes/webflow-alt-text.ts:47-49,154,213 (429s + stream halt message). Prototype: bulkAlt succeeds unconditionally \u2014 no quota/limit state.",
+  "note": ""
+ },
+ {
+  "claim": "Links: Redirect Chains panel \u2014 multi-hop trace with per-hop status, loop badge, internal/external, final destination, expand/collapse",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: RedirectManager.tsx:288-343 (chains SectionCard) + server/redirect-scanner.ts:21-29 (RedirectChain with type internal|external). Prototype: links.js has NO chain UI \u2014 its header comment even delegates 'Site Audit DETECTS ... redirect chains' but audit.js has no chain-trace panel either.",
+  "note": ""
+ },
+ {
+  "claim": "Links: all-pages status inventory table (HTTP badge, path/title, static/cms/GSC source badge, redirects-to)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: RedirectManager.tsx:473-527 (page status table). Prototype: links.js redirects tab shows only the 404\u2192301 suggestion list; no full-inventory status table.",
+  "note": ""
+ },
+ {
+  "claim": "Links: redirects filter tabs (All/Redirects/404s/Errors) + path/title search",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: RedirectManager.tsx:214-222 (search + status filters),435-471 (tab bar + search input). Prototype: no filter tabs or search in links.js redirects tab.",
+  "note": ""
+ },
+ {
+  "claim": "Links: edit redirect target inline (fix a wrong suggestion) + post-accept 'Change target'",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: RedirectManager.tsx:147-151 (updateRuleTo),394-428 (editingRule inline UI). Prototype: links.js rows are accept/reject only (lines 236-237); the .lk-to.edit CSS class (line 64) has no corresponding edit affordance.",
+  "note": ""
+ },
+ {
+  "claim": "Links: copy all accepted redirect rules to clipboard",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: RedirectManager.tsx:167-172 (copyRulesToClipboard 'from \u2192 to' lines),366-368 (Copy All button). Prototype: links.js offers Export CSV only (line 251) \u2014 no clipboard copy.",
+  "note": "Mockup's CSV export partially overlaps intent; the clipboard verb itself is unhomed."
+ },
+ {
+  "claim": "Links: send accepted redirect rules to client (redirect_proposal client action + note \u22642000)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: RedirectManager.tsx:174-203 (sendAcceptedRulesToClient),362-387 ('Send to Client' button). Prototype: links.js has per-INTERNAL-link 'Client' send (line 278) but the redirects tab has no send-to-client at all.",
+  "note": ""
+ },
+ {
+  "claim": "Links: Internal Links priority filter tabs with counts + free-text search (page/title/anchor)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InternalLinks.tsx:84-99 (priority filter + search matching page/title/anchor),252-285 (UI). Prototype: links.js internal tab sorts by priority and shows count stats but has no filter tabs and no search.",
+  "note": ""
+ },
+ {
+  "claim": "Links: Internal Links list vs grouped-by-source-page view toggle",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InternalLinks.tsx:286-305 (view toggle),315-356 (grouped render). Prototype: single flat list only.",
+  "note": ""
+ },
+ {
+  "claim": "Links: copy <a href> HTML snippet per internal-link suggestion",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InternalLinks.tsx:342-350,381-389 (copy IconButton per suggestion). Prototype: links.js rows offer 'Insert' (direct insertion, line 276) and 'Client' send \u2014 no copy-HTML-snippet verb.",
+  "note": "Mockup 'Insert' is a NEW aspirational capability, not a superset that exists at HEAD; the copy-snippet verb still needs a home or explicit supersession sign-off."
+ },
+ {
+  "claim": "Links: page link-health scoring (0-100 per page) + Avg Link Score stat + 5-stat row",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: server/internal-links.ts:247-262 (pageHealth scoring) + InternalLinks.tsx:216-222 (5 StatCards incl. Avg Link Score). Prototype: links.js internal stats are simple counts (opportunities/high-priority/orphans); no per-page score.",
+  "note": ""
+ },
+ {
+  "claim": "Links: partial-fetch diagnostics (pageCount vs attemptedPageCount \u2014 password-protected, <2 pages, healthy-coverage)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InternalLinks.tsx:438-458 (attemptedPageCount*0.5 amber warning) + server/internal-links.ts:414 + FEATURE_AUDIT.md:4154. Prototype: no fetch-coverage diagnostics.",
+  "note": ""
+ },
+ {
+  "claim": "Links: Dead Links crawl-domain selector (staging vs live custom domains)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: LinkChecker.tsx:48-57,111-124 (domain picker) + server/routes/webflow-analysis.ts:166-176 (/link-check-domains). Prototype: no domain selector in links.js dead tab.",
+  "note": ""
+ },
+ {
+  "claim": "Links: Dead Links 'Redirects' sub-toggle (3xx links in content) + internal/external type filter",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: LinkChecker.tsx:43-44 (tab dead|redirects + typeFilter),186-217 (UI). Prototype: links.js dead tab has internal/external count stats and a per-row 'Redirect' convert button, but no 3xx-in-content list and no type filter control.",
+  "note": ""
+ },
+ {
+  "claim": "Links: dead-links CSV export (8-column dead + redirect links)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: LinkChecker.tsx:82-99 (exportCsv),219-227 (Export CSV button). Prototype: links.js CSV export exists only on the Redirects tab (301 rules for Webflow); dead links have no export.",
+  "note": ""
+ },
+ {
+  "claim": "Performance: Page Weight CSS-only source filter (All/Pages/CMS/CSS)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageWeight.tsx:60,131-137,187-192 ('CSS Only' option). Prototype: performance.js:135-136 filter offers only All sources / Pages only / CMS only \u2014 the CSS source is missing.",
+  "note": "Partial home exists (filter control present); the CSS bucket specifically is dropped."
+ },
+ {
+  "claim": "Performance: bulk PageSpeed test top-N pages (default 3, server max 25), averaged score + vitals panel, per-page expandable rows",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageSpeedPanel.tsx:172-194 (runBulkTest),455-610 (averaged + per-page rows) + server/routes/webflow-pagespeed.ts:26-47. Prototype: performance.js speed tab tests ONE selected page at a time ('Tested page' select + Re-test, line 187) \u2014 no bulk/averaged mode.",
+  "note": ""
+ },
+ {
+  "claim": "Performance: full Core Web Vitals set displayed \u2014 FCP, TBT, Speed Index beyond LCP/INP/CLS",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageSpeedPanel.tsx:83-96,263-270,494-501 (VitalCards incl. FCP/TBT/SI). Prototype: performance.js:168 cwvStrip renders only LCP/INP/CLS.",
+  "note": ""
+ },
+ {
+  "claim": "Performance: field-data (CrUX 'Real users') vs 'Lab test' provenance badge",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageSpeedPanel.tsx:260-261 (fieldDataAvailable emerald/amber badges). Prototype: no field/lab provenance anywhere in performance.js.",
+  "note": ""
+ },
+ {
+  "claim": "Performance: PageSpeed Diagnostics section (title/description/displayValue per finding)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD has BOTH Opportunities (PageSpeedPanel.tsx:273-296) and a separate Diagnostics section (297-317,575-604; server/pagespeed.ts:280 extractDiagnostics). Prototype: performance.js has only an 'Opportunities' list (lines 188-190) \u2014 the distinct diagnostics dataset has no home.",
+  "note": "Prototype's Opportunities block is the obvious adjacent home but does not currently include diagnostics."
+ },
+ {
+  "claim": "Performance: Content Perf per-piece CTR read-back",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ContentPerformance.tsx:343-345 (item.gsc.ctr%). Prototype: pipeline.js Published/Results tab (lines 766-795) shows clicks/position/impressions/engagement tiles \u2014 no CTR.",
+  "note": "Content-performance now lives in pipeline.js Published tab in the prototype; CTR metric specifically is absent."
+ },
+ {
+  "claim": "Performance: GA4 per-piece detail \u2014 sessions, users, bounce rate (engagement time survives)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ContentPerformance.tsx:363-385 (item.ga4 grid). Prototype: pipeline.js results card shows engagement time only (engTile) \u2014 no sessions/users/bounce.",
+  "note": ""
+ },
+ {
+  "claim": "Performance: sort controls (clicks / impressions / sessions / age)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ContentPerformance.tsx:121,145-153,220-237. Prototype: pipeline.js Published tab has no sort controls (grep sort: none).",
+  "note": ""
+ },
+ {
+  "claim": "Performance: term-coverage grading + brief-execution joinback (coverage % badge, matched/required, missing-term chips, lineage)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ContentPerformance.tsx:86-102,267,388-419 + server/domains/content/content-performance.ts:114-176 (gradeContentTermCoverage). Prototype: no term-coverage concept anywhere (pipeline.js 'coverage' hits are pricing copy only).",
+  "note": ""
+ },
+ {
+  "claim": "Performance: matrix-published cells included in performance list with 'Content Plan' source badge (dedup by keyword)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ContentPerformance.tsx:268-272 (source==='matrix' badge) + content-performance.ts imports listMatrices. Prototype: pipeline.js results list draws only from pipeline pieces (sources decay/ai/strategy); matrix cells render in the separate matrix view without joining the results list.",
+  "note": ""
+ },
+ {
+  "claim": "Performance: delivered-but-not-yet-published requests tracked in performance list",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ContentPerformance.tsx:183-188 (empty-state contract naming 'delivered' or 'published') + public-content.ts:580-582 (PUBLIC_CONTENT_PERFORMANCE_STATUSES). Prototype: pipeline.js results tab filters stage==='published' only (line 766).",
+  "note": ""
+ },
+ {
+  "claim": "Competitors: per-gap Send-to-client flow (mint competitor rec + lifecycle send, optimistic Sent badge, why-line, feedback pill)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CompetitiveIntel.tsx:122-228 (per-gap row send) + recommendations.ts:695-720 (mint endpoint). Prototype: competitors.js gap rows have only a 'Create brief' button \u2014 no send-to-client.",
+  "note": ""
+ },
+ {
+  "claim": "Competitors: per-competitor expandable detail \u2014 you-vs-them comparison bars incl. Traffic Value ($ organicCost)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CompetitiveIntel.tsx:381-394 (ComparisonBar organicCost). Prototype: competitors.js head-to-head is a flat table (Domain/Authority/Est. traffic/Keywords/Top 3) \u2014 no expandable rows, no Traffic Value $.",
+  "note": ""
+ },
+ {
+  "claim": "Competitors: per-competitor 'Their Top Keywords' list (top 10 with position, volume, KD)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CompetitiveIntel.tsx:397-411 (comp.topKeywords). Prototype: no per-competitor keyword list (gaps list is cross-set).",
+  "note": ""
+ },
+ {
+  "claim": "Competitors: per-gap 'View in Hub' deep-link (seo-keywords + buildHubDeepLinkQuery)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordGaps.tsx:92-102 (showHubLink IconButton). Prototype: gap rows link nowhere except 'Create brief' toast.",
+  "note": ""
+ },
+ {
+  "claim": "Competitors: Refresh button (invalidates competitorIntelAll cache)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CompetitiveIntel.tsx:336-343. Prototype: no refresh affordance in competitors.js (only 'Edit set' \u2192 wsettings).",
+  "note": ""
+ },
+ {
+  "claim": "Competitors: degraded/partial provider-failure messaging with Retry",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CompetitiveIntel.tsx:455-463 (degraded amber + Retry) + server/routes/seo-provider.ts:96-147 (providerFailures). Prototype: mock data always succeeds; only an unconfigured empty state (competitors.js:183-191).",
+  "note": ""
+ },
+ {
+  "claim": "Competitors: cached keyword-gap fallback from stored strategy blob + amber 'from strategy' provenance badge + honest freshness label",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CompetitiveIntel.tsx:296-297 (usingFallbackGaps),429 ('from strategy' badge),465-474 (freshness). Prototype: no cache/fallback/provenance concept.",
+  "note": ""
+ },
+ {
+  "claim": "Competitors: ShareBar own-domain trust guard (renders nothing when own domain lacks measurable traffic, <2 domains, or total<=0)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ShareBar.tsx:47-51 (hasOwn/rows<2/total<=0 \u2192 null). Prototype: competitors.js sovHtml always renders bars from mock data \u2014 no trust guard behavior demonstrated.",
+  "note": "Behavioral contract invisible in a static mockup; must be carried explicitly."
+ },
+ {
+  "claim": "Competitors: SEO provider cache-clear + diagnose admin utilities paired with the page's Refresh",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: server/routes/seo-provider.ts:250-303 (DELETE /api/seo/cache + diagnose endpoint, zero-credit note). Prototype: no cache/diagnose utilities.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: ?tab= deep-link receiver (seeds one of 7 segments; two-halves contract)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:185-198 (searchParams \u2192 initialSegment) + keywordHubDeepLink.ts:22-44 (HUB_DEEP_LINK_PARAMS). Prototype: keywords.js switches lenses via in-memory state only (data-lens onclick) \u2014 no URL/param model.",
+  "note": "Prototype lens bar is the analogous receiver home but is not URL-wired."
+ },
+ {
+  "claim": "Keywords: ?q= deep-link opens detail drawer on mount (normalized keyword identity)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:189-197,283-295 (mount-once deep-link open). Prototype: drawer opens only from row click (wireRows); no query-param open.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: cross-surface deep-link senders (buildHubDeepLinkQuery) from Strategy opportunity/gap/target components + drawer replaced-by",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: keywordHubDeepLink.ts:1-14 + sender files exist (KeywordOpportunities.tsx, KeywordGaps.tsx, SiteTargetKeywords.tsx, issue/KeywordTargetsLens.tsx, strategyNextActionTarget.ts). Prototype: strategy.js rows deep-link to 'editor' only; competitors.js gaps have no hub link \u2014 the sender half has no prototype equivalent.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: truncation honesty banner \u2014 N keywords hidden by display cap (rawEvidenceTotal vs rawEvidenceReturned)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:243-252,675-686 + keyword-command-center.ts:311-315. Prototype: mock list is complete; no truncation disclosure.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: metric-window disclosure label (GSC_METRIC_WINDOW_DAYS; rank=window avg; volume=provider estimate)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:664-671 + shared/keyword-window.ts. Prototype: no metric-provenance disclosure.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: 7 status segment pills with live counts (All/Striking Distance/In Strategy/Tracked/Needs Review/Retired/Local)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: HubSegmentBar.tsx:46-54 (HUB_SEGMENT_METAS) + KeywordHub.tsx:155-178,343-351 (live counts). Prototype: keywords.js has a DIFFERENT 5-lens taxonomy (Rankings/Opportunities/Pages/Clusters/Lifecycle, line 215-221) with counts \u2014 the HEAD status-segment model (striking distance, needs review, retired, local) is not represented.",
+  "note": "Two competing taxonomies; mapping needs an owner decision, not silent replacement."
+ },
+ {
+  "claim": "Keywords: 12 advanced filters (content, page_assigned, raw_evidence, local_candidates, visible_locally, possible_match, not_visible, not_checked, provider_degraded, \u2026)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: HubAdvancedFilters.tsx:1-37 + keyword-command-center.ts:22-49 (KEYWORD_COMMAND_CENTER_FILTERS). Prototype: keywords.js shows two decorative chip buttons 'Intent' and 'Stage' with no filter logic.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: user column sorting \u2014 8 HubSortKeys incl. opportunity/clicks/difficulty server sorts + sort-summary badge",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:92-131 (hubSortToKccSort + sortSummary),647-654 + keyword-command-center.ts:320. Prototype: no sortable columns or sort badge.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: server pagination (50/page, Page N of M, total count)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:210-220 (paged rowsQuery) + HubKeywordList.tsx:303-338 (pagination nav). Prototype: full mock list rendered at once; no pagination.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: GSC clicks column in the row grid",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: HubKeywordList.tsx:257-259 (columns=['position','clicks','volume','difficulty']). Prototype: keywords.js rows show rank/vol/diff/opp/gain \u2014 no clicks column.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: local-visibility posture column (Visible/Possible/Not Visible/Degraded + lifecycle fallback)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: HubKeywordList.tsx:104-135 (localSeoColumnLabel) + KeywordHub.tsx:200,714. Prototype: rows have an intent=local tag only; local posture per keyword is delegated wholesale to Local Presence.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: row provenance badges \u2014 lifecycle StatusBadge + 'From gap' + 'Auto-managed' (three-state strategyOwned)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: HubKeywordRowMeta.tsx:27-52 + keyword-command-center.ts:252-266. Prototype: rows show stage pill + intent only; no gap/auto-managed provenance.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: per-row lifecycle action menu \u2014 full 7-verb catalog incl. promote_evidence, pause_tracking, restore (server-computed nextActions)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordActionMenu.tsx:26-53 + keyword-command-center.ts:59-69 + KeywordHub.tsx:394-397. Prototype: no per-row action menu; drawer CTAs are only 'Stage into Insights Engine' / 'Open in editor' / 'SERP'.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: hard delete (separate non-lifecycle channel, isHardDeleteEligible mirror, red reserved, confirm dialog)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordActionMenu.tsx:18-20,55-60 (canHardDelete mirror) + KeywordHub.tsx:398-407 + keyword-command-center.ts route :165 (DELETE). Prototype: no delete anywhere in keywords.js.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: protected-keyword model (isProtected/protectionReason, force override with reason shown before confirm, drawer + bulk)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: keyword-command-center.ts:241-243 + KeywordHub.tsx:360-362,451-467,763-788 (force-gate ConfirmDialog). Prototype: no protection concept.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: add keyword input (manual add via rank-tracking path, Enter/Add, error band)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:266-270,498-509,528-551 + rank-tracking.ts:75 (POST keywords). Prototype: only 'Add to Strategy' from the client-feedback panel (keywords.js:181) \u2014 no free-form manual keyword add.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: drawer Origin/provenance section + 'View in Strategy' back-link",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordDetailDrawer.tsx:169-196,268-291 ('Origin' panel + View in Strategy). Prototype drawer has Rankings/Opportunity/Pages lens sections only \u2014 no origin/provenance.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: drawer source labels (strategy/page_assignment/content_gap/feedback/client_request/manual/rank_data/local_*)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordDetailDrawer.tsx:354 + keyword-command-center.ts:99-113 (KeywordCommandCenterSourceLabel union). Prototype: no source labels.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: closed-loop outcome read-back chip (baseline\u2192current verdict, W5.1)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordDetailDrawer.tsx:39-40,316-322 (OutcomeReadbackChip). Prototype: no outcome read-back in drawer (outcome readbacks exist only on pipeline.js published pieces).",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: pin/unpin tracked keyword (feeds protection + hard-delete eligibility)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordDetailDrawer.tsx:67,413-422 + rank-tracking.ts:94 (PATCH pin). Prototype: no pin concept.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: live SERP detail \u2014 national live rank vs GSC avg, AI Overview present/cited, SERP-feature badges (P6)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordDetailDrawer.tsx:478-508 + keyword-command-center.ts:131-146. Prototype: drawer has a bare 'SERP' button; no national-vs-GSC comparison, AI Overview, or feature badges.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: per-market local visibility breakdown in drawer (pack rank, match confidence, show-all >6) + on-demand check_local_visibility + candidate promotion",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordDetailDrawer.tsx:34,196-198,543-581,648-703 + KeywordHub.tsx:447-450. Prototype: keywords.js drawer delegates ('Local ranking & GBP health live in Local Presence'); local.js shows per-keyword map-pack SOV (line 382) but no per-market breakdown w/ match confidence, no on-demand check, no candidate promotion.",
+  "note": "Partial relocation to Local Presence; the drawer-level breakdown + refresh verbs are unhomed."
+ },
+ {
+  "claim": "Keywords: replaced-by chain navigation (deprecated keyword \u2192 replacement, in-place select or deep-link fallback)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordDetailDrawer.tsx:45-51,598-621 + KeywordHub.tsx:729. Prototype: no replaced-by concept.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: lost-visibility flag on rows/drawer + lost_visibility filter",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordDetailDrawer.tsx:240 + keyword-command-center.ts:255-256. Prototype: strategy.js has a 'lost visibility' narrative section (line 222) but keywords.js has no per-row flag or filter.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: review_page handoff \u2192 Page Intelligence with fixContext state",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:422-434 (navigate page-intelligence with fixContext). Prototype: drawer 'Open in editor' goes to the editor; Page Intelligence is declared REPLACED by the keywords surface (keywords.js header) \u2014 the fixContext handoff contract has no defined equivalent.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: GSC query-variant aggregation (variantCount/variants) + value transparency (valueReasons, currentMonthly/upsideMonthly $)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: keyword-command-center.ts:244-273. Prototype: rows show a single 'gain' number with no variant aggregation or value-reason transparency.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: national SERP refresh trigger (flag national-serp-tracking + Growth+ tier + budget gate + job serialization + NotificationBell)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:562-575 + rank-tracking.ts:133-161 + feature-flags.ts:38. Prototype: no refresh trigger, tier gate, or job concept.",
+  "note": ""
+ },
+ {
+  "claim": "Keywords: WebSocket live invalidation \u2014 RANK_TRACKING_UPDATED, SERP_SNAPSHOTS_REFRESHED, STRATEGY_UPDATED \u2192 React Query",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: KeywordHub.tsx:321-341 (useWorkspaceEvents handlers). Prototype: static; no WS model.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: Growth/Premium tier gate on refresh \u2014 surface needs a locked state",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: rank-tracking.ts:175-177 (tierGate forbiddenError) + llm-mentions.ts:81-91 (tier check). Prototype: aivis.js has no tier/locked/upgrade state \u2014 all clients render the full surface with mock data.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: explicit 'not measured' share-of-voice state (brand unidentifiable \u2260 red 0%)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AiVisibilityPanel.tsx:145-179 (distinct not-measured rendering). Prototype: aivis.js SOV bars always render with the client present (sov arrays include 'you' rows) \u2014 the not-measured state is never demonstrated.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: raw mention-volume KPI (mentions in AI answers \u2014 what HEAD actually measures)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AiVisibilityPanel.tsx:182-191 (mention-volume StatCard, blue data law). Prototype: aivis.js KPIs are an invented 'AI visibility score' (0-100), brand search volume, branded %, AI sessions \u2014 no raw mention-volume KPI matching what HEAD actually measures.",
+  "note": "Honesty risk: prototype invents a composite score HEAD does not compute."
+ },
+ {
+  "claim": "AI Visibility: mention-volume trend over dated snapshots (\u22652 snapshots + delta \u2014 before/after AEO proof)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AiVisibilityPanel.tsx:26-63 (MentionsTrendSparkline),194-199 + llm-mentions-store.ts:220 (getLlmMentionsTrend). Prototype: only static delta chips ('trending up') and decorative sparklines \u2014 no dated-snapshot trend.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: aggregate cited source-domains list (top-5 off-site AEO targeting list)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AiVisibilityPanel.tsx:215-227 (sourceDomains block). Prototype: aivis.js shows sources PER PROMPT in the Answer Monitor but never an aggregated top-domains list.",
+  "note": "Per-prompt sources are a partial adjacent home."
+ },
+ {
+  "claim": "AI Visibility: refresh error surfacing (403 tier / 409 already-running band) + workspace/global job-conflict messages",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AiVisibilityPanel.tsx:110-118 + rank-tracking.ts:171-172 (workspace/global conflict strings). Prototype: no refresh affordance at all ('Last scan 2 days ago \u00b7 weekly' static).",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: ?tab=llms-txt deep link into Workspace Settings (two-halves contract wired)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: WorkspaceSettings.tsx:71-107 (llms-txt in VALID_SECTION_TABS + searchParams sync). Prototype: llms.txt generator relocates INTO the Brand & AI view (aivis.js:428 lx-host + llmstxt.js) with no URL model \u2014 inbound ?tab=llms-txt senders need a re-mapped target.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: AEO site review background job (AEO_SITE_REVIEW, maxPages 15, traffic-prioritized, requires completed audit)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AeoReview.tsx:91-103,179-199 + aeo-review.ts:104 (POST /site). Prototype: aivis.js 'AI Search Ready' section shows static site-level checks with a readiness score \u2014 no scan job, no prerequisites, no per-page review mechanics.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: single-page on-demand AEO review (merges into stored site review)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AeoReview.tsx:105-132 + aeo-review.ts:40 (POST /page). Prototype: no per-page review.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: per-page AEO change recommendations (12 typed change types, effort/priority chips, quick-win counts, estimated minutes, per-page score)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AeoReview.tsx:28-56 (CHANGE_TYPE_CONFIG),232-268. Prototype: only site-level pass/fail checks with an 'Improve' toast (aivis.js:293-308,436).",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: effort + priority filters on the AEO change list",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AeoReview.tsx:73-74,232-233,304,322. Prototype: no filters on the readiness checks.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: send AEO page recommendations to client (aeo_change client action, diff payload, requiresSourceResearch withholding)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: AeoReview.tsx:134-176 (sendPageToClient). Prototype: 'Improve' queues an internal fix toast; nothing goes to the client.",
+  "note": ""
+ },
+ {
+  "claim": "AI Visibility: ?tab=aeo-review deep link within SEO Audit ('AI Search Ready' sub-tab)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: SeoAudit.tsx:74,317 (aeo-review sub-tab 'AI Search Ready'). Prototype: AI Search Ready relocates to the Brand & AI view (aivis.js:410) with no URL model \u2014 inbound deep-link senders break without a redirect map.",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: OG title/description mirrored into every static save payload",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: useSeoEditorPageWorkflow.ts:102-110 (openGraph:{title,description} in PUT /pages/:id/seo). Prototype: editor.js renders a social preview but has no save-payload contract \u2014 an invisible behavior that a rebuild can silently drop.",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: per-page inline error states (network/permission/validation) with auto-dismiss",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: useSeoEditorPageWorkflow.ts:111-156 (error mapping + 5s auto-dismiss) + PageEditRow.tsx:185-194. Prototype: editor.js has no error states (grep error|fail: 3 incidental hits, none UI states).",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: AI 3-variation picker + paired title+desc set picker (choose 1 of 3)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageEditRow.tsx:235-271 (paired 'both' picker),301-319 (title),350-368 (desc). Prototype: editor.js aiField() writes a single suggestion directly \u2014 no variation options.",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: Analyze Page + auto-persist analysis to keywordStrategy.pageMap, 'Analysis on file' state, Re-analyze",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: useSeoEditorPageWorkflow.ts:214-249 (analyzePage + persist) + PageEditRow.tsx:196-219. Prototype: no analyze concept (grep analy: none).",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: recommendations-engine metadata flags per page (traffic-at-risk, priority now/soon/later, banners)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: SeoEditor.tsx:45,152-160 (recsForPage \u2192 per-page counts) + PageEditRow.tsx:156-184 (banners). Prototype: editor.js per-page recs are keyword-match tips ('Work kw into the title', line 974) \u2014 not engine recommendations with priority/traffic-at-risk.",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: recommendation-weighted page sort (flagged pages first)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: SeoEditor.tsx:162-165 (filterAndSortSeoPages with metadataRecommendationCountByPageId). Prototype: no rec-weighted ordering.",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: fixContext inbound deep-link (cross-surface 'Fix in SEO Editor' auto-expand + scroll, re-fires per new target)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: useSeoEditorSessionState.ts:69-86 + src/types/fix-context.ts:1-11. Prototype: no inbound fix-context mechanism.",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: session persistence of unsaved edits/variations/expanded rows across tab switches (localStorage + RQ cache)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: useSeoEditorSessionState.ts:37-66 (readCachedSeoEdits restore) + seoEditorPersistence.ts. Prototype: in-memory only; persistence contract invisible in mockups.",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: Pattern Apply (append/prepend to selected titles/descriptions with diff preview + truncation)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: useSeoEditorBulkWorkflow.ts:249-282 (previewPattern) + webflow-seo-apply.ts:40 (seo-pattern-apply). Prototype: bulk bar has AI-fix/Approve/Send/Publish only \u2014 no pattern apply (grep pattern: none).",
+  "note": ""
+ },
+ {
+  "claim": "SEO Editor: bulk AI rewrite of ALL selected pages (not just missing) as background job with progress + cancel",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: useSeoEditorBulkWorkflow.ts:284-308 (bulkAiRewrite field both/title/desc),356-372 (cancelRewrite) + webflow-seo-jobs.ts:62. Prototype: editor.js bulk verb is 'AI-fix missing' (missing-only, line 819); no all-selected rewrite, no job progress, no cancel.",
+  "note": ""
+ },
+ {
+  "claim": "Brand & AI: voice calibration workspace \u2014 samples CRUD (7 context tags), Voice DNA editor, Guardrails editor, 3-variation calibration loop",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: VoiceTab.tsx:64-108 + SamplesSection.tsx:33-65 + DNASection.tsx:26-190 + GuardrailsSection.tsx:30-286 + useVoiceCalibrationWorkflow.ts:46-133 + brand-engine.ts:63-79 (calibration-feedback API). Prototype: brand.js:179-180 reduces VoiceTab to one row snippet ('Calibrated against 6 published pages. Reads on-brand at 92% similarity' \u2014 an invented metric); no samples/DNA/guardrails/calibration UI in brand.js, brand-flows.js, or brand-modal.js.",
+  "note": "All four editors + the calibration loop genuinely unhomed; belongs on the owner sign-off list (Q1)."
+ },
+ {
+  "claim": "Brand & AI: Page Strategy blueprints \u2014 list/create/AI-generate/delete, blueprint detail (scope toggle, section plan, Save Version), version history, unexposed reorder endpoint",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PageStrategyTab.tsx:18-253 + BlueprintDetail.tsx:100-291,361-537 + BlueprintVersionHistory.tsx:12-106 + brand-engine.ts:106-170 + BrandHub.tsx:979-1002. Prototype: brand.js:413-414 relocates Page Strategy 'lives with Content Pipeline' via a one-line pointer; pipeline.js contains ZERO blueprint content (grep -c blueprint = 0).",
+  "note": "Relocation pointer with no designed destination \u2014 owner decision (Q2)."
+ },
+ {
+  "claim": "Brand & AI: Copy Pipeline \u2014 per-entry generation jobs, CopyReviewPanel, BatchGenerationPanel, CopyExportPanel, CopyIntelligenceManager",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CopyReviewPanel.tsx:74-543 + BatchGenerationPanel.tsx:127-359 + CopyExportPanel.tsx:36-120 + CopyIntelligenceManager.tsx:42-405 + brand-engine.ts:174-252 + background-jobs.ts:15 (COPY_BATCH_GENERATION). Prototype: no copy-pipeline surface in brand.js/brand-flows.js/brand-modal.js/pipeline.js.",
+  "note": "Same destination decision as blueprints (Q2); the client receiving half (review inbox) must stay wired."
+ },
+ {
+  "claim": "Brand & AI: Discovery process\u2192extraction review loop \u2014 per-source Process, extraction cards (confidence/category/routedTo/quote), accept/dismiss, status filter tabs",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: DiscoveryTab.tsx:78-192 (ExtractionCard),204-318 (ExtractionsPanel),716-731 (handleProcess) + brand-engine.ts:52-58 (updateExtraction w/ content+routedTo). Prototype: brand-flows.js renderDiscovery (296-330) replaces this with founder-interview Q&A + 'Regenerate Knowledge Base' \u2014 no per-extraction human review loop.",
+  "note": "Core human-review loop unhomed (Q3)."
+ },
+ {
+  "claim": "Brand & AI: multi-brandscript management \u2014 list/create (framework templates)/import/delete + per-section optimistic concurrency (expectedUpdatedAt \u2192 409)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: BrandscriptTab.tsx:27-190 (CreateForm w/ templates),472-599 (ListView + delete),229-243 (save) + brand-engine.ts:24-37 (list/templates). Prototype: brand-flows.js models exactly one implicit StoryBrand script per client (BRANDSCRIPT map, lines 189-204) with a fixed 7-part STORYBRAND structure \u2014 no list/create/import/delete, no concurrency.",
+  "note": "HEAD canonical template is 8 sections vs mockup's 7 \u2014 collapse decision needs sign-off (Q6)."
+ },
+ {
+  "claim": "Brand & AI: rich-text (TipTap) editing for brand voice + knowledge base incl. markdown\u2194HTML round-trip and legacy Preview-block stripping",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: BrandHub.tsx:90-231 (LEGACY_PREVIEW_SPLIT_RE + conversion helpers),566-610,643-712 (RichTextEditor panels). Prototype: brand-modal.js:128-132 edits everything in a plain <textarea class=gm-ta>.",
+  "note": "Modal-izing voice/KB silently downgrades structured editing."
+ },
+ {
+  "claim": "Brand & AI: background-job recovery across reloads/workspace switches (sessionStorage job IDs, re-attach, done/error toasts + NextStepsCard)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: BrandHub.tsx:74-88 (contextJobStorageKey sessionStorage),341-443 (recovery effect + completion handling). Prototype: pure behavior contract, invisible in static mockups; brand-modal generation resolves instantly.",
+  "note": ""
+ },
+ {
+  "claim": "Brand & AI: ?tab= deep-link two-halves contract (9 values + 2 legacy aliases) and &focus= anchors with 4+ external senders",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: BrandHub.tsx:237-247,331-339 (receiver + sync),69-72 (BRAND_TAB_ALIASES); senders verified at SchemaGeneratorSetup.tsx:46, GbpMappingStatusBlock.tsx:46, LocalSeoMarketSetupDrawer.tsx:150, LocalPresencePage.tsx:172 (all ?tab=business-footprint&focus=locations-section). Prototype: no URL model \u2014 dropping the receiver breaks 4 inbound links + bookmarks (Q13).",
+  "note": "Sender paths differ slightly from claim (schema/, google-business-profile/, local-seo/ subdirs) but all four exist."
+ },
+ {
+  "claim": "Brand & AI: Export All approved identity deliverables to markdown (count badge, disabled at 0; unexposed server ?tier= filter)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: IdentityTab.tsx:368-385 (handleExportAll),459-475 + brand-engine.ts:98-101 (?tier= param). Prototype: brand-modal.js:144,191 shows per-item Export ('Exported X to Markdown' toast) \u2014 a new proposed single-item export with no HEAD endpoint; Export All absent.",
+  "note": "Q8: Export-All needs a home; prototype's per-item export is aspirational (no single-item endpoint at HEAD)."
+ },
+ {
+  "claim": "Brand & AI: E-E-A-T typed asset CRUD \u2014 8 asset types with structured metadata + AI autofill",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: EeatAssetsTab.tsx:49-58 (ASSET_TYPE_OPTIONS),85-98 (metadataFromDraft),122 (useAutofillEeatAssets),202-289 (runAutofill). Prototype: brand-flows.js renderEeat (363-391) reframes as pillars with boolean signals + Add buttons \u2014 no typed-asset CRUD or metadata model, and no defined mapping from 8 types to pillar signals.",
+  "note": "Q5: keep asset CRUD, pillar view as computed lens \u2014 needs sign-off."
+ },
+ {
+  "claim": "Brand & AI: delete discovery source (cascades extractions, confirm) + per-batch source-type selection (transcript/brand_doc/competitor/existing_copy)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: DiscoveryTab.tsx:31-36 (SOURCE_TYPE_OPTIONS),479-489 (selector),733-744 (handleDelete),813-824 (ConfirmDialog). Prototype: brand-flows.js doc list (renderDiscovery) shows docs with tags but no delete and no source-type selector on upload.",
+  "note": ""
+ },
+ {
+  "claim": "Brand & AI: brand-docs folder API (GET/POST/DELETE, .txt/.md) feeding AI prompts \u2014 headless at HEAD",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: server/routes/brand-docs.ts:26,54,92 (all three routes) + seo-context-source.ts:25,51 (consumed in AI context); only textual mentions in BrandHub.tsx:637-639,707-710 \u2014 no upload UI at HEAD. Prototype: brand-flows.js Discovery has a doc dropzone (bf-drop) which COULD home this, but no decision recorded.",
+  "note": "Owner decision (Q9): wire into Discovery dropzone or record as intentionally API-only."
+ },
+ {
+  "claim": "Brand & AI: latent states \u2014 Promote-to-Guardrail shipped disabled ('Coming soon \u2014 Tier 2'), SteeringChat dead code, brand_identity_versions unexposed",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: CopyIntelligenceManager.tsx:288-298 (muted disabled Promote button) + SteeringChat.tsx:17 exported with ZERO importers (grep -rn SteeringChat src/ excluding self: no matches). Prototype: none of these exist, so a rebuild will silently resolve each latent state.",
+  "note": "Owner decisions Q10/Q11/Q12."
+ },
+ {
+  "claim": "Brand & AI: WS both-halves wiring for brandscript/discovery/voice/brand-identity/blueprint/copy-section events \u2192 RQ invalidation registry",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ws-events.ts:120-133 (BRANDSCRIPT_UPDATED\u2026COPY_SECTION_UPDATED) + useWsInvalidation.ts:87-90 (registry handlers). Prototype: static mockups \u2014 every rebuilt panel must re-register query keys.",
+  "note": "Per-surface rebuild checklist item."
+ },
+ {
+  "claim": "Recommendations client: allow-list public projection as the ONLY client read path (EMV stripped, banded impactBand, restricted clientStatus, flag-gated byte-identical OFF)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: recommendation-public-projection.ts:16-86 (CLIENT_FACING_STATUSES + projection) + client-insight-recommendation-view-model.ts:20-46 (single build path). Prototype: recs.js client card renders a raw '\u2248 $3,900/mo pipeline' figure (line 115) \u2014 copying it literally breaks the leak-proof contract.",
+  "note": "Rebuild data layer must consume GET /api/public/recommendations verbatim."
+ },
+ {
+  "claim": "Recommendations client: tier-locked act-on \u2014 server 403 (free+monetizable \u2192 requiredTier growth) mirrored by actOn.mode='locked' \u2192 TierGate upsell",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: recommendations.ts:353-366 (server-authoritative 403 before transaction) + IssueContentCard.tsx:104-110 (isLocked/lockedTier),183-194 (TierGate). Prototype: recs.js/portal.js have no locked/tier state \u2014 'Approve & go' is always active.",
+  "note": "Literal copy gives free-tier clients a button that hard-403s."
+ },
+ {
+  "claim": "Recommendations client: confirm dialog before greenlight (headline + no-charge consequence) + 'Request this'/'Discuss this' verb split",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: IssueContentCard.tsx:105-106 (greenlightLabel split),222-235 (single ConfirmDialog before act-on POST, blocker #1/D3). Prototype: recs.js cliCard 'Approve & go' fires _recApprove in one tap (line 196); portal.js 'one tap to greenlight' (line 570) \u2014 regresses litigated audit blockers D1/D3.",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: relevance feedback (Relevant / Not-relevant per target keyword; declined disables greenlight; keyword-feedback spine)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: the-issue/TheIssueClientPage.tsx:207-208 (submitFeedback approved/declined) + IssueContentCard.tsx:141-168. Prototype: no relevance-feedback affordance on any rec card.",
+  "note": "Losing it severs a client\u2192strategy input loop."
+ },
+ {
+  "claim": "Recommendations client: 'Let's talk' soft-yes \u2014 opens AI advisor pre-seeded with the move (no status write)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: the-issue/TheIssueClientPage.tsx:211-216 (handleLetsTalk \u2192 onAskAi pre-seed, no status write) + IssueContentCard.tsx:197-204. Prototype: recs.js 'Discuss' button has NO handler (dead button); portal semantics unspecified \u2014 HEAD's no-write advisor behavior has no confirmed home.",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: legacy self-serve status updates (PATCH pending\u2192in_progress\u2192completed; premium vs growth verb sets; completion mirrors page state + outcome action)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: recommendations.ts:173-286 (PATCH /api/public/recommendations) + InsightsEngine.tsx:200-211,613-676 (isPremium verb sets). Prototype: no self-serve action-plan interaction anywhere (recs.js client card = approve/discuss only).",
+  "note": "Owner decision (Q3) on where the action-plan model lives."
+ },
+ {
+  "claim": "Recommendations client: legacy client dismiss (DELETE with read-before-dismiss activity log)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: recommendations.ts:289-310 (DELETE public) + InsightsEngine.tsx:214-225,688-698. Prototype: dismiss exists only operator-side (recs.js _recDismiss on the admin desk).",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: client-triggered regeneration (POST /generate background job, active-job dedupe, job-aware empty state)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: recommendations.ts:118-136 (POST /generate) + InsightsEngine.tsx:144-197 (useBackgroundTasks + dedupe),291-303 (button). Prototype: no refresh/regenerate affordance in recs.js or portal.js.",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: per-item purchase CTAs ('Let Us Fix This \u2014 $X' / 'Order Content Brief \u2014 $X', In-Cart state, premium upsell footer)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InsightsEngine.tsx:498 (inCart),637-658 (productType/productPrice CTAs),713-728 (upsell footer). Prototype: no pricing UI on any client rec card.",
+  "note": "Revenue path; conflicts with The Issue no-pricing rule \u2014 owner decision (Q3)."
+ },
+ {
+  "claim": "Recommendations client: 'Also on your plan' archetype grouping (client-friendly labels + counts + link-outs)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: IssueAlsoOnPlanSection.tsx:34-88 (CLIENT_GROUP_META label map). Prototype: recs.js client panel lists cards flat; no archetype grouping.",
+  "note": "Persona-audit outcome; dropping it reverts a litigated fix."
+ },
+ {
+  "claim": "Recommendations client: 'Your next bets' $-forecast band (banded monthly $, outcome-unit equivalent, no per-bet greenlight; flag the-issue-client-next-bets)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: IssueNextBetsSection.tsx:1-115 (full band) + feature-flags.ts group 'The Issue (Client)' includes the-issue-client-next-bets. Prototype: no forecast band.",
+  "note": "Flag-gated OFF but must keep a named home."
+ },
+ {
+  "claim": "Recommendations client: loop footer response summary ('greenlit N \u00b7 M in discussion' + briefs-in-flight) + GET /responses",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: IssueLoopFooter.tsx:28-87 + recommendations.ts:489-499 (GET /responses). Prototype: no loop-count render.",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: Overview '#1 Priority' top-rec card with opportunity Score badge + 'Why this is #1' contribution bars",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: OverviewTab.tsx:120-132 (topRecId reconciliation),395-440 (contribution bars). Prototype: portal.js has no #1-priority card (opportunities list is flat, line 570).",
+  "note": "Cross-surface with client-portal overview (Q1/Q7 boundary)."
+ },
+ {
+  "claim": "Recommendations client: Inbox recommendation-mirror respond-only card (write verbs disabled, nudge to Strategy hub; server 409s generic respond)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: UnifiedInbox.tsx:547-600 (RESPOND-only mirror; send-to-client.ts 409s generic /respond). Prototype: portal.js two-way inbox exists but no rec-mirror respond-only design.",
+  "note": "Cross-flag to the client Inbox auditor."
+ },
+ {
+  "claim": "Recommendations client: competitor-rec client renderer gate (hidden until strategy-competitor-send ON)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InsightsEngine.tsx:136-138,236-238 (renderer gate). Prototype: no renderer-registry or gating concept.",
+  "note": "Guard-by-construction pattern must carry to any rebuilt renderer registry."
+ },
+ {
+  "claim": "Recommendations client: legacy priority IA (fix_now/fix_soon/fix_later/ongoing sections + impact/effort badges, affected-pages chips, at-risk metrics, estimated gain, timestamp)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InsightsEngine.tsx:66-129 (PRIORITY_CONFIG),407-739 (full mode render). Prototype: no four-priority taxonomy anywhere.",
+  "note": "Q3: action-plan module decision."
+ },
+ {
+  "claim": "Recommendations client: four states + job-aware empty (loading/error+retry/empty-generating/TierGate locked) + admin preview-as-client read-only mode",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InsightsEngine.tsx:248-306 (states) + the-issue/TheIssueClientPage.tsx:94-95,205-208 (previewMode suppresses writes),229-239. Prototype: portal/recs demo only the happy path; preview mode has no home.",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: WS-driven freshness (RECOMMENDATIONS_UPDATED \u2192 shared.recommendations + client.theIssue + client.recResponses + client.curatedRecommendations; DELIVERABLE_* for mirror)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: wsInvalidation.ts:416-429,617-618,648-660 (exact key fanout). Prototype: static; rebuild must re-register both broadcast halves.",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: operator wording overrides + client running-order applied at the display boundary (flag ON)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: client-insight-recommendation-view-model.ts:39-43 (applyClientRecommendationCopyAndOrder when exposeClientStatus),102-122. Prototype: n/a \u2014 free if the allow-list projection is the read path.",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: resilient curated-feed read (getSafe \u2192 empty set, distinct query keys, 2-state content floor)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: src/api/theIssue.ts:41-88 (theIssueApi getSafe semantics) + IssueContentPlanSection.tsx:85-140 (floor render). Prototype: no degraded-read design; naive fetch would error-card thin clients.",
+  "note": ""
+ },
+ {
+  "claim": "Recommendations client: tier/flag matrix (premium vs growth/free InsightsEngine variants; 6 gating flags incl. strategy-the-issue, the-issue-client-*, client-ia-v2, strategy-competitor-send)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: InsightsEngine.tsx:159,432-444,613-686 (isPremium forks) + feature-flags.ts:77-115 (client-ia-v2 etc.),308-480 (The Issue (Client) group keys). Prototype: no flag model \u2014 rebuild's flag-retirement plan must map each flag explicitly.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: client route model + auth stack (shared-password gate, per-user login, forgot/reset, Turnstile, logout, auth-mode detection)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:263-283 (useClientAuth + Turnstile refs),503-541 (auth gate render); ClientAuthGate.tsx (410 lines) + useClientAuth.ts exist. Prototype: portal.js is an operator-canvas preview with zero auth/routing (grep login|password|auth: none).",
+  "note": "Reuse-unchanged quick win, but needs an explicit ticket."
+ },
+ {
+  "claim": "Client portal: tab IA \u2014 14 ClientTabs + built client-ia-v2 4+1 shell (Overview\u00b7Inbox\u00b7Results\u00b7Deep Dive\u00b7Settings)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: routes.ts:25 (14-value ClientTab union incl. deep-dive/results/settings) + clientDashboardNav.ts:43-67 (clientIaV2 shell). Prototype/kit: Client Dashboard Plan proposes a DIFFERENT 4-tab collapse 'Overview \u00b7 Performance \u00b7 Strategy \u00b7 Inbox' (Plan: 'consolidate to four... Roll Plans/ROI into contextual moments').",
+  "note": "Two competing collapses (HEAD's ratified IA v2 vs the kit's 4-tab) \u2014 owner decision, stop-and-ask #1."
+ },
+ {
+  "claim": "Client portal: legacy deep-link compatibility (search/analytics\u2192performance, inbox aliases incl. retired schema-review, ?severity=, ?sub=, ?tab=roi)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: client-dashboard-tab.ts:59-65 (resolveClientTab) + routes.ts:29-34 (CLIENT_INBOX_ROUTE_ALIASES incl. schema-review\u2192reviews) + inbox-filter.ts:9-16 (LEGACY_FILTER_MAP); ?severity= read at ClientDashboard.tsx:633. Prototype: no URL model \u2014 rebuild router must honor these or 404 emails/bookmarks.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: dark/light theme toggle (persisted localStorage)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:93-100 (dashboard-theme localStorage) + ClientHeader.tsx:184-185 (Sun/Moon toggle). Prototype: portal.js is 'Light theme by design' (header comment lines 3,12) \u2014 toggle removed by design, not by decision.",
+  "note": "Owner decision, stop-and-ask #2."
+ },
+ {
+  "claim": "Client portal: date-range selector \u2014 preset days + custom range (paid-gated), drives all GSC+GA4 queries",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:111-117 (days + customDateRange),197-208 + ClientHeader.tsx:203-216 (picker UI). Prototype: portal.js shows a fixed 'organic visits \u00b7 last 12 months' story (line 538) with no range control.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: nav visibility + admin curation toggles (analyticsClientView, seoClientView, siteIntelligenceClientView, eventConfig pinned nouns, paid-only tabs, external-billing hiding)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: clientDashboardNav.ts:30-67 (isPaid/isExternalBilling/toggle-driven nav) + OverviewTab.tsx:540 (siteIntelligenceClientView gate) + ClientDashboard.tsx:459-460 (eventConfig),566-577 (external-billing hiding). Prototype: no per-toggle client-render demonstration.",
+  "note": "Verify per-toggle during build."
+ },
+ {
+  "claim": "Client portal: trial mechanics \u2014 countdown banner (dismissible, persisted), trial-ended banner, isTrial plan states",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:579-589 (dismiss key + countdown),738-796 (banners) + PlansTab.tsx:34,152. Prototype: no trial concept anywhere in portal.js.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: section error banners + IA v2 prioritized notice region + loading skeletons + error-retry + empty-state setup guidance",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:158-180 (sectionErrors),476-500 (loading),730-810 (notice region role=status) + OverviewTab.tsx:588-620 (setup-guidance empty state). Prototype: portal.js demos only the provable-data happy path.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: real-time WS invalidation (~45 workspace events \u2192 React Query caches)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:342-438 (useWorkspaceEvents handler map spanning ~45 WS_EVENTS). Prototype: static.",
+  "note": "Mandatory wiring ticket per rebuilt surface (data-flow rule 2)."
+ },
+ {
+  "claim": "Client portal: EmailCaptureGate + ClientOnboardingQuestionnaire + OnboardingWizard welcome tour (re-launchable)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:317-332 (email gate),546-555,936-984 (questionnaire) + ClientHeader.tsx:191 ('Show welcome tour'). Prototype: no equivalents.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: SeoEducationTip per-tab first-visit tips + SeoGlossary + data freshness stamps",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:764,808 (SeoEducationTip mounts) + OverviewTab.tsx:266-278 (freshness stamps). Prototype: no education/glossary/freshness affordances.",
+  "note": "Currently unassigned in the new IA."
+ },
+ {
+  "claim": "Client portal: #1 Priority card w/ opportunity-component bars + composite HealthScoreCard breakdown + PredictionShowcaseCard + IntelligenceSummaryCard + DiagnosticRootCauseCards",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: OverviewTab.tsx:120-133,395-453 (#1 Priority + bars),281-285 (HealthScoreCard breakdown),353 (DiagnosticRootCauseCards),539-560 (intelligence summary + PredictionShowcaseCard). Prototype: portal.js hero is verdict/value/proof with none of these cards.",
+  "note": "The Issue partially supersedes; needs per-card decisions."
+ },
+ {
+  "claim": "Client portal: The Issue flag-gated extras \u2014 next-bets $-forecast band, requested-keyword rank trend, competitor snapshot w/ segmentProfile gate, segment slot inserts",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: the-issue/TheIssueClientPage.tsx:101-115 (segmentProfile slots + theIssueNextBets) + nextBetsForecast.ts + strategy/StrategyRequestedKeywordTrendSection.tsx. Prototype: portal.js demos none of these flag-gated sections.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: one-pager export bar (GET /api/public/export/:id/one-pager, print-to-PDF, segment-aware) \u2014 the portal's only export",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: IssueExportBar.tsx:3-47 (server-rendered one-pager, client-authed, print). Prototype: no export affordance (grep export|one-pager in portal.js: none).",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: GA4 deep analytics \u2014 devices/pages/sources/organic/landing/new-vs-returning/conversions/events tables + DataSnapshots + sub-tab deep links",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PerformanceTab.tsx:45-153 (sub-tab navigation) + AnalyticsTab.tsx (640 lines of tables) + DataSnapshots.tsx (381 lines). Prototype: portal.js shows one 12-month trend chart; no breakdown tables.",
+  "note": "Must land as progressive disclosure, not deletion."
+ },
+ {
+  "claim": "Client portal: full audit detail \u2014 score summary, audit diff, page-speed, top fixes, site-wide issues, all-pages ?severity= filter, audit history + request-health-check empty state",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: HealthTab.tsx:63-133 (auditDetail branch) + ClientDashboard.tsx:633 (initialSeverity from ?severity=). Prototype: plan reduces to 'single health score with top issues, collapsed detail' \u2014 reduction needs explicit confirmation.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: fix economics + purchase path \u2014 impact bands, Fix-this-$X vs covered-by-hours framing, request-fix, add-to-cart, SeoCartDrawer w/ premium discount, Stripe checkout",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: HealthTab.tsx:32-39 (tier framing + onRequestFix),93 (HealthCartSummary) + SeoCart.tsx:36-75 (drawer + premium discount) + client-dashboard/buildImpactBandsByCheck.ts. Prototype: whole monetization path unhomed (plan \u00a704 'contextual upgrade-math moments' \u2014 flows undesigned).",
+  "note": "Stop-and-ask #3."
+ },
+ {
+  "claim": "Client portal: InsightsEngine client action plan embedded in Health tab",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ClientDashboard.tsx:633-639 (HealthTab children = ErrorBoundary'd InsightsEngine 'Action Plan'). Prototype: undemonstrated; overlaps The Issue content-plan section \u2014 verify overlap before deleting.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: Strategy depth \u2014 interior tabs + orient header, snapshot/refresh/next-steps/business-priorities/page-improvements/rank-stories, keyword table + evidence drawer (growth TierGate), page\u2194keyword map, decline modal + declined section + feedback summary",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: StrategyTab.tsx:66,127-143 (interior tabs),191-197 (decline reason state + drawer),356 (empty),709-930 (full section stack) + PageKeywordMapContent.tsx (437 lines). Prototype: plan rebuilds Strategy around different sections; per-section decisions needed.",
+  "note": "Admin ledger itself flags page\u2194keyword map as unverified."
+ },
+ {
+  "claim": "Client portal: Inbox granular flows \u2014 per-item flag/edit on approve, apply-to-site w/ partial-failure retry, GBP review-response card, projected review modal, schema review approve/request-changes, work-order threads w/ attachments",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: UnifiedInbox.tsx:129-204,459-560 (respond flows),798-806 (projected review mount) + SchemaReviewTab.tsx:82-302 (approve/request_changes) + RequestsTab.tsx:45-58 (notes + files) + useUnifiedInbox.ts:77 (useApplyDeliverable). Prototype: portal.js demos only plan-level approve + free-text request \u2014 the highest-stakes client write paths (publish-to-live-site) have no designed homes.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: content plan matrix review \u2014 plans list, MatrixProgressView, per-cell preview + flag w/ comment (optimistic)",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: ContentPlanTab.tsx:18-80 (flag w/ comment + optimistic) + MatrixProgressView.tsx (311 lines). Prototype: no home; HEAD IA v2 already demotes it to a collapsed Deep Dive section.",
+  "note": ""
+ },
+ {
+  "claim": "Client portal: billing surfaces \u2014 Plans tier cards + upgrade checkout, billing portal, PricingConfirmationModal + external-billing bypass/hiding, beta mode, chat usage limits + upgrade prompt",
+  "verdict": "CONFIRMED",
+  "evidence": "HEAD: PlansTab.tsx:30-68 (checkout + billing portal),152-232 + ClientDashboard.tsx:566-577 (external-billing),917-934 (upgrade modal gating) + ClientChatWidget.tsx:93,118,322-323 (chat limits + upgrade) + client/BetaContext.tsx. Prototype: plan removes Plans/ROI as standing tabs with no replacement flows designed \u2014 revenue paths that must never 404.",
+  "note": "Owner decision, stop-and-ask #3. Note: BetaContext lives at src/components/client/BetaContext.tsx (not src/contexts/)."
+ }
+]

@@ -3,10 +3,13 @@ import { setBroadcast } from '../../server/broadcast.js';
 import db from '../../server/db/index.js';
 import {
   applyKeywordCommandCenterAction,
+  applyKeywordCommandCenterBulkAction,
   buildKeywordCommandCenterDetail,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
   filterNeedsLocalCandidates,
+  mergeTrackedKeywordProvenance,
+  protectedReason,
 } from '../../server/keyword-command-center.js';
 import { replaceAllContentGaps } from '../../server/content-gaps.js';
 import { replaceAllKeywordGaps } from '../../server/keyword-gaps.js';
@@ -16,11 +19,12 @@ import { addTrackedKeyword, getTrackedKeywords, storeRankSnapshot } from '../../
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createJob, clearCompletedJobs } from '../../server/jobs.js';
 import { buildLocalSeoKeywordCandidates, updateLocalSeoConfiguration, runLocalSeoRefreshJob } from '../../server/local-seo.js';
-import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import { LOCAL_CANDIDATE_ROW_LIMIT } from '../../server/domains/keyword-command-center/candidate-boundary.js';
 import { FakeSeoProvider } from '../../server/providers/fake-seo-provider.js';
 import { _resetRegistryForTest, registerProvider } from '../../server/seo-data-provider.js';
-import { keywordComparisonKey, normalizeKeywordForComparison } from '../../shared/keyword-normalization.js';
+import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
+import { storeSerpSnapshots } from '../../server/serp-snapshots-store.js';
+import { keywordComparisonKey, keywordIdentityKeyV2, normalizeKeywordForComparison } from '../../shared/keyword-normalization.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
@@ -140,6 +144,7 @@ beforeEach(() => {
 
 afterEach(() => {
   _resetRegistryForTest();
+  if (workspaceId) setWorkspaceFlagOverride('national-serp-tracking', workspaceId, null);
   if (workspaceId) clearCompletedJobs({ workspaceId });
   if (workspaceId) db.prepare('DELETE FROM discovered_queries WHERE workspace_id = ?').run(workspaceId);
   if (workspaceId) deleteWorkspace(workspaceId);
@@ -156,7 +161,7 @@ function seedFeedback(keyword: string, status: 'approved' | 'declined' | 'reques
       source = excluded.source,
       declined_by = excluded.declined_by,
       updated_at = datetime('now')
-  `).run(workspaceId, keyword, status, reason ?? null, 'test', status === 'declined' ? 'admin' : null);
+  `).run(workspaceId, keywordComparisonKey(keyword), status, reason ?? null, 'test', status === 'declined' ? 'admin' : null);
 }
 
 function feedbackRows() {
@@ -229,6 +234,56 @@ describe('normalizeKeywordForComparison', () => {
 });
 
 describe('buildKeywordCommandCenter', () => {
+  it('returns the exact punctuation-sensitive row from keyword detail', async () => {
+    for (const [keyword, volume] of [['C', 100], ['C#', 200], ['C++', 300]] as const) {
+      addTrackedKeyword(workspaceId, keyword, {
+        source: TRACKED_KEYWORD_SOURCE.MANUAL,
+        volume,
+      });
+    }
+
+    for (const [keyword, volume] of [['C', 100], ['C#', 200], ['C++', 300]] as const) {
+      const detail = await buildKeywordCommandCenterDetail(workspaceId, keyword, { includeLocalSeo: false });
+      expect(detail?.row).toMatchObject({ keyword, metrics: { volume } });
+    }
+  });
+
+  it('keeps C and C# rows distinct and never lets a legacy SERP alias overwrite v2 evidence', async () => {
+    setWorkspaceFlagOverride('national-serp-tracking', workspaceId, true);
+    addTrackedKeyword(workspaceId, 'C language', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    addTrackedKeyword(workspaceId, 'C# language', { source: TRACKED_KEYWORD_SOURCE.MANUAL });
+    db.prepare(`
+      INSERT INTO serp_snapshots (
+        workspace_id, date, query, position, matched_url, features,
+        ai_overview_cited, ai_overview_present
+      ) VALUES (?, '2026-06-24', 'c language', 99, 'https://legacy.example/c', '["legacy"]', 0, 1)
+    `).run(workspaceId);
+    storeSerpSnapshots(workspaceId, '2026-06-24', [
+      {
+        query: 'C language', position: 1, matchedUrl: 'https://fresh.example/c',
+        features: ['organic'], observedAt: '2026-06-24T12:00:00.000Z',
+      },
+      {
+        query: 'C# language', position: 2, matchedUrl: 'https://fresh.example/c-sharp',
+        features: ['featured_snippet'], observedAt: '2026-06-24T12:01:00.000Z',
+      },
+    ]);
+
+    const payload = await readRows();
+    const cRows = payload.rows.filter(row => {
+      const identity = keywordIdentityKeyV2(row.keyword);
+      return identity === keywordIdentityKeyV2('C language') || identity === keywordIdentityKeyV2('C# language');
+    });
+    expect(cRows).toHaveLength(2);
+    expect(cRows.find(row => keywordIdentityKeyV2(row.keyword) === keywordIdentityKeyV2('C language'))?.metrics).toMatchObject({
+      nationalPosition: 1, matchedUrl: 'https://fresh.example/c',
+    });
+    expect(cRows.find(row => keywordIdentityKeyV2(row.keyword) === keywordIdentityKeyV2('C# language'))?.metrics).toMatchObject({
+      nationalPosition: 2, matchedUrl: 'https://fresh.example/c-sharp',
+    });
+    expect(cRows.some(row => row.metrics.nationalPosition === 99)).toBe(false);
+  });
+
   it('only opts into expensive local candidates for local candidate filters', () => {
     expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL)).toBe(false);
     expect(filterNeedsLocalCandidates(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES)).toBe(true);
@@ -367,7 +422,11 @@ describe('buildKeywordCommandCenter', () => {
     expect(firstPage?.rows[0]?.explanation).toBeUndefined();
   });
 
-  it('caps unselected rank evidence in all rows to match summary counts', async () => {
+  it('includes all unselected rank evidence with impressions>0 in all rows to match summary counts (keyword-universe-full coverage is unconditional)', async () => {
+    // The keyword-universe-full flag was retired in flag-sunset Wave 2b (2026-07-02): the
+    // uncapped, value-ordered rank-evidence coverage (UNIVERSE_SAFETY_CEILING) is now the
+    // sole path — the old top-50-by-impressions cap no longer applies. Every ranked-untracked
+    // query with impressions>0 (or clicks>0) is kept, up to the 2000-row safety ceiling.
     storeRankSnapshot(workspaceId, '2026-05-21', Array.from({ length: 120 }, (_, index) => ({
       query: `untracked gsc query ${index}`,
       position: index + 1,
@@ -377,16 +436,24 @@ describe('buildKeywordCommandCenter', () => {
     })));
 
     const summary = await buildKeywordCommandCenterSummary(workspaceId);
-    const rows = await buildKeywordCommandCenterRows(workspaceId, {
+    // pageSize is capped at MAX_PAGE_SIZE (100); fetch page 2 to see the remaining 20 rows.
+    const firstPage = await buildKeywordCommandCenterRows(workspaceId, {
       filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
       page: 1,
       pageSize: 100,
     });
+    const secondPage = await buildKeywordCommandCenterRows(workspaceId, {
+      filter: KEYWORD_COMMAND_CENTER_FILTERS.ALL,
+      page: 2,
+      pageSize: 100,
+    });
 
-    expect(summary?.counts.total).toBe(50);
-    expect(rows?.pageInfo.totalRows).toBe(50);
-    expect(rows?.rows).toHaveLength(50);
-    expect(rows?.rows.some(row => row.normalizedKeyword === 'untracked gsc query 119')).toBe(false);
+    expect(summary?.counts.total).toBe(120);
+    expect(firstPage?.pageInfo.totalRows).toBe(120);
+    expect(firstPage?.rows).toHaveLength(100);
+    expect(secondPage?.rows).toHaveLength(20);
+    const allKeywords = [...(firstPage?.rows ?? []), ...(secondPage?.rows ?? [])].map(row => row.normalizedKeyword);
+    expect(allKeywords).toContain(normalizeKeywordForComparison('untracked gsc query 119'));
   });
 
   it('supports server-side search and lazy detail reads for one keyword', async () => {
@@ -862,6 +929,68 @@ describe('Keyword Command Center lost visibility', () => {
 });
 
 describe('applyKeywordCommandCenterAction', () => {
+  it('isolates generated planned-page artifacts by semantic v2 identity', () => {
+    for (const keyword of ['C', 'C#', 'C++']) {
+      applyKeywordCommandCenterAction(workspaceId, {
+        action: KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
+        keyword,
+      });
+    }
+
+    const paths = db.prepare(`
+      SELECT page_path FROM page_keywords
+       WHERE workspace_id = ? AND page_path LIKE '/planned/%'
+       ORDER BY page_path COLLATE BINARY
+    `).all(workspaceId) as Array<{ page_path: string }>;
+    expect(paths.map(row => row.page_path)).toEqual([
+      '/planned/c',
+      '/planned/c-plus-plus',
+      '/planned/c-sharp',
+    ]);
+
+    applyKeywordCommandCenterAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.DECLINE,
+      keyword: 'C#',
+      force: true,
+    });
+    const remaining = db.prepare(`
+      SELECT page_path FROM page_keywords
+       WHERE workspace_id = ? AND page_path LIKE '/planned/%'
+       ORDER BY page_path COLLATE BINARY
+    `).all(workspaceId) as Array<{ page_path: string }>;
+    expect(remaining.map(row => row.page_path)).toEqual(['/planned/c', '/planned/c-plus-plus']);
+  });
+
+  it('chooses the same UTF-8-binary raw spelling for same-v2 bulk aliases regardless of input order', () => {
+    const first = applyKeywordCommandCenterBulkAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.TRACK,
+      keywords: ['paper tiger bulk', 'Paper-Tiger Bulk'],
+    });
+    expect(first.items.map(item => item.keyword)).toEqual(['Paper-Tiger Bulk']);
+    expect(getTrackedKeywords(workspaceId).find(keyword => keywordIdentityKeyV2(keyword.query) === 'paper tiger bulk')?.query)
+      .toBe('Paper-Tiger Bulk');
+
+    const second = applyKeywordCommandCenterBulkAction(workspaceId, {
+      action: KEYWORD_COMMAND_CENTER_ACTIONS.TRACK,
+      keywords: ['Paper-Tiger Bulk', 'paper tiger bulk'],
+    });
+    expect(second.items.map(item => item.keyword)).toEqual(['Paper-Tiger Bulk']);
+    expect(getTrackedKeywords(workspaceId).find(keyword => keywordIdentityKeyV2(keyword.query) === 'paper tiger bulk')?.query)
+      .toBe('Paper-Tiger Bulk');
+  });
+
+  it('hydrates v2-only gap provenance for KCC protection checks', () => {
+    addTrackedKeyword(workspaceId, '大阪 歯科', {
+      source: TRACKED_KEYWORD_SOURCE.CONTENT_GAP,
+      sourceGapKeyV2: '大阪 歯科',
+    });
+    const row = mergeTrackedKeywordProvenance(
+      workspaceId,
+      getTrackedKeywords(workspaceId, { includeInactive: true }),
+    ).find(item => keywordIdentityKeyV2(item.query) === keywordIdentityKeyV2('大阪 歯科'));
+    expect(protectedReason(row)).toBe('Gap-approved keyword');
+  });
+
   it('adds requested keywords to strategy using canonical keyword equality', async () => {
     seedFeedback('Requested-Keyword', 'requested', 'Client asked about this.');
 
@@ -898,7 +1027,7 @@ describe('applyKeywordCommandCenterAction', () => {
     expect(feedbackRows()).toEqual([]);
     const tracked = getTrackedKeywords(workspaceId, { includeInactive: true });
     expect(tracked.filter(keyword => keywordComparisonKey(keyword.query) === 'paper tiger')).toEqual([
-      expect.objectContaining({ query: 'paper-tiger', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+      expect.objectContaining({ query: 'paper tiger', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
     ]);
   });
 
@@ -920,7 +1049,7 @@ describe('applyKeywordCommandCenterAction', () => {
       expect.objectContaining({ query: 'porcelain veneers cost' }),
     ]));
     expect(getTrackedKeywords(workspaceId, { includeInactive: true })).toEqual(expect.arrayContaining([
-      expect.objectContaining({ query: 'Porcelain Veneers Cost', status: TRACKED_KEYWORD_STATUS.PAUSED }),
+      expect.objectContaining({ query: 'porcelain veneers cost', status: TRACKED_KEYWORD_STATUS.PAUSED }),
     ]));
 
     applyKeywordCommandCenterAction(workspaceId, {
@@ -928,7 +1057,7 @@ describe('applyKeywordCommandCenterAction', () => {
       keyword: 'porcelain veneers cost',
     });
     expect(getTrackedKeywords(workspaceId)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ query: 'Porcelain Veneers Cost', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
+      expect.objectContaining({ query: 'porcelain veneers cost', status: TRACKED_KEYWORD_STATUS.ACTIVE }),
     ]));
   });
 
@@ -947,7 +1076,7 @@ describe('applyKeywordCommandCenterAction', () => {
     const inactive = getTrackedKeywords(workspaceId, { includeInactive: true });
     expect(inactive.filter(keyword => keywordComparisonKey(keyword.query) === 'emergency dentist near me')).toEqual([
       expect.objectContaining({
-        query: 'Emergency Dentist - Near-Me',
+        query: 'emergency dentist near me',
         status: TRACKED_KEYWORD_STATUS.PAUSED,
       }),
     ]);
@@ -1705,19 +1834,19 @@ describe('skinny rows — no sibling expansion (regression for row-count drift)'
       expect(row.localSeoState?.lifecycle).toBe(KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE);
     }
 
-    setWorkspaceFlagOverride('keyword-universe-full', workspaceId, true);
-    try {
-      const fullUniversePayload = await buildKeywordCommandCenterRows(
-        workspaceId,
-        { filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, pageSize: 200 },
-        { includeLocalSeo: true },
-      );
-      expect(fullUniversePayload).not.toBeNull();
-      expect(fullUniversePayload!.rows.length).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
-      expect(fullUniversePayload!.pageInfo.totalRows).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
-    } finally {
-      setWorkspaceFlagOverride('keyword-universe-full', workspaceId, null);
-    }
+    // The keyword-universe-full flag was retired in flag-sunset Wave 2b (2026-07-02): the
+    // uncapped keyword-universe coverage path is now unconditional. Re-assert the same
+    // LOCAL_CANDIDATES cap holds under that (now permanent) full-universe behavior — the
+    // `local_candidates` filter's own LOCAL_CANDIDATE_ROW_LIMIT is a separate, independent
+    // cap that the universe uncap does NOT lift (see docs/rules/keyword-hub.md).
+    const fullUniversePayload = await buildKeywordCommandCenterRows(
+      workspaceId,
+      { filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES, pageSize: 200 },
+      { includeLocalSeo: true },
+    );
+    expect(fullUniversePayload).not.toBeNull();
+    expect(fullUniversePayload!.rows.length).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
+    expect(fullUniversePayload!.pageInfo.totalRows).toBeLessThanOrEqual(LOCAL_CANDIDATE_ROW_LIMIT);
   });
 });
 

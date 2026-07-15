@@ -1,6 +1,11 @@
 // shared/types/outcome-tracking.ts
 // Outcome Intelligence Engine — shared types for server and frontend
 
+// R5 action catalog: every member of ActionType has a metadata entry in the
+// `outcome` context of shared/types/action-catalog.ts (ACTION_CATALOG.outcome),
+// verified by tests/contract/action-catalog.test.ts. This union is the source of
+// truth for values — the catalog imports it and never redefines it. See
+// docs/rules/action-catalog.md.
 export type ActionType =
   | 'insight_acted_on'
   | 'content_published'
@@ -24,7 +29,14 @@ export type ActionType =
   // the `strategy_keyword_*` ACTIVITY types live in server/activity-log.ts (ActivityType),
   // NOT here.
   | 'topic_cluster_keep'
-  | 'content_gap_keep';
+  | 'content_gap_keep'
+  // Reconcile R8-PR1 (Task B13) — future GBP (Google Business Profile) review-response
+  // publish seam. SHIPS DARK: server/google-business-profile-review-response-publish-job.ts
+  // records this action at the moment `updateGbpReviewReply` succeeds, but the job cannot
+  // actually fire in production until Google API access opens. The recording logic is
+  // exercised now by tests so it is correct from day one. See
+  // docs/rules/outcome-engine-stubs.md.
+  | 'gbp_review_reply';
 
 export type Attribution =
   | 'platform_executed'
@@ -40,6 +52,72 @@ export type OutcomeScore =
   | 'inconclusive';
 
 export type SourceFlag = 'live' | 'backfill';
+
+/**
+ * Reconcile R6 (Task B11) — the source-system kinds a tracked_actions row is
+ * recorded against, as observed across the ~16 production recordAction call sites.
+ * This is a SOFT/advisory union: `sourceType` on the row (and on `RecordActionParams`)
+ * stays a free `string` so the generic POST /api/outcomes/:ws/actions route and any
+ * future producer accept new kinds without a hard enum break. Use `KnownSourceType`
+ * only where an exhaustive-ish switch benefits from the known members (e.g.
+ * resolveWinTitle) — always keep a fallthrough for the `(string & {})` arm.
+ *
+ * Read aliases: `content_post`/`content_brief` are historical duplicates of
+ * `post`/`brief` that resolveWinTitle already fans in — both kept so the type mirrors
+ * the real data.
+ */
+export type KnownSourceType =
+  | 'recommendation'
+  | 'insight'
+  | 'post'
+  | 'content_post'
+  | 'brief'
+  | 'content_brief'
+  | 'content_request'
+  | 'client_action'
+  | 'approval'
+  | 'schema'
+  | 'strategy'
+  | 'strategy_page_keyword'
+  | 'brand_voice'
+  | 'content_decay'
+  | 'internal_link'
+  // Reconcile R8-PR1 (Task B13) recordAction seams — minted AFTER B12 wrote the
+  // integrity sweep's classification, so both are added here + classified in
+  // server/outcome-source-integrity-sweep-job.ts (D2). `gbp_review_response` is
+  // ROW-BACKED (sourceId is a google_business_review_responses.id); `audit` is
+  // NOT ROW-CHECKABLE (sourceId is the synthetic `${pageId}-${check}` fix key).
+  | 'gbp_review_response'
+  | 'audit';
+
+/**
+ * Advisory source-ref type. `KnownSourceType | (string & {})` keeps editor
+ * autocomplete for the known kinds while still accepting any string at runtime —
+ * so threading a snapshot never breaks a producer that emits an unlisted sourceType.
+ */
+export type SourceRef = KnownSourceType | (string & {});
+
+/**
+ * Reconcile R6 (Task B11) — the ephemeral source's IDENTITY snapshotted onto the
+ * durable tracked_actions row AT WRITE TIME. Outcomes are designed to outlive their
+ * sources (recommendation sets/briefs/approvals are regenerated), so this captures
+ * what the source WAS when the action was recorded, letting client-facing win titles
+ * resolve snapshot-first instead of degrading to a generic per-action-type label once
+ * the live source is gone. All fields optional — a page-ref/self-ref source may only
+ * carry a `page`, and a source with no title in scope carries neither.
+ *
+ * Stored in the `source_snapshot` JSON column (nullable); read via parseJsonSafe with
+ * `trackedActionSourceSnapshotSchema`. The resolved title is ALSO denormalized into the
+ * flat `source_label` column so the wins read path can index it without JSON parsing.
+ */
+export interface TrackedActionSourceSnapshot {
+  /** The source's human title at record time (rec/brief/post/request/client-action title). */
+  title?: string;
+  /** The source kind at record time (usually mirrors the row's sourceType). */
+  type?: SourceRef;
+  /** The page URL/path the source targeted, when it is a page-scoped source. */
+  page?: string;
+}
 export type BaselineConfidence = 'exact' | 'estimated';
 export type LearningsConfidence = 'high' | 'medium' | 'low';
 export type LearningsTrend = 'improving' | 'stable' | 'declining';
@@ -65,6 +143,51 @@ export type OutcomeProvenance =
                           //      revenue-reconciled. Renders "measured" + an exact count, but the DOLLAR
                           //      figure stays estimate-banded (still count × lead value).
   | 'actual_reconciled';  // P3: reconciled to call-tracking / CRM closed-won. Renders "actual".
+
+/**
+ * Reconcile R9 (Task B15) — ADMIN-ONLY per-row coverage/provenance signal on `action_outcomes`,
+ * recording how far THIS outcome's value got / how it was derived. Powers the admin coverage
+ * funnel (server/outcome-coverage.ts: computeOutcomeCoverage → tracked/measured/reconciled
+ * counts) and is DISTINCT from `OutcomeProvenance` above: `OutcomeProvenance` is a
+ * workspace-level, computed-at-read-time confidence tier for The Issue's client-facing GA4
+ * conversion-tracking maturity and is never persisted. `OutcomeCoverageProvenance` is a
+ * PERSISTED, per-outcome-row column consumed only by admin surfaces (OutcomesOverview /
+ * OutcomeDashboard) — never rendered client-side. The two intentionally share the
+ * 'estimate_ga4' legacy-default vocabulary (the audit's naming), but must not be conflated:
+ * do not import one where the other is expected.
+ *
+ * Funnel stages (weakest → strongest, matching computeOutcomeCoverage's tracked/measured/
+ * reconciled buckets):
+ */
+export type OutcomeCoverageProvenance =
+  | 'estimate_ga4'   // Legacy default AND the read-fallback for a NULL provenance column (a row
+                     // recorded before this column existed). Counts as the base tracked/measured
+                     // funnel stage — never dropped, never promoted to 'reconciled'.
+  | 'measured_action' // The outcome's value was derived from a real measured action (not a bare
+                      // GA4 estimate). Counts as 'measured' in the funnel.
+  | 'actual_reconciled'; // The outcome's value has been reconciled to closed/actual records.
+                        // Counts as 'reconciled' in the funnel — the top of the stack.
+
+/**
+ * SB-003 (UI-rebuild W1.1) — read-safe admin money-frame for the Engine/cockpit header.
+ * CRON-PRECOMPUTED (mirrors return-hook-cron), NEVER computed on a hot GET: computeROI WRITES a
+ * snapshot (server/roi.ts → saveSnapshot), so it must not run at render time (AD-003).
+ *  - `valueAtStake` REUSES ROIData.revenueAtStake (Σ keyword upsideMonthly) — not re-derived.
+ *  - `recoveredSoFar` is net-new: realized/measured outcome value to date.
+ *  - `provenance` is the READ-TIME, client-facing tier that drives the estimate/measured/actual
+ *    basis pill. It is `OutcomeProvenance`, NEVER `OutcomeCoverageProvenance` (that one is the
+ *    admin-only per-row coverage signal above — do not conflate).
+ */
+export interface AdminMoneyFrame {
+  /** Monthly $ unlocked if tracked keywords move toward stronger positions (= ROIData.revenueAtStake). */
+  valueAtStake: number;
+  /** $ already realized/measured to date (net-new derived). */
+  recoveredSoFar: number;
+  /** Read-time confidence tier → estimate/measured/actual pill. */
+  provenance: OutcomeProvenance;
+  /** ISO timestamp of the cron precompute — drives the freshness meta (AD-001). */
+  precomputedAt: string;
+}
 
 /** Already a percentage (e.g., 6.3 for 6.3%). Do NOT multiply by 100. */
 export interface BaselineSnapshot {
@@ -154,6 +277,16 @@ export interface TrackedAction {
    *  insights, legacy rows). Feeds the P6 realized-vs-predicted calibration loop
    *  (server/outcome-emv-calibration.ts). */
   predictedEmv?: number | null;
+  /** Reconcile R6 (B11): the source's resolved title snapshotted at record time.
+   *  Denormalized flat copy of `sourceSnapshot.title` for index-free win-title lookup.
+   *  null when the write site had no source title in scope (page-ref/self-ref sources)
+   *  or no `source` was threaded (legacy/pre-B11 rows). */
+  sourceLabel?: string | null;
+  /** Reconcile R6 (B11): the ephemeral source's identity ({ title?, type?, page? })
+   *  captured at record time so client win titles resolve snapshot-first and stop
+   *  degrading to a generic label when the live source is regenerated. null when no
+   *  `source` was threaded. See TrackedActionSourceSnapshot + docs/adr/0008. */
+  sourceSnapshot?: TrackedActionSourceSnapshot | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,6 +305,26 @@ export interface ActionOutcome {
   attributedValue: number | null;
   /** Describes how attributedValue was computed (e.g. 'clicks_delta_x_cpc'). NULL when attributedValue is NULL. */
   valueBasis: string | null;
+  /**
+   * Reconcile R9 (Task B15) — ADMIN-ONLY coverage-funnel signal: how far this outcome's value
+   * got / how it was derived (see OutcomeCoverageProvenance doc). NULL for rows recorded before
+   * this column existed (or when the write site did not thread a value) — computeOutcomeCoverage()
+   * treats NULL as the 'estimate_ga4' read-fallback. Never rendered client-side.
+   */
+  provenance: OutcomeCoverageProvenance | null;
+}
+
+/**
+ * Reconcile R9 (Task B15) — ADMIN-ONLY outcome coverage funnel response shape, shared between
+ * server/outcome-coverage.ts (computeOutcomeCoverage) and src/api/outcomes.ts. `tracked` is the
+ * total outcome row count for the workspace (every row reaches at least this stage); `measured`
+ * and `reconciled` are inclusive of the stronger stage they gate (reconciled rows also count as
+ * measured). Never rendered on a client-facing surface.
+ */
+export interface OutcomeCoverage {
+  tracked: number;
+  measured: number;
+  reconciled: number;
 }
 
 export interface PlaybookStep {
@@ -279,12 +432,25 @@ export interface TopWin {
   sourceType: string;
   /** Id within the source system; used to resolve the real source title for client display. */
   sourceId: string | null;
+  /** R6 (B11): the source's title snapshotted at record time. Resolution is snapshot-FIRST:
+   *  when present, resolveWinTitle uses this before the (possibly-stale) live lookup, so a
+   *  regenerated/deleted source no longer degrades the win to a generic label. null/absent
+   *  for legacy/pre-B11 rows or sources that carried no title. Optional to keep this an
+   *  expand-only change — the real producer (getTopWinsFromActions) always sets it, and
+   *  every consumer reads it defensively (`win.sourceLabel?.trim()`). */
+  sourceLabel?: string | null;
   pageUrl: string | null;
   targetKeyword: string | null;
   delta: DeltaSummary;
   score: OutcomeScore;
   /** Realized dollar value of the win outcome (action_outcomes.attributed_value). NULL when no CPC data was available. */
   attributedValue: number | null;
+  /** Reconcile C4 — the honest execution attribution carried through from the tracked
+   *  action so client-facing surfaces can frame the win truthfully (e.g.
+   *  `externally_executed` must NOT read as "we shipped it"). `not_acted_on` never
+   *  reaches a wins surface (getTopWinsFromActions filters it), but the field is on the
+   *  full union so consumers switch exhaustively. Expand-only, mirroring `sourceLabel`. */
+  attribution: Attribution;
   createdAt: string;
   scoredAt: string;
 }
@@ -301,6 +467,11 @@ export interface OutcomeWinEntry {
   score: OutcomeScore;
   /** Realized dollar value of the win outcome. NULL when no CPC data was available. */
   attributedValue: number | null;
+  /** Reconcile C4 — honest execution attribution carried through from the tracked action.
+   *  WinsSurface must NOT claim "we shipped/built" for `externally_executed` rows (work done
+   *  on the client's side that we flagged/called). Only `platform_executed` wins are "what we
+   *  shipped". `not_acted_on` never reaches this surface (filtered upstream). */
+  attribution: Attribution;
   detectedAt: string;
 }
 
@@ -355,4 +526,10 @@ export interface WorkspaceOutcomeOverview {
   topWin: TopWin | null;
   attentionNeeded: boolean;
   attentionReason?: string;
+  /**
+   * Reconcile R9 (Task B15) — ADMIN-ONLY coverage funnel summary for this workspace. Optional
+   * so existing consumers of WorkspaceOutcomeOverview are unaffected; OutcomesOverview.tsx is
+   * the only renderer. Never surfaced client-side.
+   */
+  coverage?: OutcomeCoverage;
 }

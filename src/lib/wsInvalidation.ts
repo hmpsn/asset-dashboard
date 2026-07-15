@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { BRAND_INTAKE_WORKSPACE_EVENT_DOMAIN } from '../../shared/types/brand-intake';
 import { queryKeys } from './queryKeys';
 import { invalidateMany, type QueryInvalidationKey } from './queryInvalidation';
 import { WS_EVENTS, type WsEventName } from './wsEvents';
@@ -18,9 +19,16 @@ function readStringField(data: unknown, field: string): string | undefined {
     : undefined;
 }
 
+function readBooleanField(data: unknown, field: string): boolean {
+  return typeof data === 'object'
+    && data !== null
+    && (data as Record<string, unknown>)[field] === true;
+}
+
 function contentPipelineKeys(workspaceId: string): readonly QueryInvalidationKey[] {
   return [
     queryKeys.admin.contentPipeline(workspaceId),
+    queryKeys.admin.contentPerformanceAll(workspaceId),
     queryKeys.admin.contentCalendar(workspaceId),
     queryKeys.admin.workspaceHome(workspaceId),
     queryKeys.admin.intelligenceAll(workspaceId),
@@ -123,6 +131,7 @@ function adminInvalidationKeys(
     case WS_EVENTS.APPROVAL_UPDATE:
       return [
         queryKeys.client.approvals(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         queryKeys.admin.approvals(workspaceId),
         queryKeys.admin.cmsEditorAll(),
         queryKeys.admin.workspaceHome(workspaceId),
@@ -131,6 +140,7 @@ function adminInvalidationKeys(
     case WS_EVENTS.APPROVAL_APPLIED:
       return [
         queryKeys.client.approvals(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         queryKeys.admin.approvals(workspaceId),
         queryKeys.admin.seoEditorAll(),
         queryKeys.admin.cmsEditorAll(),
@@ -150,6 +160,13 @@ function adminInvalidationKeys(
       return [
         queryKeys.client.contentRequests(workspaceId),
         queryKeys.admin.requests(workspaceId),
+        // C2 request mutations advance every previously linked artifact revision
+        // in the same transaction. Refresh those authorities even when the event
+        // carries only the request id (the established broadcast contract).
+        queryKeys.admin.briefs(workspaceId),
+        queryKeys.admin.briefsDetailAll(workspaceId),
+        queryKeys.admin.posts(workspaceId),
+        queryKeys.admin.postsDetailAll(workspaceId),
         queryKeys.admin.workspaceBadges(workspaceId),
         ...contentPipelineKeys(workspaceId),
         queryKeys.admin.notifications(),
@@ -167,6 +184,7 @@ function adminInvalidationKeys(
         queryKeys.admin.postsDetailAll(workspaceId),
         queryKeys.admin.contentTemplates(workspaceId),
         queryKeys.admin.contentMatrices(workspaceId),
+        queryKeys.admin.contentMatrixGenerationAll(workspaceId),
         ...contentPipelineKeys(workspaceId),
         queryKeys.admin.roi(workspaceId),
         queryKeys.client.roi(workspaceId),
@@ -202,6 +220,7 @@ function adminInvalidationKeys(
       ] as const;
     case WS_EVENTS.WORKSPACE_UPDATED:
       return [
+        queryKeys.admin.brandIntake(workspaceId),
         queryKeys.admin.workspaceHome(workspaceId),
         queryKeys.admin.workspaceDetail(workspaceId),
         queryKeys.admin.workspaceOverview(),
@@ -218,6 +237,7 @@ function adminInvalidationKeys(
         queryKeys.client.insights(workspaceId),
         queryKeys.client.clientInsights(workspaceId),
         queryKeys.client.intelligence(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         queryKeys.client.rankHistory(workspaceId),
         queryKeys.client.latestRanks(workspaceId),
         // The Issue (Client) P0 — a saved outcomeValue/segmentConfig changes the dollar verdict, so
@@ -257,12 +277,16 @@ function adminInvalidationKeys(
       ] as const;
     case WS_EVENTS.DELIVERABLE_SENT:
     case WS_EVENTS.DELIVERABLE_UPDATED:
-      return [queryKeys.admin.workspaceDeliverables(workspaceId)] as const;
+      return [
+        queryKeys.admin.workspaceDeliverables(workspaceId),
+        queryKeys.admin.brandGenerationAll(workspaceId),
+      ] as const;
     case WS_EVENTS.INSIGHT_RESOLVED:
       return [
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.clientInsights(workspaceId),
         queryKeys.client.intelligence(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         // The Connected Intelligence feed showed resolved items as open (2026-06-09 audit).
         queryKeys.admin.insightFeed(workspaceId),
       ] as const;
@@ -285,8 +309,12 @@ function adminInvalidationKeys(
         queryKeys.admin.outcomeActions(workspaceId),
         queryKeys.admin.outcomeScorecard(workspaceId),
         queryKeys.admin.outcomeTimeline(workspaceId),
+        // R9 (B15): a newly-tracked action can carry a fresh (possibly NULL-provenance)
+        // outcome row once scored — refresh the coverage funnel too.
+        queryKeys.admin.outcomeCoverage(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.intelligence(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
       ] as const;
     case WS_EVENTS.OUTCOME_SCORED:
       return [
@@ -294,9 +322,13 @@ function adminInvalidationKeys(
         queryKeys.admin.outcomeScorecard(workspaceId),
         queryKeys.admin.outcomeTimeline(workspaceId),
         queryKeys.admin.outcomeTopWins(workspaceId),
+        // R9 (B15): a scored outcome writes/updates a provenance-bearing row — the funnel
+        // counts must refresh.
+        queryKeys.admin.outcomeCoverage(workspaceId),
         queryKeys.admin.outcomeLearnings(workspaceId),
         queryKeys.client.outcomeSummary(workspaceId),
         queryKeys.client.outcomeWins(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.intelligence(workspaceId),
         // W5.1: outcome read-back chips/badges live on these admin surfaces, so a
@@ -305,11 +337,13 @@ function adminInvalidationKeys(
         queryKeys.admin.keywordStrategy(workspaceId),
         queryKeys.admin.keywordCommandCenter(workspaceId),
         queryKeys.admin.posts(workspaceId),
+        queryKeys.admin.contentPerformanceAll(workspaceId),
       ] as const;
     case WS_EVENTS.OUTCOME_EXTERNAL_DETECTED:
       return [
         queryKeys.admin.outcomeActions(workspaceId),
         queryKeys.client.outcomeWins(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
       ] as const;
     case WS_EVENTS.OUTCOME_LEARNINGS_UPDATED:
       return [
@@ -323,6 +357,7 @@ function adminInvalidationKeys(
       return [
         queryKeys.admin.outcomePlaybooks(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
       ] as const;
     case WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED:
       return [
@@ -364,14 +399,13 @@ function adminInvalidationKeys(
     case WS_EVENTS.CLIENT_ACTION_UPDATE:
       return [
         queryKeys.client.clientActions(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         queryKeys.admin.clientActions(workspaceId),
         queryKeys.admin.intelligence(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.admin.workspaceHome(workspaceId),
         queryKeys.admin.notifications(),
       ] as const;
-    case WS_EVENTS.MEETING_BRIEF_GENERATED:
-      return [queryKeys.admin.meetingBrief(workspaceId)] as const;
     case WS_EVENTS.COPY_METADATA_UPDATED:
       return [queryKeys.admin.copyMetadataAll(workspaceId)] as const;
     case WS_EVENTS.COPY_BATCH_PROGRESS:
@@ -410,6 +444,7 @@ function adminInvalidationKeys(
     case WS_EVENTS.RECOMMENDATIONS_UPDATED:
       return [
         queryKeys.shared.recommendations(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         queryKeys.admin.recommendations(workspaceId),
         queryKeys.shared.pageEditStates(workspaceId, false),
         queryKeys.shared.pageEditStates(workspaceId, true),
@@ -424,6 +459,8 @@ function adminInvalidationKeys(
       ] as const;
     case WS_EVENTS.STRATEGY_UPDATED:
       return strategyMutationKeys(workspaceId);
+    case WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED:
+      return [queryKeys.admin.strategyKeywordSet(workspaceId)] as const;
     case WS_EVENTS.RANK_TRACKING_UPDATED:
       return rankTrackingMutationKeys(workspaceId);
     case WS_EVENTS.SERP_SNAPSHOTS_REFRESHED:
@@ -492,9 +529,19 @@ function adminInvalidationKeys(
         queryKeys.admin.discoveryExtractionsAll(workspaceId),
       ] as const;
     case WS_EVENTS.VOICE_PROFILE_UPDATED:
-      return [queryKeys.admin.voiceProfile(workspaceId)] as const;
+      return [
+        queryKeys.admin.voiceProfile(workspaceId),
+        queryKeys.admin.intelligence(workspaceId),
+        queryKeys.admin.intelligenceAll(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+        queryKeys.client.brandSummary(workspaceId),
+      ] as const;
     case WS_EVENTS.BRAND_IDENTITY_UPDATED:
-      return [queryKeys.admin.brandIdentity(workspaceId)] as const;
+      return [
+        queryKeys.admin.brandIdentity(workspaceId),
+        queryKeys.admin.brandGenerationAll(workspaceId),
+        queryKeys.client.brandSummary(workspaceId),
+      ] as const;
     case WS_EVENTS.BLUEPRINT_UPDATED:
       return [
         queryKeys.admin.blueprints(workspaceId),
@@ -543,6 +590,7 @@ function adminInvalidationKeys(
         queryKeys.admin.workspaceHome(workspaceId),
         queryKeys.admin.workOrders(workspaceId),
         queryKeys.client.workOrders(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         queryKeys.admin.notifications(),
       ] as const;
     case WS_EVENTS.WORK_ORDER_COMMENT: {
@@ -574,16 +622,33 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.workFeedActivity(workspaceId),
       ] as const;
     case WS_EVENTS.APPROVAL_UPDATE:
+      return [
+        queryKeys.client.approvals(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+      ] as const;
     case WS_EVENTS.APPROVAL_APPLIED:
-      return [queryKeys.client.approvals(workspaceId)] as const;
+      return [
+        queryKeys.client.approvals(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+      ] as const;
     case WS_EVENTS.CLIENT_ACTION_UPDATE:
-      return [queryKeys.client.clientActions(workspaceId)] as const;
+      return [
+        queryKeys.client.clientActions(workspaceId),
+        queryKeys.client.intelligence(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+      ] as const;
     case WS_EVENTS.REQUEST_CREATED:
     case WS_EVENTS.REQUEST_UPDATE:
       return [queryKeys.client.requests(workspaceId)] as const;
     case WS_EVENTS.CONTENT_REQUEST_CREATED:
     case WS_EVENTS.CONTENT_REQUEST_UPDATE:
-      return [queryKeys.client.contentRequests(workspaceId)] as const;
+      return [
+        queryKeys.client.contentRequests(workspaceId),
+        queryKeys.client.contentPlan(workspaceId),
+        queryKeys.client.unifiedInbox(workspaceId),
+        queryKeys.client.postPreviewAll(workspaceId),
+        queryKeys.client.intelligence(workspaceId),
+      ] as const;
     case WS_EVENTS.BRIEF_UPDATED:
       return [
         queryKeys.client.contentRequests(workspaceId),
@@ -610,6 +675,7 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.unifiedInbox(workspaceId),
         queryKeys.client.theIssue(workspaceId),
         queryKeys.client.recResponses(workspaceId),
+        queryKeys.client.brandSummary(workspaceId),
       ] as const;
     case WS_EVENTS.COPY_SECTION_UPDATED:
       return [
@@ -626,8 +692,26 @@ function clientDashboardInvalidationKeys(
       ] as const;
     case WS_EVENTS.WORKSPACE_UPDATED:
       // client.roi carries the outcomeVerdict (The Issue P0), which depends on the workspace's
-      // outcomeValue/segmentConfig — refresh it when those are saved.
-      return [queryKeys.client.pricing(workspaceId), queryKeys.client.roi(workspaceId)] as const;
+      // outcomeValue/segmentConfig — refresh it when those are saved. Google connection
+      // changes also alter the provider-backed intelligence slice; the mutation includes a
+      // narrow payload marker so ordinary workspace saves do not refetch that larger view.
+      return [
+        queryKeys.client.pricing(workspaceId),
+        queryKeys.client.roi(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+        ...(readBooleanField(data, 'googleConnectionChanged')
+          || readStringField(data, 'domain') === BRAND_INTAKE_WORKSPACE_EVENT_DOMAIN
+          ? [queryKeys.client.intelligence(workspaceId)]
+          : []),
+      ] as const;
+    case WS_EVENTS.VOICE_PROFILE_UPDATED:
+      return [
+        queryKeys.client.intelligence(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+        queryKeys.client.brandSummary(workspaceId),
+      ] as const;
+    case WS_EVENTS.BRAND_IDENTITY_UPDATED:
+      return [queryKeys.client.brandSummary(workspaceId)] as const;
     case WS_EVENTS.FORM_CAPTURE_CONFIG_UPDATED:
       // client.roi carries the outcomeVerdict provenance label; saving tracked forms can flip it to
       // measured_action before the next capture poll.
@@ -645,6 +729,7 @@ function clientDashboardInvalidationKeys(
       // greenlit/sent rec updates the client surface immediately (both-halves contract).
       return [
         queryKeys.shared.recommendations(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
         queryKeys.client.theIssue(workspaceId),
         queryKeys.client.recResponses(workspaceId),
       ] as const;
@@ -668,7 +753,10 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.pageKeywords(workspaceId),
       ] as const;
     case WS_EVENTS.WORK_ORDER_UPDATE:
-      return [queryKeys.client.workOrders(workspaceId)] as const;
+      return [
+        queryKeys.client.workOrders(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+      ] as const;
     case WS_EVENTS.WORK_ORDER_COMMENT: {
       const orderId = readStringField(data, 'id');
       return orderId
@@ -686,18 +774,28 @@ function clientDashboardInvalidationKeys(
         queryKeys.client.outcomeSummary(workspaceId),
         queryKeys.client.outcomeWins(workspaceId),
         queryKeys.client.intelligence(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
       ] as const;
     case WS_EVENTS.OUTCOME_EXTERNAL_DETECTED:
-      return [queryKeys.client.outcomeWins(workspaceId)] as const;
+      return [
+        queryKeys.client.outcomeWins(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+      ] as const;
     case WS_EVENTS.OUTCOME_ACTION_RECORDED:
       return [
         queryKeys.client.outcomeSummary(workspaceId),
         queryKeys.client.intelligence(workspaceId),
       ] as const;
     case WS_EVENTS.OUTCOME_LEARNINGS_UPDATED:
-      return [queryKeys.client.intelligence(workspaceId)] as const;
+      return [
+        queryKeys.client.intelligence(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+      ] as const;
     case WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED:
-      return [queryKeys.client.intelligence(workspaceId)] as const;
+      return [
+        queryKeys.client.intelligence(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+      ] as const;
     case WS_EVENTS.INSIGHT_BRIDGE_UPDATED:
     case WS_EVENTS.INTELLIGENCE_CACHE_UPDATED:
     case WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED:
@@ -705,7 +803,10 @@ function clientDashboardInvalidationKeys(
     // keys — dead in a client session. The client portal needs its own mapping or the
     // digest shows resolved insights as open until refocus.
     case WS_EVENTS.INSIGHT_RESOLVED:
-      return clientInsightKeys(workspaceId);
+      return [
+        ...clientInsightKeys(workspaceId),
+        queryKeys.client.monthlyDigest(workspaceId),
+      ] as const;
     case WS_EVENTS.CONTENT_PUBLISHED:
       // Manual publish (server/routes/content-publish.ts) broadcasts ONLY this event —
       // without a client mapping the post status, content plan, and ROI stay stale.

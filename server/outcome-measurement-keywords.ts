@@ -125,6 +125,9 @@ export function recordKeywordTrackingAction(
     baselineConfidence: baseline ? 'exact' : 'estimated',
     attribution: 'platform_executed',
     sourceFlag: 'live',
+    // R6 (B11): a keyword-tracking action's identity IS the keyword it targets on its
+    // page — snapshot both so the win title reads the keyword, not a generic label.
+    source: { label: keyword, snapshot: { title: keyword, type: STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, page: pageUrl ?? undefined } },
   });
   log.info(
     { workspaceId: params.workspaceId, keyword, sourceId, hasBaseline: Boolean(baseline) },

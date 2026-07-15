@@ -10,7 +10,28 @@ import { RequestList } from './briefs/RequestList';
 import { BriefList } from './briefs/BriefList';
 import { useAdminBriefWorkflow, type BriefSortField } from '../hooks/admin/useAdminBriefWorkflow';
 
-export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { workspaceId: string; fixContext?: FixContext | null; clearFixContext?: () => void }) {
+interface ContentBriefsProps {
+  workspaceId: string;
+  fixContext?: FixContext | null;
+  clearFixContext?: () => void;
+  embedded?: boolean;
+  /** Opens one persisted brief in-place; omitted keeps the existing collapsed list behavior. */
+  initialBriefId?: string | null;
+  /** Narrows the established manager to one truthful composition without duplicating its hooks or mutations. */
+  display?: 'full' | 'generator' | 'requests';
+  /** Optional admitted request ids for Intake's requests-only composition. */
+  requestIds?: readonly string[];
+}
+
+export function ContentBriefs({
+  workspaceId,
+  fixContext,
+  clearFixContext,
+  embedded = false,
+  initialBriefId,
+  display = 'full',
+  requestIds,
+}: ContentBriefsProps) {
   const {
     activePostId,
     briefError,
@@ -81,7 +102,7 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
     toggleRequestBrief,
     undoDelete,
     updateRequestStatus,
-  } = useAdminBriefWorkflow({ workspaceId, fixContext, clearFixContext });
+  } = useAdminBriefWorkflow({ workspaceId, fixContext, clearFixContext, initialBriefId });
 
   if (loading) {
     return (
@@ -113,6 +134,49 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
       />
     );
   }
+
+  const briefControls = (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <FormInput
+          type="text"
+          value={briefSearch}
+          onChange={setBriefSearch}
+          placeholder="Search briefs..."
+          className="w-48 pl-8 pr-7 t-caption-sm"
+        />
+        {briefSearch && (
+          <IconButton
+            onClick={() => setBriefSearch('')}
+            icon={X}
+            label="Clear search"
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
+          />
+        )}
+      </div>
+      <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
+        <Icon as={ArrowUpDown} size="sm" />
+        <FormSelect value={briefSort} onChange={value => setBriefSort(value as BriefSortField)} options={[
+          { value: 'date', label: 'Newest' },
+          { value: 'keyword', label: 'Keyword A-Z' },
+          { value: 'difficulty', label: 'Difficulty' },
+        ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer" />
+      </div>
+    </div>
+  );
+  const focusedBrief = initialBriefId ? briefs.find((brief) => brief.id === initialBriefId) : undefined;
+  const focusedBriefs = focusedBrief ? [focusedBrief] : briefs;
+  const visibleClientRequests = display === 'requests' && requestIds
+    ? clientRequests.filter((request) => requestIds.includes(request.id))
+    : clientRequests;
+  const showBriefControls = display === 'full' && !focusedBrief;
+  const showGenerator = display === 'generator' || (display === 'full' && !focusedBrief);
+  const showRequests = display === 'requests' || (display === 'full' && !focusedBrief);
+  const showPosts = display === 'full' && !focusedBrief;
+  const showBriefList = display === 'full' || Boolean(focusedBrief);
 
   return (
     <div className="space-y-8">
@@ -173,68 +237,45 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         </div>
       )}
 
-      <PageHeader
-        title="Content Briefs"
-        subtitle={`${briefs.length} total brief${briefs.length === 1 ? '' : 's'}`}
-        icon={<Icon as={Clipboard} size="lg" className="text-accent-brand" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Icon as={Search} size="md" className="text-[var(--brand-text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <FormInput
-                type="text"
-                value={briefSearch}
-                onChange={setBriefSearch}
-                placeholder="Search briefs..."
-                className="w-48 pl-8 pr-7 t-caption-sm"
-              />
-              {briefSearch && (
-                <IconButton
-                  onClick={() => setBriefSearch('')}
-                  icon={X}
-                  label="Clear search"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--brand-text-muted)] hover:text-[var(--brand-text)]"
-                />
-              )}
-            </div>
-            <div className="flex items-center gap-1 t-caption-sm text-[var(--brand-text-muted)]">
-              <Icon as={ArrowUpDown} size="sm" />
-              <FormSelect value={briefSort} onChange={value => setBriefSort(value as BriefSortField)} options={[
-                { value: 'date', label: 'Newest' },
-                { value: 'keyword', label: 'Keyword A-Z' },
-                { value: 'difficulty', label: 'Difficulty' },
-              ]} className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded px-1.5 py-1 t-caption-sm text-[var(--brand-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 cursor-pointer" />
-            </div>
-          </div>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Content Briefs"
+          subtitle={`${briefs.length} total brief${briefs.length === 1 ? '' : 's'}`}
+          icon={<Icon as={Clipboard} size="lg" className="text-accent-brand" />}
+          actions={briefControls}
+        />
+      ) : showBriefControls ? (
+        <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Content briefs controls">
+          {briefControls}
+        </div>
+      ) : null}
 
       {/* Generator */}
-      <BriefGenerator
-        workspaceId={workspaceId}
-        keyword={keyword}
-        businessCtx={businessCtx}
-        pageType={pageType}
-        generationStyle={generationStyle}
-        refUrls={refUrls}
-        showAdvanced={showAdvanced}
-        generating={generating}
-        error={error}
-        templateCrossref={templateCrossref}
-        onKeywordChange={setKeyword}
-        onBusinessCtxChange={setBusinessCtx}
-        onPageTypeChange={setPageType}
-        onGenerationStyleChange={setGenerationStyle}
-        onRefUrlsChange={setRefUrls}
-        onToggleAdvanced={() => setShowAdvanced(v => !v)}
-        onGenerate={generateBrief}
-      />
+      {showGenerator && (
+        <BriefGenerator
+          workspaceId={workspaceId}
+          keyword={keyword}
+          businessCtx={businessCtx}
+          pageType={pageType}
+          generationStyle={generationStyle}
+          refUrls={refUrls}
+          showAdvanced={showAdvanced}
+          generating={generating}
+          error={error}
+          templateCrossref={templateCrossref}
+          onKeywordChange={setKeyword}
+          onBusinessCtxChange={setBusinessCtx}
+          onPageTypeChange={setPageType}
+          onGenerationStyleChange={setGenerationStyle}
+          onRefUrlsChange={setRefUrls}
+          onToggleAdvanced={() => setShowAdvanced(v => !v)}
+          onGenerate={generateBrief}
+        />
+      )}
 
       {/* Client Requests */}
-      <RequestList
-        clientRequests={clientRequests}
+      {showRequests && <RequestList
+        clientRequests={visibleClientRequests}
         expandedRequest={expandedRequest}
         generatingBriefFor={generatingBriefFor}
         loadingBrief={loadingBrief}
@@ -268,10 +309,10 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
         generatingPostFor={generatingPostFor}
         onGeneratePost={generatePost}
         onOpenPost={setActivePostId}
-      />
+      />}
 
       {/* Generated Posts list */}
-      {posts.length > 0 && !activePostId && (
+      {showPosts && posts.length > 0 && !activePostId && (
         // pr-check-disable-next-line -- Generated-post list is a compact non-SectionCard shell around selectable rows.
         <div className="bg-[var(--surface-2)] border border-blue-500/20 p-4 space-y-3" style={{ borderRadius: 'var(--radius-signature-lg)' }}>
           <div className="flex items-center gap-2 mb-1">
@@ -305,30 +346,33 @@ export function ContentBriefs({ workspaceId, fixContext, clearFixContext }: { wo
       )}
 
       {/* Briefs list (standalone — not linked to a request) */}
-      <BriefList
-        briefs={briefs}
-        clientRequests={clientRequests as any}
-        expanded={expanded}
-        briefSearch={briefSearch}
-        briefSort={briefSort}
-        editingBrief={editingBrief}
-        generatingPostFor={generatingPostFor}
-        regeneratingBrief={regeneratingBrief}
-        sendingToClient={sendingToClient}
-        onSetExpanded={setExpanded}
-        onSetBriefSearch={setBriefSearch}
-        onSetBriefSort={setBriefSort}
-        onSetEditingBrief={setEditingBrief}
-        onSaveBriefField={saveBriefField}
-        onGeneratePost={generatePost}
-        onRegenerateBrief={regenerateBrief}
-        onCopyAsMarkdown={copyAsMarkdown}
-        onExportClientHTML={exportClientHTML}
-        onSendToClient={sendToClient}
-        onConfirmDeleteBrief={confirmDeleteBrief}
-        onRegenerateOutline={regenerateOutline}
-        regeneratingOutline={regeneratingOutline}
-      />
+      {showBriefList && (
+        <BriefList
+          briefs={focusedBriefs}
+          clientRequests={(focusedBrief ? [] : clientRequests) as any}
+          expanded={expanded}
+          briefSearch={briefSearch}
+          briefSort={briefSort}
+          editingBrief={editingBrief}
+          generatingPostFor={generatingPostFor}
+          regeneratingBrief={regeneratingBrief}
+          sendingToClient={sendingToClient}
+          onSetExpanded={setExpanded}
+          onSetBriefSearch={setBriefSearch}
+          onSetBriefSort={setBriefSort}
+          onSetEditingBrief={setEditingBrief}
+          onSaveBriefField={saveBriefField}
+          onGeneratePost={generatePost}
+          onRegenerateBrief={regenerateBrief}
+          onCopyAsMarkdown={copyAsMarkdown}
+          onExportClientHTML={exportClientHTML}
+          onSendToClient={sendToClient}
+          onConfirmDeleteBrief={confirmDeleteBrief}
+          onRegenerateOutline={regenerateOutline}
+          regeneratingOutline={regeneratingOutline}
+          workspaceMode={Boolean(embedded && focusedBrief)}
+        />
+      )}
     </div>
   );
 }

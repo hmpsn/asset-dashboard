@@ -14,6 +14,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { saveRecommendations, loadRecommendations } from '../../server/recommendations.js';
+import { resolveRecommendationsForChange } from '../../server/domains/recommendations/resolution-service.js';
+import { updateRecommendationStatus, StruckRecCompletionError } from '../../server/domains/recommendations/status-service.js';
+import { setBroadcast } from '../../server/broadcast.js';
 import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
@@ -451,5 +454,56 @@ describe('Recommendations — DB state consistency', () => {
     const storedRec = stored!.recommendations.find(r => r.id === 'rec_db_check_001');
     expect(storedRec).toBeDefined();
     expect(storedRec!.status).toBe('in_progress');
+  });
+});
+
+// ─── 10. R4-PR1 — struck≠completed guard (trust-critical invariant) ──────────
+// A struck (or sent/discussing/approved) rec must NEVER be swept to `completed`: it would read to
+// the client as "✓ done" when the operator actually decided not to do it, or clobber a client-owned
+// decision. The guard closes the direct-completion path (status-service) AND the write-driven
+// auto-resolve path (resolution-service).
+
+describe('Recommendations — struck≠completed guard (R4-PR1)', () => {
+  it('updateRecommendationStatus refuses to complete a struck rec (StruckRecCompletionError)', () => {
+    seedRecommendationSet([makeRec({ id: 'rec_struck_complete', status: 'pending', lifecycle: 'struck', struckAt: new Date().toISOString() })]);
+    expect(() => updateRecommendationStatus(testWsId, 'rec_struck_complete', 'completed')).toThrow(StruckRecCompletionError);
+    // The rec is untouched — still pending, still struck.
+    const after = loadRecommendations(testWsId)!.recommendations.find(r => r.id === 'rec_struck_complete')!;
+    expect(after.status).toBe('pending');
+    expect(after.lifecycle).toBe('struck');
+  });
+
+  it('updateRecommendationStatus refuses to complete a client-owned (sent) rec', () => {
+    seedRecommendationSet([makeRec({ id: 'rec_sent_complete', status: 'pending', clientStatus: 'sent', sentAt: new Date().toISOString() })]);
+    expect(() => updateRecommendationStatus(testWsId, 'rec_sent_complete', 'completed')).toThrow(StruckRecCompletionError);
+  });
+
+  it('non-completion transitions on a struck rec still work (in_progress is allowed)', () => {
+    seedRecommendationSet([makeRec({ id: 'rec_struck_inprog', status: 'pending', lifecycle: 'struck', struckAt: new Date().toISOString() })]);
+    const updated = updateRecommendationStatus(testWsId, 'rec_struck_inprog', 'in_progress');
+    expect(updated?.status).toBe('in_progress');
+  });
+
+  it('PATCH status=completed on a struck rec returns 400 (not 500)', async () => {
+    seedRecommendationSet([makeRec({ id: 'rec_struck_http', status: 'pending', lifecycle: 'struck', struckAt: new Date().toISOString() })]);
+    const res = await patchJson(`/api/public/recommendations/${testWsId}/rec_struck_http`, { status: 'completed' });
+    expect(res.status).toBe(400);
+  });
+
+  it('resolveRecommendationsForChange does NOT auto-complete a struck rec whose page changed', () => {
+    // This case calls the resolution-service in-process (not via HTTP), so init the in-process
+    // broadcast to a no-op (the ephemeral server runs in a separate process — this does not conflict).
+    setBroadcast(() => {}, () => {});
+    seedRecommendationSet([
+      makeRec({ id: 'rec_struck_autoresolve', status: 'pending', lifecycle: 'struck', struckAt: new Date().toISOString(), affectedPages: ['/struck-page'] }),
+      makeRec({ id: 'rec_active_autoresolve', status: 'pending', affectedPages: ['/struck-page'] }),
+    ]);
+    // A page edit touching BOTH recs' page. The active rec resolves; the struck rec must NOT.
+    const resolved = resolveRecommendationsForChange(testWsId, { affectedPages: ['/struck-page'] });
+    expect(resolved).toBe(1); // only the active rec
+
+    const after = loadRecommendations(testWsId)!.recommendations;
+    expect(after.find(r => r.id === 'rec_struck_autoresolve')!.status).toBe('pending'); // NOT completed
+    expect(after.find(r => r.id === 'rec_active_autoresolve')!.status).toBe('completed');
   });
 });

@@ -126,10 +126,20 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     owner: 'platform-foundation',
     rationale: 'Observability inventory is advisory until its checks are narrowed into deterministic contracts.',
   },
+  'verify:deferred-ledger': {
+    classification: 'pr-ci-blocking',
+    owner: 'platform-foundation',
+    rationale: 'The UI-rebuild deferred-work ledger (schema, expiry, roadmap links) is cheap, deterministic, and required for every rebuild PR.',
+  },
   'verify:feature-flags': {
     classification: 'pr-ci-blocking',
     owner: 'platform-foundation',
     rationale: 'Feature flag catalog consistency is cheap, deterministic, and required for every PR.',
+  },
+  'verify:env': {
+    classification: 'secret-backed',
+    owner: 'integrations',
+    rationale: 'Environment profile verification inspects provider configuration and is run manually in the target local or staging environment.',
   },
   'verify:lexicon': {
     classification: 'pr-ci-blocking',
@@ -165,6 +175,11 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     classification: 'pr-ci-blocking',
     owner: 'platform-foundation',
     rationale: 'Style drift checks are already cheap deterministic PR quality gates.',
+  },
+  'verify:bundle-budget': {
+    classification: 'pr-ci-blocking',
+    owner: 'platform-foundation',
+    rationale: 'Frontend JS/CSS/font size ratchet is cheap, deterministic, and runs against the Vite manifest plus built index links emitted by the PR quality build.',
   },
   'verify:coverage-campaign': {
     classification: 'manual-advisory',

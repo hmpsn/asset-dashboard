@@ -4,7 +4,6 @@ import { generateMonthlyDigest } from './monthly-digest.js';
 
 export async function buildClientMonthlyDigestView(
   ws: Workspace,
-  month?: string,
 ): Promise<MonthlyDigestData> {
-  return generateMonthlyDigest(ws, month);
+  return generateMonthlyDigest(ws);
 }

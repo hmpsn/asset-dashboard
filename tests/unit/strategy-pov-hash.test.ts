@@ -1,107 +1,93 @@
-import { describe, it, expect } from 'vitest';
-import { buildStrategyPovHash } from '../../server/strategy-pov-generator.js';
-import type { Recommendation } from '../../shared/types/recommendations.js';
+import { describe, expect, it } from 'vitest';
+import db from '../../server/db/index.js';
+import { buildEffectiveBrandVoiceBlock } from '../../server/intelligence/seo-context-source.js';
+import { buildSystemPrompt } from '../../server/prompt-assembly.js';
+import { buildStrategyPovHash, buildStrategyPovPrompt } from '../../server/strategy-pov-generator.js';
+import { createVoiceProfile, updateVoiceProfile } from '../../server/voice-calibration.js';
+import type { VoiceDNA, VoiceGuardrails } from '../../shared/types/brand-engine.js';
+import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
+import { seedWorkspace } from '../fixtures/workspace-seed.js';
 
 /**
- * Lane B cache-completeness contract (plan Step 3, audit §8, scaled-review fix #5):
- * buildStrategyPovHash MUST bust when ANY of these change. The hash operates over the POV rec set
- * passed in — which is now VARIANT-AWARE upstream (active for admin, curated for client, scaled-
- * review fix #1) — but the hash itself is variant-agnostic over its inputs, so these cases assert
- * busting on the passed recs regardless of how they were selected:
- *   - the POV rec id-set
- *   - each rec's clientStatus / lifecycle
- *   - each rec's CONTENT (title / insight / estimatedGain / opportunity value)
- *   - the rec ORDER (the POV leads with the #1 move)
- *   - the variant (admin vs client prose AND source set must not share a cache)
- *   - the regenerate nonce
- * It MUST NOT bust on the prose-edit version change (folding version in would let a plain generate
- * after an operator edit overwrite the edit). Identical inputs ⇒ identical hash (pure).
+ * AUD-D6: the cache fingerprint is over the exact effective prompts sent to AI.
+ * The regenerate nonce is a control-plane cache bypass and is deliberately absent
+ * from this pure hash contract.
  */
-
-function rec(over: Partial<Recommendation>): Recommendation {
-  return {
-    id: 'r1',
-    workspaceId: 'ws',
-    priority: 'fix_now',
-    type: 'content',
-    title: 't',
-    description: 'd',
-    insight: 'i',
-    impact: 'high',
-    effort: 'low',
-    impactScore: 50,
-    source: 's',
-    affectedPages: [],
-    trafficAtRisk: 0,
-    impressionsAtRisk: 0,
-    estimatedGain: 'g',
-    actionType: 'manual',
-    status: 'pending',
-    clientStatus: 'sent',
-    lifecycle: 'active',
-    createdAt: '2026-06-19T00:00:00.000Z',
-    updatedAt: '2026-06-19T00:00:00.000Z',
-    ...over,
-  } as Recommendation;
-}
-
-const base = [
-  rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A', insight: 'ia', estimatedGain: 'ga' }),
-  rec({ id: 'b', clientStatus: 'approved', lifecycle: 'active', title: 'B', insight: 'ib', estimatedGain: 'gb' }),
-];
-
 describe('buildStrategyPovHash', () => {
-  it('is pure — identical inputs produce identical hash', () => {
-    expect(buildStrategyPovHash(base, 'admin', null)).toBe(buildStrategyPovHash(base, 'admin', null));
+  const systemPrompt = 'SYSTEM\nVOICE DNA: crisp and direct\nCUSTOM: prefer evidence';
+  const userPrompt = 'SITE CONTEXT:\n- Site health score: 81\nBRAND VOICE: plainspoken';
+
+  it('is stable for identical effective prompt inputs', () => {
+    expect(buildStrategyPovHash(systemPrompt, userPrompt, 'admin')).toBe(
+      buildStrategyPovHash(systemPrompt, userPrompt, 'admin'),
+    );
   });
 
-  it('busts when the curated rec id-set changes', () => {
-    const withExtra = [...base, rec({ id: 'c' })];
-    expect(buildStrategyPovHash(withExtra, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+  it('busts for any rendered evidence or effective-user-prompt change', () => {
+    expect(buildStrategyPovHash(systemPrompt, `${userPrompt}\n- Overall win rate: 72%`, 'admin')).not.toBe(
+      buildStrategyPovHash(systemPrompt, userPrompt, 'admin'),
+    );
   });
 
-  it('busts when a curated rec clientStatus changes', () => {
-    const flipped = [rec({ id: 'a', clientStatus: 'discussing', lifecycle: 'active', title: 'A', insight: 'ia', estimatedGain: 'ga' }), base[1]];
-    expect(buildStrategyPovHash(flipped, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+  it('busts for effective system-prompt changes such as calibrated voice or custom notes', () => {
+    expect(buildStrategyPovHash(`${systemPrompt}\nNever say leverage.`, userPrompt, 'admin')).not.toBe(
+      buildStrategyPovHash(systemPrompt, userPrompt, 'admin'),
+    );
   });
 
-  it('busts when a curated rec lifecycle changes', () => {
-    const flipped = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'throttled', title: 'A', insight: 'ia', estimatedGain: 'ga' }), base[1]];
-    expect(buildStrategyPovHash(flipped, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+  it('keeps admin and client variants isolated', () => {
+    expect(buildStrategyPovHash(systemPrompt, userPrompt, 'client')).not.toBe(
+      buildStrategyPovHash(systemPrompt, userPrompt, 'admin'),
+    );
   });
 
-  it('busts when a curated rec CONTENT changes (title / insight / estimatedGain / opportunity value)', () => {
-    const newTitle = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A-EDITED', insight: 'ia', estimatedGain: 'ga' }), base[1]];
-    expect(buildStrategyPovHash(newTitle, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+  it('omits the user-prompt voice section for a calibrated profile with DNA but no samples', () => {
+    const seeded = seedWorkspace();
+    const dna: VoiceDNA = {
+      personalityTraits: ['direct', 'specific'],
+      toneSpectrum: { formal_casual: 6, serious_playful: 3, technical_accessible: 8 },
+      sentenceStyle: 'Calibrated DNA sentinel: short declarative sentences.',
+      vocabularyLevel: 'Plain operator language',
+    };
+    const guardrails: VoiceGuardrails = {
+      forbiddenWords: ['synergy-sentinel'],
+      requiredTerminology: [],
+      toneBoundaries: ['No hype'],
+      antiPatterns: [],
+    };
 
-    const newInsight = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A', insight: 'ia-EDITED', estimatedGain: 'ga' }), base[1]];
-    expect(buildStrategyPovHash(newInsight, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+    try {
+      createVoiceProfile(seeded.workspaceId);
+      updateVoiceProfile(seeded.workspaceId, { status: 'calibrating', voiceDNA: dna, guardrails });
+      db.prepare(`UPDATE voice_profiles SET status = 'calibrated' WHERE workspace_id = ?`) // status-ok: compatibility fixture for calibrated prompt hashing
+        .run(seeded.workspaceId);
 
-    const newGain = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A', insight: 'ia', estimatedGain: 'ga-EDITED' }), base[1]];
-    expect(buildStrategyPovHash(newGain, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
+      const effectiveVoice = buildEffectiveBrandVoiceBlock(seeded.workspaceId);
+      const system = buildSystemPrompt(seeded.workspaceId, 'Draft a strategy POV.');
+      const user = buildStrategyPovPrompt({
+        workspaceId: seeded.workspaceId,
+        version: 1,
+        assembledAt: new Date().toISOString(),
+        seoContext: {
+          strategy: undefined,
+          brandVoice: '',
+          effectiveBrandVoiceBlock: effectiveVoice,
+          businessContext: '',
+          personas: [],
+          knowledgeBase: '',
+          effectiveLocalSeoBlock: '',
+          latestSnapshotAt: null,
+        },
+      } as WorkspaceIntelligence, [], 'admin');
 
-    const newValue = [rec({ id: 'a', clientStatus: 'sent', lifecycle: 'active', title: 'A', insight: 'ia', estimatedGain: 'ga', opportunity: { value: 999 } as Recommendation['opportunity'] }), base[1]];
-    expect(buildStrategyPovHash(newValue, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
-  });
-
-  it('busts when the rec ORDER changes (POV leads with the #1 curated move)', () => {
-    const reordered = [base[1], base[0]];
-    expect(buildStrategyPovHash(reordered, 'admin', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
-  });
-
-  it('busts when the variant changes (admin vs client must not share a cache)', () => {
-    expect(buildStrategyPovHash(base, 'client', null)).not.toBe(buildStrategyPovHash(base, 'admin', null));
-  });
-
-  it('busts when the regenerate nonce changes', () => {
-    expect(buildStrategyPovHash(base, 'admin', 'nonce-1')).not.toBe(buildStrategyPovHash(base, 'admin', null));
-    expect(buildStrategyPovHash(base, 'admin', 'nonce-2')).not.toBe(buildStrategyPovHash(base, 'admin', 'nonce-1'));
-  });
-
-  it('does NOT bust on a prose-edit version change (the version is not part of the hash)', () => {
-    // The version no longer participates in the hash — a plain generate after an operator edit must
-    // return the cached (edited) POV, not overwrite it. The signature dropped `version` entirely, so
-    // there is no version arg to vary: identical curated content + variant + nonce ⇒ identical hash.
-    expect(buildStrategyPovHash(base, 'admin', null)).toBe(buildStrategyPovHash(base, 'admin', null));
+      expect(effectiveVoice).toBe('');
+      expect(system).toContain(dna.sentenceStyle);
+      expect(user).not.toContain('EFFECTIVE BRAND VOICE');
+      expect(user).not.toContain('no brand voice');
+    } finally {
+      db.prepare('DELETE FROM voice_samples WHERE voice_profile_id IN (SELECT id FROM voice_profiles WHERE workspace_id = ?)').run(seeded.workspaceId);
+      db.prepare('DELETE FROM voice_profiles WHERE workspace_id = ?').run(seeded.workspaceId);
+      seeded.cleanup();
+    }
   });
 });

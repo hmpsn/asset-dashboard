@@ -10,8 +10,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock callAI BEFORE importing the helpers so the hoisted vi.mock takes effect.
 const callAI = vi.fn();
+const VOICE_LAYER_SENTINEL = 'VOICE DNA:\nCalibrated briefing voice';
+const EFFECTIVE_VOICE_SENTINEL = 'BRAND VOICE PROFILE:\nCalibrated sample sentinel';
+const PROSE_LAYER_SENTINEL = 'UNIVERSAL PROSE QUALITY RULES';
+const buildSystemPrompt = vi.fn((_workspaceId: string, baseInstructions: string) => [
+  baseInstructions,
+  VOICE_LAYER_SENTINEL,
+  PROSE_LAYER_SENTINEL,
+].join('\n\n'));
 vi.mock('../../server/ai.js', () => ({
   callAI: (...args: unknown[]) => callAI(...args),
+}));
+vi.mock('../../server/prompt-assembly.js', () => ({
+  buildSystemPrompt: (...args: unknown[]) => buildSystemPrompt(...args),
+}));
+vi.mock('../../server/intelligence/seo-context-source.js', () => ({
+  buildEffectiveBrandVoiceBlock: vi.fn(() => `\n\n${EFFECTIVE_VOICE_SENTINEL}`),
 }));
 
 import { punchHeroHeadline, writeWeeklyOpener } from '../../server/briefing-prompt.js';
@@ -42,6 +56,7 @@ function story(over: Partial<BriefingStory> = {}): BriefingStory {
 describe('punchHeroHeadline (Phase 2.5e)', () => {
   beforeEach(() => {
     callAI.mockReset();
+    buildSystemPrompt.mockClear();
   });
 
   it('returns the AI rewrite when guards pass (5-12 words, no hedges)', async () => {
@@ -112,6 +127,7 @@ describe('punchHeroHeadline (Phase 2.5e)', () => {
 describe('writeWeeklyOpener (Phase 2.5e)', () => {
   beforeEach(() => {
     callAI.mockReset();
+    buildSystemPrompt.mockClear();
   });
 
   const ctx = { workspaceName: 'Swish', weekOf: '2026-04-27', workspaceId: WORKSPACE_ID };
@@ -243,16 +259,28 @@ describe('writeWeeklyOpener (Phase 2.5e)', () => {
     expect(out).toContain('May 12');
   });
 
-  it('uses the system field for instructions (codebase idiom)', async () => {
+  it('uses the layered system prompt exactly once without duplicating voice in user data', async () => {
     callAI.mockResolvedValue(aiResponse('945 impressions split across 3 dentist austin pages this week.'));
     await writeWeeklyOpener(stories, ctx);
     const call = callAI.mock.calls[0][0];
+    expect(buildSystemPrompt).toHaveBeenCalledOnce();
+    expect(buildSystemPrompt).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      expect.stringContaining('25 words MAX'),
+    );
     expect(typeof call.system).toBe('string');
     expect(call.system).toContain('25 words MAX');
     expect(call.system).toContain('BANNED words:');
+    expect(call.system).toContain(VOICE_LAYER_SENTINEL);
+    expect(call.system).toContain(EFFECTIVE_VOICE_SENTINEL);
+    expect(call.system).toContain(PROSE_LAYER_SENTINEL);
     // User message should NOT carry the rule block anymore.
     expect(call.messages[0].content).not.toContain('25 words MAX');
     expect(call.messages[0].content).not.toContain('BANNED words:');
+    expect(call.messages[0].content).not.toContain(VOICE_LAYER_SENTINEL);
+    expect(call.messages[0].content).not.toContain(EFFECTIVE_VOICE_SENTINEL);
+    expect(`${call.system}\n${call.messages[0].content}`.match(/Calibrated briefing voice/g)).toHaveLength(1);
+    expect(`${call.system}\n${call.messages[0].content}`.match(/Calibrated sample sentinel/g)).toHaveLength(1);
   });
 
   it('sanitizes control characters in workspaceName (soft prompt-injection hardening)', async () => {
@@ -272,6 +300,7 @@ describe('writeWeeklyOpener (Phase 2.5e)', () => {
 describe('punchHeroHeadline (Phase 2.5e review fixes)', () => {
   beforeEach(() => {
     callAI.mockReset();
+    buildSystemPrompt.mockClear();
   });
 
   it('rejects standalone "appears" (regex now catches both "appears" and "appears to")', async () => {
@@ -286,17 +315,29 @@ describe('punchHeroHeadline (Phase 2.5e review fixes)', () => {
     expect(out).toBe(ORIGINAL_HEADLINE);
   });
 
-  it('uses the system field for instructions', async () => {
+  it('uses the layered system prompt exactly once without duplicating voice in user data', async () => {
     callAI.mockResolvedValue(aiResponse('Fleet maintenance page broke into the top five.'));
     await punchHeroHeadline(ORIGINAL_HEADLINE, HINT, WORKSPACE_ID);
     const call = callAI.mock.calls[0][0];
+    expect(buildSystemPrompt).toHaveBeenCalledOnce();
+    expect(buildSystemPrompt).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      expect.stringContaining('5-12 words'),
+    );
     expect(typeof call.system).toBe('string');
     expect(call.system).toContain('5-12 words');
     expect(call.system).toContain('BANNED words:');
+    expect(call.system).toContain(VOICE_LAYER_SENTINEL);
+    expect(call.system).toContain(EFFECTIVE_VOICE_SENTINEL);
+    expect(call.system).toContain(PROSE_LAYER_SENTINEL);
     // User message should ONLY carry the data.
     expect(call.messages[0].content).not.toContain('BANNED words:');
+    expect(call.messages[0].content).not.toContain(VOICE_LAYER_SENTINEL);
+    expect(call.messages[0].content).not.toContain(EFFECTIVE_VOICE_SENTINEL);
     expect(call.messages[0].content).toContain('Original headline:');
     expect(call.messages[0].content).toContain('Underlying data:');
+    expect(`${call.system}\n${call.messages[0].content}`.match(/Calibrated briefing voice/g)).toHaveLength(1);
+    expect(`${call.system}\n${call.messages[0].content}`.match(/Calibrated sample sentinel/g)).toHaveLength(1);
   });
 
   // ── Devin PR #387 round-2 fixes ──

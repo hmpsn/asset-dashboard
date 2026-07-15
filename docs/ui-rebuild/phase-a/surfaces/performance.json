@@ -1,0 +1,442 @@
+{
+  "gather": {
+    "surface": "performance",
+    "capabilityClassification": [
+      {
+        "capability": "A1 on-demand page-weight scan",
+        "resolution": "ui-only",
+        "note": "GET /api/webflow/page-weight/:siteId exists (server/routes/webflow-audit.ts:148); compose with DataTable+Toolbar."
+      },
+      {
+        "capability": "A2 snapshot persistence + freshness meta",
+        "resolution": "ui-only",
+        "note": "Snapshot envelope returns createdAt (server/performance-store.ts:160-167); 'Last scan Nd ago' meta is pure render."
+      },
+      {
+        "capability": "A3 summary cards (4)",
+        "resolution": "ui-only",
+        "note": "Client-side aggregation of existing payload; MetricTile."
+      },
+      {
+        "capability": "A4 search pages+assets",
+        "resolution": "ui-only",
+        "note": "SearchField over existing payload; keep focus-preserve behavior."
+      },
+      {
+        "capability": "A5 CSS source filter",
+        "resolution": "open-question",
+        "note": "Doc OQ#7. Server emits css:-prefixed rows (server/webflow-assets.ts:244); restoring the filter is zero server cost — default keep."
+      },
+      {
+        "capability": "A6 ranked weight bars w/ thresholds",
+        "resolution": "ui-only",
+        "note": "Meter inside DataTable rows; thresholds already in PageWeight.tsx:35-52."
+      },
+      {
+        "capability": "A7 expandable per-page asset breakdown",
+        "resolution": "ui-only",
+        "note": "Row expand or Drawer; data in existing payload."
+      },
+      {
+        "capability": "A8 heavy-page tip → Asset Manager deep link",
+        "resolution": "ui-only",
+        "note": "Sender half is UI; receiver param missing today (no useSearchParams in AssetAudit.tsx — grep empty) → cross-surface dep on asset-manager."
+      },
+      {
+        "capability": "A9 per-asset Compress action (new)",
+        "resolution": "defer-candidate",
+        "note": "Kit-new; quick win = deep-link to Asset Manager filtered to asset — DEF-* row + receiver contract with asset-manager surface."
+      },
+      {
+        "capability": "A10 Page Weight states (empty/loading/error)",
+        "resolution": "ui-only",
+        "note": "State-kit convention; 30-60s contextual loading message preserved."
+      },
+      {
+        "capability": "B1 single-page PSI test w/ page selector",
+        "resolution": "ui-only",
+        "note": "POST /api/webflow/pagespeed-single/:siteId exists (webflow-pagespeed.ts:56-88)."
+      },
+      {
+        "capability": "B2 bulk top-N PSI testing (avg score/vitals, per-page results)",
+        "resolution": "open-question",
+        "note": "Doc OQ#2. Server fully supports N≤25 (webflow-pagespeed.ts:26-47); retention is pure UI — default retain as a mode; dropping it violates additive parity."
+      },
+      {
+        "capability": "B3 mobile/desktop strategy (side-by-side in mockup)",
+        "resolution": "ui-only",
+        "note": "Per-strategy endpoints + snapshots exist; side-by-side = two reads, improved presentation."
+      },
+      {
+        "capability": "B4 performance score ring",
+        "resolution": "ui-only",
+        "note": "Meter/MetricRing with existing 90/50 thresholds."
+      },
+      {
+        "capability": "B5 full CWV set (FCP/TBT/SI beyond LCP/INP/CLS)",
+        "resolution": "open-question",
+        "note": "Newly-flagged sub-gap (ledger untracked); all metrics already in server payload — default render all 6, zero server cost."
+      },
+      {
+        "capability": "B6 field-data (CrUX) vs lab provenance badge",
+        "resolution": "open-question",
+        "note": "Doc OQ#3. fieldDataAvailable + cwvAssessment already serialized (server/pagespeed.ts:28-32) — default keep; trust-signal hard to justify dropping."
+      },
+      {
+        "capability": "B7 opportunities list w/ savings",
+        "resolution": "ui-only",
+        "note": "opportunities in payload (pagespeed.ts:326); per-opportunity Fix routing is kit-new (see kitNewFeatures)."
+      },
+      {
+        "capability": "B8 diagnostics section",
+        "resolution": "open-question",
+        "note": "Doc OQ#3. diagnostics already in payload (pagespeed.ts:327) — default keep, collapsed GroupBlock."
+      },
+      {
+        "capability": "B9 snapshot persistence/restore per strategy",
+        "resolution": "ui-only",
+        "note": "pagespeed-snapshot route exists (webflow-pagespeed.ts:50-54); single-page restore is a possible improvement (saveSinglePageSpeed persists, HEAD never restores)."
+      },
+      {
+        "capability": "B10 rate-limit-aware error/loading/retry",
+        "resolution": "ui-only",
+        "note": "State kit; keep GOOGLE_PSI_KEY guidance copy."
+      },
+      {
+        "capability": "B11 ?tab=speed|weight deep-link receiver",
+        "resolution": "ui-only",
+        "note": "Two-halves contract must survive rebuild (Performance.tsx:11-15; sender SeoAudit.tsx:552); contract test exists."
+      },
+      {
+        "capability": "B12 server side-effects / performance-store shapes",
+        "resolution": "ui-only",
+        "note": "Constraint, not work: rebuild must keep calling the same endpoints so savePageSpeed/invalidateIntelligenceCache and the intelligence slices keep firing."
+      },
+      {
+        "capability": "B13 Lighthouse category scores (new)",
+        "resolution": "needs-server-work",
+        "note": "sn-performance-1; server requests category:'performance' only (server/pagespeed.ts:63). Recommend defer — net-new, no parity risk."
+      },
+      {
+        "capability": "B14 dead pageWeight.get/analyze client methods",
+        "resolution": "ui-only",
+        "note": "Confirmed unrouted: grep \"'/api/pagespeed\" server/ → zero hits; delete in rebuild PR."
+      },
+      {
+        "capability": "C1 per-piece GSC clicks/impressions/position",
+        "resolution": "ui-only",
+        "note": "Serialized in ContentPerformanceItem (content-performance.ts:196-204)."
+      },
+      {
+        "capability": "C2 per-piece CTR",
+        "resolution": "ui-only",
+        "note": "gsc.ctr already serialized (content-performance.ts:200); mockup omission is a render choice — keep."
+      },
+      {
+        "capability": "C3 GA4 sessions/users/bounce/engagement",
+        "resolution": "ui-only",
+        "note": "All four + conversions serialized (content-performance.ts:210-217); keep in drawer."
+      },
+      {
+        "capability": "C4 aggregate totals vs outcome-first reframe",
+        "resolution": "open-question",
+        "note": "Doc OQ#6. Totals are client-side sums of returned rows (display aggregation, allowed); 'wins' count depends on C15 verdict decision."
+      },
+      {
+        "capability": "C5 sort controls",
+        "resolution": "open-question",
+        "note": "Doc OQ#7. DataTable gives sort nearly free — default keep."
+      },
+      {
+        "capability": "C6 per-piece daily trend chart",
+        "resolution": "ui-only",
+        "note": "GET /api/content-performance/:ws/:req/trend exists (content-requests.ts:305-331); Sparkline inline + full chart in drawer."
+      },
+      {
+        "capability": "C7 term-coverage grading + brief-execution joinback",
+        "resolution": "open-question",
+        "note": "Doc OQ#1 (placement only). Data fully server-side today (content-performance.ts:114-176); dropping = hard parity stop. Default: badge+chips on card, joinback in drawer."
+      },
+      {
+        "capability": "C8 matrix-published cells w/ source badge",
+        "resolution": "ui-only",
+        "note": "source:'matrix' serialized with dedup (content-performance.ts:255-285); render check owed in build."
+      },
+      {
+        "capability": "C9 page-type/keyword/slug badges",
+        "resolution": "ui-only",
+        "note": "All fields on item; Badge/IntentTag."
+      },
+      {
+        "capability": "C10 delivered AND published statuses",
+        "resolution": "open-question",
+        "note": "Doc OQ#4. Server already includes delivered (content-performance.ts:184); default: status FilterChip or 'delivered' section, don't filter server-side."
+      },
+      {
+        "capability": "C11 days-since-publish",
+        "resolution": "ui-only",
+        "note": "daysSincePublish serialized."
+      },
+      {
+        "capability": "C12 empty/error/loading states",
+        "resolution": "ui-only",
+        "note": "State kit."
+      },
+      {
+        "capability": "C13 public scrubbed client read path",
+        "resolution": "ui-only",
+        "note": "Shared handler with audience scrub (content-performance.ts:161-176 scrubForPublic); constraint: don't fork shapes. Client UI owned by client-portal surface."
+      },
+      {
+        "capability": "C14 MCP get_content_performance",
+        "resolution": "ui-only",
+        "note": "Same handler (server/mcp/tools/content.ts:59); untouched by rebuild."
+      },
+      {
+        "capability": "C15 win/early/flat verdict (new)",
+        "resolution": "needs-server-work",
+        "note": "sn-performance-2 + doc OQ#5. Hard floor forbids client-side verdicts, so the trade-off table's heuristic quick win is off the table."
+      },
+      {
+        "capability": "C16 'Add to Insights Engine' graduation (new)",
+        "resolution": "needs-server-work",
+        "note": "sn-performance-3 + doc OQ#5; upsertInsight exists but no route/InsightType/write contract for content wins."
+      },
+      {
+        "capability": "C17 'View live' button (new)",
+        "resolution": "ui-only",
+        "note": "Compose from ws.gscPropertyUrl/liveDomain + normalizePageUrl(targetPageSlug) — same recipe the trend route uses server-side (content-requests.ts:316-321)."
+      },
+      {
+        "capability": "C18 engagement/impressions lift % vs baseline (new)",
+        "resolution": "needs-server-work",
+        "note": "sn-performance-4; no pre-publish baseline read exists — grep for baseline computation in content-performance.ts empty. Recommend defer."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-performance-1",
+        "kind": "field",
+        "description": "Fetch + persist Lighthouse accessibility/best-practices/SEO category scores alongside performance in PSI calls; extend snapshot shape in performance-store.",
+        "existsToday": "no",
+        "evidence": "server/pagespeed.ts:63 requests category:'performance' only; :225-226 reads only lighthouseResult.categories.performance",
+        "whereItLives": "server/pagespeed.ts + server/performance-store.ts",
+        "effort": "S",
+        "likelySharedWith": [
+          "site-audit"
+        ]
+      },
+      {
+        "id": "sn-performance-2",
+        "kind": "derivation",
+        "description": "Server-computed win/early/flat verdict per published piece, wired to outcome-tracking vocabulary (OutcomeScore/EarlySignal) and serialized on ContentPerformanceItem; verdicts must never be UI-computed (hard floor).",
+        "existsToday": "no",
+        "evidence": "No verdict field in ContentPerformanceItem assembly (server/domains/content/content-performance.ts:196-230); vocabulary exists at shared/types/outcome-tracking.ts:47-53 (OutcomeScore) and :126 (EarlySignal)",
+        "whereItLives": "server/domains/content/content-performance.ts (+ shared/types/content.ts field)",
+        "effort": "M",
+        "likelySharedWith": [
+          "content-pipeline",
+          "client-portal"
+        ]
+      },
+      {
+        "id": "sn-performance-3",
+        "kind": "endpoint",
+        "description": "Content-win → insight graduation write path: new POST route + a new registered InsightType (4-part registration) using existing upsertInsight, with broadcast + addActivity. Quick-win alternative: pre-filled manual form posting to the existing generic outcomes actions route.",
+        "existsToday": "partial",
+        "evidence": "upsertInsight exists (server/analytics-insights-store.ts:177) and generic POST /api/outcomes/:ws/actions is referenced (shared/types/outcome-tracking.ts comment ~L60); no content-win insight type or graduation route — grep 'graduat' in server/ not attempted for route, no such route in insights.ts (only GET queue + PUT at lines 15,27)",
+        "whereItLives": "server/routes/insights.ts or server/domains/content/ + shared/types/analytics.ts",
+        "effort": "M",
+        "likelySharedWith": [
+          "insights",
+          "engine"
+        ]
+      },
+      {
+        "id": "sn-performance-4",
+        "kind": "derivation",
+        "description": "Pre-publish baseline comparison producing engagement-lift % and impressions-lift % per piece (before/after publish GA4+GSC window read), serialized on the item.",
+        "existsToday": "no",
+        "evidence": "getContentPerformance reads only a single trailing 90-day window (content-performance.ts:191-224); no baseline/lift computation anywhere in the handler",
+        "whereItLives": "server/domains/content/content-performance.ts",
+        "effort": "M",
+        "likelySharedWith": [
+          "content-pipeline"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "C7 term-coverage/brief-execution diagnostic placement (no prototype home).",
+        "proposedDefault": "Coverage % badge + missing-term chips on the Published card; full joinback panel in the piece Drawer. Dropping is a hard parity stop (FEATURE_AUDIT #503).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "B2 bulk PageSpeed testing (top-N ≤25, averaged score/vitals, per-page results) absent from mockup — retain or consolidate to single-page?",
+        "proposedDefault": "Retain as a Segmented mode on Page Speed; server capability exists, pure UI cost.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "B6 field-vs-lab badge and B8 diagnostics — intentional simplification?",
+        "proposedDefault": "Keep both: data already serialized; diagnostics as a collapsed GroupBlock, field/lab as a provenance Badge.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "C10 delivered-but-not-published items — where do their metrics surface?",
+        "proposedDefault": "Status FilterChip on the Published lens including 'delivered'; server already returns them.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "C15/C16 verdict + graduation data source and write contract (ledger mislabels verdict as existing).",
+        "proposedDefault": "Server-side verdict via sn-performance-2 (outcome-tracking vocabulary); graduation = manual pre-filled form first, automatic path deferred to its own plan.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "C4 aggregate reframing drops total sessions/impressions for outcome-first framing.",
+        "proposedDefault": "Outcome-first headline tiles + keep GSC/GA4 totals as secondary MetricTiles (client-side sums of returned rows).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "A5 CSS source filter and C5 sort controls dropped by mockup — intentional?",
+        "proposedDefault": "Keep both: css: rows are real server output and DataTable sorting is free.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "B14 dead pageWeight.get/analyze client methods — confirm deletion.",
+        "proposedDefault": "Delete in the rebuild PR; verified unrouted.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Does Page 'content-perf' retire when Content Perf folds into the pipeline Published tab, and with what redirect?",
+        "proposedDefault": "Retire per route-removal checklist with a redirect map per D8 (content-perf → pipeline?tab=published) in the consolidation PR.",
+        "needsOwner": true,
+        "source": "newly-found"
+      },
+      {
+        "question": "A9 Compress deep-link needs an asset-id/filter receiver param in Asset Manager — who ships the receiver half?",
+        "proposedDefault": "asset-manager surface owns the receiver (AssetAudit.tsx has no useSearchParams today); performance ships the sender only after that contract lands.",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "A9 per-asset Compress → Asset Manager",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Quick-win deep-link is cheap and closes the media-optimization loop; blocked only on the asset-manager receiver contract."
+      },
+      {
+        "proposal": "A2/B9 'Last scan Nd ago' freshness meta",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Snapshot createdAt already serialized; pure render."
+      },
+      {
+        "proposal": "B7 per-opportunity Fix button routing",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Fix targets (asset manager? SEO editor?) are undefined; opportunities list itself ships without it."
+      },
+      {
+        "proposal": "B13 Lighthouse category scores",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Net-new server work (sn-performance-1) with zero parity risk; ship later."
+      },
+      {
+        "proposal": "C15 win/early/flat verdict",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Core of the mockup's outcome framing, but only via server-side sn-performance-2 (hard floor bans client heuristics); pending OQ#5."
+      },
+      {
+        "proposal": "C16 Add to Insights Engine graduation",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Automatic path touches insight-store/bridge/broadcast contracts and needs its own plan; manual pre-filled form is the acceptable interim."
+      },
+      {
+        "proposal": "C17 View live button",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Trivial URL composition from existing workspace + slug fields."
+      },
+      {
+        "proposal": "C18 engagement/impressions lift %",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Requires new baseline derivation (sn-performance-4); no fabricated numbers allowed without it."
+      },
+      {
+        "proposal": "derivedSpeed() page-weight score penalty",
+        "recommendation": "reject",
+        "rationale": "Doc itself flags it as prototype artifice for demo realism, not a feature."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Performance › Page Weight (default)",
+        "Performance › Page Speed (single + bulk mode via Segmented; mobile/desktop side-by-side)",
+        "Content Perf → folds into content-pipeline Published tab + piece Drawer (cross-surface; this surface contributes the metric/coverage card spec)"
+      ],
+      "primitives": [
+        "MetricTile (summary cards, aggregates)",
+        "DataTable (ranked pages, per-page bulk results, published pieces)",
+        "Meter (weight bars, score)",
+        "Sparkline (clicks-since-publish, trend)",
+        "SearchField",
+        "FilterChip/Segmented (source filter, strategy, status, bulk-vs-single)",
+        "Drawer (per-page asset breakdown, PSI detail, piece joinback panel)",
+        "Toolbar",
+        "GroupBlock (opportunities, diagnostics)",
+        "Badge/IntentTag (status, field-vs-lab, coverage)"
+      ],
+      "dataHooks": [
+        "pageWeight.webflowPageWeight / webflowPageWeightSnapshot (src/api/seo.ts:435-440)",
+        "pageWeight.pagespeedBulk / pagespeedSingle / pagespeedSnapshot (src/api/seo.ts:442-449)",
+        "contentPerformance.get / trend (src/api/seo.ts:361-373)"
+      ],
+      "statesPlan": "All four per lens: pre-run empty w/ scan CTA, 30-60s contextual loading, rate-limit-aware error w/ retry (GOOGLE_PSI_KEY copy), needsSite lock via shell; snapshot-restore renders stale data with freshness meta.",
+      "mountNote": "@ds-rebuilt behind ui-rebuild-shell; keep ?tab=speed|weight receiver + SeoAudit deep link; HEAD components fetch via raw useState/useEffect — rebuild adds proper React Query hooks in src/hooks/admin/ (admin-* keys). Must keep calling the same endpoints so performance-store writes + intelligence-cache invalidation keep firing (B12)."
+    },
+    "crossSurfaceDeps": [
+      "asset-manager: A8/A9 deep-link receiver contract (filter/asset-id param) — receiver missing at HEAD",
+      "content-pipeline: owns the Published tab + drawer where Content Perf lands; shared card/drawer spec and sn-performance-2/-4 consumers",
+      "site-audit: inbound deep link (SeoAudit.tsx:552) + its ledger requires a CWV display remaining on Performance",
+      "client-portal: shared getContentPerformance handler with public scrub — admin rebuild must not fork response shapes (C13)",
+      "insights/engine: sn-performance-3 graduation write path touches insight-store + broadcast contracts",
+      "D8: redirect map required if Page 'content-perf' is consolidated into pipeline"
+    ],
+    "unknowns": [
+      "C8 matrix-sourced items: server serialization verified (source:'matrix'), but whether the pipeline Published mockup's source-chip model renders them distinguishably is unverifiable from a static prototype — verify at build",
+      "Whether Asset Manager's compress flow can be invoked per-asset (vs its bulk 'Compress All', AssetAudit.tsx:437) — needed before the A9 full version; deep-link quick win unaffected"
+    ],
+    "effortEstimate": "M"
+  },
+  "verify": {
+    "surface": "performance",
+    "verdicts": [
+      {
+        "needId": "sn-performance-1",
+        "verdict": "CONFIRMED",
+        "evidence": "server/pagespeed.ts:63 sets category:'performance' only; server/pagespeed.ts:224-227 extractScore reads lighthouseResult.categories.performance exclusively; PageSpeedResult interface (server/pagespeed.ts:22-33) has no accessibility/best-practices/seo category fields. Snapshot persistence is a free JSON `result` column (server/performance-store.ts:17-21,186-188), so extending the stored shape needs no migration/row-mapper lockstep — effort S holds."
+      },
+      {
+        "needId": "sn-performance-2",
+        "verdict": "ADJUSTED",
+        "evidence": "The 'no verdict on ContentPerformanceItem' claim is correct (shared/types/content.ts:384-398 has no verdict field; assembly server/domains/content/content-performance.ts:230-254 omits it). BUT the gatherer missed that a server-computed win/early verdict ALREADY exists end-to-end and the hard floor is already met: OutcomeReadback (shared/types/outcome-tracking.ts:471-497) wraps OutcomeScore (:46-53) + DeltaDirection and is server-computed via getScoredOutcomeReadbacks (imported server/content-posts-db.ts:13) then enriched onto GeneratedPost.outcome at the list boundary (server/content-posts-db.ts:314-341, W5.1). CORRECTION: this is NOT net-new derivation — the verdict vocabulary AND the scoring engine exist; the actual work is wiring the existing readback onto ContentPerformanceItem by join (same source-id/targetKeyword pattern as content-posts-db.ts:339), which is closer to S/M than M, and 'verdicts never UI-computed' is already satisfied server-side."
+      },
+      {
+        "needId": "sn-performance-3",
+        "verdict": "CONFIRMED",
+        "evidence": "upsertInsight exists at server/analytics-insights-store.ts:177 (confirmed). server/routes/insights.ts has ONLY GET /queue (:15) and PUT /:insightId/resolve (:27) — no POST and no graduation route. No `graduat` route anywhere in server/ (grep hits are doc text in roi.ts/lexicon.ts/outcome-tracking.ts only). No content-win InsightType (grep content_win/content-win/win_insight in server+shared/types/analytics.ts empty). Generic POST /api/outcomes/:workspaceId/actions confirmed at server/routes/outcomes.ts:302; the cited ~L60 reference is the KnownSourceType comment block naming that route (shared/types/outcome-tracking.ts:~60). Effort M is fair (4-part InsightType registration + new POST route + broadcast + addActivity)."
+      },
+      {
+        "needId": "sn-performance-4",
+        "verdict": "CONFIRMED",
+        "evidence": "getContentPerformance reads a single trailing 90-day window only (server/domains/content/content-performance.ts:196 getAllGscPages(...,90) and :213 getGA4LandingPages(...,90,100)); items map (:230-254) carries only that single gsc/ga4 snapshot with no before/after publish comparison. No engagementLift/impressionsLift/baselineWindow/prePublish/liftPct anywhere in server/ or shared/types/ (grep empty). Effort M is fair — a new pre/post-publish window read + lift computation + serialized field."
+      }
+    ]
+  }
+}

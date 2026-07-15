@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';
 import { randomUUID } from 'crypto';
+import { getKeywordStrategyGenerationState } from '../../server/keyword-strategy-generation-store.js';
 
 // ── Hoisted mock state ────────────────────────────────────────────────────────
 
@@ -299,6 +300,7 @@ describe('GET /api/public/business-priorities/:workspaceId', () => {
 
 describe('POST /api/public/content-gap-vote/:workspaceId', () => {
   it('creates a vote and returns { ok: true }', async () => {
+    const revisionBefore = getKeywordStrategyGenerationState(wsId).revision;
     const res = await clientPostJson(`/api/public/content-gap-vote/${wsId}`, {
       keyword: 'seo audit software',
       vote: 'up',
@@ -307,6 +309,7 @@ describe('POST /api/public/content-gap-vote/:workspaceId', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { ok: boolean };
     expect(body.ok).toBe(true);
+    expect(getKeywordStrategyGenerationState(wsId).revision).toBe(revisionBefore + 1);
   });
 
   it('stores the vote with the correct keyword (normalized) and vote value', async () => {
@@ -350,6 +353,58 @@ describe('POST /api/public/content-gap-vote/:workspaceId', () => {
     expect(afterRows).toHaveLength(0);
   });
 
+  it('does not invalidate, broadcast, or log an unchanged clear', async () => {
+    const keyword = `never voted ${randomUUID()}`;
+    const revisionBefore = getKeywordStrategyGenerationState(wsId).revision;
+    const activityBefore = (db.prepare(`
+      SELECT COUNT(*) AS count FROM activity_log
+      WHERE workspace_id = ? AND type = 'client_content_gap_vote'
+    `).get(wsId) as { count: number }).count;
+    clearBroadcastCalls();
+
+    const res = await clientPostJson(`/api/public/content-gap-vote/${wsId}`, { keyword, vote: 'none' });
+
+    expect(res.status).toBe(200);
+    expect(getKeywordStrategyGenerationState(wsId).revision).toBe(revisionBefore);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect((db.prepare(`
+      SELECT COUNT(*) AS count FROM activity_log
+      WHERE workspace_id = ? AND type = 'client_content_gap_vote'
+    `).get(wsId) as { count: number }).count).toBe(activityBefore);
+  });
+
+  it('rejects punctuation-only keywords without changing revision', async () => {
+    const revisionBefore = getKeywordStrategyGenerationState(wsId).revision;
+    const res = await clientPostJson(`/api/public/content-gap-vote/${wsId}`, {
+      keyword: '!!!',
+      vote: 'up',
+    });
+
+    expect(res.status).toBe(400);
+    expect(getKeywordStrategyGenerationState(wsId).revision).toBe(revisionBefore);
+  });
+
+  it('rolls back the vote when generation revision invalidation fails', async () => {
+    const keyword = `rollback vote ${randomUUID()}`;
+    db.exec(`
+      CREATE TEMP TRIGGER fail_content_gap_vote_revision
+      BEFORE UPDATE OF keyword_strategy_generation_revision ON workspaces
+      BEGIN
+        SELECT RAISE(ABORT, 'forced vote revision failure');
+      END;
+    `);
+    try {
+      const res = await clientPostJson(`/api/public/content-gap-vote/${wsId}`, { keyword, vote: 'up' });
+      expect(res.status).toBe(500);
+      expect(db.prepare(`
+        SELECT 1 FROM content_gap_votes_v2_compat
+        WHERE workspace_id = ? AND raw_keyword = ?
+      `).get(wsId, keyword)).toBeUndefined();
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS fail_content_gap_vote_revision');
+    }
+  });
+
   it('returns 401 without auth cookie', async () => {
     const res = await fetch(`${baseUrl}/api/public/content-gap-vote/${wsId}`, {
       method: 'POST',
@@ -387,6 +442,29 @@ describe('POST /api/public/content-gap-vote/:workspaceId', () => {
 });
 
 describe('GET /api/public/content-gap-votes/:workspaceId', () => {
+  it('returns meaning-distinct raw Unicode vote keys and clears them exactly', async () => {
+    await clientPostJson(`/api/public/content-gap-vote/${wsId}`, { keyword: 'C', vote: 'down' });
+    await clientPostJson(`/api/public/content-gap-vote/${wsId}`, { keyword: 'C#', vote: 'up' });
+    await clientPostJson(`/api/public/content-gap-vote/${wsId}`, { keyword: '東京', vote: 'up' });
+    await clientPostJson(`/api/public/content-gap-vote/${wsId}`, { keyword: '__proto__', vote: 'down' });
+
+    const before = await getJson(`/api/public/content-gap-votes/${wsId}`);
+    expect(await before.json()).toEqual(expect.objectContaining({
+      votes: expect.objectContaining({ C: 'down', 'C#': 'up', '東京': 'up', __proto__: 'down' }),
+    }));
+    const beforeBody = await (await getJson(`/api/public/content-gap-votes/${wsId}`)).json() as {
+      votes: Record<string, string>;
+    };
+    expect(Object.prototype.hasOwnProperty.call(beforeBody.votes, '__proto__')).toBe(true);
+
+    await clientPostJson(`/api/public/content-gap-vote/${wsId}`, { keyword: 'C#', vote: 'none' });
+    const after = await getJson(`/api/public/content-gap-votes/${wsId}`);
+    const body = await after.json() as { votes: Record<string, string> };
+    expect(body.votes.C).toBe('down');
+    expect(body.votes['C#']).toBeUndefined();
+    expect(body.votes['東京']).toBe('up');
+  });
+
   it('returns votes map after seeding votes', async () => {
     // Use keywords without special chars so normalization is identity
     const kwAlpha = 'vote get test alpha unique';
@@ -459,6 +537,13 @@ describe('Broadcasts after mutations', () => {
     expect(match).toBeDefined();
     const payload = match!.payload as { keyword: string; vote: string };
     expect(payload.vote).toBe('up');
+    expect(broadcastState.calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        workspaceId: wsId,
+        event: WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED,
+        payload: expect.objectContaining({ reason: 'content_gap_vote' }),
+      }),
+    ]));
   });
 });
 

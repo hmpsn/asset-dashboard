@@ -7,7 +7,7 @@ import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
 import { recordAction, getActionBySource, fillPredictedEmvIfNull } from './outcome-tracking.js';
 import { recommendationOutcomeActionType } from './domains/recommendations/outcome-action-type.js';
-import { loadRecommendationSet } from './domains/recommendations/storage.js';
+import { loadRecommendationSet, loadRecommendationItem } from './domains/recommendations/storage.js';
 import type { RecType } from '../shared/types/recommendations.js';
 
 const log = createLogger('outcome-backfill');
@@ -17,6 +17,7 @@ const log = createLogger('outcome-backfill');
 interface ContentPostRow {
   id: string;
   workspace_id: string;
+  title: string | null;
   target_keyword: string | null;
   published_at: string | null;
 }
@@ -25,6 +26,12 @@ interface AnalyticsInsightRow {
   id: string;
   workspace_id: string;
   page_id: string | null;
+  // D4: title columns the live insight seam (recordInsightResolutionOutcome in
+  // server/outcome-tracking.ts) uses to snapshot the source label — threaded here so a
+  // backfilled insight win renders the real headline instead of the generic per-action
+  // label forever (backfill is skip-if-exists, so it is never re-snapshotted).
+  page_title: string | null;
+  strategy_keyword: string | null;
   resolution_status: string | null;
   resolved_at: string | null;
 }
@@ -38,12 +45,12 @@ interface WorkspaceIdRow {
 const stmts = createStmtCache(() => ({
   allWorkspaceIds: db.prepare(`SELECT id FROM workspaces`),
   publishedPosts: db.prepare(`
-    SELECT id, workspace_id, target_keyword, published_at
+    SELECT id, workspace_id, title, target_keyword, published_at
     FROM content_posts
     WHERE workspace_id = ? AND published_at IS NOT NULL
   `),
   resolvedInsights: db.prepare(`
-    SELECT id, workspace_id, page_id, resolution_status, resolved_at
+    SELECT id, workspace_id, page_id, page_title, strategy_keyword, resolution_status, resolved_at
     FROM analytics_insights
     WHERE workspace_id = ? AND resolution_status = 'resolved'
   `),
@@ -53,6 +60,22 @@ const stmts = createStmtCache(() => ({
     SELECT id, source_id
     FROM tracked_actions
     WHERE workspace_id = ? AND source_type = 'recommendation' AND predicted_emv IS NULL
+  `),
+  // B12 repair pass: recommendation-sourced actions that never captured a source_label
+  // snapshot (pre-R6-PR1 rows — recordAction() started writing source_label/source_snapshot
+  // in R6-PR1, so every row created before that migration has both columns NULL).
+  nullLabelRecActions: db.prepare(`
+    SELECT id, source_id
+    FROM tracked_actions
+    WHERE workspace_id = ? AND source_type = 'recommendation' AND source_label IS NULL
+  `),
+  // B12: never overwrites — guarded on source_label IS NULL in the statement itself, so a
+  // label captured at record time (or by a previous run of this same repair pass) can never
+  // be clobbered. Mirrors fillPredictedEmvIfNull's immutable-once-filled contract.
+  fillSourceLabelIfNull: db.prepare(`
+    UPDATE tracked_actions
+    SET source_label = ?, source_snapshot = ?, updated_at = datetime('now')
+    WHERE id = ? AND workspace_id = ? AND source_label IS NULL
   `),
 }));
 
@@ -85,6 +108,12 @@ export function backfillPublishedContent(workspaceId: string): number {
           sourceFlag: 'backfill',
           baselineConfidence: 'estimated',
           attribution: 'platform_executed',
+          // R6 (B11): snapshot the post's real title from the row we already read so a
+          // backfilled content win reads the headline, not the generic label. Guarded on
+          // a real title (FM-2); target_keyword captured as a secondary identity hint.
+          ...(post.title?.trim()
+            ? { source: { label: post.title.trim(), snapshot: { title: post.title.trim(), type: 'post' } } }
+            : {}),
         });
         count++;
       }
@@ -127,6 +156,18 @@ export function backfillResolvedInsights(workspaceId: string): number {
           sourceFlag: 'backfill',
           baselineConfidence: 'estimated',
           attribution: 'platform_executed',
+          // D4: snapshot the insight's identity using the SAME title-preference the live
+          // seam uses (recordInsightResolutionOutcome: pageTitle -> strategyKeyword). Only
+          // pass a source when a real title exists (FM-2: never fabricate). Without this a
+          // backfilled insight win falls through resolveWinTitle's snapshot->live->generic
+          // chain — and there is NO `insight` live-lookup case in resolveWinTitle, so it
+          // degrades to the generic label permanently.
+          ...(() => {
+            const title = insight.page_title?.trim() || insight.strategy_keyword?.trim() || null;
+            return title
+              ? { source: { label: title, snapshot: { title, type: 'insight' as const, page: insight.page_id ?? undefined } } }
+              : {};
+          })(),
         });
         count++;
       }
@@ -203,6 +244,12 @@ export function backfillCompletedRecommendations(workspaceId: string): number {
           // null when the rec carries no opportunity (legacy row / OV not attached).
           predictedEmv: rec.opportunity?.predictedEmv ?? null,
           attribution: 'platform_executed',
+          // R6 (B11): snapshot the rec's identity from the read model we already hold.
+          // Only a real title is captured (FM-2: never fabricated) — omitted when the
+          // legacy row has no title.
+          ...(typeof rec.title === 'string' && rec.title.trim()
+            ? { source: { label: rec.title.trim(), snapshot: { title: rec.title.trim(), type: 'recommendation', page: firstAffectedPage ?? undefined } } }
+            : {}),
         });
         count++;
       }
@@ -272,6 +319,59 @@ export function backfillPredictedEmvSnapshots(workspaceId: string): number {
   return filled;
 }
 
+/**
+ * Reconcile R6 (Task B12) repair pass: best-effort fill of MISSING `source_label` /
+ * `source_snapshot` on existing recommendation-sourced tracked_actions rows, using the
+ * now-live `recommendation_items` rows (R7 blob->rows cutover, B5) as the title source.
+ *
+ * Why these rows exist: recordAction() only started writing source_label/source_snapshot in
+ * R6-PR1 (migration 165) — every recommendation-sourced action recorded before that point has
+ * both columns NULL, so its win title falls all the way through to the generic per-action-type
+ * label (resolveWinTitle's snapshot->live->generic chain) even though the live recommendation
+ * row may still exist today.
+ *
+ * Guards (mirrors backfillPredictedEmvSnapshots):
+ *  - NEVER overwrites: fillSourceLabelIfNull is gated on `source_label IS NULL` in the
+ *    statement itself — a label captured at record time, or by a prior run of this pass, can
+ *    never be clobbered.
+ *  - NEVER fabricates: only fills when `loadRecommendationItem` returns a row with a
+ *    non-empty `title` (FM-2 — an absent/blank title is skipped, not backfilled with a guess).
+ *  - Actions whose recommendation no longer exists are left NULL (no oracle to consult) — they
+ *    surface via the integrity sweep (server/outcome-source-integrity-sweep-job.ts) instead.
+ *
+ * Idempotent by construction: filled rows stop matching the `source_label IS NULL` candidate
+ * query, so a second run is a natural no-op. Uses `loadRecommendationItem` (single-row read)
+ * rather than `loadRecommendationSet` (whole-set read) since candidates are typically sparse
+ * relative to the full recommendation set.
+ */
+export function backfillSourceLabels(workspaceId: string): number {
+  const candidates = stmts().nullLabelRecActions.all(workspaceId) as Array<{ id: string; source_id: string | null }>;
+  if (candidates.length === 0) return 0;
+
+  let filled = 0;
+  const run = db.transaction(() => {
+    for (const action of candidates) {
+      const recId = action.source_id?.trim();
+      if (!recId) continue;
+      const rec = loadRecommendationItem(workspaceId, recId);
+      const title = rec?.title?.trim();
+      if (!title) continue; // FM-2: never fabricate a label from an absent/blank title
+      const firstAffectedPage = Array.isArray(rec?.affectedPages)
+        ? rec.affectedPages.find((page): page is string => typeof page === 'string' && page.trim().length > 0) ?? undefined
+        : undefined;
+      const snapshot = JSON.stringify({ title, type: 'recommendation', page: firstAffectedPage });
+      const result = stmts().fillSourceLabelIfNull.run(title, snapshot, action.id, workspaceId);
+      if (result.changes > 0) filled++;
+    }
+  });
+  run();
+
+  if (filled > 0) {
+    log.info({ workspaceId, filled, candidates: candidates.length }, 'backfillSourceLabels complete');
+  }
+  return filled;
+}
+
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 export interface BackfillResult {
@@ -303,8 +403,12 @@ export function runBackfill(workspaceId?: string): BackfillResult {
       // (they no longer match the NULL candidate query) and only genuine pre-A5 /
       // opportunity-less-at-completion rows get the best-effort fill.
       const emvFills = backfillPredictedEmvSnapshots(wsId);
+      // B12: same ordering rationale as A5 — runs AFTER the rec pass so newly created
+      // actions (already snapshotted at record time) don't match the NULL candidate query;
+      // only genuine pre-R6-PR1 rows get the best-effort label fill.
+      const labelFills = backfillSourceLabels(wsId);
       backfilledCount += posts + insights + recs;
-      log.info({ workspaceId: wsId, posts, insights, recs, emvFills }, 'Workspace backfill complete');
+      log.info({ workspaceId: wsId, posts, insights, recs, emvFills, labelFills }, 'Workspace backfill complete');
     } catch (err) {
       errors++;
       log.error({ err, workspaceId: wsId }, 'Workspace backfill failed — skipping');

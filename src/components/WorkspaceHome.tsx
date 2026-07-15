@@ -1,9 +1,9 @@
-import { useState, useEffect, Suspense } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Shield, Search, BarChart3, TrendingUp, TrendingDown,
-  Loader2, Bell, FileText, AlertTriangle,
+  Bell, FileText, AlertTriangle,
   Globe, Clipboard, Flag, Clock, RefreshCw, Layers, DollarSign, Target,
 } from 'lucide-react';
 import {
@@ -24,10 +24,7 @@ import { SeoWorkStatus, ActivityFeed, RankingsSnapshot, ActiveRequestsAnnotation
 import { type Page, adminPath, clientPath } from '../routes';
 import { useWorkspaceHomeData, useAdminROI, useWorkspaceIntelligence } from '../hooks/admin';
 import { queryKeys } from '../lib/queryKeys';
-import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { timeAgo } from '../lib/timeAgo';
-
-const MeetingBriefPage = lazyWithRetry(() => import('./admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 
 interface WorkspaceHomeProps {
   workspaceId: string;
@@ -52,11 +49,6 @@ function fmt(n: number): string {
   return String(n);
 }
 
-const HOME_TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'meeting-brief', label: 'Meeting Brief' },
-];
-
 // Tabs for the lower operational sections (below the metric grid)
 const SECTION_TABS = [
   { id: 'overview', label: 'Overview' },
@@ -64,12 +56,10 @@ const SECTION_TABS = [
   { id: 'activity', label: 'Activity' },
 ];
 
-type HomeTab = 'overview' | 'meeting-brief';
 type SectionTab = 'overview' | 'pipeline' | 'activity';
 
 export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webflowSiteName, gscPropertyUrl, ga4PropertyId }: WorkspaceHomeProps) {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   // The standalone Rank Tracker folded into the Keyword Hub; rank-related
   // drill-ins route to seo-keywords.
   const ranksTab: Page = 'seo-keywords';
@@ -89,10 +79,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   const { data: intel } = useWorkspaceIntelligence(workspaceId, ['siteHealth', 'contentPipeline', 'clientSignals']);
   const [now, setNow] = useState(() => new Date());
   const [workOrderPanelOpen, setWorkOrderPanelOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<HomeTab>(() => {
-    const param = searchParams.get('tab');
-    return param === 'meeting-brief' ? 'meeting-brief' : 'overview';
-  });
   const [activeSectionTab, setActiveSectionTab] = useState<SectionTab>('overview');
 
   const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
@@ -108,16 +94,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
   useEffect(() => {
     setChecklistVisible(!localStorage.getItem(storageKey));
   }, [storageKey]);
-
-  // Clear ?tab= from URL on manual tab change so refresh shows last selection
-  const handleTabChange = (id: string) => {
-    setActiveTab(id as HomeTab);
-    if (searchParams.has('tab')) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('tab');
-      setSearchParams(next, { replace: true });
-    }
-  };
 
   // Tick every 30s so relative timestamps stay fresh
   useEffect(() => {
@@ -409,21 +385,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       {/* T2.2 — WorkspaceHealthBadge REMOVED. Site Health StatCard + MetricRing
           is the single canonical health representation on this screen. */}
 
-      <TabBar
-        tabs={HOME_TABS}
-        active={activeTab}
-        onChange={handleTabChange}
-        className="mb-2"
-        ariaLabel="Workspace view"
-      />
-
-      {activeTab === 'meeting-brief' ? (
-        <ErrorBoundary label="Meeting Brief">
-          <Suspense fallback={<div className="flex items-center justify-center py-24"><Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" /></div>}>
-            <MeetingBriefPage workspaceId={workspaceId} onNavigate={navigate} />
-          </Suspense>
-        </ErrorBoundary>
-      ) : (
       <>
       {/* ── Weekly Accomplishments ── */}
       {weeklySummary && <WeeklyAccomplishments summary={weeklySummary} />}
@@ -614,6 +575,7 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
       <AnomalyAlerts workspaceId={workspaceId} isAdmin={true} />
 
       {/* T2.4 — Operational sections grouped in a TabBar to avoid a 10-section scroll */}
+      {/* tab-deeplink-ok — local section switcher; WorkspaceHome no longer receives ?tab= subtabs */}
       <TabBar
         tabs={SECTION_TABS}
         active={activeSectionTab}
@@ -665,7 +627,6 @@ export function WorkspaceHome({ workspaceId, workspaceName, webflowSiteId, webfl
         </>
       )}
       </>
-      )}
 
       {/* ── Work-order conversation/close panel (focused modal) ── */}
       {workOrderPanelOpen && (

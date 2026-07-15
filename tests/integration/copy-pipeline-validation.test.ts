@@ -111,6 +111,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status — validation'
   it('returns 400 for invalid status value', async () => {
     const res = await patchJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/status`, {
       status: 'not-a-valid-status',
+      expectedRevision: 0,
     });
     expect(res.status).toBe(400);
   });
@@ -118,6 +119,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status — validation'
   it('returns 404 for valid status on unknown section', async () => {
     const res = await patchJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/status`, {
       status: 'draft',
+      expectedRevision: 0,
     });
     // valid status but section doesn't exist
     expect(res.status).toBe(404);
@@ -128,7 +130,10 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status — validation'
   it('accepts all valid status enum values (Zod passes, 404 from DB lookup)', async () => {
     const validStatuses = ['pending', 'draft', 'client_review', 'approved', 'revision_requested'];
     for (const status of validStatuses) {
-      const res = await patchJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/status`, { status });
+      const res = await patchJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/status`, {
+        status,
+        expectedRevision: 0,
+      });
       // Should pass Zod validation (400 would mean schema rejection), but 404 because section doesn't exist
       expect(res.status).not.toBe(400);
     }
@@ -142,13 +147,17 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text — validation', 
   });
 
   it('returns 400 for empty copy string (min(1))', async () => {
-    const res = await patchJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/text`, { copy: '' });
+    const res = await patchJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/text`, {
+      copy: '',
+      expectedRevision: 0,
+    });
     expect(res.status).toBe(400);
   });
 
   it('returns 404 for valid copy on unknown section', async () => {
     const res = await patchJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/text`, {
       copy: 'Updated copy text here',
+      expectedRevision: 0,
     });
     expect(res.status).toBe(404);
   });
@@ -160,6 +169,7 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest — validation'
   it('returns 400 for missing originalText', async () => {
     const res = await postJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/suggest`, {
       suggestedText: 'New suggestion',
+      expectedRevision: 0,
     });
     expect(res.status).toBe(400);
   });
@@ -167,6 +177,7 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest — validation'
   it('returns 400 for missing suggestedText', async () => {
     const res = await postJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/suggest`, {
       originalText: 'Original text here',
+      expectedRevision: 0,
     });
     expect(res.status).toBe(400);
   });
@@ -175,6 +186,7 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest — validation'
     const res = await postJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/suggest`, {
       originalText: '',
       suggestedText: 'New suggestion',
+      expectedRevision: 0,
     });
     expect(res.status).toBe(400);
   });
@@ -183,8 +195,54 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest — validation'
     const res = await postJson(`/api/copy/${wsId}/section/sec_nonexistent_13502/suggest`, {
       originalText: 'Original text here',
       suggestedText: 'Improved suggestion',
+      expectedRevision: 0,
     });
     expect(res.status).toBe(404);
+  });
+
+  it('rejects missing, negative, fractional, and unsafe expected revisions', async () => {
+    const invalidExpectedRevisions = [undefined, -1, 1.5, Number.MAX_SAFE_INTEGER + 1];
+    for (const expectedRevision of invalidExpectedRevisions) {
+      const body = expectedRevision === undefined
+        ? { originalText: 'Original', suggestedText: 'Suggestion' }
+        : { originalText: 'Original', suggestedText: 'Suggestion', expectedRevision };
+      const res = await postJson(
+        `/api/copy/${wsId}/section/sec_nonexistent_13502/suggest`,
+        body,
+      );
+      expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe('Copy replacement and bulk-send revision validation', () => {
+  it('requires an expected revision for section regeneration', async () => {
+    const res = await postJson(
+      `/api/copy/${wsId}/bp_nonexistent_13502/entry_nonexistent_13502/regenerate/sec_nonexistent_13502`,
+      { note: 'Tighten this section.' },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('requires a section revision census for bulk send', async () => {
+    const res = await postJson(
+      `/api/copy/${wsId}/bp_nonexistent_13502/entry_nonexistent_13502/send-to-client`,
+      {},
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects duplicate section identities before entry lookup', async () => {
+    const res = await postJson(
+      `/api/copy/${wsId}/bp_nonexistent_13502/entry_nonexistent_13502/send-to-client`,
+      {
+        sectionRevisions: [
+          { sectionId: 'section-1', expectedRevision: 2 },
+          { sectionId: 'section-1', expectedRevision: 2 },
+        ],
+      },
+    );
+    expect(res.status).toBe(400);
   });
 });
 

@@ -549,7 +549,10 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
   // toggleStage comes from useToggleSet (above). Bulk "Stage N" adds the selection (a set UNION, not
   // a toggle) — the toggle primitive only handles single keys.
   const stageMany = (recIds: string[]) =>
-    setStagedRecIds((prev) => new Set([...prev, ...recIds]));
+    setStagedRecIds((prev) => new Set([...prev, ...recIds.filter((id) => sendableSet.has(id))]));
+  const toggleSendableStage = (recId: string) => {
+    if (sendableSet.has(recId)) toggleStage(recId);
+  };
   const handleSendIssue = () => {
     if (stagedSendableIds.length === 0) return;
     // The ONE client commit (Blocker 5): send the staged set, then clear it.
@@ -682,8 +685,9 @@ export function KeywordStrategyPanel({ workspaceId }: Props) {
         onEditWording={operatorSteering.editWording}
         stagedCount={stagedCount}
         curatedCount={curatedCount}
-        stagedRecIds={stagedRecIds}
-        onStage={toggleStage}
+        stagedRecIds={new Set(stagedSendableIds)}
+        stageableRecIds={sendableSet}
+        onStage={toggleSendableStage}
         onStageMany={stageMany}
         onAddRec={() => setAddRecOpen(true)}
       />

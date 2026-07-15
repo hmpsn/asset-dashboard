@@ -19,6 +19,9 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
+import { RebuiltAppChrome, useRebuildShellEnabled } from './components/layout/RebuiltAppChrome';
+import { REBUILT_SURFACES } from './components/layout/rebuiltSurfaces';
+import { Icon } from './components/ui/Icon';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { TabBar } from './components/ui/TabBar';
 import { Clipboard, Globe } from 'lucide-react';
@@ -28,6 +31,11 @@ import type { FixContext } from './types/fix-context';
 const ClientDashboard = lazyWithRetry(() => import('./components/ClientDashboard').then(m => ({ default: m.ClientDashboard })));
 const LandingPage = lazyWithRetry(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 const PageRewriteChat = lazyWithRetry(() => import('./components/PageRewriteChat').then(m => ({ default: m.PageRewriteChat })));
+// DEV-only design-system harness (F3.2) — mounted only under import.meta.env.DEV
+// (see the /__ds-harness route). Never shipped to production; exempt from nav/registry.
+const DsHarness = import.meta.env.DEV
+  ? lazyWithRetry(() => import('./components/dev/DsHarness'))
+  : null;
 
 // ── Lazy-loaded admin tab chunks ──
 const SettingsPanel = lazyWithRetry(() => import('./components/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
@@ -63,11 +71,23 @@ const OutcomesOverview = lazyWithRetry(() => import('./components/admin/outcomes
 const AdminInbox = lazyWithRetry(() => import('./components/admin/AdminInbox').then(m => ({ default: m.AdminInbox })));
 const ClientActionsTab = lazyWithRetry(() => import('./components/admin/ClientActionsTab').then(m => ({ default: m.ClientActionsTab })));
 const ClientDeliverablesPane = lazyWithRetry(() => import('./components/admin/ClientDeliverablesPane').then(m => ({ default: m.ClientDeliverablesPane })));
-const MeetingBriefPage = lazyWithRetry(() => import('./components/admin/MeetingBrief/MeetingBriefPage').then(m => ({ default: m.MeetingBriefPage })));
 const DiagnosticReportPage = lazyWithRetry(() => import('./components/admin/DiagnosticReport/DiagnosticReportPage').then(m => ({ default: m.DiagnosticReportPage })));
 
 function ChunkFallback() {
   return <div className="flex items-center justify-center py-24"><div className="w-6 h-6 border-2 rounded-[var(--radius-pill)] animate-spin border-[var(--surface-3)] border-t-teal-400" /></div>;
+}
+
+function RebuiltClipboardStatus({ status }: { status: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed right-5 top-[calc(var(--shell-topbar)+var(--space-4))] z-[var(--z-toast)] flex max-w-[min(420px,calc(100vw-2.5rem))] items-center gap-1.5 rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] px-4 py-2 t-caption-sm font-medium text-accent-brand shadow-[var(--shadow-lg)]"
+    >
+      <Icon name="clipboard" size="sm" className="flex-none" />
+      <span>{status}</span>
+    </div>
+  );
 }
 
 // Not lazy-loaded — the redirect fires immediately so a lazy chunk would add
@@ -129,6 +149,19 @@ function App() {
       <Routes>
         <Route path="/welcome" element={<Suspense fallback={<ChunkFallback />}><LandingPage /></Suspense>} />
         <Route path="/styleguide" element={<StyleguideRedirect />} />
+        {/* DEV-only DS harness — the F3.3 keyboard-walk target. Excluded from
+            production builds; import.meta.env.DEV is statically false in prod so
+            this Route (and its lazy chunk) is tree-shaken away. */}
+        {import.meta.env.DEV && DsHarness && (
+          <Route
+            path="/__ds-harness"
+            element={
+              <ToastProvider>
+                <Suspense fallback={<ChunkFallback />}><DsHarness /></Suspense>
+              </ToastProvider>
+            }
+          />
+        )}
         <Route path="/client/beta/:workspaceId/*" element={<ClientRouteShell betaMode />} />
         <Route path="/client/:workspaceId/*" element={<ClientRouteShell />} />
         <Route path="/*" element={<ToastProvider><BackgroundTaskProvider><AdminApp /></BackgroundTaskProvider></ToastProvider>} />
@@ -163,6 +196,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const rebuildShellEnabled = useRebuildShellEnabled();
 
   // ── Server state via React Query ──
   const { data: workspaces = [] } = useWorkspaces();
@@ -187,6 +221,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const [focusMode, setFocusMode] = useState(false);
   // Derived synchronously — prevents layout flash when navigating away (useEffect runs after paint)
   const effectiveFocusMode = focusMode && tab === 'rewrite';
+  const rebuiltSurfaceActive = rebuildShellEnabled && REBUILT_SURFACES[tab] !== undefined;
 
   // Reset backing state when navigating away so returning to rewrite starts fresh
   useEffect(() => {
@@ -195,7 +230,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
 
   // Escape key exits focus mode (in addition to the sidebar strip click)
   useEffect(() => {
-    if (!effectiveFocusMode) return;
+    if (!effectiveFocusMode || rebuiltSurfaceActive) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       // Don't exit if the user is actively typing in any editable element
@@ -205,7 +240,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [effectiveFocusMode]);
+  }, [effectiveFocusMode, rebuiltSurfaceActive]);
 
   // Read fixContext from router state (set by SeoAudit / KeywordStrategy navigate calls)
   useEffect(() => {
@@ -242,6 +277,11 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (!urlWorkspaceId) return null;
     return workspaces.find(w => w.id === urlWorkspaceId) || null;
   }, [urlWorkspaceId, workspaces]);
+  const chromeWorkspace = useMemo(() => {
+    if (selected) return selected;
+    if (GLOBAL_TABS.has(tab)) return workspaces[0] ?? null;
+    return null;
+  }, [selected, tab, workspaces]);
 
   // Rewrite tab is always a full-height two-pane layout (independent scroll per pane).
   // Focus mode additionally hides the sidebar, but height containment is needed in both modes.
@@ -390,8 +430,6 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     }
 
     if (tab === 'home') return <WorkspaceHome key={`home-${selected.id}`} workspaceId={selected.id} workspaceName={selected.webflowSiteName || selected.name} webflowSiteId={selected.webflowSiteId} webflowSiteName={selected.webflowSiteName} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
-    // 'brief' kept for backward compat — WorkspaceHome tab is the primary discovery path
-    if (tab === 'brief') return <MeetingBriefPage key={`brief-${selected.id}`} workspaceId={selected.id} onNavigate={navigate} />;
     if (tab === 'diagnostics') return <DiagnosticReportPage key={`diagnostics-${selected.id}`} workspaceId={selected.id} />;
     if (tab === 'media') return <MediaTab key={selected.folder} siteId={selected.webflowSiteId} workspaceId={selected.id} workspaceFolder={selected.folder} queue={workspaceQueue} />;
     if (tab === 'seo-audit') return <SeoAudit key={`seo-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} siteName={selected.webflowSiteName || selected.name} />;
@@ -415,7 +453,14 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (tab === 'brand') return <BrandHub key={`brand-${selected.id}`} workspaceId={selected.id} webflowSiteId={selected.webflowSiteId} />;
     if (tab === 'analytics-hub') return <AnalyticsHub key={`analytics-${selected.id}`} workspaceId={selected.id} siteId={selected.webflowSiteId} gscPropertyUrl={selected.gscPropertyUrl} ga4PropertyId={selected.ga4PropertyId} />;
     if (tab === 'performance') return <Performance key={`perf-${selected.webflowSiteId}`} siteId={selected.webflowSiteId!} workspaceId={selected.id} />;
-    if (tab === 'content-perf') return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
+    if (tab === 'content-perf') {
+      if (rebuildShellEnabled) {
+        const item = new URLSearchParams(location.search).get('item');
+        const target = `${adminPath(selected.id, 'content-pipeline')}?tab=published${item ? `&item=${encodeURIComponent(item)}` : ''}`;
+        return <Navigate to={target} replace />;
+      }
+      return <ContentPerformance key={`content-perf-${selected.id}`} workspaceId={selected.id} />;
+    }
     if (tab === 'requests') return (
       <div className="flex flex-col">
         <TabBar
@@ -440,6 +485,61 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
 
     return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
+
+  const canMountRebuiltSurface = chromeWorkspace !== null || GLOBAL_TABS.has(tab);
+  const RebuiltSurface = rebuildShellEnabled && canMountRebuiltSurface ? REBUILT_SURFACES[tab] : undefined;
+  if (RebuiltSurface && canMountRebuiltSurface) {
+    const rebuiltWorkspaceId = selected?.id ?? chromeWorkspace?.id ?? '';
+    return (
+      <>
+        <RebuiltAppChrome
+          workspaces={workspaces}
+          selected={chromeWorkspace}
+          tab={tab}
+          theme={theme}
+          pendingContentRequests={pendingContentRequests}
+          connectionHealth={{
+            connected,
+            hasOpenAIKey: health.hasOpenAIKey,
+            hasWebflowToken: health.hasWebflowToken,
+            workspaceCount: workspaces.length,
+          }}
+          onCreate={handleCreate}
+          onDelete={handleDelete}
+          onLinkSite={handleLinkSite}
+          onUnlinkSite={handleUnlinkSite}
+          toggleTheme={toggleTheme}
+          onLogout={onLogout}
+          focusMode={effectiveFocusMode}
+          onFocusModeChange={setFocusMode}
+        >
+          <ErrorBoundary label={tab}>
+            <Suspense fallback={<ChunkFallback />}>
+              <RebuiltSurface key={`${tab}:${rebuiltWorkspaceId}`} workspaceId={rebuiltWorkspaceId} />
+            </Suspense>
+          </ErrorBoundary>
+        </RebuiltAppChrome>
+        {clipboardStatus && <RebuiltClipboardStatus status={clipboardStatus} />}
+        {/* Global chrome the legacy shell renders as siblings — restored for EVERY
+            rebuilt surface (review PR #1480: the rebuilt branch dropped these, killing
+            ⌘K + admin chat). Connection health is rendered by RebuiltAppChrome. */}
+        <CommandPalette
+          workspaces={workspaces}
+          selectedWorkspace={chromeWorkspace}
+          onSelectWorkspace={(ws) => navigate(adminPath(ws.id))}
+        />
+        {health.hasOpenAIKey && chromeWorkspace && (
+          <ErrorBoundary label="Admin Chat">
+            <AdminChat
+              key={chromeWorkspace.id}
+              workspaceId={chromeWorkspace.id}
+              workspaceName={chromeWorkspace.webflowSiteName || chromeWorkspace.name}
+            />
+          </ErrorBoundary>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[var(--surface-1)] text-[var(--brand-text)]">
@@ -515,6 +615,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
       {selected && health.hasOpenAIKey && (
         <ErrorBoundary label="Admin Chat">
           <AdminChat
+            key={selected.id}
             workspaceId={selected.id}
             workspaceName={selected.webflowSiteName || selected.name}
           />

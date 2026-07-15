@@ -18,7 +18,13 @@ import { parsePaginationParams } from '../pagination.js';
 import { notifyTeamActionApproved, notifyTeamContentRequest, notifyTeamChangesRequested, notifyTeamWorkOrderComment } from '../email.js';
 import { getWorkOrder } from '../work-orders.js';
 import { addWorkOrderComment, listWorkOrderComments } from '../work-order-comments.js';
-import { getPost, updatePostField, snapshotPostVersion, getMostRecentPostVersion } from '../content-posts.js';
+import {
+  getMostRecentPostVersion,
+  getPost,
+  updatePostField,
+  updatePostFieldWithSnapshot,
+} from '../content-posts.js';
+import { GenerationRevisionConflictError } from '../generation-provenance.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 import { normalizePageUrl } from '../utils/page-address.js';
 import { validateEnum } from '../utils/request-validation.js';
@@ -27,11 +33,16 @@ import { countHtmlWords } from '../content-posts-ai.js';
 import { getPageKeyword, listPageKeywords, listPageKeywordsPaged } from '../page-keywords.js';
 import { assembleStoredKeywordStrategy } from '../keyword-strategy-assembler.js';
 import { getClientActor, requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
-import { getPageTrend, getQueryPageData } from '../search-console.js';
+import { getQueryPageData } from '../search-console.js';
 import { getWorkspace, computeEffectiveTier } from '../workspaces.js';
-import { getTrackedKeywords, addTrackedKeyword, removeTrackedKeyword } from '../rank-tracking.js';
+import { getTrackedKeywords, addTrackedKeywordAndInvalidateStrategy, removeTrackedKeywordAndInvalidateStrategy } from '../rank-tracking.js';
 import { TRACKED_KEYWORD_SOURCE } from '../../shared/types/rank-tracking.js';
-import { handlePublicContentPerformance } from '../domains/content/content-performance.js';
+import { getContentPerformanceTrend, handlePublicContentPerformance } from '../domains/content/content-performance.js';
+import {
+  toPublicContentBrief,
+  toPublicContentPost,
+  toPublicContentTopicRequest,
+} from '../domains/content/public-projections.js';
 import { isProgrammingError } from '../errors.js';
 import { getConfiguredProvider } from '../seo-data-provider.js';
 import { resolveWorkspaceLocationCode } from '../local-seo.js';
@@ -65,7 +76,6 @@ const router = Router();
 const ACTIVITY_COMMENT_PREVIEW_LENGTH = 200;
 type TrackedKeywordActivityType = 'client_keyword_tracked' | 'client_keyword_removed';
 const requirePublicContentWriteAuth = requireAuthenticatedClientPortalAuth('workspaceId');
-const PUBLIC_CONTENT_PERFORMANCE_STATUSES = new Set(['delivered', 'published']);
 
 router.use('/api/public/:resource/:workspaceId', requireClientPortalAuth('workspaceId'));
 
@@ -90,6 +100,25 @@ function recordTrackedKeywordActivity(
     addActivity(workspaceId, type, title, '', {}, actor); // client-visibility-ok: admin-only signal, not surfaced in client activity feed
   } catch (err) {
     log.warn({ err, workspaceId, type }, 'tracked-keyword activity log failed');
+  }
+}
+
+function runPublicContentPostCommitEffect(
+  workspaceId: string,
+  resourceId: string,
+  effect: string,
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    try {
+      log.warn(
+        { err, workspaceId, resourceId, effect },
+        'public content post-commit effect failed',
+      );
+    } catch { // catch-ok -- failure reporting cannot rewrite a committed public mutation as failed.
+    }
   }
 }
 
@@ -323,11 +352,17 @@ router.post('/api/public/content-request/:workspaceId', requirePublicContentWrit
   const targetPageSlug = sanitizePublicPlainText(req.body.targetPageSlug, 200);
   if (!topic || !targetKeyword) return res.status(400).json({ error: 'topic and targetKeyword are required' });
   const request = createContentRequest(req.params.workspaceId, { topic, targetKeyword, intent, priority, rationale, clientNote, serviceType, pageType, initialStatus, targetPageId: targetPageId || undefined, targetPageSlug: targetPageSlug || undefined });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} requested topic: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
-  notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
-  res.json(request);
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'request-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} requested topic: "${topic}"`, `Keyword: "${targetKeyword}" · Priority: ${priority}`, { requestId: request.id }, actor);
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'request-created-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'request-email', () => {
+    notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority, rationale: rationale || '' });
+  });
+  res.json(toPublicContentTopicRequest(request));
 });
 
 // Client can see their own requests (with comments and brief access for review)
@@ -335,25 +370,12 @@ router.get('/api/public/content-requests/:workspaceId', (req, res) => {
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   const pagination = parsePaginationParams(req.query);
-  const toClientView = (r: ReturnType<typeof listContentRequests>[number]) => ({
-    id: r.id, topic: r.topic, targetKeyword: r.targetKeyword, intent: r.intent,
-    priority: r.priority, status: r.status, source: r.source,
-    serviceType: r.serviceType || 'brief_only', pageType: r.pageType || 'blog', upgradedAt: r.upgradedAt,
-    comments: r.comments || [], requestedAt: r.requestedAt, updatedAt: r.updatedAt,
-    deliveryUrl: ['delivered', 'published'].includes(r.status) ? r.deliveryUrl : undefined,
-    deliveryNotes: ['delivered', 'published'].includes(r.status) ? r.deliveryNotes : undefined,
-    // Include briefId only when in client_review or later
-    briefId: ['client_review', 'approved', 'changes_requested', 'in_progress', 'delivered', 'published'].includes(r.status) ? r.briefId : undefined,
-    // Include postId only when post is ready for client review or beyond
-    postId: ['post_review', 'delivered', 'published'].includes(r.status) || (r.status === 'changes_requested' && r.serviceType === 'full_post') ? r.postId : undefined,
-    clientFeedback: r.clientFeedback,
-  });
   if (!pagination) {
-    return res.json(listContentRequests(req.params.workspaceId).map(toClientView));
+    return res.json(listContentRequests(req.params.workspaceId).map(toPublicContentTopicRequest));
   }
   const paged = listContentRequestsPaged(req.params.workspaceId, pagination.limit, pagination.offset);
   return res.json({
-    items: paged.items.map(toClientView),
+    items: paged.items.map(toPublicContentTopicRequest),
     pageInfo: { total: paged.total, limit: paged.limit, offset: paged.offset, hasMore: paged.hasMore },
   });
 });
@@ -377,11 +399,17 @@ router.post('/api/public/content-request/:workspaceId/submit', requirePublicCont
     clientNote: notes, source: 'client', serviceType, pageType, initialStatus,
     targetPageId: targetPageId || undefined, targetPageSlug: targetPageSlug || undefined,
   });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
-  notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'medium', rationale: notes || '' });
-  res.json(request);
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'submit-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'content_requested', `${actor?.name || 'Client'} submitted topic: "${topic}"`, `Keyword: "${targetKeyword}"`, { requestId: request.id }, actor);
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'submit-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'submit-email', () => {
+    notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'medium', rationale: notes || '' });
+  });
+  res.json(toPublicContentTopicRequest(request));
 });
 
 // Client declines a recommended topic
@@ -399,10 +427,14 @@ router.post('/api/public/content-request/:workspaceId/:id/decline', requirePubli
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'content_declined', `${actor?.name || 'Client'} declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
-  res.json(updated);
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'decline-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'content_declined', `${actor?.name || 'Client'} declined topic: "${updated.topic}"`, reason || 'No reason given', { requestId: updated.id }, actor);
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'decline-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  });
+  res.json(toPublicContentTopicRequest(updated));
 });
 
 // Client approves a brief
@@ -418,18 +450,24 @@ router.post('/api/public/content-request/:workspaceId/:id/approve', requirePubli
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'brief_approved', `${actor?.name || 'Client'} approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId }, actor);
-  const wsInfo = getWorkspace(req.params.workspaceId);
-  notifyTeamActionApproved({
-    workspaceId: req.params.workspaceId,
-    workspaceName: wsInfo?.name || req.params.workspaceId,
-    actionTitle: `Brief approved: ${updated.topic}`,
-    sourceType: 'content_brief',
-    actionSummary: `Keyword: ${updated.targetKeyword}`,
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'brief-approval-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'brief_approved', `${actor?.name || 'Client'} approved brief for "${updated.topic}"`, '', { requestId: updated.id, briefId: updated.briefId }, actor);
   });
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
-  res.json(updated);
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'brief-approval-email', () => {
+    const wsInfo = getWorkspace(req.params.workspaceId);
+    notifyTeamActionApproved({
+      workspaceId: req.params.workspaceId,
+      workspaceName: wsInfo?.name || req.params.workspaceId,
+      actionTitle: `Brief approved: ${updated.topic}`,
+      sourceType: 'content_brief',
+      actionSummary: `Keyword: ${updated.targetKeyword}`,
+    });
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'brief-approval-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  });
+  res.json(toPublicContentTopicRequest(updated));
 });
 
 // Client requests changes on a brief
@@ -448,18 +486,24 @@ router.post('/api/public/content-request/:workspaceId/:id/request-changes', requ
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'changes_requested', `${actor?.name || 'Client'} requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
-  const wsInfo = getWorkspace(req.params.workspaceId);
-  notifyTeamChangesRequested({
-    workspaceName: wsInfo?.name || req.params.workspaceId,
-    workspaceId: req.params.workspaceId,
-    topic: updated.topic,
-    targetKeyword: updated.targetKeyword,
-    feedback: feedback || '',
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'brief-changes-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'changes_requested', `${actor?.name || 'Client'} requested changes on "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
   });
-  res.json(updated);
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'brief-changes-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'brief-changes-email', () => {
+    const wsInfo = getWorkspace(req.params.workspaceId);
+    notifyTeamChangesRequested({
+      workspaceName: wsInfo?.name || req.params.workspaceId,
+      workspaceId: req.params.workspaceId,
+      topic: updated.topic,
+      targetKeyword: updated.targetKeyword,
+      feedback: feedback || '',
+    });
+  });
+  res.json(toPublicContentTopicRequest(updated));
 });
 
 // Client upgrades from brief_only to full_post
@@ -479,10 +523,14 @@ router.post('/api/public/content-request/:workspaceId/:id/upgrade', requirePubli
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'content_upgraded', `${actor?.name || 'Client'} upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
-  res.json(updated);
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'upgrade-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'content_upgraded', `${actor?.name || 'Client'} upgraded "${updated.topic}" to full blog post`, '', { requestId: updated.id }, actor);
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'upgrade-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  });
+  res.json(toPublicContentTopicRequest(updated));
 });
 
 // Client or team adds a comment
@@ -492,10 +540,14 @@ router.post('/api/public/content-request/:workspaceId/:id/comment', requirePubli
   if (!content) return res.status(400).json({ error: 'content is required' });
   const updated = addComment(req.params.workspaceId, req.params.id, author, content);
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'content_request_commented', `${actor?.name || 'Client'} commented on "${updated.topic}"`, activityCommentPreview(content), { requestId: updated.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
-  res.json(updated);
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'comment-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'content_request_commented', `${actor?.name || 'Client'} commented on "${updated.topic}"`, activityCommentPreview(content), { requestId: updated.id }, actor);
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'comment-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  });
+  res.json(toPublicContentTopicRequest(updated));
 });
 
 // Client reads its own work-order conversation thread (the "Work in progress" lane).
@@ -546,10 +598,7 @@ router.post('/api/public/work-order/:workspaceId/:orderId/comment', requirePubli
 router.get('/api/public/content-brief/:workspaceId/:briefId', (req, res) => {
   const brief = getBrief(req.params.workspaceId, req.params.briefId);
   if (!brief) return res.status(404).json({ error: 'Brief not found' });
-  // Return client-safe view — sourceEvidence (C4) is admin-internal scraped
-  // source text (~25 KB of competitor bodyText); never serve it to clients.
-  const { sourceEvidence: _sourceEvidence, ...clientBrief } = brief;
-  res.json(clientBrief);
+  res.json(toPublicContentBrief(brief));
 });
 
 // Client can download a brief as branded HTML
@@ -574,30 +623,9 @@ router.get('/api/public/content-performance/:workspaceId', async (req, res) => {
 
 router.get('/api/public/content-performance/:workspaceId/:requestId/trend', async (req, res) => {
   try {
-    const ws = getWorkspace(req.params.workspaceId);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-    const request = getContentRequest(req.params.workspaceId, req.params.requestId);
-    if (!request) return res.status(404).json({ error: 'Request not found' });
-    if (!PUBLIC_CONTENT_PERFORMANCE_STATUSES.has(request.status)) {
-      return res.status(404).json({ error: 'Request not found' });
-    }
-    if (!request.targetPageSlug || !ws.gscPropertyUrl || !ws.webflowSiteId) {
-      return res.json({ trend: [] });
-    }
-
-    let siteBase = ws.gscPropertyUrl.replace(/\/$/, '');
-    if (siteBase.startsWith('sc-domain:')) {
-      siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
-    }
-    const pagePath = normalizePageUrl(request.targetPageSlug);
-    const pageUrl = `${siteBase}${pagePath === '/' ? '' : pagePath}`;
-
-    const publishDate = request.updatedAt || request.requestedAt;
-    const startDate = publishDate.split('T')[0];
-    const endDate = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
-
-    const trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
-    res.json({ trend });
+    const result = await getContentPerformanceTrend(req.params.workspaceId, req.params.requestId, { audience: 'public' });
+    if (!result) return res.status(404).json({ error: 'Published item not found' });
+    res.json(result);
   } catch (err: unknown) {
     log.warn({ err, workspaceId: req.params.workspaceId, requestId: req.params.requestId }, 'public content performance trend failed');
     res.status(500).json({ error: 'Unable to load content performance trend' });
@@ -662,12 +690,18 @@ router.post('/api/public/content-request/:workspaceId/from-audit', requirePublic
     targetPageSlug: pageSlug,
   });
 
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'content_requested', `Content improvement requested for "${pageName}" (from audit)`, `Keyword: "${targetKeyword}" · ${issues.length} issues identified`, { requestId: request.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
-  notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'high', rationale });
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'audit-request-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'content_requested', `Content improvement requested for "${pageName}" (from audit)`, `Keyword: "${targetKeyword}" · ${issues.length} issues identified`, { requestId: request.id }, actor);
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'audit-request-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_CREATED, { id: request.id, topic });
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, request.id, 'audit-request-email', () => {
+    notifyTeamContentRequest({ workspaceName: ws.name, workspaceId: req.params.workspaceId, topic, targetKeyword, priority: 'high', rationale });
+  });
 
-  res.json({ ...request, topKeywords });
+  res.json({ ...toPublicContentTopicRequest(request), topKeywords });
 });
 
 // --- Public Tracked Keywords (client can view/add/remove) ---
@@ -686,7 +720,7 @@ router.post('/api/public/tracked-keywords/:workspaceId', requirePublicContentWri
   const actor = getClientActor(req, ws.id);
   const existingKeywords = getTrackedKeywords(ws.id);
   const alreadyTracked = existingKeywords.some(k => k.query === keyword);
-  const keywords = alreadyTracked ? existingKeywords : addTrackedKeyword(ws.id, keyword, {
+  const keywords = alreadyTracked ? existingKeywords : addTrackedKeywordAndInvalidateStrategy(ws.id, keyword, {
     source: TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED,
   });
   res.json({ keywords });
@@ -718,7 +752,7 @@ router.delete('/api/public/tracked-keywords/:workspaceId', requirePublicContentW
   if (!keyword) return res.status(400).json({ error: 'Keyword required' });
   const existingKeywords = getTrackedKeywords(ws.id);
   const wasTracked = existingKeywords.some(k => k.query === keyword);
-  const keywords = wasTracked ? removeTrackedKeyword(ws.id, keyword) : existingKeywords;
+  const keywords = wasTracked ? removeTrackedKeywordAndInvalidateStrategy(ws.id, keyword) : existingKeywords;
   res.json({ keywords });
   if (wasTracked) {
     const actor = getClientActor(req, ws.id);
@@ -741,9 +775,7 @@ router.get('/api/public/content-posts/:workspaceId/:postId', (req, res) => {
     return res.status(403).json({ error: 'Post is not available for client review' });
   }
 
-  // aiReview (C4) is the admin QA verdict pack — admin-internal; never serve to clients.
-  const { aiReview: _aiReview, ...clientPost } = post;
-  res.json(clientPost);
+  res.json(toPublicContentPost(post));
 });
 
 // Client approves a post — transitions request to 'delivered'
@@ -765,18 +797,24 @@ router.post('/api/public/content-request/:workspaceId/:id/approve-post', require
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'post_approved', `${actor?.name || 'Client'} approved post for "${updated.topic}"`, '', { requestId: updated.id }, actor);
-  const wsInfo = getWorkspace(req.params.workspaceId);
-  notifyTeamActionApproved({
-    workspaceId: req.params.workspaceId,
-    workspaceName: wsInfo?.name || req.params.workspaceId,
-    actionTitle: `Post approved: ${updated.topic}`,
-    sourceType: 'content_post',
-    actionSummary: `Keyword: ${updated.targetKeyword}`,
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'post-approval-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'post_approved', `${actor?.name || 'Client'} approved post for "${updated.topic}"`, '', { requestId: updated.id }, actor);
   });
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
-  res.json(updated);
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'post-approval-email', () => {
+    const wsInfo = getWorkspace(req.params.workspaceId);
+    notifyTeamActionApproved({
+      workspaceId: req.params.workspaceId,
+      workspaceName: wsInfo?.name || req.params.workspaceId,
+      actionTitle: `Post approved: ${updated.topic}`,
+      sourceType: 'content_post',
+      actionSummary: `Keyword: ${updated.targetKeyword}`,
+    });
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'post-approval-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  });
+  res.json(toPublicContentTopicRequest(updated));
 });
 
 // Client requests changes on a post
@@ -802,18 +840,24 @@ router.post('/api/public/content-request/:workspaceId/:id/request-post-changes',
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Request not found' });
-  const actor = getClientActor(req, req.params.workspaceId);
-  addActivity(req.params.workspaceId, 'post_changes_requested', `${actor?.name || 'Client'} requested changes on post for "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
-  const wsInfo = getWorkspace(req.params.workspaceId);
-  notifyTeamChangesRequested({
-    workspaceName: wsInfo?.name || req.params.workspaceId,
-    workspaceId: req.params.workspaceId,
-    topic: updated.topic,
-    targetKeyword: updated.targetKeyword,
-    feedback: feedback || '',
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'post-changes-activity', () => {
+    const actor = getClientActor(req, req.params.workspaceId);
+    addActivity(req.params.workspaceId, 'post_changes_requested', `${actor?.name || 'Client'} requested changes on post for "${updated.topic}"`, feedback || '', { requestId: updated.id }, actor);
   });
-  res.json(updated);
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'post-changes-broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.CONTENT_REQUEST_UPDATE, { id: updated.id, status: updated.status });
+  });
+  runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'post-changes-email', () => {
+    const wsInfo = getWorkspace(req.params.workspaceId);
+    notifyTeamChangesRequested({
+      workspaceName: wsInfo?.name || req.params.workspaceId,
+      workspaceId: req.params.workspaceId,
+      topic: updated.topic,
+      targetKeyword: updated.targetKeyword,
+      feedback: feedback || '',
+    });
+  });
+  res.json(toPublicContentTopicRequest(updated));
 });
 
 // Client edits post content (sections, title, meta — NOT status or admin fields)
@@ -834,6 +878,14 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', requi
     return res.status(403).json({ error: 'Post is not open for editing' });
   }
 
+  const { expectedUpdatedAt, title, metaDescription, introduction, sections, conclusion } = req.body;
+  if (post.updatedAt !== expectedUpdatedAt) {
+    return res.status(409).json({
+      error: 'This post changed since you opened it. Refresh before saving again.',
+      code: 'content_post_changed',
+    });
+  }
+
   // Coalesce rapid client edits: if the newest snapshot is already a client_edit
   // from less than 60 s ago, the new edit extends the same editing session —
   // skip creating a fresh snapshot to avoid 20+ versions per rapid-edit session.
@@ -844,13 +896,7 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', requi
     || recentVersion.triggerDetail !== 'client_edit'
     || (Date.now() - new Date(recentVersion.createdAt).getTime()) >= COALESCE_WINDOW_MS;
 
-  // Snapshot before client edits so admin can see the diff
-  if (shouldSnapshot) {
-    snapshotPostVersion(post, 'manual_edit', 'client_edit');
-  }
-
-  const { title, metaDescription, introduction, sections, conclusion } = req.body;
-  const updates: Record<string, unknown> = {};
+  const updates: Parameters<typeof updatePostField>[2] = {};
   if (title !== undefined) updates.title = sanitizePlainText(title);
   if (metaDescription !== undefined) updates.metaDescription = sanitizePlainText(metaDescription);
   if (introduction !== undefined) updates.introduction = sanitizeRichText(introduction);
@@ -889,21 +935,47 @@ router.patch('/api/public/content-posts/:workspaceId/:postId/client-edit', requi
 
   let updated;
   try {
-    updated = updatePostField(req.params.workspaceId, req.params.postId, updates);
+    updated = shouldSnapshot
+      ? updatePostFieldWithSnapshot(
+          req.params.workspaceId,
+          req.params.postId,
+          updates,
+          post.generationRevision,
+          { trigger: 'manual_edit', triggerDetail: 'client_edit' },
+        )
+      : updatePostField(
+          req.params.workspaceId,
+          req.params.postId,
+          updates,
+          post.generationRevision,
+        );
   } catch (err) {
+    if (err instanceof GenerationRevisionConflictError) {
+      return res.status(409).json({
+        error: 'This post changed while your edit was saving. Refresh before trying again.',
+        code: err.code,
+      });
+    }
     return next(err);
   }
   if (!updated) return res.status(404).json({ error: 'Post not found' });
 
-  const actor = getClientActor(req, req.params.workspaceId);
-  if (shouldSnapshot) {
-    addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
+  const changed = updated.generationRevision !== post.generationRevision;
+  if (changed) {
+    if (shouldSnapshot) {
+      runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'client-edit-activity', () => {
+        const actor = getClientActor(req, req.params.workspaceId);
+        addActivity(req.params.workspaceId, 'post_client_edit', `${actor?.name || 'Client'} edited post content for "${post.targetKeyword}"`, '', { postId: post.id }, actor);
+      });
+    }
+    runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'client-edit-intelligence-cache', () => {
+      invalidateContentPipelineIntelligence(req.params.workspaceId);
+    });
+    runPublicContentPostCommitEffect(req.params.workspaceId, updated.id, 'client-edit-broadcast', () => {
+      broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
+    });
   }
-  invalidateContentPipelineIntelligence(req.params.workspaceId);
-  broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.POST_UPDATED, { postId: updated.id, status: updated.status });
-  // aiReview (C4) is admin-internal — strip from the client-edit response too.
-  const { aiReview: _aiReview, ...clientPost } = updated;
-  res.json(clientPost);
+  res.json(toPublicContentPost(updated));
 });
 
 export default router;

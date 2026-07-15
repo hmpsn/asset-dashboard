@@ -67,6 +67,7 @@ describe('scoreActionAtCheckpoint — clicks delta × CPC → attributed_value',
     // Create an action with a GSC baseline that has real clicks data.
     // insight_acted_on uses 'clicks' as its primary_metric — ideal for this test.
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'insight_acted_on',
       sourceType: 'test-cpc',
@@ -144,6 +145,7 @@ describe('scoreActionAtCheckpoint — no CPC → attributed_value remains null',
     });
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'insight_acted_on',
       sourceType: 'test-nocpc',
@@ -227,6 +229,7 @@ describe('scoreActionAtCheckpoint — content_published (primary_metric=position
     // content_published uses primary_metric='position' — this is the action type
     // that Task 2.6 records; previously attributed_value was always null for it.
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'content_published',
       sourceType: 'test-publish',

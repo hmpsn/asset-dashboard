@@ -73,7 +73,7 @@ vi.mock('../../../src/api/content', () => ({
 vi.mock('../../../src/hooks/useAutoSave', () => ({
   useAutoSave: vi.fn(() => ({
     scheduleAutoSave: vi.fn(),
-    flush: vi.fn(() => Promise.resolve()),
+    flush: vi.fn(() => Promise.resolve({ ok: true })),
     saveStatus: 'idle' as const,
   })),
 }));

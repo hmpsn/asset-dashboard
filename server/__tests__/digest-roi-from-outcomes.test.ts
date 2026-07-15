@@ -10,7 +10,7 @@
  * After the implementation the test passes.
  */
 
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import { recordAction, recordOutcome, getROIHighlightsFromOutcomes } from '../../server/outcome-tracking.js';
 import type { ROIHighlight } from '../../shared/types/narrative.js';
@@ -44,11 +44,122 @@ const WIN_DELTA = {
 };
 
 describe('getROIHighlightsFromOutcomes', () => {
+  it('supports a measured-at window for current-month digest highlights', () => {
+    const ws = `${WS_BASE}-window`;
+    seedWorkspace(ws);
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-04-30T23:59:59.999Z'));
+      const prior = recordAction({ // recordAction-ok — isolated outcome fixture cleaned in afterAll
+        attribution: 'platform_executed',
+        workspaceId: ws,
+        actionType: 'content_published',
+        sourceType: 'test',
+        sourceId: crypto.randomUUID(),
+        pageUrl: '/prior-month',
+        baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+      });
+      recordOutcome({
+        actionId: prior.id,
+        checkpointDays: 30,
+        metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 50 },
+        score: 'win',
+        deltaSummary: WIN_DELTA,
+        attributedValue: 100,
+        valueBasis: 'clicks_delta_x_cpc',
+      });
+
+      vi.setSystemTime(new Date('2026-05-01T00:00:00.000Z'));
+      const current = recordAction({ // recordAction-ok — isolated outcome fixture cleaned in afterAll
+        attribution: 'platform_executed',
+        workspaceId: ws,
+        actionType: 'content_published',
+        sourceType: 'test',
+        sourceId: crypto.randomUUID(),
+        pageUrl: '/current-month',
+        baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+      });
+      recordOutcome({
+        actionId: current.id,
+        checkpointDays: 30,
+        metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 50 },
+        score: 'win',
+        deltaSummary: WIN_DELTA,
+        attributedValue: 100,
+        valueBasis: 'clicks_delta_x_cpc',
+      });
+
+      const highlights = getROIHighlightsFromOutcomes(ws, 10, {
+        start: '2026-05-01T00:00:00.000Z',
+        endExclusive: '2026-06-01T00:00:00.000Z',
+      });
+
+      expect(highlights.map((item) => item.pageUrl)).toEqual(['/current-month']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('selects the highest winning checkpoint inside the requested window', () => {
+    const ws = `${WS_BASE}-checkpoint-window`;
+    seedWorkspace(ws);
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-05-10T12:00:00.000Z'));
+      const action = recordAction({ // recordAction-ok — isolated outcome fixture cleaned in afterAll
+        attribution: 'platform_executed',
+        workspaceId: ws,
+        actionType: 'content_published',
+        sourceType: 'test',
+        sourceId: crypto.randomUUID(),
+        pageUrl: '/checkpoint-window',
+        baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+      });
+      recordOutcome({
+        actionId: action.id,
+        checkpointDays: 30,
+        metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 50 },
+        score: 'win',
+        deltaSummary: WIN_DELTA,
+        attributedValue: 100,
+        valueBasis: 'clicks_delta_x_cpc',
+      });
+
+      vi.setSystemTime(new Date('2026-05-24T12:00:00.000Z'));
+      recordOutcome({
+        actionId: action.id,
+        checkpointDays: 60,
+        metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 90 },
+        score: 'strong_win',
+        deltaSummary: { ...WIN_DELTA, current_value: 90, delta_absolute: 80, delta_percent: 800 },
+        attributedValue: 200,
+        valueBasis: 'clicks_delta_x_cpc',
+      });
+
+      const highlights = getROIHighlightsFromOutcomes(ws, 5, {
+        start: '2026-05-01T00:00:00.000Z',
+        endExclusive: '2026-05-23T00:00:00.000Z',
+      });
+
+      expect(highlights).toHaveLength(1);
+      expect(highlights[0]).toMatchObject({
+        pageUrl: '/checkpoint-window',
+        clicksGained: 40,
+        attributedValue: 100,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns a non-empty ROIHighlight list for a workspace with a scored, valued outcome', () => {
     const ws = `${WS_BASE}-main`;
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'content_published',
       sourceType: 'test',
@@ -90,6 +201,34 @@ describe('getROIHighlightsFromOutcomes', () => {
     // FIX 3: attributedValue must be surfaced in the ROIHighlight
     expect(first).toHaveProperty('attributedValue');
     expect(first.attributedValue).toBe(100);
+    expect(first.attribution).toBe('platform_executed');
+  });
+
+  it('propagates externally_executed attribution into the client digest highlight', () => {
+    const ws = `${WS_BASE}-external-attribution`;
+    seedWorkspace(ws);
+    const action = recordAction({ // recordAction-ok
+      attribution: 'externally_executed',
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      pageUrl: '/client-implemented',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+    recordOutcome({
+      actionId: action.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 50 },
+      score: 'win',
+      deltaSummary: WIN_DELTA,
+      attributedValue: 100,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+
+    const [highlight] = getROIHighlightsFromOutcomes(ws, 5);
+
+    expect(highlight.attribution).toBe('externally_executed');
   });
 
   it('returns an empty list for a workspace with no scored outcomes', () => {
@@ -106,6 +245,7 @@ describe('getROIHighlightsFromOutcomes', () => {
 
     for (let i = 0; i < 4; i++) {
       const action = recordAction({ // recordAction-ok
+        attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
         workspaceId: ws,
         actionType: 'content_published',
         sourceType: 'test',
@@ -128,6 +268,110 @@ describe('getROIHighlightsFromOutcomes', () => {
     expect(highlights.length).toBeLessThanOrEqual(2);
   });
 
+  // C4 (attribution honesty): a `not_acted_on` action — an unexecuted proposal the
+  // workspace never acted on — must NEVER contribute to the client monthly digest wins,
+  // even when its outcome scored a win. getWinsWithValueByWorkspace (the digest's read
+  // path) must exclude it via the `ta.attribution != 'not_acted_on'` predicate.
+  it('excludes a not_acted_on action from digest wins even when its outcome scored a win', () => {
+    const ws = `${WS_BASE}-not-acted-on`;
+    seedWorkspace(ws);
+
+    // An executed win — SHOULD appear.
+    const executed = recordAction({ // recordAction-ok
+      attribution: 'platform_executed',
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      pageUrl: '/executed-page',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+    recordOutcome({
+      actionId: executed.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 60 },
+      score: 'strong_win',
+      deltaSummary: { ...WIN_DELTA, delta_absolute: 50, delta_percent: 500 },
+      attributedValue: 120,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+
+    // An UNEXECUTED proposal that also "scored a win" — MUST NOT appear.
+    const proposal = recordAction({ // recordAction-ok
+      attribution: 'not_acted_on',
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      pageUrl: '/proposal-page',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+    recordOutcome({
+      actionId: proposal.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 90 },
+      score: 'strong_win',
+      deltaSummary: { ...WIN_DELTA, delta_absolute: 80, delta_percent: 800 },
+      attributedValue: 200,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+
+    const highlights = getROIHighlightsFromOutcomes(ws, 10);
+
+    // Only the executed win survives.
+    expect(highlights.length).toBe(1);
+    expect(highlights[0].pageUrl).toBe('/executed-page');
+    // The phantom proposal win must be absent.
+    expect(highlights.some(h => h.pageUrl === '/proposal-page')).toBe(false);
+  });
+
+  it('excludes internal-only action-catalog entries from digest and value highlights', () => {
+    const ws = `${WS_BASE}-client-hidden`;
+    seedWorkspace(ws);
+
+    const internalOnly = recordAction({ // recordAction-ok — isolated outcome fixture cleaned in afterAll
+      attribution: 'platform_executed',
+      workspaceId: ws,
+      actionType: 'voice_calibrated',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      baselineSnapshot: { captured_at: new Date().toISOString() },
+    });
+    recordOutcome({
+      actionId: internalOnly.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString() },
+      score: 'strong_win',
+      deltaSummary: WIN_DELTA,
+      attributedValue: 999,
+      valueBasis: 'manual',
+    });
+
+    const visible = recordAction({ // recordAction-ok — isolated outcome fixture cleaned in afterAll
+      attribution: 'platform_executed',
+      workspaceId: ws,
+      actionType: 'content_published',
+      sourceType: 'test',
+      sourceId: crypto.randomUUID(),
+      pageUrl: '/visible-win',
+      baselineSnapshot: { captured_at: new Date().toISOString(), clicks: 10 },
+    });
+    recordOutcome({
+      actionId: visible.id,
+      checkpointDays: 30,
+      metricsSnapshot: { captured_at: new Date().toISOString(), clicks: 50 },
+      score: 'win',
+      deltaSummary: WIN_DELTA,
+      attributedValue: 100,
+      valueBasis: 'clicks_delta_x_cpc',
+    });
+
+    const highlights = getROIHighlightsFromOutcomes(ws, 10);
+
+    expect(highlights).toHaveLength(1);
+    expect(highlights[0]).toMatchObject({ pageUrl: '/visible-win', attributedValue: 100 });
+  });
+
   // FIX 4: dedup — an action with win outcomes at BOTH the 30-day and 60-day
   // checkpoints must yield exactly ONE highlight (the higher checkpoint wins).
   it('deduplicates: one action with wins at two checkpoints yields exactly one highlight', () => {
@@ -135,6 +379,7 @@ describe('getROIHighlightsFromOutcomes', () => {
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'content_published',
       sourceType: 'test',

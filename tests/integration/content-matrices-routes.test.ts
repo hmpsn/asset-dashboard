@@ -12,19 +12,29 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { createTemplate, deleteTemplate } from '../../server/content-templates.js';
+import db from '../../server/db/index.js';
 
 const ctx = createEphemeralTestContext(import.meta.url, { autoPublicAuth: true });
 const { api, postJson, del } = ctx;
 
 let testWsId = '';
+let templateId = '';
 
 beforeAll(async () => {
   await ctx.startServer();
   const ws = createWorkspace('Content Matrices Test');
   testWsId = ws.id;
+  templateId = createTemplate(testWsId, {
+    name: 'Service matrix template',
+    pageType: 'service',
+    schemaTypes: ['Service', 'BreadcrumbList'],
+  }).id;
 }, 25_000);
 
 afterAll(async () => {
+  db.prepare('DELETE FROM content_matrices WHERE workspace_id = ?').run(testWsId);
+  deleteTemplate(testWsId, templateId);
   deleteWorkspace(testWsId);
   await ctx.stopServer();
 });
@@ -32,6 +42,7 @@ afterAll(async () => {
 describe('Content Matrices — CRUD', () => {
   let matrixId = '';
   let firstCellId = '';
+  let firstCellRevision = 0;
 
   it('GET returns empty array initially', async () => {
     const res = await api(`/api/content-matrices/${testWsId}`);
@@ -51,10 +62,44 @@ describe('Content Matrices — CRUD', () => {
     expect(res.status).toBe(400);
   });
 
+  it('POST rejects a missing or cross-workspace template without leaking it', async () => {
+    const otherWorkspaceId = createWorkspace('Content Matrices Other Workspace').id;
+    const otherTemplate = createTemplate(otherWorkspaceId, { name: 'Other template' });
+    try {
+      const missing = await postJson(`/api/content-matrices/${testWsId}`, {
+        name: 'Missing template matrix',
+        templateId: 'tpl_missing',
+      });
+      const crossWorkspace = await postJson(`/api/content-matrices/${testWsId}`, {
+        name: 'Cross workspace matrix',
+        templateId: otherTemplate.id,
+      });
+      expect(missing.status).toBe(404);
+      expect(crossWorkspace.status).toBe(404);
+      expect((await missing.json()).error).toBe((await crossWorkspace.json()).error);
+    } finally {
+      deleteTemplate(otherWorkspaceId, otherTemplate.id);
+      deleteWorkspace(otherWorkspaceId);
+    }
+  });
+
+  it('POST returns 400 when a matrix pattern cannot be rendered safely', async () => {
+    const res = await postJson(`/api/content-matrices/${testWsId}`, {
+      name: 'Unsafe matrix',
+      templateId,
+      dimensions: [{ variableName: 'service', values: ['Audits'] }],
+      urlPattern: '/services/{missing}',
+      keywordPattern: '{service} service',
+    });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/urlPattern/);
+  });
+
   it('POST creates a matrix with auto-generated cells', async () => {
     const res = await postJson(`/api/content-matrices/${testWsId}`, {
       name: 'Service × City Matrix',
-      templateId: 'tpl_fake_123',
+      templateId,
       dimensions: [
         { variableName: 'service', values: ['Plumbing', 'Electrical'] },
         { variableName: 'city', values: ['Austin', 'Dallas', 'Houston'] },
@@ -66,7 +111,8 @@ describe('Content Matrices — CRUD', () => {
     const body = await res.json();
     expect(body.id).toMatch(/^mtx_/);
     expect(body.name).toBe('Service × City Matrix');
-    expect(body.templateId).toBe('tpl_fake_123');
+    expect(body.templateId).toBe(templateId);
+    expect(body.revision).toBe(1);
     expect(body.dimensions).toHaveLength(2);
     // 2 services × 3 cities = 6 cells
     expect(body.cells).toHaveLength(6);
@@ -80,9 +126,11 @@ describe('Content Matrices — CRUD', () => {
     expect(austinPlumbing).toBeDefined();
     expect(austinPlumbing.plannedUrl).toBe('/services/austin/plumbing');
     expect(austinPlumbing.status).toBe('planned');
+    expect(austinPlumbing.expectedSchemaTypes).toEqual(['Service', 'BreadcrumbList']);
 
     matrixId = body.id;
     firstCellId = body.cells[0].id;
+    firstCellRevision = body.cells[0].revision;
   });
 
   it('GET returns the created matrix in list', async () => {
@@ -133,6 +181,7 @@ describe('Content Matrices — CRUD', () => {
             cpc: 2.50,
             validatedAt: new Date().toISOString(),
           },
+          expectedCellRevision: firstCellRevision,
         }),
       },
     );
@@ -141,6 +190,7 @@ describe('Content Matrices — CRUD', () => {
     const updatedCell = body.cells.find((c: { id: string }) => c.id === firstCellId);
     expect(updatedCell.status).toBe('keyword_validated');
     expect(updatedCell.keywordValidation.volume).toBe(1200);
+    firstCellRevision = updatedCell.revision;
     // keyword_validated still counts as 'planned' in stats
     expect(body.stats.planned).toBe(6);
   });
@@ -151,7 +201,7 @@ describe('Content Matrices — CRUD', () => {
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'draft' }),
+        body: JSON.stringify({ status: 'draft', expectedCellRevision: 0 }),
       },
     );
     expect(res.status).toBe(404);
@@ -165,34 +215,42 @@ describe('Content Matrices — CRUD', () => {
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'published' }),
+        body: JSON.stringify({ status: 'published', expectedCellRevision: firstCellRevision }),
       },
     );
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/transition/i);
   });
 
-  // I2: the matrix-level PUT must NOT be able to bypass the cell state machine by writing a
-  // wholesale `cells` array with an illegal status skip (e.g. planned→published).
-  it('PUT with a wholesale cells rewrite cannot bypass the cell guard (illegal skip → 409)', async () => {
+  it('PUT rejects wholesale cells so callers cannot forge lifecycle history', async () => {
     const getRes = await api(`/api/content-matrices/${testWsId}/${matrixId}`);
     const matrix = await getRes.json();
     const plannedCell = matrix.cells.find((c: { status: string }) => c.status === 'planned');
     expect(plannedCell).toBeDefined();
     const tamperedCells = matrix.cells.map((c: { id: string }) =>
-      c.id === plannedCell.id ? { ...c, status: 'published' } : c,
+      c.id === plannedCell.id
+        ? {
+            ...c,
+            status: 'keyword_validated',
+            statusHistory: [{
+              from: 'published',
+              to: 'flagged',
+              at: '2026-07-13T00:00:00.000Z',
+            }],
+          }
+        : c,
     );
     const res = await ctx.api(`/api/content-matrices/${testWsId}/${matrixId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cells: tamperedCells }),
+      body: JSON.stringify({ cells: tamperedCells, expectedMatrixRevision: matrix.revision }),
     });
-    expect(res.status).toBe(409);
-    // And the stored cell status is unchanged.
+    expect(res.status).toBe(400);
     const afterRes = await api(`/api/content-matrices/${testWsId}/${matrixId}`);
     const after = await afterRes.json();
     const stillPlanned = after.cells.find((c: { id: string }) => c.id === plannedCell.id);
     expect(stillPlanned.status).toBe('planned');
+    expect(stillPlanned.statusHistory).toBeUndefined();
   });
 
   it('standalone keyword recommendations return optional reasoning without breaking the base shape', async () => {

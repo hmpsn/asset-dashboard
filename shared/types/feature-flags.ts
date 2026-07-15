@@ -5,13 +5,19 @@
  *   Server: FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *   Frontend: VITE_FEATURE_<FLAG_NAME_UPPERCASED_WITH_UNDERSCORES>=true
  *
- * Example: to enable 'keyword-universe-full' in production, set:
- *   FEATURE_KEYWORD_UNIVERSE_FULL=true  (server)
- *   VITE_FEATURE_KEYWORD_UNIVERSE_FULL=true  (Vite build)
+ * Example: to enable 'national-serp-tracking' in production, set:
+ *   FEATURE_NATIONAL_SERP_TRACKING=true  (server)
+ *   VITE_FEATURE_NATIONAL_SERP_TRACKING=true  (Vite build)
  */
 export const FEATURE_FLAGS = {
-  // Platform Intelligence Enhancements
-  'smart-placeholders': false,
+  // MCP deliverable generation program. Reserved in P0 so the rollout contract exists before
+  // any paid-run start gate or product UI is wired. Correctness, authorization, CAS, and failure
+  // truth remain unflagged; these flags will gate only paid generation starts in their owner phases.
+  'content-matrix-generation': false,
+  // C3 — one budgeted, exact-once context projection for brief/post/MCP generation.
+  // OFF preserves the current prompt/context call sequence byte-for-byte.
+  'content-generation-context-v2': false,
+  'brand-deliverable-generation': false,
 
   // Client Insights Briefing (5-phase feature)
   // NOTE: the CLIENT magazine overview variant (InsightsBriefingPage + sub-components)
@@ -28,21 +34,10 @@ export const FEATURE_FLAGS = {
 
   // Keyword Hub (Wave 4). The `keyword-hub` umbrella flag was RETIRED at the Phase C
   // cutover (2026-06-11): the Hub is now the only keyword surface (KCC + Rank Tracker
-  // deleted, seo-ranks redirected), so no kill-switch remains. The two sub-flags below
-  // gate independent coverage/scoring overhauls and keep their own removal conditions.
-  // Keyword universe overhaul: gates the COVERAGE EXPANSION — remove the row caps,
-  // include every GSC-clicked/impressed query (full ranking coverage), keep all
-  // not-yet-ranking discovery — behind a flag so old-vs-new is comparable on
-  // staging and rollback is one switch. Junk gate + sort + window fixes ship
-  // unflagged. OFF = today's capped behavior, byte-identical.
-  // See docs/superpowers/plans/2026-06-05-keyword-universe-overhaul.md.
-  'keyword-universe-full': false,
-
-  // SEO Decision Engine P4: geo-targeting — thread the workspace target-geo (locationCode +
-  // languageCode) through the DataForSEO domain-analysis + keyword methods so non-US clients
-  // are queried in their own market, not the US/English SERP. OFF = today's US/'en' defaults,
-  // byte-identical (callers pass no geo; discoveryGeoToken keeps the legacy cache keys).
-  'geo-targeting': false,
+  // deleted, seo-ranks redirected), so no kill-switch remains. The keyword universe
+  // coverage overhaul (`keyword-universe-full`) and geo-targeting (`geo-targeting`) were
+  // retired in flag-sunset Wave 2b (2026-07-02): both were globally ON in prod, so their
+  // gates are now unconditional (byte-identical behavior, dead OFF-branch code deleted).
 
   // SEO Decision Engine P6: national-serp-tracking — first PAID Group C phase. Adds a true
   // advanced-SERP rank + SERP-feature (AI Overview / featured snippet) time series per tracked
@@ -75,27 +70,20 @@ export const FEATURE_FLAGS = {
   // SEO Decision Engine P8 (FINAL): ai-visibility — the LLM-citation measurement layer. Reads
   // DataForSEO's LLM-mentions database for the client's domain → an AI-visibility KPI (share-of-
   // voice vs co-mentioned competitors + mention volume + before/after trend + source domains LLMs
-  // cite) on admin + client. KPI-only (no new rec/insight). Growth+; budget observe-only.
-  // OFF = no LLM-mentions fetch, no snapshot, no UI (byte-identical).
-  'ai-visibility': false,
-
-  // Phase 5: automated signal recompute — the daily activity-gated cron + the on-mutation enqueues
-  // that refresh analytics insights. OFF = signals refresh only on view (24h-throttled) + the manual
-  // "Recompute now" button. Dark-launched so the per-workspace GSC/GA4 cost is watched on staging first.
-  'signal-auto-recompute': false,
+  // cite) on the admin panel. KPI-only (no new rec/insight). Growth+; budget observe-only.
+  // Retired in flag-sunset Wave 2b (2026-07-02): was globally ON in prod, so the fetch/snapshot/UI
+  // are now unconditional (byte-identical behavior, dead OFF-branch code deleted).
 
   // Strategy v2 "SEO command center" — decision-first IA (Orient → Act → Evidence) + interior
   // tabs. Dark-launches the rebuilt admin Strategy page; replaces the retired decision-bands
   // layout. OFF = the legacy sequential layout, byte-identical.
   // See docs/superpowers/plans/2026-06-17-strategy-v2-command-center.md.
   'strategy-command-center': false,
-  // Strategy v3 — staleness scan child flag. Dark-launches the runSentRecStalenessScan cron
-  // pass (sent-rec "no response 14d" nudges + supersession flags). OFF = no nudge engine.
-  'strategy-staleness-scan': false,
-  // Strategy v3 — DEFERRED paid-topic monetization spine (generic strategy_addon SKU +
-  // rec→cart bridge for keyword/topic rec types). OFF until the roadmap item lands; v3 renders
-  // Add-to-plan ONLY where rec.productType already resolves a SKU (decision 1 / spec §2 / §11).
-  'strategy-paid-topics': false,
+  // Reconcile R4-PR1 — deliverable divergence sweep child flag. Dark-launches the READ-ONLY
+  // runDeliverableDivergenceSweep cron pass that compares each rec's clientStatus against its
+  // recommendation:<id> deliverable mirror and reports pairs that DISAGREE (the two named
+  // divergence-by-construction paths). OFF = no sweep. It mutates NOTHING — reporting only.
+  'strategy-divergence-sweep': false,
   // Strategy redesign (child flags under strategy-command-center) — declared once in the P2
   // pre-commit, activated in later phases. P3 activates managed-set; P4 activates the other two.
   // Strategy redesign — managed keyword working set (add/remove/keep/replenish). Activated P3.
@@ -127,20 +115,18 @@ export const FEATURE_FLAGS = {
   'the-issue-client-measured-capture': false,
   // P1 children — DECLARED OFF + unread in P0 so the flag family/group is stable. Do not start P1
   // until P0 is merged + green on staging.
-  // P3: named-record reconciliation (call-tracking + CRM closed-won → actual_reconciled). RESERVED
-  // for P3 — NOT P1a website capture (P1a uses the-issue-client-measured-capture).
-  'the-issue-client-reconciliation': false,
   // P1: event-driven SMS/email push + forwardable one-pager export (the return hook).
   'the-issue-client-return-hook': false,
-  // P1: segment-conditional competitor/authority + local map-pack/reviews + portfolio inserts.
-  'the-issue-client-segment-inserts': false,
   // P1: "next bets" $-forecast reframe from existing recommendation estimatedGain.
   'the-issue-client-next-bets': false,
   // Client IA v2 — master flag for the verdict-first Overview reframe (P1) → 4-tab shell (P2+).
   // Gates every new IA-v2 render; flag-OFF the client dashboard is byte-identical to today's spine.
   'client-ia-v2': false,
-  // Client IA v2 — conditional Locations tab + leaderboard for multi-location accounts (P5).
-  'client-locations': false,
+
+  // UI Rebuild F4 — DS-native admin shell chrome. Additive/pilot-mounted only:
+  // App.tsx stays on the legacy shell, and rebuilt surfaces opt into
+  // RebuiltAppChrome at their own mount point. OFF = today's admin chrome.
+  'ui-rebuild-shell': false,
 } as const;
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAGS;
@@ -196,6 +182,7 @@ export const FEATURE_FLAG_GROUP_LABELS = [
   'SEO Decision Engine',
   'Strategy',
   'The Issue (Client)',
+  'UI Rebuild',
 ] as const;
 
 export type FeatureFlagGroupLabel = (typeof FEATURE_FLAG_GROUP_LABELS)[number];
@@ -216,17 +203,46 @@ export const LEGACY_FEATURE_FLAG_ROADMAP_IDS = Object.values(LEGACY_ROADMAP) as 
 const REVIEWED_AT = '2026-05-15';
 
 export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntry> = {
-  'smart-placeholders': {
-    label: 'Smart placeholders (admin chips + client ghost text)',
+  'content-matrix-generation': {
+    label: 'Content matrix — grounded page-set generation',
     group: 'Platform Intelligence Enhancements',
     lifecycle: {
-      owner: 'platform-foundation',
-      createdAt: '2026-05-06',
+      owner: 'content-pipeline',
+      status: 'active',
+      createdAt: '2026-07-13',
       rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove when placeholder behavior has no fallback branch and is default-on for all supported paths.',
-      linkedRoadmapItemId: LEGACY_ROADMAP.platformIntelligenceEnhancements,
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: REVIEWED_AT,
+      removalCondition: 'Re-audit by 2026-08-11; retire after the matrix generation workflow is staging-validated and the guarded path is the supported default.',
+      linkedRoadmapItemId: 'mcp-content-matrix-generation',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-14',
+    },
+  },
+  'content-generation-context-v2': {
+    label: 'Content generation — budgeted context v2',
+    group: 'Platform Intelligence Enhancements',
+    lifecycle: {
+      owner: 'content-pipeline',
+      status: 'active',
+      createdAt: '2026-07-14',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Re-audit by 2026-08-11; retire after staging proves content quality parity plus lower prompt-token and p95 latency, and the v2 context path becomes the supported default.',
+      linkedRoadmapItemId: 'genq-content-context-v2',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-14',
+    },
+  },
+  'brand-deliverable-generation': {
+    label: 'Brand intake — reviewed deliverable generation',
+    group: 'Platform Intelligence Enhancements',
+    lifecycle: {
+      owner: 'brand-engine',
+      status: 'active',
+      createdAt: '2026-07-13',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Retire after the grounded brand-generation workflow is staging-validated, the guarded path is the supported default, and B3 review delivery no longer requires an OFF compatibility branch.',
+      linkedRoadmapItemId: 'mcp-brand-deliverable-generation',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-13',
     },
   },
   'client-briefing-v2': {
@@ -266,32 +282,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       linkedRoadmapItemId: 'cda-sc5-work-feed',
       staleAuditCadence: 'monthly',
       lastReviewedAt: '2026-06-12',
-    },
-  },
-  'keyword-universe-full': {
-    label: 'Keyword Universe — full coverage (uncap, all GSC-clicked/impressed + discovery)',
-    group: 'Keyword Hub',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-02',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after the full keyword universe (uncapped coverage + junk gate) is validated on staging and becomes the default; the cap-based path is then deleted.',
-      linkedRoadmapItemId: 'keyword-universe-overhaul',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-02',
-    },
-  },
-  'geo-targeting': {
-    label: 'Geo targeting — query non-US clients in their own market (domain/keyword/competitor SERP)',
-    group: 'SEO Decision Engine',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-24',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove after workspace target-geo threading is validated on staging and becomes the default; non-US clients are then always queried in their own market (US/en only as the last-resort fallback).',
-      linkedRoadmapItemId: 'seo-engine-p4-geo-correctness-target-geo',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-24',
     },
   },
   'national-serp-tracking': {
@@ -359,32 +349,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-29',
     },
   },
-  'ai-visibility': {
-    label: 'AI visibility — LLM citation share-of-voice vs competitors',
-    group: 'SEO Decision Engine',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-24',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Promote to default once LLM-mention snapshots + the AI-visibility KPI (share-of-voice, trend, source domains) are validated on staging and per-workspace cost is acceptable; the flag is then removed and the KPI runs for all Growth+ workspaces.',
-      linkedRoadmapItemId: 'seo-engine-p8-ai-visibility-llm-citation',
-      staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-06-24',
-    },
-  },
-  'signal-auto-recompute': {
-    label: 'Strategy signals — automated recompute (daily cron + on-mutation)',
-    group: 'Strategy',
-    lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-17',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Promote to default once the daily-cron + on-mutation provider (GSC/GA4) cost is validated acceptable on staging; the flag is then removed and the recompute paths run unconditionally.',
-      linkedRoadmapItemId: 'strategy-redesign-phase-5c-auto-recompute',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-17',
-    },
-  },
   'strategy-command-center': {
     label: 'Strategy v2 — SEO command center (Orient/Act/Evidence + interior tabs)',
     group: 'Strategy',
@@ -398,31 +362,20 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-17',
     },
   },
-  'strategy-staleness-scan': {
-    label: 'Strategy v3 — sent-rec staleness scan (nudge + supersession cron)',
+  'strategy-divergence-sweep': {
+    label: 'Reconcile R4 — rec↔deliverable divergence sweep (read-only report cron)',
     group: 'Strategy',
     lifecycle: {
       owner: 'analytics-intelligence',
-      createdAt: '2026-06-17',
+      // Historical alignment note: this flag was reviewed against the 2026-06-29 lifecycle anchor.
+      // The lifecycle-meaningful field is the removalCondition ("Re-audit by 2026-10-02"), which is
+      // unaffected by the slightly earlier createdAt.
+      createdAt: '2026-06-29',
       rolloutTarget: 'staging-validation',
-      removalCondition: 'Promote to default once the on-read throttle resurface + nudge cron cost is validated on staging; flag removed and the scan runs unconditionally in the 24h outcome tick.',
+      removalCondition: 'Remove after the R4-PR2 DB trigger makes struck≠completed + rec↔mirror lockstep UNbypassable AND a full staging soak shows the sweep reports zero divergent pairs; the read-only sweep then runs unconditionally in the 24h outcome tick (or is retired once the trigger guarantees zero drift). Re-audit by 2026-10-02.',
       linkedRoadmapItemId: 'strategy-v3-curation-cockpit',
       staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-17',
-    },
-  },
-  'strategy-paid-topics': {
-    label: 'Strategy v3 — paid-topic monetization spine (DEFERRED roadmap)',
-    group: 'Strategy',
-    lifecycle: {
-      status: 'reserved',
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-17',
-      rolloutTarget: 'staging-validation',
-      removalCondition: 'Enable + remove once the generic strategy_addon SKU + rec→cart bridge + keyword/topic product map ship (deferred roadmap item D8). Until then v3 renders Add-to-plan only where rec.productType already resolves.',
-      linkedRoadmapItemId: 'strategy-paid-topic-monetization-spine',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-17',
+      lastReviewedAt: '2026-06-29',
     },
   },
   'strategy-keywords-managed-set': {
@@ -516,20 +469,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-20',
     },
   },
-  'the-issue-client-reconciliation': {
-    label: 'The Issue (Client) — named-record reconciliation (P3, actual_reconciled)',
-    group: 'The Issue (Client)',
-    lifecycle: {
-      status: 'reserved',
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-20',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Reserved for CRM/call-tracking reconciliation → actual_reconciled (P3); NOT P1a website capture. Enable + remove once call-tracking + CRM closed-won graduates provenance to actual_reconciled and the count becomes clickable to named records.',
-      linkedRoadmapItemId: 'the-issue-client-redesign-p1-reconciliation',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-20',
-    },
-  },
   'the-issue-client-return-hook': {
     label: 'The Issue (Client) — push/export return hook (P1)',
     group: 'The Issue (Client)',
@@ -539,20 +478,6 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       rolloutTarget: 'staging-validation',
       removalCondition: 'Promote to default once the event-driven push + forwardable one-pager export delivery cost is validated on staging.',
       linkedRoadmapItemId: 'the-issue-client-redesign-p1-return-hook',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-20',
-    },
-  },
-  'the-issue-client-segment-inserts': {
-    label: 'The Issue (Client) — segment-conditional inserts (P1)',
-    group: 'The Issue (Client)',
-    lifecycle: {
-      status: 'reserved',
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-20',
-      rolloutTarget: 'pilot-clients',
-      removalCondition: 'Promote to default once segment-conditional competitor/authority + local map-pack/reviews + portfolio inserts are validated with pilot clients on staging.',
-      linkedRoadmapItemId: 'the-issue-client-redesign-p1-segments',
       staleAuditCadence: 'monthly',
       lastReviewedAt: '2026-06-20',
     },
@@ -583,17 +508,17 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       lastReviewedAt: '2026-06-20',
     },
   },
-  'client-locations': {
-    label: 'Client dashboard — conditional Locations tab (multi-location track)',
-    group: 'The Issue (Client)',
+  'ui-rebuild-shell': {
+    label: 'UI rebuild — DS-native admin shell chrome',
+    group: 'UI Rebuild',
     lifecycle: {
-      owner: 'analytics-intelligence',
-      createdAt: '2026-06-20',
+      owner: 'ui-platform',
+      createdAt: '2026-07-05',
       rolloutTarget: 'staging-validation',
-      removalCondition: 'Remove once the multi-location leaderboard + Locations drill-down (P5) is validated and becomes default for accounts with >1 location.',
-      linkedRoadmapItemId: 'client-dashboard-ia-restructure',
-      staleAuditCadence: 'monthly',
-      lastReviewedAt: '2026-06-20',
+      removalCondition: 'Retire once the rebuilt admin shell ships unflagged after the Keywords pilot and Phase A admin fan-out validate the shell chrome.',
+      linkedRoadmapItemId: 'ui-rebuild-f4-shell',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-05',
     },
   },
 };
@@ -601,7 +526,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
   {
     label: 'Platform Intelligence Enhancements',
-    keys: ['smart-placeholders'],
+    keys: ['content-matrix-generation', 'content-generation-context-v2', 'brand-deliverable-generation'],
   },
   {
     label: 'Client Insights Briefing',
@@ -609,19 +534,23 @@ export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: Fe
   },
   {
     label: 'Keyword Hub',
-    keys: ['keyword-universe-full'],
+    keys: [],
   },
   {
     label: 'SEO Decision Engine',
-    keys: ['geo-targeting', 'national-serp-tracking', 'local-gbp', 'gbp-auth-connection', 'gbp-auth-reviews', 'gbp-review-responses', 'ai-visibility'],
+    keys: ['national-serp-tracking', 'local-gbp', 'gbp-auth-connection', 'gbp-auth-reviews', 'gbp-review-responses'],
   },
   {
     label: 'Strategy',
-    keys: ['signal-auto-recompute', 'strategy-command-center', 'strategy-staleness-scan', 'strategy-paid-topics', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
+    keys: ['strategy-command-center', 'strategy-divergence-sweep', 'strategy-keywords-managed-set', 'strategy-competitor-send', 'strategy-signal-fold', 'strategy-the-issue', 'strategy-trust-ladder-autosend'],
   },
   {
     label: 'The Issue (Client)',
-    keys: ['the-issue-client-spine', 'the-issue-client-measured-capture', 'the-issue-client-reconciliation', 'the-issue-client-return-hook', 'the-issue-client-segment-inserts', 'the-issue-client-next-bets', 'client-ia-v2', 'client-locations'],
+    keys: ['the-issue-client-spine', 'the-issue-client-measured-capture', 'the-issue-client-return-hook', 'the-issue-client-next-bets', 'client-ia-v2'],
+  },
+  {
+    label: 'UI Rebuild',
+    keys: ['ui-rebuild-shell'],
   },
 ];
 

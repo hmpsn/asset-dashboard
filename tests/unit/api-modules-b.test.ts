@@ -5,7 +5,8 @@
  * Strategy: mock src/api/client so each wrapper is tested for correct URL,
  * HTTP verb, and body construction without hitting the network.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from 'vitest';
+import type { PublicContentTopicRequest } from '../../shared/types/content';
 
 // ── Mock the base API client ────────────────────────────────────────────────
 vi.mock('../../src/api/client', () => ({
@@ -94,15 +95,18 @@ describe('contentBriefs.generate', () => {
 
 describe('contentBriefs.update', () => {
   it('calls patch with briefId in path and body', async () => {
-    await contentBriefs.update('ws-1', 'brief-1', { title: 'Updated Title' });
-    expect(mockPatch).toHaveBeenCalledWith('/api/content-briefs/ws-1/brief-1', { title: 'Updated Title' });
+    await contentBriefs.update('ws-1', 'brief-1', 4, { title: 'Updated Title' });
+    expect(mockPatch).toHaveBeenCalledWith('/api/content-briefs/ws-1/brief-1', {
+      title: 'Updated Title',
+      expectedRevision: 4,
+    });
   });
 });
 
 describe('contentBriefs.remove', () => {
   it('calls del with briefId in path', async () => {
-    await contentBriefs.remove('ws-1', 'brief-1');
-    expect(mockDel).toHaveBeenCalledWith('/api/content-briefs/ws-1/brief-1');
+    await contentBriefs.remove('ws-1', 'brief-1', 4);
+    expect(mockDel).toHaveBeenCalledWith('/api/content-briefs/ws-1/brief-1', { expectedRevision: 4 });
   });
 });
 
@@ -144,18 +148,18 @@ describe('contentBriefs.templateCrossref', () => {
 
 describe('contentBriefs.regenerateOutline', () => {
   it('calls post with feedback in body', async () => {
-    await contentBriefs.regenerateOutline('ws-1', 'brief-1', 'Make it more detailed');
+    await contentBriefs.regenerateOutline('ws-1', 'brief-1', 4, 'Make it more detailed');
     expect(mockPost).toHaveBeenCalledWith(
       '/api/content-briefs/ws-1/brief-1/regenerate-outline',
-      { feedback: 'Make it more detailed' },
+      { feedback: 'Make it more detailed', expectedRevision: 4 },
     );
   });
 
   it('calls post with undefined feedback when not provided', async () => {
-    await contentBriefs.regenerateOutline('ws-1', 'brief-1');
+    await contentBriefs.regenerateOutline('ws-1', 'brief-1', 4);
     expect(mockPost).toHaveBeenCalledWith(
       '/api/content-briefs/ws-1/brief-1/regenerate-outline',
-      { feedback: undefined },
+      { feedback: undefined, expectedRevision: 4 },
     );
   });
 });
@@ -173,22 +177,28 @@ describe('contentPosts.list', () => {
 
 describe('contentPosts.generate', () => {
   it('calls post on generate subpath', async () => {
-    await contentPosts.generate('ws-1', { briefId: 'brief-1' });
-    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/generate', { briefId: 'brief-1' });
+    await contentPosts.generate('ws-1', { briefId: 'brief-1', expectedBriefRevision: 4 });
+    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/generate', {
+      briefId: 'brief-1',
+      expectedBriefRevision: 4,
+    });
   });
 });
 
 describe('contentPosts.update', () => {
   it('calls patch with postId in path', async () => {
-    await contentPosts.update('ws-1', 'post-1', { title: 'New Title' });
-    expect(mockPatch).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1', { title: 'New Title' });
+    await contentPosts.update('ws-1', 'post-1', 7, { title: 'New Title' });
+    expect(mockPatch).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1', {
+      title: 'New Title',
+      expectedRevision: 7,
+    });
   });
 });
 
 describe('contentPosts.remove', () => {
   it('calls del with postId in path', async () => {
-    await contentPosts.remove('ws-1', 'post-1');
-    expect(mockDel).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1');
+    await contentPosts.remove('ws-1', 'post-1', 7);
+    expect(mockDel).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1', { expectedRevision: 7 });
   });
 });
 
@@ -200,11 +210,11 @@ describe('contentPosts.getById', () => {
 });
 
 describe('contentPosts.regenerateSection', () => {
-  it('calls post on regenerate-section subpath', async () => {
-    await contentPosts.regenerateSection('ws-1', 'post-1', { sectionIndex: 2, instruction: 'Make shorter' });
+  it('pins both the post and source-brief revisions', async () => {
+    await contentPosts.regenerateSection('ws-1', 'post-1', 7, 4, 2);
     expect(mockPost).toHaveBeenCalledWith(
       '/api/content-posts/ws-1/post-1/regenerate-section',
-      { sectionIndex: 2, instruction: 'Make shorter' },
+      { sectionIndex: 2, expectedRevision: 7, expectedBriefRevision: 4 },
     );
   });
 });
@@ -225,51 +235,60 @@ describe('contentPosts.versions', () => {
 
 describe('contentPosts.revertVersion', () => {
   it('calls post on revert subpath', async () => {
-    await contentPosts.revertVersion('ws-1', 'post-1', 'ver-2');
-    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1/versions/ver-2/revert');
+    await contentPosts.revertVersion('ws-1', 'post-1', 'ver-2', 7);
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/content-posts/ws-1/post-1/versions/ver-2/revert',
+      { expectedRevision: 7 },
+    );
   });
 });
 
 describe('contentPosts.publishToWebflow', () => {
   it('calls post on publish-to-webflow subpath', async () => {
-    await contentPosts.publishToWebflow('ws-1', 'post-1');
-    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1/publish-to-webflow', undefined);
+    await contentPosts.publishToWebflow('ws-1', 'post-1', 7);
+    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1/publish-to-webflow', {
+      expectedRevision: 7,
+    });
   });
 
   it('passes generateImage option when provided', async () => {
-    await contentPosts.publishToWebflow('ws-1', 'post-1', { generateImage: true });
+    await contentPosts.publishToWebflow('ws-1', 'post-1', 7, { generateImage: true });
     expect(mockPost).toHaveBeenCalledWith(
       '/api/content-posts/ws-1/post-1/publish-to-webflow',
-      { generateImage: true },
+      { generateImage: true, expectedRevision: 7 },
     );
   });
 });
 
 describe('contentPosts.aiReview', () => {
   it('calls post on ai-review subpath', async () => {
-    await contentPosts.aiReview('ws-1', 'post-1');
-    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1/ai-review');
+    await contentPosts.aiReview('ws-1', 'post-1', 7);
+    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1/ai-review', {
+      expectedRevision: 7,
+    });
   });
 });
 
 describe('contentPosts.scoreVoice', () => {
   it('calls post on score-voice subpath with empty body', async () => {
-    await contentPosts.scoreVoice('ws-1', 'post-1');
-    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1/score-voice', {});
+    await contentPosts.scoreVoice('ws-1', 'post-1', 7);
+    expect(mockPost).toHaveBeenCalledWith('/api/content-posts/ws-1/post-1/score-voice', {
+      expectedRevision: 7,
+    });
   });
 });
 
 describe('contentPosts.aifix', () => {
   it('calls post on ai-fix subpath with issue body', async () => {
-    await contentPosts.aifix('ws-1', 'post-1', { issueKey: 'brand_voice', reason: 'Voice too casual' });
+    await contentPosts.aifix('ws-1', 'post-1', 7, { issueKey: 'brand_voice', reason: 'Voice too casual' });
     expect(mockPost).toHaveBeenCalledWith(
       '/api/content-posts/ws-1/post-1/ai-fix',
-      { issueKey: 'brand_voice', reason: 'Voice too casual' },
+      { issueKey: 'brand_voice', reason: 'Voice too casual', expectedRevision: 7 },
     );
   });
 
   it('supports feedback mode payloads', async () => {
-    await contentPosts.aifix('ws-1', 'post-1', {
+    await contentPosts.aifix('ws-1', 'post-1', 7, {
       mode: 'feedback',
       target: 'section',
       feedback: 'Tighten this section and make it more direct.',
@@ -282,6 +301,7 @@ describe('contentPosts.aifix', () => {
         target: 'section',
         feedback: 'Tighten this section and make it more direct.',
         sectionIndex: 0,
+        expectedRevision: 7,
       },
     );
   });
@@ -328,6 +348,17 @@ describe('publicContent.requests', () => {
     await publicContent.requests('ws-1');
     const [url] = mockGetSafe.mock.calls[0];
     expect(url).toContain('/api/public/content-requests/ws-1');
+  });
+
+  it('uses the shared public request contract for reads and mutations', () => {
+    expectTypeOf<Awaited<ReturnType<typeof publicContent.requests>>>()
+      .toEqualTypeOf<PublicContentTopicRequest[]>();
+    expectTypeOf<Awaited<ReturnType<typeof publicContent.approve>>>()
+      .toEqualTypeOf<PublicContentTopicRequest>();
+    expectTypeOf<Awaited<ReturnType<typeof publicPostReview.approvePost>>>()
+      .toEqualTypeOf<PublicContentTopicRequest>();
+    expectTypeOf<Awaited<ReturnType<typeof publicPostReview.requestPostChanges>>>()
+      .toEqualTypeOf<PublicContentTopicRequest>();
   });
 });
 
@@ -391,6 +422,16 @@ describe('publicCopyReview.entries', () => {
   });
 });
 
+describe('contentPosts.applyAiFix', () => {
+  it('sends only the durable job identity to the apply boundary', async () => {
+    await contentPosts.applyAiFix('ws-1', 'post-1', 'job-1');
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/content-posts/ws-1/post-1/ai-fix/apply',
+      { jobId: 'job-1' },
+    );
+  });
+});
+
 describe('publicCopyReview.sections', () => {
   it('calls GET with public copy sections endpoint', async () => {
     await publicCopyReview.sections('ws-1', 'entry-1');
@@ -400,8 +441,11 @@ describe('publicCopyReview.sections', () => {
 
 describe('publicCopyReview.approveSection', () => {
   it('calls post with approve endpoint', async () => {
-    await publicCopyReview.approveSection('ws-1', 'section-1');
-    expect(mockPost).toHaveBeenCalledWith('/api/public/copy/ws-1/section/section-1/approve');
+    await publicCopyReview.approveSection('ws-1', 'section-1', '2026-07-13T12:00:00.000Z');
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/public/copy/ws-1/section/section-1/approve',
+      { expectedUpdatedAt: '2026-07-13T12:00:00.000Z' },
+    );
   });
 });
 
@@ -410,10 +454,15 @@ describe('publicCopyReview.suggestEdit', () => {
     await publicCopyReview.suggestEdit('ws-1', 'section-1', {
       originalText: 'Old text',
       suggestedText: 'New text',
+      expectedUpdatedAt: '2026-07-13T12:00:00.000Z',
     });
     expect(mockPost).toHaveBeenCalledWith(
       '/api/public/copy/ws-1/section/section-1/suggest',
-      { originalText: 'Old text', suggestedText: 'New text' },
+      {
+        originalText: 'Old text',
+        suggestedText: 'New text',
+        expectedUpdatedAt: '2026-07-13T12:00:00.000Z',
+      },
     );
   });
 });
@@ -431,8 +480,11 @@ describe('publicPostReview.getPost', () => {
 
 describe('publicPostReview.clientEdit', () => {
   it('calls patch on client-edit subpath', async () => {
-    await publicPostReview.clientEdit('ws-1', 'post-1', { title: 'New Title' });
-    expect(mockPatch).toHaveBeenCalledWith('/api/public/content-posts/ws-1/post-1/client-edit', { title: 'New Title' });
+    await publicPostReview.clientEdit('ws-1', 'post-1', '2026-07-13T12:00:00.000Z', { title: 'New Title' });
+    expect(mockPatch).toHaveBeenCalledWith(
+      '/api/public/content-posts/ws-1/post-1/client-edit',
+      { expectedUpdatedAt: '2026-07-13T12:00:00.000Z', title: 'New Title' },
+    );
   });
 });
 
@@ -549,10 +601,13 @@ describe('contentMatrices.update', () => {
 
 describe('contentMatrices.updateCell', () => {
   it('calls patch with cell path', async () => {
-    await contentMatrices.updateCell('ws-1', 'matrix-1', 'cell-1', { keyword: 'austin seo' });
+    await contentMatrices.updateCell('ws-1', 'matrix-1', 'cell-1', {
+      customKeyword: 'austin seo',
+      expectedCellRevision: 3,
+    });
     expect(mockPatch).toHaveBeenCalledWith(
       '/api/content-matrices/ws-1/matrix-1/cells/cell-1',
-      { keyword: 'austin seo' },
+      { customKeyword: 'austin seo', expectedCellRevision: 3 },
     );
   });
 });
@@ -1143,10 +1198,14 @@ describe('copyGeneration.generate', () => {
 
 describe('copyGeneration.regenerateSection', () => {
   it('calls post on regenerate subpath', async () => {
-    await copyGeneration.regenerateSection('ws-1', 'bp-1', 'entry-1', 'sec-1', { note: 'More detail', highlight: 'benefits' });
+    await copyGeneration.regenerateSection('ws-1', 'bp-1', 'entry-1', 'sec-1', {
+      note: 'More detail',
+      highlight: 'benefits',
+      expectedRevision: 4,
+    });
     expect(mockPost).toHaveBeenCalledWith(
       '/api/copy/ws-1/bp-1/entry-1/regenerate/sec-1',
-      { note: 'More detail', highlight: 'benefits' },
+      { note: 'More detail', highlight: 'benefits', expectedRevision: 4 },
     );
   });
 });
@@ -1178,32 +1237,46 @@ describe('copyReview.getMetadata', () => {
 
 describe('copyReview.updateSectionStatus', () => {
   it('calls patch on section status endpoint', async () => {
-    await copyReview.updateSectionStatus('ws-1', 'sec-1', 'approved' as never);
-    expect(mockPatch).toHaveBeenCalledWith('/api/copy/ws-1/section/sec-1/status', { status: 'approved' });
+    await copyReview.updateSectionStatus('ws-1', 'sec-1', 'approved' as never, 4);
+    expect(mockPatch).toHaveBeenCalledWith('/api/copy/ws-1/section/sec-1/status', {
+      status: 'approved',
+      expectedRevision: 4,
+    });
   });
 });
 
 describe('copyReview.updateSectionText', () => {
   it('calls patch on section text endpoint', async () => {
-    await copyReview.updateSectionText('ws-1', 'sec-1', 'Updated copy text here');
-    expect(mockPatch).toHaveBeenCalledWith('/api/copy/ws-1/section/sec-1/text', { copy: 'Updated copy text here' });
+    await copyReview.updateSectionText('ws-1', 'sec-1', 'Updated copy text here', 4);
+    expect(mockPatch).toHaveBeenCalledWith('/api/copy/ws-1/section/sec-1/text', {
+      copy: 'Updated copy text here',
+      expectedRevision: 4,
+    });
   });
 });
 
 describe('copyReview.addSuggestion', () => {
   it('calls post on suggest subpath', async () => {
-    await copyReview.addSuggestion('ws-1', 'sec-1', { originalText: 'Old text', suggestedText: 'New text' });
+    await copyReview.addSuggestion('ws-1', 'sec-1', {
+      originalText: 'Old text',
+      suggestedText: 'New text',
+      expectedRevision: 4,
+    });
     expect(mockPost).toHaveBeenCalledWith(
       '/api/copy/ws-1/section/sec-1/suggest',
-      { originalText: 'Old text', suggestedText: 'New text' },
+      { originalText: 'Old text', suggestedText: 'New text', expectedRevision: 4 },
     );
   });
 });
 
 describe('copyReview.sendEntryToClientReview', () => {
   it('calls post on send-to-client endpoint', async () => {
-    await copyReview.sendEntryToClientReview('ws-1', 'bp-1', 'entry-1');
-    expect(mockPost).toHaveBeenCalledWith('/api/copy/ws-1/bp-1/entry-1/send-to-client', {});
+    await copyReview.sendEntryToClientReview('ws-1', 'bp-1', 'entry-1', [
+      { sectionId: 'sec-1', expectedRevision: 4 },
+    ]);
+    expect(mockPost).toHaveBeenCalledWith('/api/copy/ws-1/bp-1/entry-1/send-to-client', {
+      sectionRevisions: [{ sectionId: 'sec-1', expectedRevision: 4 }],
+    });
   });
 });
 

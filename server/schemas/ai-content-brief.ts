@@ -49,7 +49,7 @@ export function parseContentBriefOutline(rawText: string): AiContentBriefOutline
  * Fields are optional here because the caller applies its own fallbacks
  * (|| existingBrief.X or || []) when merging into the final ContentBrief.
  */
-export const aiContentBriefSchema = z.object({
+const aiContentBriefFields = {
   secondaryKeywords: z.array(z.string()).optional(),
   suggestedTitle: z.string().optional(),
   suggestedMetaDesc: z.string().optional(),
@@ -92,9 +92,33 @@ export const aiContentBriefSchema = z.object({
   }).passthrough()).optional(),
   titleVariants: z.array(z.string()).optional(),
   metaDescVariants: z.array(z.string()).optional(),
+};
+
+/** Strict initial-generation contract: every persisted required brief field must be supplied. */
+export const aiContentBriefSchema = z.object({
+  ...aiContentBriefFields,
+  secondaryKeywords: z.array(z.string()),
+  suggestedTitle: z.string().trim().min(1),
+  suggestedMetaDesc: z.string().trim().min(1),
+  outline: z.array(z.object({
+    heading: z.string().trim().min(1),
+    subheadings: z.array(z.string()).optional(),
+    notes: z.string(),
+    wordCount: z.number().optional(),
+    keywords: z.array(z.string()).optional(),
+  }).passthrough()).min(1),
+  wordCountTarget: z.number().positive(),
+  intent: z.string().trim().min(1),
+  audience: z.string().trim().min(1),
+  competitorInsights: z.string(),
+  internalLinkSuggestions: z.array(z.string()),
 }).passthrough();
 
+/** Partial regeneration/update contract; callers merge these fields into an existing valid brief. */
+export const aiContentBriefUpdateSchema = z.object(aiContentBriefFields).passthrough();
+
 export type AiContentBrief = z.infer<typeof aiContentBriefSchema>;
+export type AiContentBriefUpdate = z.infer<typeof aiContentBriefUpdateSchema>;
 
 /**
  * Parse and validate the full brief generation/regeneration AI response.
@@ -103,4 +127,9 @@ export type AiContentBrief = z.infer<typeof aiContentBriefSchema>;
 export function parseContentBriefSchema(rawText: string): AiContentBrief {
   const raw = parseAIJsonRaw(rawText);
   return aiContentBriefSchema.parse(raw);
+}
+
+export function parseContentBriefUpdate(rawText: string): AiContentBriefUpdate {
+  const raw = parseAIJsonRaw(rawText);
+  return aiContentBriefUpdateSchema.parse(raw);
 }

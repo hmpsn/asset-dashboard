@@ -6,9 +6,33 @@ import { useState, useEffect } from 'react';
 import { Building2, Phone, Mail, MapPin, Globe, ChevronRight, Sparkles } from 'lucide-react';
 import { SectionCard } from '../ui/SectionCard';
 import { EmptyState } from '../ui/EmptyState';
-import { Badge, Icon, Button, FormInput } from '../ui';
+import { Badge, Icon, Button, Disclosure, ErrorState, FormInput, LoadingState } from '../ui';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { RenderMarkdown } from './RenderMarkdown';
 import type { BusinessProfile } from './types';
+import type { ClientBrandSummary } from '../../../shared/types/brand-generation';
+import type { BrandDeliverableType } from '../../../shared/types/brand-engine';
+
+const DELIVERABLE_LABELS: Record<BrandDeliverableType, string> = {
+  mission: 'Mission Statement',
+  vision: 'Vision Statement',
+  values: 'Core Values',
+  tagline: 'Tagline',
+  elevator_pitch: 'Elevator Pitch',
+  archetypes: 'Brand Archetypes',
+  personality_traits: 'Personality Traits',
+  voice_guidelines: 'Voice Guidelines',
+  tone_examples: 'Tone Examples',
+  messaging_pillars: 'Messaging Pillars',
+  differentiators: 'Differentiators',
+  positioning_matrix: 'Positioning Matrix',
+  brand_story: 'Brand Story',
+  personas: 'Customer Personas',
+  customer_journey: 'Customer Journey',
+  objection_handling: 'Objection Handling',
+  emotional_triggers: 'Emotional Triggers',
+  naming: 'Naming',
+};
 
 function isValidUrl(url: string): boolean {
   try { new URL(url); return true; } catch { return false; }
@@ -16,7 +40,12 @@ function isValidUrl(url: string): boolean {
 
 interface BrandTabProps {
   businessProfile?: BusinessProfile;
-  /** Plain-language brand voice summary (NOT the full brand voice doc). */
+  /** Authenticated client-safe projection: approved pieces plus the current finalized voice. */
+  brandSummary?: ClientBrandSummary;
+  brandSummaryLoading?: boolean;
+  brandSummaryError?: boolean;
+  onRetryBrandSummary?: () => void;
+  /** @deprecated Compatibility for callers that have not adopted ClientBrandSummary yet. */
   brandVoiceSummary?: string;
   /** Industry from intelligenceProfile — used for contextual placeholder */
   industry?: string;
@@ -25,6 +54,10 @@ interface BrandTabProps {
 
 export function BrandTab({
   businessProfile,
+  brandSummary,
+  brandSummaryLoading = false,
+  brandSummaryError = false,
+  onRetryBrandSummary,
   brandVoiceSummary,
   industry,
   onSaveBusinessProfile,
@@ -32,6 +65,11 @@ export function BrandTab({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const approvedDeliverables = brandSummary?.approvedDeliverables ?? [];
+  const resolvedVoiceSummary = brandSummary
+    ? brandSummary.voiceSummary
+    : brandVoiceSummary ?? null;
+  const hasBrandSummaryContent = approvedDeliverables.length > 0 || !!resolvedVoiceSummary;
 
   // Local form state — initialised from props
   // socialProfiles are sanitized on load: strip malformed URLs stored before validation was added
@@ -276,20 +314,68 @@ export function BrandTab({
         <SectionCard
           title="Brand Positioning"
           titleIcon={<Icon as={Sparkles} size="md" className="text-accent-brand" />}
-          titleExtra={<Badge label="AI-generated" tone="teal" variant="outline" shape="pill" size="sm" />}
+          titleExtra={approvedDeliverables.length > 0
+            ? <Badge label={`${approvedDeliverables.length} approved`} tone="emerald" variant="outline" shape="pill" size="sm" />
+            : undefined}
         >
-          {brandVoiceSummary ? (
-            <div className="space-y-3">
-              <p className="t-body text-[var(--brand-text)] leading-relaxed">{brandVoiceSummary}</p>
-              <p className="t-caption-sm text-[var(--brand-text-faint)]">
-                This summary reflects how your brand communicates. Contact your agency to update your brand voice guidelines.
-              </p>
+          {brandSummaryLoading ? (
+            <LoadingState message="Loading your brand foundation..." />
+          ) : brandSummaryError ? (
+            <ErrorState
+              type="data"
+              title="We couldn't load your brand foundation"
+              message="Your brand positioning is temporarily unavailable."
+              action={onRetryBrandSummary
+                ? { label: 'Try again', onClick: onRetryBrandSummary }
+                : undefined}
+            />
+          ) : hasBrandSummaryContent ? (
+            <div className="space-y-5">
+              {resolvedVoiceSummary && (
+                <section aria-labelledby="brand-voice-summary-heading" className="rounded-[var(--radius-lg)] bg-[var(--surface-3)]/45 p-4">
+                  <h3 id="brand-voice-summary-heading" className="t-label text-[var(--brand-text-muted)] mb-2">
+                    How your brand sounds
+                  </h3>
+                  <p className="t-body text-[var(--brand-text)] leading-relaxed">{resolvedVoiceSummary}</p>
+                  <p className="t-caption-sm text-[var(--brand-text-faint)] mt-2">
+                    This is your current finalized voice summary and the authority for brand and content work.
+                  </p>
+                </section>
+              )}
+
+              {approvedDeliverables.length > 0 && (
+                <section aria-labelledby="approved-brand-pieces-heading" className="space-y-2.5">
+                  <div>
+                    <h3 id="approved-brand-pieces-heading" className="t-body font-semibold text-[var(--brand-text-bright)]">
+                      Approved brand pieces
+                    </h3>
+                    <p className="t-caption-sm text-[var(--brand-text-muted)] mt-0.5">
+                      Open any piece to review the language your team has approved.
+                    </p>
+                  </div>
+                  {approvedDeliverables.map((deliverable, index) => (
+                    <Disclosure
+                      key={`${deliverable.deliverableType}:${deliverable.version}`}
+                      summary={DELIVERABLE_LABELS[deliverable.deliverableType]}
+                      defaultOpen={index === 0}
+                    >
+                      <div className="border-t border-[var(--brand-border)] pt-3">
+                        <RenderMarkdown text={deliverable.content} mode="prose" />
+                      </div>
+                    </Disclosure>
+                  ))}
+                </section>
+              )}
             </div>
           ) : (
             <EmptyState
               icon={Sparkles}
-              title="Brand positioning not yet generated"
-              description="Your agency will set up your brand voice guidelines. Check back after your onboarding is complete."
+              title={brandSummary
+                ? 'Brand positioning not yet approved'
+                : 'Brand positioning not yet generated'}
+              description={brandSummary
+                ? 'Your finalized voice summary and approved brand pieces will appear here as they become available.'
+                : 'Your agency will set up your brand voice guidelines. Check back after your onboarding is complete.'}
             />
           )}
         </SectionCard>

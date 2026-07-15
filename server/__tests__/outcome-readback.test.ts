@@ -39,6 +39,7 @@ describe('getScoredOutcomeReadbacks — latest conclusive outcome per action', (
 
     const sourceId = strategyPageKeywordSourceId('/services', 'teeth whitening');
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'strategy_keyword_added',
       sourceType: STRATEGY_PAGE_KEYWORD_SOURCE_TYPE,
@@ -83,6 +84,7 @@ describe('getScoredOutcomeReadbacks — latest conclusive outcome per action', (
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'content_published',
       sourceType: 'post',
@@ -118,6 +120,7 @@ describe('getScoredOutcomeReadbacks — latest conclusive outcome per action', (
     seedWorkspace(ws);
 
     const action = recordAction({ // recordAction-ok
+      attribution: 'platform_executed', // B14: attribution now required — preserves the prior default behavior these tests were written against
       workspaceId: ws,
       actionType: 'strategy_keyword_added',
       sourceType: STRATEGY_PAGE_KEYWORD_SOURCE_TYPE,

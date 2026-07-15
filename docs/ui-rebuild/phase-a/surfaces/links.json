@@ -1,0 +1,450 @@
+{
+  "gather": {
+    "surface": "links",
+    "capabilityClassification": [
+      {
+        "capability": "#1 3 sub-tabs shell (+4th Architecture, count badges)",
+        "resolution": "ui-only",
+        "note": "Segmented/tab bar over existing components; LinksPanel.tsx:18-22 verified."
+      },
+      {
+        "capability": "#2 ?tab= deep-link receiver",
+        "resolution": "ui-only",
+        "note": "tab-search-param.ts already supports legacyAliases (line 4,27); wire dead-links alias per Q7 default."
+      },
+      {
+        "capability": "#3 Site Audit fix-routing lands on Links",
+        "resolution": "ui-only",
+        "note": "Cross-surface contract; SeoAudit.tsx:536 sender unchanged."
+      },
+      {
+        "capability": "#4 Dead Links lazy-load + ErrorBoundary",
+        "resolution": "ui-only",
+        "note": "Keep code-splitting; LinksPanel.tsx:11 verified."
+      },
+      {
+        "capability": "#5 Run redirect scan",
+        "resolution": "ui-only",
+        "note": "GET /api/webflow/redirect-scan/:siteId exists (webflow-analysis.ts:198)."
+      },
+      {
+        "capability": "#6 GSC ghost-URL hits display (404s/mo column)",
+        "resolution": "needs-server-work",
+        "note": "sn-links-1: clicks/impressions fetched but dropped before PageStatus."
+      },
+      {
+        "capability": "#7 Redirect-target recommendations",
+        "resolution": "ui-only",
+        "note": "Heuristic exists (redirect-scanner.ts:146-160); confidence chip is Q3/sn-links-2."
+      },
+      {
+        "capability": "#8 Accept/Dismiss suggested rule",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#9 Edit redirect target inline",
+        "resolution": "ui-only",
+        "note": "at_risk restore; pure UI over existing accepted-rules state."
+      },
+      {
+        "capability": "#10 Export accepted rules CSV",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#11 Copy rules to clipboard",
+        "resolution": "ui-only",
+        "note": "at_risk restore; trivial."
+      },
+      {
+        "capability": "#12 Send redirect rules to client (redirect_proposal)",
+        "resolution": "open-question",
+        "note": "Q4: prototype drops producer while RedirectRenderer consumer lives (decision-renderers.tsx:414); default restore batch send."
+      },
+      {
+        "capability": "#13 Redirect Chains panel",
+        "resolution": "open-question",
+        "note": "Q1: data exists (RedirectScanResult.chains verified); prototype has no home."
+      },
+      {
+        "capability": "#14 All-pages status table",
+        "resolution": "open-question",
+        "note": "Q1: pageStatuses in snapshot; DataTable restore if owner keeps."
+      },
+      {
+        "capability": "#15 Filter tabs + search on page table",
+        "resolution": "open-question",
+        "note": "Q1: follows #14; FilterChip+SearchField."
+      },
+      {
+        "capability": "#16 Summary stat cards (Healthy/Redirecting/404s/Chains)",
+        "resolution": "ui-only",
+        "note": "summary in RedirectScanResult (redirect-scanner.ts:49-58); MetricTile row, final set tied to Q1."
+      },
+      {
+        "capability": "#17 Redirect snapshot persistence + auto-restore",
+        "resolution": "ui-only",
+        "note": "saveRedirectSnapshot/getRedirectSnapshot verified (redirect-store.ts:82,101)."
+      },
+      {
+        "capability": "#18 Activity log on scan",
+        "resolution": "ui-only",
+        "note": "addActivity in endpoint (webflow-analysis.ts:227-229); untouched."
+      },
+      {
+        "capability": "#19 Redirects empty/loading/error states",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#20 How-to tips block (Redirects)",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#21 AI internal-link analysis",
+        "resolution": "ui-only",
+        "note": "GET /api/webflow/internal-links/:siteId (webflow-analysis.ts:246); server pipeline unchanged."
+      },
+      {
+        "capability": "#22 Suggestion rows (from→to, anchor, reason, priority)",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#23 Priority filter tabs + search",
+        "resolution": "ui-only",
+        "note": "at_risk restore with FilterChip/SearchField."
+      },
+      {
+        "capability": "#24 List vs grouped-by-source view toggle",
+        "resolution": "ui-only",
+        "note": "at_risk restore; Segmented."
+      },
+      {
+        "capability": "#25 Copy <a href> HTML per suggestion",
+        "resolution": "ui-only",
+        "note": "Keep until N1 Insert exists (doc trade-off)."
+      },
+      {
+        "capability": "#26 Orphan-page detection + list",
+        "resolution": "ui-only",
+        "note": "pageHealth/isOrphan in snapshot (internal-links.ts:247-262 verified)."
+      },
+      {
+        "capability": "#27 Per-page link-health score + Avg Link Score stat",
+        "resolution": "ui-only",
+        "note": "score already computed and serialized in pageHealth (internal-links.ts:258-259); display restore only, Meter fits."
+      },
+      {
+        "capability": "#28 Batch send suggestions to client (internal_link)",
+        "resolution": "open-question",
+        "note": "Q4: batch vs per-item changes payload consumed by InternalLinkRenderer (decision-renderers.tsx:356); default keep batch."
+      },
+      {
+        "capability": "#29 Reanalyze",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#30 Internal-links snapshot persistence",
+        "resolution": "ui-only",
+        "note": "saveInternalLinks (performance-store.ts:358) + snapshot GET :287."
+      },
+      {
+        "capability": "#31 Outcome tracking of top-5 suggestions",
+        "resolution": "ui-only",
+        "note": "Server-side in endpoint (webflow-analysis.ts:253-277); must survive untouched."
+      },
+      {
+        "capability": "#32 Partial-fetch diagnostics",
+        "resolution": "ui-only",
+        "note": "pageCount/attemptedPageCount already in result (internal-links.ts:268,417); restore UI states."
+      },
+      {
+        "capability": "#33 Internal-links empty/loading/error",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#34 How-to/SEO-impact tips (Internal)",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#35 Crawl-domain selector",
+        "resolution": "open-question",
+        "note": "Q2: endpoint exists (webflow-analysis.ts:166, link-checker.ts:33); default carry — dropping re-breaks staging-gated sites."
+      },
+      {
+        "capability": "#36 Full-site link check",
+        "resolution": "ui-only",
+        "note": "checkSiteLinks (link-checker.ts:100) + GET :178 unchanged; sync-GET execution kept (T-carry-over)."
+      },
+      {
+        "capability": "#37 Result stats (total/healthy/dead/redirects)",
+        "resolution": "ui-only",
+        "note": "All counts in LinkCheckResult; restore lost Total/Healthy tiles."
+      },
+      {
+        "capability": "#38 Dead vs Redirects (3xx) sub-toggle + type filter",
+        "resolution": "open-question",
+        "note": "Q2: data in LinkCheckResult; default carry."
+      },
+      {
+        "capability": "#39 Dead-links CSV export",
+        "resolution": "open-question",
+        "note": "Q2: client-side CSV from existing data; default carry (export drops are a hard floor)."
+      },
+      {
+        "capability": "#40 Per-link detail + Re-check + timestamps",
+        "resolution": "ui-only",
+        "note": "Keep statusText + crawledDomain (link-checker.ts:28,240) the prototype loses."
+      },
+      {
+        "capability": "#41 Link-check snapshot persistence",
+        "resolution": "ui-only",
+        "note": "saveLinkCheck (performance-store.ts:348) + GET :192."
+      },
+      {
+        "capability": "#42 Dead-links empty/first-run/long-loading states",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "#43 Site Audit auto-runs dead-link check + deep-links",
+        "resolution": "ui-only",
+        "note": "Keep checkSiteLinks signature stable; cross-surface dep."
+      },
+      {
+        "capability": "#44 Intelligence slices read snapshots",
+        "resolution": "ui-only",
+        "note": "Verified reads: site-health-slice.ts:193,282; page-profile-slice.ts:170; keep snapshot shapes."
+      },
+      {
+        "capability": "#45 Client Inbox renders internal_link/redirect_proposal",
+        "resolution": "ui-only",
+        "note": "Consumers verified at decision-renderers.tsx:356,414; producer fate is Q4."
+      },
+      {
+        "capability": "#46 Auth via requireWorkspaceSiteAccessFromQuery",
+        "resolution": "ui-only",
+        "note": "All 7 endpoints verified (webflow-analysis.ts:166-287); no change."
+      },
+      {
+        "capability": "N1 Insert link into page",
+        "resolution": "defer-candidate",
+        "note": "Post-parity per Q6 default; needs write-target contract."
+      },
+      {
+        "capability": "N2 Per-404 hits + confidence %",
+        "resolution": "needs-server-work",
+        "note": "Hits = sn-links-1 (adopt); confidence = sn-links-2 gated on Q3."
+      },
+      {
+        "capability": "N3 Scheduled/automatic crawls",
+        "resolution": "defer-candidate",
+        "note": "sn-links-4 if adopted; sync-GET parity acceptable short-term, DEF-* row."
+      },
+      {
+        "capability": "N4 Dead-link Redirect/Reviewed row actions",
+        "resolution": "defer-candidate",
+        "note": "Quick win session-state ships; persisted reviewed-state = sn-links-3 as DEF-* follow-up."
+      },
+      {
+        "capability": "N5 Architecture as 4th tab",
+        "resolution": "ui-only",
+        "note": "Relocation: /api/site-architecture/:workspaceId + /schema-coverage exist (site-architecture.ts:19,34); coordinate removal from Page Intelligence (D3/D8), Q5."
+      },
+      {
+        "capability": "N6 Graduates into Insights Engine",
+        "resolution": "defer-candidate",
+        "note": "New bridge; post-parity per Q6 default."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-links-1",
+        "kind": "field",
+        "description": "Thread GSC clicks/impressions onto matching 404/ghost PageStatus rows (optional clicks/impressions fields) so the Redirects tab can show a real 404s/mo hits column.",
+        "existsToday": "partial",
+        "evidence": "GSC ghost URLs fetched WITH clicks+impressions at server/routes/webflow-analysis.ts:203-214, but PageStatus (server/redirect-scanner.ts:37-48) has no hits fields — data is dropped inside scanRedirects.",
+        "whereItLives": "server/redirect-scanner.ts (PageStatus + scanRedirects) + redirect-store snapshot type",
+        "effort": "S",
+        "likelySharedWith": [
+          "site-audit"
+        ]
+      },
+      {
+        "id": "sn-links-2",
+        "kind": "field",
+        "description": "Serialize the existing keyword-overlap match score as PageStatus.matchScore, displayed as 'match %' (never 'AI'). Gated on owner picking Q3 option (b).",
+        "existsToday": "partial",
+        "evidence": "findBestMatch computes bestScore internally (server/redirect-scanner.ts:146-160) but returns only the page; recommendedTarget/recommendedReason attach at :357-380 with no score.",
+        "whereItLives": "server/redirect-scanner.ts findBestMatch + PageStatus",
+        "effort": "S"
+      },
+      {
+        "id": "sn-links-3",
+        "kind": "endpoint",
+        "description": "Persisted reviewed/suppressed state for dead links (N4 full version): store + POST toggle endpoint + serialization into link-check snapshot reads.",
+        "existsToday": "no",
+        "evidence": "grep 'suppress|reviewed' in server/link-checker.ts, server/performance-store.ts, src/components/LinkChecker.tsx returned zero matches; Links has no suppression store (Site Audit's is separate per parity ledger).",
+        "whereItLives": "server/performance-store.ts (or new module) + server/routes/webflow-analysis.ts",
+        "effort": "M",
+        "likelySharedWith": [
+          "site-audit"
+        ]
+      },
+      {
+        "id": "sn-links-4",
+        "kind": "job",
+        "description": "Move the three synchronous long-GET scans (redirect-scan, link-check, internal-links) to the background-job platform; optional recurring crawl (N3). Defer-candidate, not a Phase-1 blocker.",
+        "existsToday": "no",
+        "evidence": "All three run inline in GET handlers (server/routes/webflow-analysis.ts:178,198,246); grep -i 'link|redirect|crawl' in server/cron-registry.ts returned no matches.",
+        "whereItLives": "server/jobs.ts workers + server/cron-registry.ts if scheduled",
+        "effort": "M",
+        "likelySharedWith": [
+          "site-audit"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1: Redirect chains panel + all-pages status table + filters (#13-#15) have no prototype home — restore, move to Site Audit, or cut?",
+        "proposedDefault": "Restore both as collapsed GroupBlock sections in the new Redirects tab; cutting breaks SeoAudit.tsx:550's 'review redirect chains' deep-link and deletes the platform's only chains UI.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2: carry Dead Links domain selector, 3xx sub-list, and CSV export (#35,#38,#39) into the rebuilt Dead tab?",
+        "proposedDefault": "Carry all three — data/endpoints exist, domain selector prevents a solved false-404 regression, and export drops violate a hard floor.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3: mockup's 'AI 96%' confidence chip — drop, expose real heuristic score as 'match', or build AI scoring?",
+        "proposedDefault": "(b) expose the heuristic bestScore labeled 'match' via sn-links-2; never ship a fabricated AI % (hard floor).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4: send-to-client shape — keep batched internal_link action + note, adopt per-suggestion sends (contract change), or both? Also: restore redirect_proposal send the prototype drops (#12)?",
+        "proposedDefault": "Keep HEAD batch semantics and restore redirect send; per-item send deferred to a C3-style follow-up since it changes the payload consumed by decision-renderers + inbox routing.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5: confirm Architecture moves Page Intelligence → Links tab 4 with HEAD filter/search/schema-coverage/refresh carried; who owns removal from Page Intelligence?",
+        "proposedDefault": "Confirm move; Links lane mounts it, SEO Editor/Page Intelligence lane owns removal in the same effort (D3 + route-removal checklist + D8 redirect map).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6: confirm Insert-link (N1) and links→insights bridge (N6) are post-parity roadmap, not Phase-1 blockers.",
+        "proposedDefault": "Yes — both are new engineering (Webflow write path; bridge-authoring); defer with ledger rows.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7: prototype tab ids (dead vs HEAD dead-links) — alias approach?",
+        "proposedDefault": "Keep HEAD ids and use tab-search-param.ts legacyAliases (mechanism already exists, line 4/27) so SeoAudit.tsx:536 and bookmarks keep working; no owner decision strictly needed.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "N1 Insert internal link directly into source page",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "No write path exists; requires seo-editor-write-targets contract work — post-parity per Q6 default."
+      },
+      {
+        "proposal": "N2 per-404 hits column + confidence %",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Hits are a small server field (sn-links-1) with real GSC data already fetched; confidence only as real 'match' score (Q3b, sn-links-2)."
+      },
+      {
+        "proposal": "N3 scheduled/automatic crawls",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs background-job migration (sn-links-4); sync-GET parity is acceptable short-term with a DEF-* row."
+      },
+      {
+        "proposal": "N4 dead-link Redirect/Reviewed row actions",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Adopt with session-state quick win; persisted reviewed-state (sn-links-3) ships as ledgered follow-up."
+      },
+      {
+        "proposal": "N5 Architecture as 4th Links tab",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Relocation not new code — API exists (site-architecture.ts:19,34); ratified by ledger 'moved' row, coordinate per Q5."
+      },
+      {
+        "proposal": "N6 links→Insights Engine graduation bridge",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New integration under bridge-authoring rules; not parity work."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Redirects",
+        "Internal Links",
+        "Dead Links",
+        "Architecture (pending Q5)"
+      ],
+      "primitives": [
+        "Segmented (sub-tab bar)",
+        "DataTable (page-status table, suggestion rows, dead-link rows, URL tree)",
+        "MetricTile (per-tab stat rows)",
+        "FilterChip + SearchField (status/priority/type filters + search)",
+        "GroupBlock (chains section, orphan callout, tips)",
+        "Drawer (chain trace / suggestion detail)",
+        "Toolbar (scan, export CSV, send-to-client actions)",
+        "Meter (per-page link-health score)",
+        "PageContainer"
+      ],
+      "dataHooks": [
+        "src/api/seo.ts webflow.* — GET /api/webflow/link-check-domains|link-check|link-check-snapshot|internal-links|internal-links-snapshot/:siteId (seo.ts:294-321)",
+        "src/api/misc.ts redirects — GET /api/webflow/redirect-scan|redirect-snapshot/:siteId (misc.ts:261)",
+        "src/api/clientActions.ts (internal_link / redirect_proposal producers)",
+        "GET /api/site-architecture/:workspaceId + /schema-coverage (site-architecture.ts:19,34) for tab 4",
+        "React Query keys via src/lib/queryKeys (existing snapshot query pattern in InternalLinks.tsx:43)"
+      ],
+      "statesPlan": "Per-tab: EmptyState w/ first-scan CTA, contextual loading ('Analyzing page content…', long-crawl notice), ErrorState w/ retry, plus restored partial-fetch diagnostics (#32); no tier lock (admin surface, no TierGate at HEAD).",
+      "mountNote": "Rebuilt view replaces LinksPanel at Page 'links' behind ui-rebuild-shell; requires selected.webflowSiteId (App.tsx mount); must keep ?tab= receiver with dead-links legacy alias for SeoAudit deep-links."
+    },
+    "crossSurfaceDeps": [
+      "site-audit: sends ?tab=dead-links deep-links (SeoAudit.tsx:536,550) and shares checkSiteLinks (seo-audit.ts:234) — signature + tab aliases must stay stable",
+      "seo-editor / Page Intelligence (D3): Architecture relocation N5 — Links gains tab 4, Page Intelligence loses SiteArchitecture; same-effort removal + D8 redirect map",
+      "client-portal / Inbox: internal_link + redirect_proposal renderers (decision-renderers.tsx:356,414) consume this surface's send payloads — Q4 governs any shape change",
+      "intelligence slices: site-health-slice + page-profile-slice + admin-chat-context read the three snapshots — snapshot shapes are a frozen contract",
+      "D5 icons: ~lucide call sites in LinksPanel migrate to <Icon name> per ICON_NAMES"
+    ],
+    "unknowns": [
+      "Prototype line-level cites (links.js) not independently verified — the kit mockup is a gitignored artifact; classifications rely on the surface doc's reading of it",
+      "Whether Site Audit's existing dead-link suppression store could be reused for sn-links-3 instead of a new one — that surface's doc/code was out of my read scope"
+    ],
+    "effortEstimate": "L"
+  },
+  "verify": {
+    "surface": "links",
+    "verdicts": [
+      {
+        "needId": "sn-links-1",
+        "verdict": "CONFIRMED",
+        "evidence": "server/redirect-scanner.ts:195-200 (GscGhostUrl carries clicks+impressions); ghost-merge loop server/redirect-scanner.ts:253-273 pushes only {url,path,title,source} — clicks/impressions dropped; PageStatus interface server/redirect-scanner.ts:38-48 has no hits fields. GSC fetch WITH clicks+impressions confirmed at server/routes/webflow-analysis.ts:205-217 (evidence cited 203-214, ~2-line drift, substantively correct).",
+        "correction": "Claim stands. Note: RedirectScanResult (incl. pageStatuses) persists as a JSON blob — server/redirect-store.ts:82-98 does result: JSON.stringify(result) and rowToSnapshot uses parseJsonFallback (redirect-store.ts:78) — so adding optional clicks/impressions to PageStatus needs NO migration/column/mapper lockstep. effort=S is correct; the DB-column-lockstep rule does not apply."
+      },
+      {
+        "needId": "sn-links-2",
+        "verdict": "CONFIRMED",
+        "evidence": "findBestMatch computes bestScore internally (server/redirect-scanner.ts:156-192) but returns bestPage only (line 192 `return bestScore >= 3 ? bestPage : null`). recommendedTarget/recommendedReason attach at server/redirect-scanner.ts:368-380 with no numeric score field. Evidence cited 146-160/357-380 — accurate. PageStatus (38-48) has no matchScore field.",
+        "correction": "Claim stands. Same JSON-blob persistence as sn-links-1 (redirect-store.ts:78,97) — matchScore is a free optional field on PageStatus, no migration. effort=S correct. Owner Q3 option (b) gating is a policy note, not a code fact, and does not affect the exists-today verdict."
+      },
+      {
+        "needId": "sn-links-3",
+        "verdict": "CONFIRMED",
+        "evidence": "rg -ni 'suppress|reviewed|dismiss|ignore|hide' returned ZERO matches in server/link-checker.ts, server/performance-store.ts, and src/components/LinkChecker.tsx (290 lines, no client-side suppression state either). Broad search rg -rni 'suppressed_links|dead_link.*suppress|link_suppress|reviewed_links|dismissed_link' across server/ + shared/ returned zero. Link-check persists via performance-store save('link-check',...) (performance-store.ts:348-350) as an opaque `unknown` blob — no reviewed/suppressed column or toggle endpoint anywhere.",
+        "correction": "Claim stands. No suppression store, no POST toggle endpoint, no serialization of reviewed/suppressed state exists for Links. Naming-drift synonyms (dismiss/ignore/hide) also checked and absent. effort=M is defensible (new store + endpoint + snapshot-read merge)."
+      },
+      {
+        "needId": "sn-links-4",
+        "verdict": "CONFIRMED",
+        "evidence": "All three scans run inline inside GET handlers: checkSiteLinks at server/routes/webflow-analysis.ts:182, scanRedirects at :222, analyzeInternalLinks at :250 (evidence cited 178/198/246 — modest line drift, substantively correct; each is awaited synchronously in the request handler, not dispatched to server/jobs.ts). rg -ni 'link|redirect|crawl' server/cron-registry.ts returned exit 1 / zero matches — no scheduled crawl registered.",
+        "correction": "Claim stands. kind=job and existsToday=no are correct; none of the three are wired into the background-job platform or cron-registry. Defer-candidate framing is a scope judgment, not a code fact."
+      }
+    ]
+  }
+}

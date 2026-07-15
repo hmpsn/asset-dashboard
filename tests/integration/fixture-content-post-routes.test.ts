@@ -12,7 +12,7 @@ beforeAll(async () => {
   await ctx.startServer();
   seededContent = seedContentData();
   foreignAuth = await seedAuthData();
-});
+}, 30_000);
 
 afterAll(async () => {
   seededContent?.cleanup();
@@ -71,12 +71,13 @@ describe('Content post routes with fixture-seeded content data', () => {
   it('PATCH /api/content-posts/:workspaceId/:postId rejects invalid post status transitions without mutating keyword-linked content', async () => {
     const beforeRes = await ctx.api(`/api/content-posts/${seededContent!.workspaceId}/${seededContent!.postId}`);
     expect(beforeRes.status).toBe(200);
-    const beforePost = await beforeRes.json() as { status: string; targetKeyword: string; title: string };
+    const beforePost = await beforeRes.json() as { status: string; targetKeyword: string; title: string; generationRevision: number };
     expect(beforePost.status).toBe('draft');
 
     const res = await ctx.patchJson(`/api/content-posts/${seededContent!.workspaceId}/${seededContent!.postId}`, {
       status: 'approved',
       title: `Should not persist ${Date.now()}`,
+      expectedRevision: beforePost.generationRevision,
     });
     expect(res.status).toBe(400);
 
@@ -93,11 +94,13 @@ describe('Content post routes with fixture-seeded content data', () => {
 
   it('PATCH /api/content-posts/:workspaceId/:postId rejects malformed request bodies (strict top-level keys + invalid status enum)', async () => {
     const badTopLevel = await ctx.patchJson(`/api/content-posts/${seededContent!.workspaceId}/${seededContent!.postId}`, {
+      expectedRevision: 0,
       unknownField: true,
     });
     expect(badTopLevel.status).toBe(400);
 
     const badStatus = await ctx.patchJson(`/api/content-posts/${seededContent!.workspaceId}/${seededContent!.postId}`, {
+      expectedRevision: 0,
       status: 'in_review',
     });
     expect(badStatus.status).toBe(400);
@@ -106,13 +109,14 @@ describe('Content post routes with fixture-seeded content data', () => {
   it('PATCH /api/content-posts/:workspaceId/:postId rejects duplicate section indexes and preserves persisted state', async () => {
     const beforeRes = await ctx.api(`/api/content-posts/${seededContent!.workspaceId}/${seededContent!.postId}`);
     expect(beforeRes.status).toBe(200);
-    const beforePost = await beforeRes.json() as { sections: unknown[] };
+    const beforePost = await beforeRes.json() as { sections: unknown[]; generationRevision: number };
 
     const res = await ctx.patchJson(`/api/content-posts/${seededContent!.workspaceId}/${seededContent!.postId}`, {
       sections: [
         { index: 0, heading: 'H1', content: '<p>A</p>', wordCount: 50 },
         { index: 0, heading: 'H2', content: '<p>B</p>', wordCount: 60 },
       ],
+      expectedRevision: beforePost.generationRevision,
     });
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: 'Duplicate section index 0' });

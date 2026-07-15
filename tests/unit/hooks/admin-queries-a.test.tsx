@@ -68,18 +68,6 @@ vi.mock('../../../src/api/workspaces', () => ({
   publicWorkspaces: {},
 }));
 
-// ── Mock: src/api (barrel — for meetingBriefApi) ────────────────────────────
-
-vi.mock('../../../src/api', () => ({
-  meetingBriefApi: {
-    get: vi.fn(),
-    generate: vi.fn(),
-  },
-}));
-
-import { meetingBriefApi } from '../../../src/api';
-const mockMeetingBriefGet = vi.mocked(meetingBriefApi.get);
-
 // ── Mock: src/api/platform ──────────────────────────────────────────────────
 
 vi.mock('../../../src/api/platform', () => ({
@@ -137,7 +125,6 @@ const mockBlueprintsList = vi.mocked(blueprintsApi.list);
 import { useAdminBriefsList, useAdminRequestsList } from '../../../src/hooks/admin/useAdminBriefs';
 import { useAdminROI } from '../../../src/hooks/admin/useAdminROI';
 import { useAdminPostsList, useAdminPost } from '../../../src/hooks/admin/useAdminPosts';
-import { useAdminMeetingBrief } from '../../../src/hooks/admin/useAdminMeetingBrief';
 import { useWorkspaceHomeData } from '../../../src/hooks/admin/useWorkspaceHome';
 import { useWorkspaceIntelligence } from '../../../src/hooks/admin/useWorkspaceIntelligence';
 import { useAiSuggestedBriefs } from '../../../src/hooks/admin/useAiSuggestedBriefs';
@@ -178,6 +165,12 @@ describe('useAdminRequestsList', () => {
     mockRequestsList.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useAdminRequestsList('ws-2'), { wrapper: makeWrapper() });
     expect(result.current.isLoading).toBe(true);
+  });
+
+  it('does not issue a request when its consumer disables the list', () => {
+    const { result } = renderHook(() => useAdminRequestsList('ws-2', false), { wrapper: makeWrapper() });
+    expect(result.current.isLoading).toBe(false);
+    expect(mockRequestsList).not.toHaveBeenCalled();
   });
 
   it('returns requests data when API resolves', async () => {
@@ -265,33 +258,6 @@ describe('useAdminPost', () => {
   });
 });
 
-// ── useAdminMeetingBrief ────────────────────────────────────────────────────
-
-describe('useAdminMeetingBrief', () => {
-  beforeEach(() => { mockMeetingBriefGet.mockReset(); });
-
-  it('is disabled when workspaceId is empty string', () => {
-    // hook exposes brief/isLoading/isError rather than raw RQ result
-    mockMeetingBriefGet.mockReturnValue(new Promise(() => {}));
-    const { result } = renderHook(() => useAdminMeetingBrief(''), { wrapper: makeWrapper() });
-    expect(result.current.isLoading).toBe(false);
-    expect(mockMeetingBriefGet).not.toHaveBeenCalled();
-  });
-
-  it('enters loading state when enabled with a valid workspaceId', () => {
-    mockMeetingBriefGet.mockReturnValue(new Promise(() => {}));
-    const { result } = renderHook(() => useAdminMeetingBrief('ws-1'), { wrapper: makeWrapper() });
-    expect(result.current.isLoading).toBe(true);
-  });
-
-  it('returns brief data when API resolves', async () => {
-    const briefData = { brief: { id: 'b1', summary: 'Good progress' }, unchanged: false };
-    mockMeetingBriefGet.mockResolvedValue(briefData as never);
-    const { result } = renderHook(() => useAdminMeetingBrief('ws-1'), { wrapper: makeWrapper() });
-    await waitFor(() => expect(result.current.brief).toEqual(briefData.brief));
-  });
-});
-
 // ── useWorkspaceHomeData ────────────────────────────────────────────────────
 
 describe('useWorkspaceHomeData', () => {
@@ -360,6 +326,12 @@ describe('useAiSuggestedBriefs', () => {
     mockSuggestedBriefsList.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useAiSuggestedBriefs('ws-1'), { wrapper: makeWrapper() });
     expect(result.current.isLoading).toBe(true);
+  });
+
+  it('does not issue a request when its consumer disables intake data', () => {
+    const { result } = renderHook(() => useAiSuggestedBriefs('ws-1', false), { wrapper: makeWrapper() });
+    expect(result.current.isLoading).toBe(false);
+    expect(mockSuggestedBriefsList).not.toHaveBeenCalled();
   });
 
   it('returns store data when API resolves', async () => {

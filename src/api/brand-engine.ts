@@ -5,6 +5,7 @@ import type {
   DiscoverySource, DiscoveryExtraction,
   VoiceProfile, VoiceSample, CalibrationSession,
   BrandDeliverable,
+  ReleasedBrandDeliverableType,
 } from '../../shared/types/brand-engine';
 import type {
   SiteBlueprint,
@@ -82,7 +83,7 @@ export const voice = {
 
 export const identity = {
   list: (wsId: string) => get<BrandDeliverable[]>(`/api/brand-identity/${wsId}`),
-  generate: (wsId: string, body: { deliverableType: string }) =>
+  generate: (wsId: string, body: { deliverableType: ReleasedBrandDeliverableType }) =>
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/generate`, body),
   refine: (wsId: string, id: string, body: { direction: string }) =>
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}/refine`, body),
@@ -178,7 +179,7 @@ export const copyGeneration = {
       `/api/copy/${wsId}/${blueprintId}/${entryId}/generate`,
       body ?? {}
     ),
-  regenerateSection: (wsId: string, blueprintId: string, entryId: string, sectionId: string, body: { note: string; highlight?: string }) =>
+  regenerateSection: (wsId: string, blueprintId: string, entryId: string, sectionId: string, body: { note: string; highlight?: string; expectedRevision: number }) =>
     post<CopySection | null>(
       `/api/copy/${wsId}/${blueprintId}/${entryId}/regenerate/${sectionId}`,
       body
@@ -192,25 +193,30 @@ export const copyReview = {
     get<EntryCopyStatus>(`/api/copy/${wsId}/entry/${entryId}/status`),
   getMetadata: (wsId: string, entryId: string) =>
     get<CopyMetadata | null>(`/api/copy/${wsId}/entry/${entryId}/metadata`),
-  updateSectionStatus: (wsId: string, sectionId: string, status: CopySectionStatus) =>
+  updateSectionStatus: (wsId: string, sectionId: string, status: CopySectionStatus, expectedRevision: number) =>
     patch<CopySection | null>(
       `/api/copy/${wsId}/section/${sectionId}/status`,
-      { status }
+      { status, expectedRevision }
     ),
-  updateSectionText: (wsId: string, sectionId: string, copy: string) =>
+  updateSectionText: (wsId: string, sectionId: string, copy: string, expectedRevision: number) =>
     patch<CopySection | null>(
       `/api/copy/${wsId}/section/${sectionId}/text`,
-      { copy }
+      { copy, expectedRevision }
     ),
-  addSuggestion: (wsId: string, sectionId: string, body: { originalText: string; suggestedText: string }) =>
+  addSuggestion: (wsId: string, sectionId: string, body: { originalText: string; suggestedText: string; expectedRevision: number }) =>
     post<CopySection | null>(
       `/api/copy/${wsId}/section/${sectionId}/suggest`,
       body
     ),
-  sendEntryToClientReview: (wsId: string, blueprintId: string, entryId: string) =>
+  sendEntryToClientReview: (
+    wsId: string,
+    blueprintId: string,
+    entryId: string,
+    sectionRevisions: Array<{ sectionId: string; expectedRevision: number }>,
+  ) =>
     post<{ sent: number }>(
       `/api/copy/${wsId}/${blueprintId}/${entryId}/send-to-client`,
-      {},
+      { sectionRevisions },
     ),
 };
 

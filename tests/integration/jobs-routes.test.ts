@@ -137,6 +137,27 @@ describe('Jobs — scoped JWT workspace guards', () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it('rejects reading a workspace-less (global/system) job for a non-owner member', async () => {
+    // A global job (no workspaceId, e.g. outcome-source-integrity-sweep) must
+    // not be readable by any authenticated non-owner member — the ownership
+    // gate must not skip entirely just because workspaceId is undefined.
+    const job = createJob('tenancy-regression', { message: 'global sweep' });
+
+    const res = await api(`/api/jobs/${job.id}`, { headers: scopedHeaders() });
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects cancelling a workspace-less (global/system) job for a non-owner member', async () => {
+    const job = createJob('tenancy-regression', { message: 'global sweep' });
+    updateJob(job.id, { status: 'running' });
+
+    const res = await ctx.api(`/api/jobs/${job.id}`, {
+      method: 'DELETE',
+      headers: scopedHeaders(),
+    });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('Jobs — completed clear scope', () => {

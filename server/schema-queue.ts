@@ -43,6 +43,7 @@ const stmts = createStmtCache(() => ({
   ),
   // selectByCellId + updateStatus removed in W6.3 along with markSchemaApplied
   markStaleByCellId: db.prepare(
+    // status-ok: documented exemption — only pending_schemas status write at HEAD; the WHERE status = 'pending' clause structurally enforces the sole legal origin (pending→stale, PENDING_SCHEMA_TRANSITIONS). Cell-scoped bulk write, no per-row id to read. See docs/rules/lifecycle-state-machines.md.
     `UPDATE pending_schemas SET status = 'stale', updated_at = @updated_at WHERE cell_id = @cell_id AND workspace_id = @workspace_id AND status = 'pending'`,
   ),
 }));

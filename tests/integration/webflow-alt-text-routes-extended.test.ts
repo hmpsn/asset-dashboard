@@ -30,6 +30,7 @@ import http from 'http';
 import type { AddressInfo } from 'net';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { ExternalFetchError } from '../../server/external-fetch.js';
+import { getUsageCount } from '../../server/usage-tracking.js';
 
 const nativeFetch = globalThis.fetch;
 const ALT_ROUTE_TEST_TIMEOUT_MS = 15_000;
@@ -57,6 +58,8 @@ const fetchBytesState = vi.hoisted(() => ({
   shouldThrow: false,
   throwKind: 'http' as 'http' | 'network' | 'timeout',
   throwStatus: 404 as number | undefined,
+  genericThrowOnCall: null as number | null,
+  callCount: 0,
 }));
 
 const cmsState = vi.hoisted(() => ({
@@ -99,6 +102,10 @@ vi.mock('../../server/external-fetch.js', async (importOriginal) => {
   return {
     ...actual,
     fetchExternalBytes: vi.fn(async () => {
+      fetchBytesState.callCount++;
+      if (fetchBytesState.genericThrowOnCall === fetchBytesState.callCount) {
+        throw new Error('Unexpected fetch failure');
+      }
       if (fetchBytesState.shouldThrow) {
         throw new actual.ExternalFetchError({
           kind: fetchBytesState.throwKind,
@@ -246,6 +253,8 @@ beforeEach(() => {
   fetchBytesState.shouldThrow = false;
   fetchBytesState.throwKind = 'http';
   fetchBytesState.throwStatus = 404;
+  fetchBytesState.genericThrowOnCall = null;
+  fetchBytesState.callCount = 0;
 
   cmsState.getCollectionItemResult = null;
   cmsState.updateShouldFail = false;
@@ -279,14 +288,33 @@ describe('POST /generate-alt — workspace not found', () => {
 });
 
 describe('POST /generate-alt — usage limit', () => {
-  it('returns 429 when free tier workspace has hit limit', async () => {
-    updateWorkspace(workspaceId, { tier: 'free' });
+  it('returns 429 when an expired-trial Free workspace has no allowance', async () => {
+    updateWorkspace(workspaceId, {
+      tier: 'free',
+      trialEndsAt: '2000-01-01T00:00:00.000Z',
+    });
     const res = await postJson(`/api/webflow/${workspaceId}/generate-alt/asset-limit`, {
       imageUrl: 'https://cdn.example.test/img.jpg',
       siteId,
     });
     expect(res.status).toBe(429);
     await expect(res.json()).resolves.toEqual({ error: 'Monthly AI generation limit reached' });
+  });
+
+  it('uses Growth allowance for an active-trial Free workspace', async () => {
+    updateWorkspace(workspaceId, {
+      tier: 'free',
+      trialEndsAt: '2999-01-01T00:00:00.000Z',
+    });
+    altState.queue.push('Active trial alt text');
+
+    const res = await postJson(`/api/webflow/${workspaceId}/generate-alt/asset-trial`, {
+      imageUrl: 'https://cdn.example.test/trial.jpg',
+      siteId,
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ altText: 'Active trial alt text', updated: true });
   });
 });
 
@@ -402,8 +430,11 @@ describe('POST /bulk-generate-alt — workspace not found', () => {
 });
 
 describe('POST /bulk-generate-alt — free tier usage limit at start', () => {
-  it('returns 429 when free tier has hit alt_text_generations limit', async () => {
-    updateWorkspace(workspaceId, { tier: 'free' });
+  it('returns 429 when an expired-trial Free workspace has no allowance', async () => {
+    updateWorkspace(workspaceId, {
+      tier: 'free',
+      trialEndsAt: '2000-01-01T00:00:00.000Z',
+    });
     const res = await postJson(`/api/webflow/${workspaceId}/bulk-generate-alt`, {
       assets: [{ assetId: 'a1', imageUrl: 'https://cdn.example.test/a1.jpg' }],
       siteId,
@@ -417,7 +448,11 @@ describe('POST /bulk-generate-alt — free tier usage limit at start', () => {
 });
 
 describe('POST /bulk-generate-alt — successful single asset', () => {
-  it('streams NDJSON with status + result + done for one asset', async () => {
+  it('uses Growth allowance at preflight and reservation for an active-trial Free workspace', async () => {
+    updateWorkspace(workspaceId, {
+      tier: 'free',
+      trialEndsAt: '2999-01-01T00:00:00.000Z',
+    });
     altState.queue.push('First asset alt');
 
     const res = await postJson(`/api/webflow/${workspaceId}/bulk-generate-alt`, {
@@ -499,6 +534,57 @@ describe('POST /bulk-generate-alt — fetchExternalBytes fails with network erro
     expect(resultLine!.assetId).toBe('bulk-net-fail');
     expect(resultLine!.altText).toBeNull();
     expect(String(resultLine!.error)).toContain('network');
+  });
+});
+
+describe('POST /bulk-generate-alt — generic fetch failure accounting', () => {
+  it('counts and refunds one generic failure exactly once', async () => {
+    fetchBytesState.genericThrowOnCall = 1;
+
+    const res = await postJson(`/api/webflow/${workspaceId}/bulk-generate-alt`, {
+      assets: [{ assetId: 'bulk-generic-fail', imageUrl: 'https://cdn.example.test/generic.jpg' }],
+    });
+    expect(res.status).toBe(200);
+
+    const lines = await parseNdjson(res);
+    const resultLine = lines.find(line => line.type === 'result');
+    expect(resultLine).toMatchObject({
+      assetId: 'bulk-generic-fail',
+      altText: null,
+      updated: false,
+      error: 'Unexpected fetch failure',
+      done: 1,
+      total: 1,
+    });
+    expect(lines.find(line => line.type === 'done')).toMatchObject({ done: 1, total: 1 });
+    expect(getUsageCount(workspaceId, 'alt_text_generations')).toBe(0);
+  });
+
+  it('does not refund a prior successful asset when the next generic fetch fails', async () => {
+    fetchBytesState.genericThrowOnCall = 2;
+    altState.queue.push('Successful first alt');
+
+    const res = await postJson(`/api/webflow/${workspaceId}/bulk-generate-alt`, {
+      assets: [
+        { assetId: 'bulk-success-before-error', imageUrl: 'https://cdn.example.test/success.jpg' },
+        { assetId: 'bulk-generic-after-success', imageUrl: 'https://cdn.example.test/generic-after.jpg' },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const lines = await parseNdjson(res);
+    expect(lines.find(line => line.assetId === 'bulk-success-before-error')).toMatchObject({
+      updated: true,
+      done: 1,
+      total: 2,
+    });
+    expect(lines.find(line => line.assetId === 'bulk-generic-after-success')).toMatchObject({
+      updated: false,
+      done: 2,
+      total: 2,
+    });
+    expect(lines.find(line => line.type === 'done')).toMatchObject({ done: 2, total: 2 });
+    expect(getUsageCount(workspaceId, 'alt_text_generations')).toBe(1);
   });
 });
 

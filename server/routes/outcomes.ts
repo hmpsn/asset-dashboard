@@ -26,6 +26,7 @@ import {
   getActionIdsByWorkspace,
   getWinRateForActionIds,
 } from '../outcome-tracking.js';
+import { computeOutcomeCoverage } from '../outcome-coverage.js';
 import { getPlaybooks } from '../outcome-playbooks.js';
 import { getWorkspaceLearnings } from '../workspace-learnings.js';
 import { loadRecommendations } from '../recommendations.js';
@@ -33,8 +34,14 @@ import { getClientAction } from '../client-actions.js';
 import { getBrief } from '../content-brief.js';
 import { getPost } from '../content-posts-db.js';
 import { getContentRequest } from '../content-requests.js';
+import { clientActionLabel } from '../../shared/types/client-vocabulary.js';
+import {
+  getActionCatalogEntry,
+  toClientSafeOutcomeEventPayload,
+} from '../../shared/types/action-catalog.js';
 import type {
   ActionType,
+  Attribution,
   ActionPlaybook,
   OutcomeScorecard,
   WorkspaceOutcomeOverview,
@@ -44,7 +51,7 @@ import type {
   TopWin,
 } from '../../shared/types/outcome-tracking.js';
 import type { RecommendationSet } from '../../shared/types/recommendations.js';
-import { actionTypeEnum, attributionEnum, outcomeScoreEnum } from '../schemas/outcome-schemas.js';
+import { actionTypeEnum, attributionEnum, outcomeScoreEnum, trackedActionSourceSnapshotSchema } from '../schemas/outcome-schemas.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 
 const log = createLogger('outcomes');
@@ -53,8 +60,35 @@ const router = Router();
 
 // ── Helpers ──
 
-function computeScorecard(workspaceId: string): OutcomeScorecard {
-  const actions = getActionsByWorkspace(workspaceId);
+/**
+ * Compute the outcome scorecard for a workspace.
+ *
+ * `excludeNotActedOn` (C4 attribution-honesty): when true, `not_acted_on` actions —
+ * unexecuted proposals the workspace never acted on — are dropped from ALL rollups
+ * (win-rate numerator/denominator, byCategory, totals, trend) so they never inflate
+ * a client-facing win rate or "confirmed wins" count. The ADMIN summary route leaves
+ * this false to preserve the historical admin-parity semantics (admin surfaces
+ * deliberately include not_acted_on for full-funnel visibility — see the /overview
+ * parity contract). The PUBLIC summary route passes true. This mirrors the A1
+ * exclusion already applied to the wins surfaces (getTopWinsFromActions).
+ *
+ * `excludeClientHidden` keeps internal-only platform milestones (for example,
+ * voice-authority finalization) out of client-facing counts. Unknown historical
+ * action values remain visible rather than being silently discarded.
+ */
+function computeScorecard(
+  workspaceId: string,
+  opts?: { excludeNotActedOn?: boolean; excludeClientHidden?: boolean },
+): OutcomeScorecard {
+  const allActions = getActionsByWorkspace(workspaceId);
+  const actions = allActions.filter(action => {
+    if (opts?.excludeNotActedOn && action.attribution === 'not_acted_on') return false;
+    if (opts?.excludeClientHidden) {
+      const catalogEntry = getActionCatalogEntry('outcome', action.actionType);
+      if (catalogEntry?.clientVisible === false) return false;
+    }
+    return true;
+  });
 
   // Group by action type
   const byType = new Map<ActionType, { wins: number; strongWins: number; scored: number; total: number }>();
@@ -212,6 +246,9 @@ router.get('/api/outcomes/overview', (_req, res) => {
         topWin: topWins[0] ?? null,
         attentionNeeded,
         attentionReason,
+        // R9 (B15): admin-only coverage funnel summary — cheap indexed aggregate, same shape
+        // as the per-workspace endpoint. Never surfaced client-side.
+        coverage: computeOutcomeCoverage(ws.id),
       });
     }
 
@@ -230,6 +267,18 @@ router.get('/api/outcomes/:workspaceId/scorecard', requireWorkspaceAccess('works
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get scorecard');
     res.status(500).json({ error: 'Failed to get outcome scorecard' });
+  }
+});
+
+// GET /api/outcomes/:workspaceId/coverage — Reconcile R9 (B15): admin-only outcome
+// coverage funnel (tracked → measured → reconciled). Never exposed on a public/client route.
+router.get('/api/outcomes/:workspaceId/coverage', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  try {
+    const coverage = computeOutcomeCoverage(req.params.workspaceId);
+    res.json(coverage);
+  } catch (err) {
+    log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get outcome coverage');
+    res.status(500).json({ error: 'Failed to get outcome coverage' });
   }
 });
 
@@ -285,6 +334,14 @@ router.post(
     }),
     attribution: attributionEnum.optional(),
     measurementWindow: z.number().int().min(7).max(365).optional(),
+    // R6 (B11): optional source-identity snapshot. Advisory — the API accepts a free-form
+    // { label, snapshot } so external/programmatic recorders can capture the source's
+    // title at write time. `snapshot.type` stays a free string (mirrors the advisory
+    // SourceRef union); no hard enum break.
+    source: z.object({
+      label: z.string().min(1).max(500),
+      snapshot: trackedActionSourceSnapshotSchema.optional(),
+    }).optional(),
   })),
   async (req, res) => {
     try {
@@ -297,6 +354,22 @@ router.post(
           }
         }
 
+        // R8-PR2 (B14): tolerate-old, HONEST default. recordAction now REQUIRES attribution
+        // (the inverted `?? 'platform_executed'` internal default was removed as a trust
+        // hazard — it silently over-credited the platform). External callers (MCP holders of
+        // persistent API keys, programmatic recorders) that omit attribution keep working —
+        // this is a NON-breaking change — but their action is stored with the honest
+        // `not_acted_on` ("we don't know / not attributed"), NEVER the silent
+        // `platform_executed`, plus a deprecation warn nudging them to send it explicitly.
+        const attribution: Attribution = req.body.attribution ?? 'not_acted_on';
+        if (req.body.attribution === undefined) {
+          log.warn(
+            { workspaceId: req.params.workspaceId, sourceType: req.body.sourceType, actionType: req.body.actionType },
+            'DEPRECATION: POST /api/outcomes/:workspaceId/actions received no `attribution` — defaulting to the honest `not_acted_on`. ' +
+            'Pass an explicit attribution (platform_executed | externally_executed | not_acted_on); the silent default will be removed in a future release.',
+          );
+        }
+
         const action = recordAction({ // recordAction-ok: workspaceId validated by requireWorkspaceAccess middleware
           workspaceId: req.params.workspaceId,
           actionType: req.body.actionType as ActionType,
@@ -305,11 +378,17 @@ router.post(
           pageUrl: req.body.pageUrl,
           targetKeyword: req.body.targetKeyword,
           baselineSnapshot: { ...req.body.baselineSnapshot, captured_at: new Date().toISOString() },
-          attribution: req.body.attribution,
+          attribution,
           measurementWindow: req.body.measurementWindow,
+          // R6 (B11): thread the optional source-identity snapshot from the request body.
+          source: req.body.source,
         });
 
-        broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.OUTCOME_ACTION_RECORDED, { actionId: action.id });
+        broadcastToWorkspace(
+          req.params.workspaceId,
+          WS_EVENTS.OUTCOME_ACTION_RECORDED,
+          toClientSafeOutcomeEventPayload(action.actionType, { actionId: action.id }),
+        );
         invalidateIntelligenceCache(req.params.workspaceId);
         return { success: true, action } as const;
       });
@@ -400,7 +479,16 @@ router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(
     // Full OutcomeScorecard serialization (E5): the client OutcomeSummary component
     // renders strongWinRate and pendingMeasurement — omitting them produced NaN%.
     // Nothing here is admin-sensitive (aggregate win-rate stats only; no $ values).
-    const scorecard = computeScorecard(req.params.workspaceId);
+    //
+    // C4 (attribution honesty): exclude `not_acted_on` actions — unexecuted proposals
+    // the workspace never acted on — from the CLIENT win-rate and confirmed-wins counts.
+    // Internal-only platform milestones are excluded for the same reason: they remain
+    // useful in admin diagnostics but are not client outcome claims. Admin routes retain
+    // the full ledger for operational visibility.
+    const scorecard = computeScorecard(req.params.workspaceId, {
+      excludeNotActedOn: true,
+      excludeClientHidden: true,
+    });
     res.json(scorecard);
   } catch (err) {
     log.error({ err, workspaceId: req.params.workspaceId }, 'Failed to get client summary');
@@ -410,38 +498,41 @@ router.get('/api/public/outcomes/:workspaceId/summary', requireClientPortalAuth(
 
 // Honest generic per-action-type labels for win entries whose source title cannot be
 // resolved (E5, audit #5). Replaces the fabricated `"<action_type> action"` string,
-// which implied a recommendation title that never existed. Record<ActionType, string>
-// keeps this exhaustive — adding an ActionType without a label is a compile error.
-const WIN_FALLBACK_LABELS: Record<ActionType, string> = {
-  insight_acted_on: 'Acted on a site insight',
-  content_published: 'Published new content',
-  brief_created: 'Created a content brief',
-  strategy_keyword_added: 'Added a keyword to the strategy',
-  schema_deployed: 'Deployed structured data',
-  audit_fix_applied: 'Applied a technical fix',
-  content_refreshed: 'Refreshed existing content',
-  internal_link_added: 'Added internal links',
-  meta_updated: 'Updated page metadata',
-  voice_calibrated: 'Calibrated brand voice',
-  competitor_gap_closed: 'Closed a competitor keyword gap',
-  cluster_published: 'Filled a topic cluster',
-  cannibalization_resolved: 'Resolved keyword cannibalization',
-  local_visibility_won: 'Won local pack visibility',
-  local_service_added: 'Started targeting a local service',
-  // Strategy redesign P2 pre-commit — managed-set keep markers (internal curation, never a
-  // scored win; present only to keep this Record<ActionType,…> exhaustive).
-  topic_cluster_keep: 'Prioritized a topic cluster',
-  content_gap_keep: 'Prioritized a content opportunity',
-};
-
+// which implied a recommendation title that never existed.
+//
+// C2/R12a: this fallback now reads the single canonical client vocabulary map
+// (shared/types/client-vocabulary.ts) instead of carrying its own
+// Record<ActionType, string> — folded together with WinsSurface.tsx's ACTION_LABELS
+// and OutcomeSummary.tsx's ACTION_TYPE_LABELS after the owner wording sign-off pass.
+// The admin action catalog (`shared/types/action-catalog.ts`, `outcome` context)
+// remains a SEPARATE, shorter admin-style label set — this endpoint is CLIENT-visible
+// (GET /api/public/outcomes/:workspaceId/wins; WinsSurface.tsx renders
+// `entry.recommendation` — this fallback text — directly) and must keep the fuller
+// client-facing phrasing, not the admin nouns.
 /**
- * Resolve the REAL source title for a win entry via sourceType/sourceId.
- * Falls back to an honest generic action label when the source has no title
- * or no longer exists. `recSet` is lazily loaded once per request by the caller
- * so a 10-win response doesn't re-read the recommendation set 10 times.
+ * Resolve the REAL source title for a win entry.
+ *
+ * R6 (B11) — resolution order is snapshot → live → generic:
+ *   1. SNAPSHOT-FIRST: if the action carried a source title snapshotted at record
+ *      time (`win.sourceLabel`), use it. This is the durable identity captured when
+ *      the action was recorded, so a regenerated/deleted source no longer degrades
+ *      the win to a generic label.
+ *   2. LIVE lookup: fall back to reading the source's CURRENT title via
+ *      sourceType/sourceId (recommendation set, client action, post, brief, request).
+ *      Kept intact for legacy/pre-B11 rows that have no snapshot.
+ *   3. GENERIC fallback: an honest per-action-type label when neither resolves. This
+ *      fallback is DELIBERATELY retained — its demotion is B12's job, after the
+ *      integrity sweep confirms zero danglers. Do not delete it here.
+ *
+ * `recSet` is lazily loaded once per request by the caller so a 10-win response
+ * doesn't re-read the recommendation set 10 times.
  */
 function resolveWinTitle(workspaceId: string, win: TopWin, getRecSet: () => RecommendationSet | null): string {
-  const fallback = WIN_FALLBACK_LABELS[win.actionType] ?? win.actionType.replace(/_/g, ' ');
+  const fallback = clientActionLabel(win.actionType);
+  // 1. Snapshot-first: the write-time captured title, immune to source regeneration.
+  const snapshotTitle = win.sourceLabel?.trim();
+  if (snapshotTitle) return snapshotTitle;
+  // 2. Live lookup (legacy rows / no snapshot captured).
   if (!win.sourceId) return fallback;
   try {
     switch (win.sourceType) {
@@ -481,7 +572,7 @@ function resolveWinTitle(workspaceId: string, win: TopWin, getRecSet: () => Reco
 router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), (req, res) => {
   try {
     const workspaceId = req.params.workspaceId;
-    const wins = getTopWinsForWorkspace(workspaceId, 10);
+    const wins = getTopWinsForWorkspace(workspaceId, 10, { excludeClientHidden: true });
     // Lazy once-per-request recommendation set for title resolution
     let recSet: RecommendationSet | null | undefined;
     const getRecSet = () => {
@@ -498,6 +589,9 @@ router.get('/api/public/outcomes/:workspaceId/wins', requireClientPortalAuth(), 
       delta: w.delta,
       score: w.score,
       attributedValue: w.attributedValue,
+      // C4: carry honest execution attribution so WinsSurface frames externally_executed
+      // wins truthfully ("we called it") instead of claiming "we shipped it".
+      attribution: w.attribution,
       detectedAt: w.scoredAt,
     }));
     res.json(entries);

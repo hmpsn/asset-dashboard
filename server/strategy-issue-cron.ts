@@ -39,7 +39,12 @@ import {
   loadRecommendations,
   isActiveRec,
 } from './recommendations.js';
-import { generateStrategyPov, POV_UNCHANGED } from './strategy-pov-generator.js';
+import {
+  generateStrategyPov,
+  POV_GENERATION_SUPERSEDED,
+  POV_REFRESH_AVAILABLE,
+  POV_UNCHANGED,
+} from './strategy-pov-generator.js';
 import { sendRecommendation, markRecommendationAutoSent } from './recommendation-lifecycle.js';
 import { mirrorRecommendationToDeliverable } from './domains/inbox/recommendation-dual-write.js';
 import { getEarnedEnabledArchetypes } from './strategy-autosend-store.js';
@@ -148,14 +153,24 @@ async function runIssuePushForWorkspaceInner(
   // the same isActiveRec set this cron's isEligible gates on) — the draft is already ready, so it
   // STILL counts as a successful push for idempotency + doorbell purposes.
   let unchanged = false;
+  let editPreserved = false;
   try {
     await generateStrategyPov(workspaceId, { variant: 'admin' });
   } catch (err) {
     // brittle: matches the POV_UNCHANGED message string (the generator throws new Error(POV_UNCHANGED)).
     // Compared against the imported sentinel const, not a literal — but it is still a message-equality
     // check, so a future Error reusing that message would be misclassified. No dedicated error class exists.
-    if (err instanceof Error && err.message === POV_UNCHANGED) {
+    if (err instanceof Error && (
+      err.message === POV_UNCHANGED
+      || err.message === POV_GENERATION_SUPERSEDED
+    )) {
       unchanged = true;
+    } else if (err instanceof Error && err.message === POV_REFRESH_AVAILABLE) {
+      // Effective evidence/voice changed, but the standing draft contains an
+      // operator edit. A scheduler is never replacement authority: preserve the
+      // draft, mark the cycle ready, and let the UI offer explicit Regenerate.
+      unchanged = true;
+      editPreserved = true;
     } else {
       // Unexpected (AI 5xx, DB hiccup). Re-throw so the tick logs + retries next
       // hour WITHOUT stamping the week — a transient failure must not lock the
@@ -179,8 +194,12 @@ async function runIssuePushForWorkspaceInner(
       workspaceId,
       'strategy_issue_pushed',
       `The weekly Issue for ${ws.name} is drafted and ready to curate`,
-      unchanged ? 'No change since last cycle — the draft was already up to date' : undefined,
-      { weekOf, unchanged },
+      editPreserved
+        ? 'Evidence or voice changed — the operator-edited draft was preserved and can be refreshed explicitly'
+        : unchanged
+          ? 'No change since last cycle — the draft was already up to date'
+          : undefined,
+      { weekOf, unchanged, ...(editPreserved ? { editPreserved: true } : {}) },
     );
   } catch (err) {
     log.error({ err, workspaceId, weekOf }, 'issue doorbell failed (swallowed) — push stands, auto-send proceeds');
@@ -202,8 +221,12 @@ async function runIssuePushForWorkspaceInner(
     }
   }
 
-  log.info({ workspaceId, weekOf, unchanged }, 'weekly Issue pushed — operator doorbell rung');
-  return { status: unchanged ? 'unchanged' : 'pushed', weekOf };
+  log.info({ workspaceId, weekOf, unchanged, editPreserved }, 'weekly Issue pushed — operator doorbell rung');
+  return {
+    status: unchanged ? 'unchanged' : 'pushed',
+    weekOf,
+    ...(editPreserved ? { reason: 'operator edit preserved; refresh available' } : {}),
+  };
 }
 
 /**
@@ -247,8 +270,26 @@ export function runAutoSendForWorkspace(workspaceId: string, weekOf: string, wsN
       // clientStatus. Returns the updated rec for the mirror.
       const marked = markRecommendationAutoSent(workspaceId, recId);
       // Mirror to the client-deliverable spine — identical to the manual send path. Best-effort
-      // (never throws; the send already stands).
-      mirrorRecommendationToDeliverable(workspaceId, marked ?? sent);
+      // (never throws; the send already stands). R4-PR1: the cron now OBSERVES the typed result and
+      // records a durable admin-only activity on failure instead of silently swallowing the
+      // divergence (a sent rec that never reached the client feed). rec_status_updated is NOT
+      // client-visible; guarded so a logging failure can't break the auto-send loop.
+      const mirroredRec = marked ?? sent;
+      const mirror = mirrorRecommendationToDeliverable(workspaceId, mirroredRec);
+      if (!mirror.ok) {
+        try {
+          addActivity(
+            workspaceId,
+            'rec_status_updated',
+            `Client-deliverable mirror failed for auto-sent "${mirroredRec.title}"`,
+            `The recommendation was auto-sent but its unified deliverable mirror did not write (${mirror.error}). The client feed may not show it until reconciled.`,
+            { recId: mirroredRec.id, mirrorError: mirror.error, autoSent: true },
+          );
+        } catch (activityErr) {
+          log.error({ err: activityErr, workspaceId, recId: mirroredRec.id }, 'failed to record auto-send mirror-failure activity');
+        }
+        log.error({ workspaceId, recId: mirroredRec.id, error: mirror.error }, 'auto-send dual-write mirror failed (observed by cron)');
+      }
       count++;
       sentArchetypes.add(recArchetype(sent.type));
     } catch (err) {
@@ -299,9 +340,12 @@ export function runAutoSendForWorkspace(workspaceId: string, weekOf: string, wsN
 const lastTickRunWeek: Record<string, string> = {};
 
 async function tick(now = new Date()): Promise<void> {
-  // Whole-cron flag gate: skip entirely if the feature is globally off.
-  if (!isFeatureEnabled('strategy-the-issue')) return;
-
+  // No whole-cron GLOBAL flag gate here: per-workspace `isEligible()` (below) is the
+  // authoritative gate — it calls `isFeatureEnabled('strategy-the-issue', ws.id)` and
+  // short-circuits BEFORE any recommendation load, so evaluating every workspace is
+  // cheap even when the flag is globally off. A global early-exit (`isFeatureEnabled`
+  // with no workspaceId) would wrongly skip a workspace that has the flag ON via a
+  // per-workspace override while the global default is OFF (e.g. staging pilots).
   const weekOf = currentWeekOfUTC(now);
   const all = listWorkspaces();
   for (const ws of all) {

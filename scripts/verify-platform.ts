@@ -7,11 +7,11 @@
  *   2) npx vite build
  *   3) targeted decomposition/migration regression suites
  *   4) platform lifecycle audits (feature flags + performance budgets + deprecations + health cadence + ADR log)
- *   5) npx vitest run (full suite)
+ *   5) npx vitest run --maxWorkers=4 (full suite)
  *   6) npx tsx scripts/pr-check.ts
  *
  * Options:
- *   --quick      Skip full `npx vitest run` (keeps targeted suites).
+ *   --quick      Skip the bounded full test suite (keeps targeted suites).
  *   --with-e2e   Append `npx playwright test` at the end.
  *   --plan       Print commands only; do not execute.
  */
@@ -82,7 +82,9 @@ const steps: Step[] = [
 ];
 
 if (!isQuick) {
-  steps.push({ label: 'Full test suite', cmd: 'npx', args: ['vitest', 'run'] });
+  // Keep spawned integration servers below the local machine's reliable
+  // concurrency ceiling; CI already shards these suites independently.
+  steps.push({ label: 'Full test suite', cmd: 'npx', args: ['vitest', 'run', '--maxWorkers=4'] });
 }
 
 steps.push({ label: 'PR checks', cmd: 'npx', args: ['tsx', 'scripts/pr-check.ts'] });

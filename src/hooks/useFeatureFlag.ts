@@ -11,7 +11,7 @@ import { queryKeys } from '../lib/queryKeys';
  * Falls back to the static default in FEATURE_FLAGS while loading.
  *
  * Usage:
- *   const enabled = useFeatureFlag('keyword-universe-full');
+ *   const enabled = useFeatureFlag('strategy-the-issue');
  */
 export function useFeatureFlag(flag: FeatureFlagKey): boolean {
   const { data } = useQuery({

@@ -209,7 +209,7 @@ describe('recommendations domain boundary', () => {
     expect(generation).toMatch(/function generateRecommendations\b/);
     expect(generation).toContain('buildRecommendationGenerationContext');
     expect(generation).toContain('appendAuditRecommendations');
-    expect(generation).toContain('finalizeRecommendations(recs');
+    expect(generation).toContain('finalizeRecommendations(candidates');
     expect(generation).toContain('broadcastToWorkspace');
     expect(facade).toContain("const generationServicePath = './domains/recommendations/generation-service.js'");
     expect(facade).toContain('await import(generationServicePath)');
@@ -229,7 +229,7 @@ describe('recommendations domain boundary', () => {
     expect(finalization).toContain('autoResolvedPageStateIds.push(resolvedPageId)');
     expect(finalization).toContain('sortRecommendations(recs, effectiveBusinessPriorities');
     expect(generation).toContain("from './finalization.js'");
-    expect(generation).toContain('finalizeRecommendations(recs');
+    expect(generation).toContain('finalizeRecommendations(candidates');
     expect(facade).not.toContain('function mintSignalRecs');
     expect(facade).not.toContain('signal-fold: minted intelligence signals as recommendations');
     expect(facade).not.toContain('applyLifecycleCarryOver(recs');

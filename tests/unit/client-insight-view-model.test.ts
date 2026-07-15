@@ -10,6 +10,7 @@ import {
 } from '../../server/analytics-insights-store.js';
 import type { AnalyticsInsight } from '../../shared/types/analytics.js';
 import type {
+  ClientSafeLearningsProjection,
   ClientSignalsSlice,
   ContentPipelineSlice,
   InsightsSlice,
@@ -98,7 +99,7 @@ function makePipelineSlice(overrides: Partial<ContentPipelineSlice> = {}): Conte
 }
 
 function makeLearningsSlice(overrides: Partial<LearningsSlice> = {}): LearningsSlice {
-  return {
+  const base: ClientSafeLearningsProjection = {
     availability: 'ready',
     summary: null,
     confidence: null,
@@ -116,7 +117,15 @@ function makeLearningsSlice(overrides: Partial<LearningsSlice> = {}): LearningsS
         measuredAt: '2026-06-01T00:00:00.000Z',
       },
     ] satisfies WeCalledItEntry[],
-    ...overrides,
+  };
+  const { clientProjection: explicitProjection, ...sliceOverrides } = overrides;
+  const clientProjection = Object.prototype.hasOwnProperty.call(overrides, 'clientProjection')
+    ? explicitProjection
+    : ({ ...base, ...sliceOverrides } as ClientSafeLearningsProjection);
+  return {
+    ...base,
+    ...sliceOverrides,
+    clientProjection,
   };
 }
 
@@ -318,7 +327,7 @@ describe('buildClientIntelligenceView', () => {
     });
     expect(view.pipelineStatus).toEqual({
       briefs: { total: 6, inProgress: 4 },
-      posts: { total: 5, inProgress: 3 },
+      posts: { total: 5, inProgress: 1 },
       pendingApprovals: 3,
     });
     expect('learningHighlights' in view).toBe(false);
@@ -374,6 +383,15 @@ describe('buildClientIntelligenceView', () => {
       },
     ]);
     expect('siteHealthSummary' in view).toBe(false);
+  });
+
+  it('fails closed when an older learnings assembler omits clientProjection', () => {
+    const view = buildClientIntelligenceView(makeIntel({
+      learnings: makeLearningsSlice({ clientProjection: undefined }),
+    }), 'growth');
+
+    expect(view.learningHighlights).toBeNull();
+    expect(view.weCalledIt).toEqual([]);
   });
 
   it('caps keyword feedback samples and rejection reasons for client display', () => {

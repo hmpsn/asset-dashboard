@@ -46,6 +46,20 @@ vi.mock('../server/chat-memory.js', () => ({
   listSessions: vi.fn(() => []),
 }));
 
+const mockBuildKeywordFeedbackSignals = vi.fn(() => ({
+  approved: [] as string[],
+  rejected: [] as string[],
+  patterns: { approveRate: 0, topRejectionReasons: [] as string[] },
+}));
+vi.mock('../server/keyword-feedback.js', () => ({
+  buildKeywordFeedbackSignals: (...args: unknown[]) => mockBuildKeywordFeedbackSignals(...args),
+}));
+
+const mockListContentGapVoteSignals = vi.fn(() => [] as Array<{ topic: string; votes: number }>);
+vi.mock('../server/content-gap-votes.js', () => ({
+  listContentGapVoteSignals: (...args: unknown[]) => mockListContentGapVoteSignals(...args),
+}));
+
 // ── Mocks for other slices used by workspace-intelligence.ts ──────────────
 
 vi.mock('../server/intelligence/seo-context-source.js', () => ({
@@ -109,6 +123,12 @@ describe('assembleClientSignals', () => {
     const { invalidateIntelligenceCache } = await import('../server/workspace-intelligence.js');
     invalidateIntelligenceCache('ws-1');
     vi.clearAllMocks();
+    mockBuildKeywordFeedbackSignals.mockReturnValue({
+      approved: [],
+      rejected: [],
+      patterns: { approveRate: 0, topRejectionReasons: [] },
+    });
+    mockListContentGapVoteSignals.mockReturnValue([]);
   });
 
   it('returns all required fields with empty data sources', async () => {
@@ -383,21 +403,14 @@ describe('assembleClientSignals', () => {
     }
   });
 
-  it('populates keyword feedback from DB queries', async () => {
-    const db = (await import('../server/db/index.js')).default;
-    vi.mocked(db.prepare).mockImplementation((sql: string) => {
-      if (sql.includes("status = ?") && sql.includes('keyword_feedback')) {
-        return {
-          all: vi.fn((wsId, status) => {
-            if (status === 'approved') return [{ keyword: 'seo tools' }, { keyword: 'web analytics' }];
-            if (status === 'declined') return [{ keyword: 'cheap seo', reason: 'too generic' }];
-            return [];
-          }),
-          get: vi.fn(),
-          run: vi.fn(),
-        } as any;
-      }
-      return { all: vi.fn(() => []), get: vi.fn(() => undefined), run: vi.fn() } as any;
+  it('populates centralized keyword feedback signals', async () => {
+    mockBuildKeywordFeedbackSignals.mockReturnValue({
+      approved: ['seo tools', 'web analytics'],
+      rejected: ['cheap seo'],
+      patterns: {
+        approveRate: 2 / 3,
+        topRejectionReasons: ['too generic'],
+      },
     });
 
     const { buildWorkspaceIntelligence } = await import('../server/workspace-intelligence.js');

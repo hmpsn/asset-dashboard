@@ -11,6 +11,8 @@ import { rowToWorkspaceLearnings } from './db/outcome-mappers.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 import type { WorkspaceLearningsRow } from './db/outcome-mappers.js';
 import type {
   WorkspaceLearnings,
@@ -491,9 +493,32 @@ export function computeOverallLearnings(
 
 // --- Core compute function ---
 
+/**
+ * Compute the full learnings aggregate from an already-authorized scored set.
+ * Audience-specific projections reuse this function so checkpoint, confidence,
+ * domain, and top-action semantics cannot drift from the canonical workspace
+ * computation.
+ */
+export function computeWorkspaceLearningsFromScored(
+  workspaceId: string,
+  scored: ScoredActionWithOutcome[],
+  computedAt = new Date().toISOString(),
+): WorkspaceLearnings {
+  const totalScoredActions = scored.length;
+  return {
+    workspaceId,
+    computedAt,
+    confidence: computeConfidence(totalScoredActions),
+    totalScoredActions,
+    content: computeContentLearnings(scored),
+    strategy: computeStrategyLearnings(scored),
+    technical: computeTechnicalLearnings(scored),
+    overall: computeOverallLearnings(scored),
+  };
+}
+
 export function computeWorkspaceLearnings(workspaceId: string): WorkspaceLearnings {
   const actions = getActionsByWorkspace(workspaceId);
-  const now = new Date().toISOString();
 
   // Collect the latest usable scored 30/60/90-day outcome for every action.
   // 30/60-day verdicts can be meaningful before the 90-day completion flag flips.
@@ -515,24 +540,7 @@ export function computeWorkspaceLearnings(workspaceId: string): WorkspaceLearnin
     }
   }
 
-  const totalScoredActions = scored.length;
-  const confidence = computeConfidence(totalScoredActions);
-
-  const content = computeContentLearnings(scored);
-  const strategy = computeStrategyLearnings(scored);
-  const technical = computeTechnicalLearnings(scored);
-  const overall = computeOverallLearnings(scored);
-
-  return {
-    workspaceId,
-    computedAt: now,
-    confidence,
-    totalScoredActions,
-    content,
-    strategy,
-    technical,
-    overall,
-  };
+  return computeWorkspaceLearningsFromScored(workspaceId, scored);
 }
 
 // --- Cache management ---
@@ -808,10 +816,12 @@ export async function recomputeAllWorkspaceLearnings(): Promise<void> {
         computed_at: learnings.computedAt,
       });
 
-      broadcastToWorkspace(workspaceId, WS_EVENTS.OUTCOME_LEARNINGS_UPDATED, {
-        totalScoredActions: learnings.totalScoredActions,
-        confidence: learnings.confidence,
-      });
+      invalidateMonthlyDigestCache(workspaceId);
+      clearIntelligenceCache(workspaceId);
+      // Aggregate admin learnings can include client-hidden workflow outcomes.
+      // Shared workspace subscribers need only the invalidation event, not the
+      // internal denominator/confidence payload.
+      broadcastToWorkspace(workspaceId, WS_EVENTS.OUTCOME_LEARNINGS_UPDATED, {});
       log.info(
         { workspaceId, totalScoredActions: learnings.totalScoredActions, confidence: learnings.confidence },
         'Workspace learnings recomputed'

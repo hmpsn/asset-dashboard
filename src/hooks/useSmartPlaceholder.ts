@@ -1,13 +1,10 @@
 // src/hooks/useSmartPlaceholder.ts
-// Smart placeholder hook for chat inputs.
-// Admin context: generates suggestion chips from seoContext (brand voice, personas, businessContext).
-// Client context: ghost text only — no chips, no indication of AI.
-// Feature flag: 'smart-placeholders' off → returns generic placeholder only.
+// Smart placeholder hook for admin chat inputs.
+// Generates suggestion chips from seoContext (brand voice, personas, businessContext).
 // CRITICAL: Reads from cached seoContext intelligence slice. NO independent AI calls.
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useFeatureFlag } from './useFeatureFlag';
 import { intelligenceApi } from '../api/intelligence';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -15,9 +12,7 @@ export interface SmartPlaceholderResult {
   /** The ghost-text placeholder string for the input */
   placeholder: string;
   /**
-   * 2-3 suggestion chip strings. Only populated in admin context when
-   * seoContext is available and 'smart-placeholders' flag is on.
-   * Always undefined in client context.
+   * 2-3 suggestion chip strings. Only populated when seoContext is available.
    */
   suggestions?: string[];
 }
@@ -25,6 +20,8 @@ export interface SmartPlaceholderResult {
 interface UseSmartPlaceholderOptions {
   workspaceId: string;
   isAdminContext: boolean;
+  /** Allows closed or otherwise hidden consumers to defer the intelligence read. */
+  enabled?: boolean;
 }
 
 /** Generic fallback when seoContext is unavailable */
@@ -78,24 +75,18 @@ function buildAdminSuggestions(
 }
 
 export function useSmartPlaceholder(
-  { workspaceId, isAdminContext }: UseSmartPlaceholderOptions,
+  { workspaceId, isAdminContext, enabled = true }: UseSmartPlaceholderOptions,
 ): SmartPlaceholderResult {
-  const flagEnabled = useFeatureFlag('smart-placeholders');
-
   // Fetch seoContext slice — reads from 5-min TTL cache on server
-  // Only fetch when flag is on and we have a workspaceId
+  // Only fetch when we have a workspaceId
   const { data: intel } = useQuery({
     queryKey: queryKeys.admin.intelligence(workspaceId, ['seoContext']),
     queryFn: ({ signal }) => intelligenceApi.getIntelligence(workspaceId, ['seoContext'], undefined, undefined, signal),
-    enabled: flagEnabled && !!workspaceId && isAdminContext,
+    enabled: enabled && !!workspaceId && isAdminContext,
     staleTime: 5 * 60 * 1000, // match server cache TTL
   });
 
   return useMemo(() => {
-    if (!flagEnabled) {
-      return genericPlaceholder(isAdminContext);
-    }
-
     const seoCtx = intel?.seoContext;
 
     // Thin workspace — try industry-based placeholder
@@ -105,26 +96,17 @@ export function useSmartPlaceholder(
       return genericPlaceholder(isAdminContext);
     }
 
-    if (isAdminContext) {
-      // Admin: contextual placeholder + suggestion chips
-      const placeholder = seoCtx.businessContext
-        ? `Ask about ${seoCtx.businessContext.trim().slice(0, 40)}...`
-        : 'Ask about this workspace...';
+    // Contextual placeholder + suggestion chips
+    const placeholder = seoCtx.businessContext
+      ? `Ask about ${seoCtx.businessContext.trim().slice(0, 40)}...`
+      : 'Ask about this workspace...';
 
-      const suggestions = buildAdminSuggestions(
-        seoCtx.brandVoice,
-        seoCtx.personas?.length ?? 0,
-        seoCtx.businessContext,
-      );
+    const suggestions = buildAdminSuggestions(
+      seoCtx.brandVoice,
+      seoCtx.personas?.length ?? 0,
+      seoCtx.businessContext,
+    );
 
-      return { placeholder, suggestions };
-    } else {
-      // Client: ghost text only — no chips, no AI indication
-      const placeholder = seoCtx.businessContext
-        ? 'Ask about your site performance...'
-        : 'Ask a question about your site...';
-
-      return { placeholder };
-    }
-  }, [flagEnabled, intel, isAdminContext]);
+    return { placeholder, suggestions };
+  }, [intel, isAdminContext]);
 }

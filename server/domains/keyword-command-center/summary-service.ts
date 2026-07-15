@@ -7,13 +7,8 @@ import {
 import { LOCAL_SEO_VISIBILITY_POSTURE } from '../../../shared/types/local-seo.js';
 import { TRACKED_KEYWORD_STATUS } from '../../../shared/types/rank-tracking.js';
 import { isSuspiciousPlannerGroupedVolume } from '../../keyword-strategy-helpers.js';
-import { countLocalSeoKeywordCandidates } from '../local-seo/candidate-service.js';
-import { getPrimaryMarketLocationCode } from '../local-seo/configuration-service.js';
 import { createLogger } from '../../logger.js';
-import { isFeatureEnabled } from '../../feature-flags.js';
 import {
-  KEYWORD_UNIVERSE_FULL_FLAG,
-  RAW_EVIDENCE_ROW_LIMIT,
   UNIVERSE_SAFETY_CEILING,
   selectRankEvidence,
   trackedKeywordMatchesFilter,
@@ -36,6 +31,7 @@ export async function buildKeywordCommandCenterSummary(
   const startedAt = Date.now();
   const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
     includeLocalSeo: options.includeLocalSeo,
+    includeSummary: true,
   });
   if (!snapshot) return null;
   const { workspace } = snapshot;
@@ -162,15 +158,7 @@ export async function buildKeywordCommandCenterSummary(
   for (const key of localVisibility.keys()) allKeys.add(key);
   const localVisibilityValues = [...localVisibility.values()];
 
-  let localCandidatesCount = 0;
-  if (options.includeLocalSeo) {
-    try {
-      // local-candidates-unconditional-ok: countLocalSeoKeywordCandidates is the cheap-count helper, not the full generator; capped at LOCAL_CANDIDATE_HARD_CAP
-      localCandidatesCount = countLocalSeoKeywordCandidates(workspace.id);
-    } catch (err) {
-      log.warn({ err, workspaceId }, 'localCandidates count failed; reporting 0');
-    }
-  }
+  const localCandidatesCount = options.includeLocalSeo ? snapshot.localCandidatesCount ?? 0 : 0;
 
   const missingVolume = Math.max(0, allKeys.size - keysWithVolume.size);
 
@@ -225,17 +213,8 @@ export async function buildKeywordCommandCenterSummary(
     finalHeapMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
   }, 'keyword command center summary built');
 
-  let geoLabel: string | undefined;
-  try {
-    geoLabel = getPrimaryMarketLocationCode(workspace.id)?.label;
-  } catch (err) {
-    log.debug({ err, workspaceId }, 'KCC summary geo label lookup failed; omitting');
-  }
-
   const droppedRankEvidenceTail = Math.max(0, rankEvidenceTotal - rankEvidence.selected.length);
-  const rawEvidenceReturnedCap = isFeatureEnabled(KEYWORD_UNIVERSE_FULL_FLAG, workspace.id)
-    ? UNIVERSE_SAFETY_CEILING
-    : RAW_EVIDENCE_ROW_LIMIT;
+  const rawEvidenceReturnedCap = UNIVERSE_SAFETY_CEILING;
 
   return {
     counts,
@@ -244,6 +223,10 @@ export async function buildKeywordCommandCenterSummary(
     rawEvidenceReturned: Math.min(counts.evidence, rawEvidenceReturnedCap),
     generatedAt: workspace.keywordStrategy?.generatedAt ?? null,
     summarizedAt: new Date().toISOString(),
-    geoLabel,
+    geoLabel: snapshot.geoLabel,
+    trafficValueMonthly: snapshot.trafficValueMonthly ?? null,
+    topicClusters: snapshot.topicClusters,
+    cannibalization: snapshot.cannibalization,
+    rankFreshness: snapshot.rankFreshness,
   };
 }

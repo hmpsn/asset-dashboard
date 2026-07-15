@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { StrategyTab } from '../../../src/components/client/StrategyTab';
 import type { ClientKeywordStrategy } from '../../../src/components/client/types';
+import type { PriorityKeywordItem } from '../../../src/components/client/strategy/strategyKeywordDisplay';
 
-const { mockUseClientIntelligence, searchParamsRef } = vi.hoisted(() => ({
+const {
+  mockUseClientIntelligence,
+  mockUseStrategyKeywordFeedback,
+  mockRemoveFeedback,
+  searchParamsRef,
+} = vi.hoisted(() => ({
   mockUseClientIntelligence: vi.fn(),
+  mockUseStrategyKeywordFeedback: vi.fn(),
+  mockRemoveFeedback: vi.fn(),
   searchParamsRef: { current: '' },
 }));
 
@@ -29,17 +37,7 @@ vi.mock('../../../src/hooks/client', () => ({
 
 // ── Strategy hooks ────────────────────────────────────────────────────────────
 vi.mock('../../../src/components/client/strategy/useStrategyKeywordFeedback', () => ({
-  useStrategyKeywordFeedback: () => ({
-    keywordFeedback: new Map(),
-    feedbackLoadError: false,
-    loadFeedback: vi.fn(),
-    submitFeedback: vi.fn(),
-    removeFeedback: vi.fn(),
-    undoFeedback: vi.fn(),
-    getFeedbackStatus: vi.fn(() => undefined),
-    isLoadingFeedback: vi.fn(() => false),
-    requestedKeywords: [],
-  }),
+  useStrategyKeywordFeedback: () => mockUseStrategyKeywordFeedback(),
 }));
 
 vi.mock('../../../src/components/client/strategy/useStrategyBusinessPriorities', () => ({
@@ -103,8 +101,24 @@ vi.mock('../../../src/components/client/strategy/StrategyPageImprovementsSection
 }));
 
 vi.mock('../../../src/components/client/strategy/StrategyKeywordsSection', () => ({
-  StrategyKeywordsSection: ({ strategyKeywordRows }: { strategyKeywordRows: unknown[] }) => (
-    <div data-testid="strategy-keywords">count:{strategyKeywordRows.length}</div>
+  StrategyKeywordsSection: ({
+    strategyKeywordRows,
+    keywordIdeaRows,
+    removePriorityKeyword,
+  }: {
+    strategyKeywordRows: PriorityKeywordItem[];
+    keywordIdeaRows: PriorityKeywordItem[];
+    removePriorityKeyword: (row: PriorityKeywordItem) => Promise<void>;
+  }) => (
+    <div data-testid="strategy-keywords">
+      count:{strategyKeywordRows.length}
+      {[...strategyKeywordRows, ...keywordIdeaRows].map(row => (
+        <div key={row.identityKey}>
+          <span>{row.label}</span>
+          <button type="button" onClick={() => void removePriorityKeyword(row)}>Remove {row.label}</button>
+        </div>
+      ))}
+    </div>
   ),
 }));
 
@@ -208,6 +222,52 @@ describe('StrategyTab', () => {
     vi.clearAllMocks();
     searchParamsRef.current = '';
     mockUseClientIntelligence.mockReturnValue({ data: undefined });
+    mockUseStrategyKeywordFeedback.mockReturnValue({
+      keywordFeedback: new Map(),
+      feedbackLoadError: false,
+      loadFeedback: vi.fn(),
+      submitFeedback: vi.fn(),
+      removeFeedback: mockRemoveFeedback,
+      undoFeedback: mockRemoveFeedback,
+      getFeedbackStatus: vi.fn(() => undefined),
+      isLoadingFeedback: vi.fn(() => false),
+      requestedKeywords: [],
+      declinedKeywords: [],
+    });
+  });
+
+  it('keeps C/C#/C++ distinct and removes the raw C# feedback identity only', async () => {
+    mockUseStrategyKeywordFeedback.mockReturnValue({
+      keywordFeedback: new Map([
+        ['c', 'requested'],
+        ['c sharp', 'requested'],
+        ['c plus plus', 'requested'],
+        ['東京', 'requested'],
+      ]),
+      feedbackLoadError: false,
+      loadFeedback: vi.fn(),
+      submitFeedback: vi.fn(),
+      removeFeedback: mockRemoveFeedback,
+      undoFeedback: mockRemoveFeedback,
+      getFeedbackStatus: vi.fn(() => 'requested'),
+      isLoadingFeedback: vi.fn(() => false),
+      requestedKeywords: ['C', 'C#', 'C++', '東京'],
+      declinedKeywords: [],
+    });
+    render(<StrategyTab {...defaultProps} strategyData={makeStrategy({ siteKeywords: [] })} />);
+
+    fireEvent.click(screen.getByText('Rankings'));
+    expect(screen.getByText('C')).toBeInTheDocument();
+    expect(screen.getByText('C#')).toBeInTheDocument();
+    expect(screen.getByText('C++')).toBeInTheDocument();
+    expect(screen.getByText('東京')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove C#' }));
+
+    await waitFor(() => expect(mockRemoveFeedback).toHaveBeenCalledWith(
+      'C#',
+      expect.objectContaining({ rethrow: true }),
+    ));
+    expect(mockRemoveFeedback).not.toHaveBeenCalledWith('C', expect.anything());
   });
 
   it('renders without crashing when strategy data is provided', () => {

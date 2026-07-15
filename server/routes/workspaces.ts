@@ -68,6 +68,15 @@ import { toAdminWorkspaceView } from '../serializers/admin-workspace-view.js';
 import { addActivity } from '../activity-log.js';
 import { outcomeValueSchema, segmentConfigSchema, targetGeoSchema } from '../schemas/workspace-schemas.js';
 import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
+import { getSearchOverview } from '../search-console.js';
+import { getWorkspaceOutcomeValueRollup } from '../outcome-tracking.js';
+import type {
+  WorkspaceOverviewAudit,
+  WorkspaceOverviewGscRollup,
+  WorkspaceOverviewItem,
+  WorkspaceOverviewSiteHealthIssue,
+  WorkspaceOverviewSiteHealthMatrix,
+} from '../../shared/types/workspace-overview.js';
 
 const log = createLogger('workspaces');
 
@@ -99,17 +108,99 @@ function listVisibleWorkspaces(req: express.Request): Workspace[] {
   return workspaces.filter(ws => allowed.has(ws.id));
 }
 
+function workspaceTier(ws: Workspace): WorkspaceOverviewItem['tier'] {
+  return ws.tier === 'growth' || ws.tier === 'premium' ? ws.tier : 'free';
+}
+
+function emptyGscRollup(connected: boolean): WorkspaceOverviewGscRollup {
+  return {
+    connected,
+    dataAvailable: false,
+    clicks: 0,
+    traffic: 0,
+    impressions: 0,
+    avgCtr: 0,
+    avgPosition: 0,
+    dateRange: null,
+  };
+}
+
+async function buildGscRollup(ws: Workspace): Promise<WorkspaceOverviewGscRollup> {
+  const connected = Boolean(ws.webflowSiteId && ws.gscPropertyUrl);
+  if (!connected || !ws.webflowSiteId || !ws.gscPropertyUrl) return emptyGscRollup(false);
+
+  try {
+    const overview = await getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, 28, {
+      queryLimit: 1,
+      pageLimit: 1,
+    });
+    return {
+      connected: true,
+      dataAvailable: true,
+      clicks: overview.totalClicks,
+      traffic: overview.totalClicks,
+      impressions: overview.totalImpressions,
+      avgCtr: overview.avgCtr,
+      avgPosition: overview.avgPosition,
+      dateRange: overview.dateRange,
+    };
+  } catch (err) {
+    log.warn({ err, workspaceId: ws.id }, 'workspaces: GSC rollup failed');
+    return emptyGscRollup(true);
+  }
+}
+
+function siteHealthIssueFromCategory(score: NonNullable<WorkspaceOverviewAudit['categoryScores']>[number]): WorkspaceOverviewSiteHealthIssue | null {
+  const count = score.errors + score.warnings + score.infos;
+  if (count === 0) return null;
+  return {
+    issueType: score.category,
+    label: score.label,
+    category: score.category,
+    severity: score.errors > 0 ? 'error' : score.warnings > 0 ? 'warning' : 'info',
+    count,
+    affectedPages: score.affectedPages,
+  };
+}
+
+function buildSiteHealthIssueMatrix(workspaceId: string, audit: WorkspaceOverviewAudit | null): WorkspaceOverviewSiteHealthMatrix {
+  if (!audit) return { workspaceId, totalIssues: 0, issues: [] };
+
+  const categoryIssues = (audit.categoryScores ?? [])
+    .map(siteHealthIssueFromCategory)
+    .filter((issue): issue is WorkspaceOverviewSiteHealthIssue => issue != null);
+
+  const issues = categoryIssues.length > 0
+    ? categoryIssues
+    : audit.errors + audit.warnings > 0
+      ? [{
+        issueType: 'site-health',
+        label: 'Site health issues',
+        category: 'site-health',
+        severity: audit.errors > 0 ? 'error' as const : 'warning' as const,
+        count: audit.errors + audit.warnings,
+        affectedPages: audit.totalPages,
+      }]
+      : [];
+
+  return {
+    workspaceId,
+    totalIssues: issues.reduce((sum, issue) => sum + issue.count, 0),
+    issues,
+  };
+}
+
 router.get('/api/workspaces', (req, res) => {
   const workspaces = listVisibleWorkspaces(req).map(ws => toAdminWorkspaceView(ws));
   res.json(workspaces);
 });
 
 // Workspace overview: aggregated metrics for all workspaces
-router.get('/api/workspace-overview', (req, res) => {
+router.get('/api/workspace-overview', async (req, res) => {
   const workspaces = listVisibleWorkspaces(req);
-  const overview = workspaces.map(ws => {
+  const overview: WorkspaceOverviewItem[] = await Promise.all(workspaces.map(async ws => {
     // Audit
-    let audit: { score: number; totalPages: number; errors: number; warnings: number; previousScore?: number; lastAuditDate?: string } | null = null;
+    let audit: WorkspaceOverviewAudit | null = null;
     if (ws.webflowSiteId) {
       const snap = getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || []);
       if (snap) {
@@ -121,6 +212,8 @@ router.get('/api/workspace-overview', (req, res) => {
           warnings: filtered.warnings,
           previousScore: snap.previousScore,
           lastAuditDate: snap.createdAt,
+          categoryScoreVersion: filtered.categoryScoreVersion,
+          categoryScores: filtered.categoryScores,
         };
       }
     }
@@ -243,6 +336,9 @@ router.get('/api/workspace-overview', (req, res) => {
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'workspaces: programming error'); /* non-critical */ }
 
     const { isTrial, trialDaysRemaining } = computeTrialState(ws);
+    const outcomeValue = getWorkspaceOutcomeValueRollup(ws.id);
+    const gscRollup = await buildGscRollup(ws);
+    const siteHealthIssueMatrix = buildSiteHealthIssueMatrix(ws.id, audit);
 
     return {
       id: ws.id,
@@ -252,7 +348,7 @@ router.get('/api/workspace-overview', (req, res) => {
       hasGsc: !!ws.gscPropertyUrl,
       hasGa4: !!ws.ga4PropertyId,
       hasPassword: !!ws.clientPassword,
-      tier: ws.tier || 'free',
+      tier: workspaceTier(ws),
       isTrial,
       trialDaysRemaining,
       audit,
@@ -291,8 +387,11 @@ router.get('/api/workspace-overview', (req, res) => {
         autoSent: { weekOf: issueAutoSentWeekOf, count: issueAutoSentCount },
       },
       pageStates,
+      outcomeValue,
+      gscRollup,
+      siteHealthIssueMatrix,
     };
-  });
+  }));
   res.json(overview);
 });
 
@@ -306,6 +405,10 @@ const createWorkspaceSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
   webflowSiteId: z.string().optional(),
   webflowSiteName: z.string().optional(),
+});
+
+const archiveWorkspaceSchema = z.object({
+  archived: z.boolean(),
 });
 
 router.post('/api/workspaces', validate(createWorkspaceSchema), (req, res) => {
@@ -376,6 +479,33 @@ router.patch('/api/workspaces/:id', requireWorkspaceAccess(), async (req, res) =
     invalidatePageCache(req.params.id);
     invalidateSubCachePrefix(req.params.id, 'slice:'); // Invalidate ALL slice caches on settings change
   });
+  const safe = toAdminWorkspaceView(ws);
+  broadcast(WS_EVENTS.WORKSPACE_UPDATED, safe);
+  broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, safe);
+  res.json(safe);
+});
+
+router.patch('/api/workspaces/:id/archive', requireWorkspaceAccess(), validate(archiveWorkspaceSchema), (req, res) => {
+  const before = getWorkspace(req.params.id);
+  if (!before) return res.status(404).json({ error: 'Not found' });
+
+  const archivedAt = req.body.archived ? (before.archivedAt ?? new Date().toISOString()) : null;
+  const ws = updateWorkspace(req.params.id, { archivedAt });
+  if (!ws) return res.status(404).json({ error: 'Not found' });
+
+  const type = archivedAt ? 'workspace_archived' : 'workspace_unarchived';
+  addActivity(
+    req.params.id,
+    type,
+    archivedAt ? `Archived workspace: ${before.name}` : `Restored workspace: ${before.name}`,
+    archivedAt
+      ? 'Hidden from default admin workspace lists; data and client history were preserved.'
+      : 'Returned to default admin workspace lists.',
+    { previousArchivedAt: before.archivedAt ?? null, archivedAt },
+  );
+
+  invalidateIntelligenceCache(req.params.id);
+  invalidatePageCache(req.params.id);
   const safe = toAdminWorkspaceView(ws);
   broadcast(WS_EVENTS.WORKSPACE_UPDATED, safe);
   broadcastToWorkspace(req.params.id, WS_EVENTS.WORKSPACE_UPDATED, safe);

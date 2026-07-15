@@ -6,8 +6,6 @@ import type {
   AiVisibilityTrendPoint,
 } from '../../api/seo';
 import { useAiVisibility, useAiVisibilityRefresh } from '../../hooks/admin/useAiVisibility';
-import { useFeatureFlag } from '../../hooks/useFeatureFlag';
-import { FeatureFlag } from '../ui/FeatureFlag';
 import { Badge, Button, EmptyState, Icon, MetricRing, SectionCard, StatCard } from '../ui';
 import { CHART_SERIES_COLORS, scoreColorClass } from '../ui/constants';
 
@@ -18,9 +16,9 @@ import { CHART_SERIES_COLORS, scoreColorClass } from '../ui/constants';
  * DATA → blue, Law 02 — the before/after AEO proof), the co-mentioned competitor breakdown,
  * and the cited source-domain AEO targets. NO purple/violet/indigo anywhere.
  *
- * The server read endpoint returns an empty payload (`latest: null`) when the `ai-visibility`
- * flag is off, so the panel simply renders nothing in that case. The "Refresh AI visibility"
- * trigger is itself flag-gated (mirrors P6/P7) and wired to useAiVisibilityRefresh.
+ * When there is no snapshot yet, the panel renders a bootstrap card with just the refresh
+ * trigger (see below) so the first refresh can be kicked off from the UI. The "Refresh AI
+ * visibility" trigger is wired to useAiVisibilityRefresh.
  */
 
 /** Compact mentions-over-time sparkline — the before/after AEO proof. Blue DATA line (Law 02).
@@ -91,30 +89,27 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
   const { data } = useAiVisibility(workspaceId);
   const refresh = useAiVisibilityRefresh(workspaceId);
 
-  const flagOn = useFeatureFlag('ai-visibility');
   const latest = data?.latest ?? null;
   const trend = data?.trend ?? [];
   const competitors = data?.competitors ?? [];
   const sourceDomains = data?.sourceDomains ?? [];
 
   const refreshButton = (
-    <FeatureFlag flag="ai-visibility">
-      <Button
-        variant="secondary"
-        size="sm"
-        icon={refresh.isPending ? undefined : RefreshCw}
-        loading={refresh.isPending}
-        disabled={refresh.isPending}
-        onClick={() => refresh.mutate()}
-      >
-        {refresh.isPending ? 'Refreshing...' : 'Refresh AI visibility'}
-      </Button>
-    </FeatureFlag>
+    <Button
+      variant="secondary"
+      size="sm"
+      icon={refresh.isPending ? undefined : RefreshCw}
+      loading={refresh.isPending}
+      disabled={refresh.isPending}
+      onClick={() => refresh.mutate()}
+    >
+      {refresh.isPending ? 'Refreshing...' : 'Refresh AI visibility'}
+    </Button>
   );
 
   // Surface a failed refresh (mirrors P6's actionErrorMessage band). The route throws an
-  // ApiError on 403 (tier) / 404 (flag) / 409 (already-running) — without this band every
-  // failure was swallowed and the click looked dead.
+  // ApiError on 403 (tier) / 409 (already-running) — without this band every failure was
+  // swallowed and the click looked dead.
   const refreshError = refresh.error instanceof Error ? refresh.error.message : null;
   const errorBand = refreshError ? (
     <div role="alert" className="rounded-[var(--radius-xl)] border border-red-500/40 bg-red-500/10 px-4 py-3">
@@ -122,13 +117,11 @@ export function AiVisibilityPanel({ workspaceId }: { workspaceId: string }) {
     </div>
   ) : null;
 
-  // No snapshot yet. With the flag OFF the panel stays hidden (the server also returns an
-  // empty payload then). With the flag ON, render the card with JUST the refresh trigger +
-  // an empty state — otherwise the bootstrap button lives below this return and the feature
-  // could never be kicked off from the UI (chicken-and-egg: no data hides the button that
-  // fetches the first data).
+  // No snapshot yet — render the card with JUST the refresh trigger + an empty state,
+  // otherwise the bootstrap button lives below this return and the feature could never be
+  // kicked off from the UI (chicken-and-egg: no data hides the button that fetches the
+  // first data).
   if (!latest) {
-    if (!flagOn) return null;
     return (
       <SectionCard
         title="AI visibility"

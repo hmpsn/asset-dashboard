@@ -4,7 +4,9 @@ import type {
   TrackedAction,
   ActionOutcome,
   ActionPlaybook,
+  Attribution,
   OutcomeScorecard,
+  OutcomeCoverage,
   TopWin,
   WorkspaceLearnings,
   WorkspaceOutcomeOverview,
@@ -38,6 +40,11 @@ export const outcomesApi = {
   getScorecard: (wsId: string, signal?: AbortSignal) =>
     getSafe<OutcomeScorecard | null>(`/api/outcomes/${wsId}/scorecard`, null, signal),
 
+  // R9 (B15): admin-only coverage funnel (tracked/measured/reconciled). Never exposed to a
+  // client-facing consumer.
+  getCoverage: (wsId: string, signal?: AbortSignal) =>
+    getSafe<OutcomeCoverage | null>(`/api/outcomes/${wsId}/coverage`, null, signal),
+
   getTopWins: (wsId: string, signal?: AbortSignal) =>
     getSafe<TopWin[]>(`/api/outcomes/${wsId}/top-wins`, [], signal),
 
@@ -59,7 +66,20 @@ export const outcomesApi = {
       pageUrl?: string;
       targetKeyword?: string;
       baselineSnapshot?: { position?: number; clicks?: number; impressions?: number; ctr?: number; sessions?: number };
-      attribution?: string;
+      /**
+       * R8-PR2 (B14): the write layer REQUIRES an honest attribution internally, but this
+       * external POST tolerates a missing value for backward compatibility. When omitted,
+       * the server stores the HONEST `not_acted_on` default (never the old silent
+       * `platform_executed`) and logs a deprecation warn. Pass an explicit value —
+       * typed to the `Attribution` union so callers can't send an arbitrary string.
+       */
+      attribution?: Attribution;
+      /**
+       * R6 (B11) advisory source-identity snapshot — captures the source's title at write
+       * time so a later win renders the real headline (e.g. a manually-published post's
+       * title) instead of a generic label. `snapshot.type`/`page` are free-form.
+       */
+      source?: { label: string; snapshot?: { title?: string; type?: string; page?: string } };
     },
   ) =>
     post<{ success: boolean; action: TrackedAction; deduplicated?: boolean }>(

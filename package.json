@@ -16,6 +16,7 @@
     "typecheck": "tsc -b --noEmit",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "db:migrate": "tsx server/db/migrate-json.ts",
+    "db:backfill-keyword-identity-v2": "tsx scripts/backfill-keyword-identity-v2.ts",
     "db:sync-staging": "tsx scripts/sync-staging-db.ts",
     "db:sync-local-parity": "bash scripts/sync-local-parity.sh",
     "db:pull-render-backup": "bash scripts/pull-render-latest-backup.sh",
@@ -28,6 +29,7 @@
     "test:component": "vitest run --project component",
     "test:integration": "vitest run --project integration",
     "test:coverage": "vitest run --coverage",
+    "test:ct": "playwright test -c playwright-ct.config.ts",
     "test:tmp:clean": "tsx scripts/cleanup-vitest-temp.ts",
     "test:tmp:clean:dry": "tsx scripts/cleanup-vitest-temp.ts --dry-run",
     "test:e2e": "playwright test",
@@ -48,6 +50,7 @@
     "report:product-surface-audit": "tsx scripts/report-product-surface-audit.ts --output data/product-surface-audit.json",
     "verify:data-integrity": "tsx scripts/report-data-integrity-recovery.ts",
     "verify:observability": "tsx scripts/report-platform-observability.ts",
+    "verify:deferred-ledger": "tsx scripts/verify-deferred-ledger.ts",
     "verify:feature-flags": "tsx scripts/feature-flag-lifecycle.ts",
     "verify:lexicon": "tsx scripts/lexicon-registry.ts",
     "verify:governance": "tsx scripts/report-verification-governance.ts",
@@ -57,6 +60,10 @@
     "verify:adr-log": "tsx scripts/adr-log.ts",
     "verify:risky-modules": "tsx scripts/platform-risky-module-dashboard.ts",
     "verify:style-drift": "tsx scripts/report-style-drift.ts",
+    "verify:bundle-budget": "tsx scripts/verify-bundle-budget.ts",
+    "generate:fontawesome-subset": "tsx scripts/generate-fontawesome-subset.ts",
+    "verify:env": "tsx scripts/verify-env.ts",
+    "smoke:providers:staging": "tsx scripts/provider-readiness-smoke.ts --profile=staging",
     "verify:coverage-campaign": "tsx scripts/coverage-campaign.ts --top 200 --since-days 180",
     "verify:coverage-campaign:strict": "tsx scripts/coverage-campaign.ts --top 200 --since-days 180 --strict-check --strict-top 30",
     "verify:coverage-campaign:strict:advisory": "tsx scripts/coverage-campaign.ts --top 200 --since-days 180 --strict-check --strict-top 30 --advisory",
@@ -137,6 +144,7 @@
     "@emnapi/core": "^1.10.0",
     "@emnapi/runtime": "^1.10.0",
     "@eslint/js": "^9.39.1",
+    "@playwright/experimental-ct-react": "^1.58.2",
     "@playwright/test": "^1.58.2",
     "@sentry/vite-plugin": "^5.1.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -164,7 +172,8 @@
     "jsdom": "^28.1.0",
     "madge": "^8.0.0",
     "typescript-eslint": "^8.48.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "vitest-axe": "^0.1.0"
   },
   "overrides": {
     "vite": "^8.0.0"

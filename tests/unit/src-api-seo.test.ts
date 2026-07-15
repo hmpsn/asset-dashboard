@@ -363,20 +363,13 @@ describe('src/api/seo — contentPerformance', () => {
     expect(url).toBe('/api/content-performance/ws-1');
   });
 
-  it('contentPerformance.get with days param', async () => {
-    await contentPerformance.get('ws-1', 30);
-    const [url] = mockedGet.mock.calls[0];
-    expect(url).toContain('days=30');
-  });
-
   it('contentPerformance.publicGet uses getOptional', async () => {
     await contentPerformance.publicGet('ws-1');
     expect(mockedGetOptional).toHaveBeenCalledWith('/api/public/content-performance/ws-1');
   });
 
-  it('contentPerformance.refresh uses post', async () => {
-    await contentPerformance.refresh('ws-1');
-    expect(mockedPost).toHaveBeenCalledWith('/api/content-performance/ws-1/refresh');
+  it('does not expose the removed phantom refresh mutation', () => {
+    expect(contentPerformance).not.toHaveProperty('refresh');
   });
 });
 
@@ -465,16 +458,6 @@ describe('src/api/seo — seoChangeTracker', () => {
 // ── pageWeight ───────────────────────────────────────────────────────────────
 
 describe('src/api/seo — pageWeight', () => {
-  it('pageWeight.get uses getOptional', async () => {
-    await pageWeight.get('ws-1');
-    expect(mockedGetOptional).toHaveBeenCalledWith('/api/pagespeed/ws-1');
-  });
-
-  it('pageWeight.analyze uses post', async () => {
-    await pageWeight.analyze('ws-1');
-    expect(mockedPost).toHaveBeenCalledWith('/api/pagespeed/ws-1/analyze');
-  });
-
   it('pageWeight.pagespeedSnapshot defaults to mobile strategy', async () => {
     await pageWeight.pagespeedSnapshot('site-1', 'ws-1');
     const [url] = mockedGetOptional.mock.calls[0];

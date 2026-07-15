@@ -94,4 +94,12 @@ describe('verification governance wiring', () => {
     expect(coverageDoc).toMatch(/Staging\s+and main push CI also stay fast/);
     expect(coverageDoc).toContain('The manually dispatched coverage job');
   });
+
+  it('bounds local test runners so integration servers can start reliably', () => {
+    const verifier = readText('scripts/verify-platform.ts');
+    const preCommit = readText('.husky/pre-commit');
+
+    expect(verifier).toContain("args: ['vitest', 'run', '--maxWorkers=4']");
+    expect(preCommit).toContain('vitest run --changed HEAD --maxWorkers=4');
+  });
 });

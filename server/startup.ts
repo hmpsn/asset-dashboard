@@ -1,49 +1,20 @@
 import { initEmailQueue } from './email.js';
-import { startThrottleCleanup } from './email-throttle.js';
-import { startScheduler } from './scheduled-audits.js';
-import { startApprovalReminders } from './approval-reminders.js';
-import { startMonthlyReports } from './monthly-report.js';
-import { startBackupScheduler } from './backup.js';
 import { clearTestModeCustomerIds } from './stripe.js';
-import { startTrialReminders } from './trial-reminders.js';
-import { startChurnSignalScheduler } from './churn-signals.js';
-import { startAnomalyDetection } from './anomaly-detection.js';
-import { startOutcomeCrons } from './outcome-crons.js';
-import { startDataRetentionCrons } from './data-retention.js';
-import { startIntelligenceCrons, startCompetitorMonitoringCron } from './intelligence-crons.js';
-import { startInsightRecomputeCron } from './insight-recompute-cron.js';
-import { startRankTrackingScheduler } from './rank-tracking-scheduler.js';
-import { startGa4ConversionSnapshotScheduler } from './ga4-conversion-snapshot-scheduler.js';
-import { startWebflowFormPoller } from './webflow-form-poller.js';
-import { startBriefingCron } from './briefing-cron.js';
-import { startStrategyIssueCron } from './strategy-issue-cron.js';
-import { startReturnHookCron } from './return-hook-cron.js';
+import { startAllRegisteredCrons } from './cron-registry.js';
 
-/** Start all background schedulers and queues. */
+/** Start all background schedulers and queues.
+ *
+ * Recurring schedulers are started generically via the cron registry
+ * (server/cron-registry.ts) — see CRON_METADATA there for the full list.
+ * `initEmailQueue` and `clearTestModeCustomerIds` are NOT recurring crons
+ * (one-time queue init and a one-shot startup cleanup, respectively) and
+ * stay hand-called here rather than in the registry. */
 let started = false;
 
 export function startSchedulers() {
   if (started) return;
   started = true;
   initEmailQueue();
-  startThrottleCleanup();
-  startScheduler();
-  startApprovalReminders();
-  startMonthlyReports();
-  startBackupScheduler();
   clearTestModeCustomerIds();
-  startTrialReminders();
-  startChurnSignalScheduler();
-  startAnomalyDetection();
-  startOutcomeCrons();
-  startDataRetentionCrons();
-  startIntelligenceCrons();
-  startCompetitorMonitoringCron();
-  startInsightRecomputeCron();
-  startRankTrackingScheduler();
-  startGa4ConversionSnapshotScheduler();
-  startWebflowFormPoller();
-  startBriefingCron();
-  startStrategyIssueCron();
-  startReturnHookCron();
+  startAllRegisteredCrons();
 }

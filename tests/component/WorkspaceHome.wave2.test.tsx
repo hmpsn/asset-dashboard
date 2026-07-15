@@ -74,11 +74,6 @@ vi.mock('../../src/components/ui/FeatureFlag', () => ({
   FeatureFlag: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-// ── Lazy component ────────────────────────────────────────────────────────────
-vi.mock('../../src/lib/lazyWithRetry', () => ({
-  lazyWithRetry: () => () => <div data-testid="meeting-brief-page" />,
-}));
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function getAdminHooks() {
   return import('../../src/hooks/admin');

@@ -133,7 +133,12 @@ import {
   useCreateWorkspace,
   useDeleteWorkspace,
 } from '../../../src/hooks/admin/useWorkspaces';
-import { useAnalyticsOverview } from '../../../src/hooks/admin/useAnalyticsOverview';
+import {
+  useAnalyticsOverview,
+  useAnalyticsOverviewFromData,
+} from '../../../src/hooks/admin/useAnalyticsOverview';
+import type { AdminSearchData } from '../../../src/hooks/admin/useAdminSearch';
+import type { AdminGA4Data } from '../../../src/hooks/admin/useAdminGA4';
 import { useIntelligenceSignals } from '../../../src/hooks/admin/useIntelligenceSignals';
 import {
   useClientSignals,
@@ -623,6 +628,71 @@ describe('useAnalyticsOverview', () => {
       { wrapper: makeWrapper() },
     );
     await waitFor(() => expect(result.current.annotations).toEqual(annotations));
+  });
+
+  it('ignores cached provider rows when that connection is excluded from the projection', () => {
+    mockAnnotationsList.mockResolvedValue([]);
+    const gsc = {
+      overview: {
+        totalClicks: 10,
+        totalImpressions: 100,
+        avgCtr: 10,
+        avgPosition: 2,
+        dateRange: { start: '2026-01-01', end: '2026-01-01' },
+        topQueries: [],
+        topPages: [],
+      },
+      trend: [{ date: '2026-01-01', clicks: 10, impressions: 100, ctr: 10, position: 2 }],
+      devices: [],
+      countries: [],
+      searchTypes: [],
+      comparison: null,
+      isLoading: false,
+      error: null,
+    } satisfies AdminSearchData;
+    const ga4 = {
+      overview: {
+        totalUsers: 20,
+        totalSessions: 30,
+        totalPageviews: 40,
+        avgSessionDuration: 60,
+        bounceRate: 30,
+        newUserPercentage: 50,
+        dateRange: { start: '2026-01-02', end: '2026-01-02' },
+      },
+      trend: [{ date: '2026-01-02', users: 20, sessions: 30, pageviews: 40 }],
+      topPages: [],
+      sources: [],
+      devices: [],
+      countries: [],
+      comparison: null,
+      newVsReturning: [],
+      organic: null,
+      landingPages: [],
+      conversions: [],
+      isLoading: false,
+      error: null,
+    } satisfies AdminGA4Data;
+
+    const { result } = renderHook(
+      () => useAnalyticsOverviewFromData('ws-1', gsc, ga4, { gsc: false, ga4: true }),
+      { wrapper: makeWrapper() },
+    );
+
+    expect(result.current.gscClicks).toBe(0);
+    expect(result.current.hasGsc).toBe(false);
+    expect(result.current.trendData).toEqual([
+      {
+        date: '2026-01-02',
+        clicks: 0,
+        impressions: 0,
+        ctr: 0,
+        position: 0,
+        users: 20,
+        sessions: 30,
+        pageviews: 40,
+      },
+    ]);
   });
 });
 

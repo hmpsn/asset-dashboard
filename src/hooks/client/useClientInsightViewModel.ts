@@ -13,6 +13,7 @@ interface ClientInsightsResponse {
 }
 
 export const emptyMonthlyDigest: MonthlyDigestData = {
+  availability: 'no_data',
   month: '',
   period: { start: '', end: '' },
   summary: '',

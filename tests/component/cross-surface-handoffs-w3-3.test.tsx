@@ -7,7 +7,7 @@
  *   3. KeywordGaps shows a View-in-Hub link when given workspaceId + navigate
  *   4. LocalSeoVisibilityPanel RepeatCompetitorList has Track button per keyword
  *   5. ContentDecay expanded row has "Refresh brief" and "Review page" buttons
- *   6. ContentPipeline decay banner is clickable (navigates to seo-audit?sub=content-decay)
+ *   6. ContentPipeline (legacy, flag-OFF) decay banner navigates to seo-audit?sub=content-decay
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -361,7 +361,7 @@ describe('ContentDecay: Refresh brief and Review page buttons', () => {
 // ---------------------------------------------------------------------------
 
 describe('ContentPipeline: decay banner clickthrough', () => {
-  it('decay banner is wrapped in ClickableRow that navigates to seo-audit?sub=content-decay', async () => {
+  it('decay banner is wrapped in ClickableRow that navigates to seo-audit?sub=content-decay (flag-OFF-valid target)', async () => {
     const { readFileSync } = await import('fs');
     const { join } = await import('path');
     const src = readFileSync(
@@ -371,7 +371,13 @@ describe('ContentPipeline: decay banner clickthrough', () => {
 
     // The banner must use ClickableRow (not a plain div)
     expect(src).toContain('ClickableRow');
-    // The onClick must navigate to seo-audit with sub=content-decay
+    // Z flag-OFF fix: ContentPipeline.tsx is the LEGACY component (renders only when
+    // ui-rebuild-shell is OFF, since 'content-pipeline' is in REBUILT_SURFACES). The legacy
+    // ContentPipeline has no `content-health` tab, so its decay banner must target the
+    // flag-OFF-valid seo-audit?sub=content-decay (legacy SeoAudit has that sub-tab). The
+    // AD-013 acting-home retarget to content-pipeline?tab=content-health lives in the REBUILT
+    // senders (cockpit-rebuilt, engine-rebuilt), which only render flag-ON where the rebuilt
+    // Content Pipeline DOES have the content-health tab.
     expect(src).toContain('seo-audit');
     expect(src).toContain('sub=content-decay');
   });
@@ -385,5 +391,21 @@ describe('ContentPipeline: decay banner clickthrough', () => {
     ); // readFile-ok
     // The dismiss button must call stopPropagation so clicking X doesn't navigate
     expect(src).toContain('e.stopPropagation()');
+  });
+
+  // Z flag-OFF guard: the LEGACY WorkspaceHome (renders only when ui-rebuild-shell is OFF,
+  // since 'home' is in REBUILT_SURFACES) must NOT send its decay attention item / stat card to
+  // content-pipeline?tab=content-health — the legacy Content Pipeline has no content-health tab,
+  // so that param silently falls back to Briefs. Legacy decay senders target the flag-OFF-valid
+  // seo-audit?sub=content-decay; the acting-home retarget lives in the rebuilt (flag-ON) senders.
+  it('legacy WorkspaceHome decay senders target seo-audit?sub=content-decay (flag-OFF-valid, not the rebuild-only content-health tab)', async () => {
+    const { readFileSync } = await import('fs');
+    const { join } = await import('path');
+    const src = readFileSync(
+      join(__dirname, '../../src/components/WorkspaceHome.tsx'),
+      'utf8',
+    ); // readFile-ok — static analysis of legacy decay senders
+    expect(src).toContain('sub=content-decay');
+    expect(src).not.toContain("'content-pipeline')}?tab=content-health");
   });
 });

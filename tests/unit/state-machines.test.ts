@@ -14,6 +14,17 @@ import {
   BACKGROUND_JOB_TRANSITIONS,
   BRIEFING_DRAFT_TRANSITIONS,
   SCHEMA_PLAN_TRANSITIONS,
+  COPY_SECTION_TRANSITIONS,
+  VOICE_PROFILE_TRANSITIONS,
+  INSIGHT_RESOLUTION_TRANSITIONS,
+  EXTRACTION_TRANSITIONS,
+  SUGGESTED_BRIEF_TRANSITIONS,
+  SEO_SUGGESTION_TRANSITIONS,
+  PENDING_SCHEMA_TRANSITIONS,
+  CLIENT_SIGNAL_TRANSITIONS,
+  BLUEPRINT_TRANSITIONS,
+  BRAND_DELIVERABLE_TRANSITIONS,
+  CLIENT_LOCATION_TRANSITIONS,
 } from '../../server/state-machines.js';
 
 // ── validateTransition() core behavior ──
@@ -761,8 +772,8 @@ describe('Generated Post transitions — additional coverage', () => {
     expect(validate('error', 'draft')).toBe('draft');
   });
 
-  it('error → generating (no rollback to generating)', () => {
-    expect(() => validate('error', 'generating')).toThrow(InvalidTransitionError);
+  it('error → generating (explicit retry)', () => {
+    expect(validate('error', 'generating')).toBe('generating');
   });
 
   it('error → review (cannot skip draft after error)', () => {
@@ -1113,5 +1124,140 @@ describe('Schema Plan transitions', () => {
 
   it('draft has two outbound edges (send to client or activate directly)', () => {
     expect(SCHEMA_PLAN_TRANSITIONS['draft']).toEqual(['sent_to_client', 'active']);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// R3-PR2 — newly folded / newly guarded lifecycle transition maps.
+// Each block pins: legal edges pass, illegal edges throw InvalidTransitionError.
+// Idempotent no-op (from === to) semantics are enforced at the WRITE BOUNDARY
+// (the store skips the guard when from === to), so the maps themselves have NO
+// self-edges — a from===to call to validateTransition is asserted to THROW here,
+// documenting that same-state is handled by callers, not the map.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('COPY_SECTION_TRANSITIONS (folded from copy-review.ts)', () => {
+  const v = (from: string, to: string) => () => validateTransition('copy_section', COPY_SECTION_TRANSITIONS, from, to);
+
+  it('legal: pending → draft', () => { expect(v('pending', 'draft')).not.toThrow(); });
+  it('legal: draft → client_review', () => { expect(v('draft', 'client_review')).not.toThrow(); });
+  it('legal: draft → approved (fast-approve)', () => { expect(v('draft', 'approved')).not.toThrow(); });
+  it('legal: client_review → revision_requested', () => { expect(v('client_review', 'revision_requested')).not.toThrow(); });
+  it('legal: revision_requested → draft', () => { expect(v('revision_requested', 'draft')).not.toThrow(); });
+
+  it('illegal: pending → approved (skips draft)', () => { expect(v('pending', 'approved')).toThrow(InvalidTransitionError); });
+  it('illegal: approved → draft (terminal)', () => { expect(v('approved', 'draft')).toThrow(InvalidTransitionError); });
+  it('self-edge is NOT a map edge (handled at write boundary): draft → draft throws', () => {
+    expect(v('draft', 'draft')).toThrow(InvalidTransitionError);
+  });
+});
+
+describe('VOICE_PROFILE_TRANSITIONS (folded from voice-calibration.ts)', () => {
+  const v = (from: string, to: string) => () => validateTransition('voice_profile', VOICE_PROFILE_TRANSITIONS, from, to);
+
+  it('legal: draft → calibrating', () => { expect(v('draft', 'calibrating')).not.toThrow(); });
+  it('legal: calibrating → calibrated', () => { expect(v('calibrating', 'calibrated')).not.toThrow(); });
+  it('legal: calibrated → calibrating (recalibrate)', () => { expect(v('calibrated', 'calibrating')).not.toThrow(); });
+  it('legal: calibrating → draft', () => { expect(v('calibrating', 'draft')).not.toThrow(); });
+
+  it('CRITICAL illegal: draft → calibrated is FORBIDDEN (must pass through calibrating)', () => {
+    expect(v('draft', 'calibrated')).toThrow(InvalidTransitionError);
+  });
+});
+
+describe('INSIGHT_RESOLUTION_TRANSITIONS (analytics_insights.resolution_status, null-origin)', () => {
+  const v = (from: string, to: string) => () => validateTransition('insight_resolution', INSIGHT_RESOLUTION_TRANSITIONS, from, to);
+
+  it('null-origin is modeled as `unresolved`: unresolved → in_progress', () => { expect(v('unresolved', 'in_progress')).not.toThrow(); });
+  it('null-origin: unresolved → resolved (resolve a freshly computed insight)', () => { expect(v('unresolved', 'resolved')).not.toThrow(); });
+  it('legal: in_progress → resolved', () => { expect(v('in_progress', 'resolved')).not.toThrow(); });
+  it('legal: resolved → in_progress (reopen — previously tolerated, kept legal)', () => { expect(v('resolved', 'in_progress')).not.toThrow(); });
+
+  it('has an `unresolved` synthetic state so a NULL current status never crashes the validator', () => {
+    expect(Object.keys(INSIGHT_RESOLUTION_TRANSITIONS)).toContain('unresolved');
+  });
+  it('self-edge is NOT a map edge (idempotent re-resolve handled at call site): resolved → resolved throws', () => {
+    expect(v('resolved', 'resolved')).toThrow(InvalidTransitionError);
+  });
+});
+
+describe('EXTRACTION_TRANSITIONS (discovery_extractions)', () => {
+  const v = (from: string, to: string) => () => validateTransition('discovery_extraction', EXTRACTION_TRANSITIONS, from, to);
+
+  it('legal: pending → accepted', () => { expect(v('pending', 'accepted')).not.toThrow(); });
+  it('legal: pending → dismissed', () => { expect(v('pending', 'dismissed')).not.toThrow(); });
+  it('illegal: dismissed → accepted (both terminal)', () => { expect(v('dismissed', 'accepted')).toThrow(InvalidTransitionError); });
+  it('illegal: accepted → pending (reopen a terminal)', () => { expect(v('accepted', 'pending')).toThrow(InvalidTransitionError); });
+});
+
+describe('SUGGESTED_BRIEF_TRANSITIONS (suggested_briefs)', () => {
+  const v = (from: string, to: string) => () => validateTransition('suggested_brief', SUGGESTED_BRIEF_TRANSITIONS, from, to);
+
+  it('legal: pending → accepted', () => { expect(v('pending', 'accepted')).not.toThrow(); });
+  it('legal: pending → snoozed', () => { expect(v('pending', 'snoozed')).not.toThrow(); });
+  it('legal: snoozed → pending (snooze expiry)', () => { expect(v('snoozed', 'pending')).not.toThrow(); });
+  it('legal: snoozed → dismissed', () => { expect(v('snoozed', 'dismissed')).not.toThrow(); });
+  it('illegal: accepted → dismissed (both terminal)', () => { expect(v('accepted', 'dismissed')).toThrow(InvalidTransitionError); });
+});
+
+describe('SEO_SUGGESTION_TRANSITIONS (seo_suggestions)', () => {
+  const v = (from: string, to: string) => () => validateTransition('seo_suggestion', SEO_SUGGESTION_TRANSITIONS, from, to);
+
+  it('legal: pending → applied', () => { expect(v('pending', 'applied')).not.toThrow(); });
+  it('legal: pending → dismissed', () => { expect(v('pending', 'dismissed')).not.toThrow(); });
+  it('illegal: dismissed → applied (re-apply a dismissed suggestion — the previously tolerated bug)', () => {
+    expect(v('dismissed', 'applied')).toThrow(InvalidTransitionError);
+  });
+  it('illegal: applied → dismissed', () => { expect(v('applied', 'dismissed')).toThrow(InvalidTransitionError); });
+});
+
+describe('PENDING_SCHEMA_TRANSITIONS (pending_schemas)', () => {
+  const v = (from: string, to: string) => () => validateTransition('pending_schema', PENDING_SCHEMA_TRANSITIONS, from, to);
+
+  it('legal: pending → stale', () => { expect(v('pending', 'stale')).not.toThrow(); });
+  it('legal: pending → applied', () => { expect(v('pending', 'applied')).not.toThrow(); });
+  it('illegal: stale → applied (terminal)', () => { expect(v('stale', 'applied')).toThrow(InvalidTransitionError); });
+});
+
+describe('CLIENT_SIGNAL_TRANSITIONS (client_signals — reversible admin triage)', () => {
+  const v = (from: string, to: string) => () => validateTransition('client_signal', CLIENT_SIGNAL_TRANSITIONS, from, to);
+
+  it('legal forward: new → reviewed', () => { expect(v('new', 'reviewed')).not.toThrow(); });
+  it('legal forward: reviewed → actioned', () => { expect(v('reviewed', 'actioned')).not.toThrow(); });
+  it('legal BACKWARD (documented admin undo): actioned → reviewed', () => { expect(v('actioned', 'reviewed')).not.toThrow(); });
+  it('legal BACKWARD (documented admin undo): reviewed → new', () => { expect(v('reviewed', 'new')).not.toThrow(); });
+  it('self-edge is NOT a map edge (no-op handled at call site): new → new throws', () => {
+    expect(v('new', 'new')).toThrow(InvalidTransitionError);
+  });
+});
+
+describe('BLUEPRINT_TRANSITIONS (site_blueprints)', () => {
+  const v = (from: string, to: string) => () => validateTransition('blueprint', BLUEPRINT_TRANSITIONS, from, to);
+
+  it('legal: draft → active', () => { expect(v('draft', 'active')).not.toThrow(); });
+  it('legal: active → archived', () => { expect(v('active', 'archived')).not.toThrow(); });
+  it('legal: archived → active (unarchive/reactivate)', () => { expect(v('archived', 'active')).not.toThrow(); });
+  it('self-edge is NOT a map edge (unchanged-status update skips guard): active → active throws', () => {
+    expect(v('active', 'active')).toThrow(InvalidTransitionError);
+  });
+});
+
+describe('BRAND_DELIVERABLE_TRANSITIONS (brand_identity_deliverables)', () => {
+  const v = (from: string, to: string) => () => validateTransition('brand_deliverable', BRAND_DELIVERABLE_TRANSITIONS, from, to);
+
+  it('legal: draft → approved', () => { expect(v('draft', 'approved')).not.toThrow(); });
+  it('legal: approved → draft (revert)', () => { expect(v('approved', 'draft')).not.toThrow(); });
+  it('self-edge is NOT a map edge (re-approval short-circuited at call site): approved → approved throws', () => {
+    expect(v('approved', 'approved')).toThrow(InvalidTransitionError);
+  });
+});
+
+describe('CLIENT_LOCATION_TRANSITIONS (client_locations)', () => {
+  const v = (from: string, to: string) => () => validateTransition('client_location', CLIENT_LOCATION_TRANSITIONS, from, to);
+
+  it('legal: needs_review → confirmed', () => { expect(v('needs_review', 'confirmed')).not.toThrow(); });
+  it('legal: confirmed → needs_review (re-review)', () => { expect(v('confirmed', 'needs_review')).not.toThrow(); });
+  it('self-edge is NOT a map edge (unchanged-status update skips guard): confirmed → confirmed throws', () => {
+    expect(v('confirmed', 'confirmed')).toThrow(InvalidTransitionError);
   });
 });

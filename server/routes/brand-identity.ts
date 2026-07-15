@@ -3,29 +3,54 @@ import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
-import { WS_EVENTS } from '../ws-events.js';
+import { BRAND_IDENTITY_UPDATED_PAYLOAD, WS_EVENTS } from '../ws-events.js';
 import {
   listDeliverables, getDeliverable,
   generateDeliverable, refineDeliverable,
   setDeliverableStatus, updateDeliverableContent, exportDeliverables,
 } from '../brand-identity.js';
-import type { DeliverableTier } from '../../shared/types/brand-engine.js';
+import {
+  isReleasedBrandDeliverableType,
+  RELEASED_BRAND_DELIVERABLE_TYPES,
+  type DeliverableTier,
+} from '../../shared/types/brand-engine.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
-import { getWorkspace } from '../workspaces.js';
+import { InvalidTransitionError } from '../state-machines.js';
+import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 import { incrementIfAllowed, decrementUsage } from '../usage-tracking.js';
 import { aiLimiter } from '../middleware.js';
 import { sanitizeErrorMessage } from '../utils/text.js';
+import { createLogger } from '../logger.js';
 
 const router = Router();
+const log = createLogger('brand-identity-routes');
+
+function runBrandIdentityPostCommitEffect(
+  workspaceId: string,
+  effect: 'activity' | 'broadcast' | 'intelligence-cache',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn({ err, workspaceId, effect }, 'brand identity post-commit effect failed');
+  }
+}
+
+function refundBrandIdentityUsage(workspaceId: string): void {
+  try {
+    decrementUsage(workspaceId, 'brandscript_generations');
+  } catch (err) {
+    log.warn({ err, workspaceId }, 'failed to refund brand identity usage');
+  }
+}
 
 // ── Zod schemas ─────────────────────────────────────────────────────────────
 
-const deliverableTypeSchema = z.enum([
-  'mission', 'vision', 'values', 'tagline', 'elevator_pitch',
-  'archetypes', 'personality_traits', 'voice_guidelines', 'tone_examples',
-  'messaging_pillars', 'differentiators', 'positioning_matrix', 'brand_story',
-  'personas', 'customer_journey', 'objection_handling', 'emotional_triggers',
-]);
+// Compatibility boundary: this is the legacy single-deliverable paid generator.
+// `naming` is durable vocabulary reserved for the reviewed MCP brand pipeline and
+// intentionally stays excluded here until that pipeline owns its generation gates.
+const deliverableTypeSchema = z.enum(RELEASED_BRAND_DELIVERABLE_TYPES);
 
 const deliverableTierSchema = z.enum(['essentials', 'professional', 'premium']);
 
@@ -88,22 +113,29 @@ router.post('/api/brand-identity/:workspaceId/generate', requireWorkspaceAccess(
   const { deliverableType } = req.body;
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const tier = ws.tier || 'free';
-  let incremented = false;
-  try {
-    if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
-      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
-    }
-    incremented = true;
-    const result = await generateDeliverable(req.params.workspaceId, deliverableType);
-    addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableType });
-    invalidateIntelligenceCache(req.params.workspaceId);
-    res.json(result);
-  } catch (err) {
-    if (incremented) { try { decrementUsage(ws.id, 'brandscript_generations'); } catch { /* best-effort */ } }
-    res.status(500).json({ error: sanitizeErrorMessage(err, 'Generation failed') });
+  const tier = computeEffectiveTier(ws);
+  if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
+    return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
   }
+
+  let result: Awaited<ReturnType<typeof generateDeliverable>>;
+  try {
+    result = await generateDeliverable(req.params.workspaceId, deliverableType);
+  } catch (err) {
+    refundBrandIdentityUsage(ws.id);
+    return res.status(500).json({ error: sanitizeErrorMessage(err, 'Generation failed') });
+  }
+
+  runBrandIdentityPostCommitEffect(req.params.workspaceId, 'activity', () => {
+    addActivity(req.params.workspaceId, 'brand_deliverable_generated', `Generated ${deliverableType.replace(/_/g, ' ')} deliverable`);
+  });
+  runBrandIdentityPostCommitEffect(req.params.workspaceId, 'broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, BRAND_IDENTITY_UPDATED_PAYLOAD);
+  });
+  runBrandIdentityPostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
+    invalidateIntelligenceCache(req.params.workspaceId);
+  });
+  return res.json(result);
 });
 
 // Refine a deliverable with steering direction
@@ -111,26 +143,37 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
   const { direction } = req.body;
   const ws = getWorkspace(req.params.workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
-  const tier = ws.tier || 'free';
-  let incremented = false;
-  try {
-    if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
-      return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
-    }
-    incremented = true;
-    const result = await refineDeliverable(req.params.workspaceId, req.params.id, direction);
-    if (!result) {
-      try { decrementUsage(ws.id, 'brandscript_generations'); } catch { /* best-effort */ }
-      return res.status(404).json({ error: 'Not found' });
-    }
-    addActivity(req.params.workspaceId, 'brand_deliverable_refined', `Refined ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
-    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId: req.params.id });
-    invalidateIntelligenceCache(req.params.workspaceId);
-    res.json(result);
-  } catch (err) {
-    if (incremented) { try { decrementUsage(ws.id, 'brandscript_generations'); } catch { /* best-effort */ } }
-    res.status(500).json({ error: sanitizeErrorMessage(err, 'Refinement failed') });
+  const target = getDeliverable(req.params.workspaceId, req.params.id);
+  if (target && !isReleasedBrandDeliverableType(target.deliverableType)) {
+    return res.status(400).json({ error: 'Unsupported legacy brand deliverable type' });
   }
+  const tier = computeEffectiveTier(ws);
+  if (!incrementIfAllowed(ws.id, tier, 'brandscript_generations')) {
+    return res.status(429).json({ error: 'Monthly limit reached for your tier', code: 'usage_limit' });
+  }
+
+  let result: Awaited<ReturnType<typeof refineDeliverable>>;
+  try {
+    result = await refineDeliverable(req.params.workspaceId, req.params.id, direction);
+  } catch (err) {
+    refundBrandIdentityUsage(ws.id);
+    return res.status(500).json({ error: sanitizeErrorMessage(err, 'Refinement failed') });
+  }
+  if (!result) {
+    refundBrandIdentityUsage(ws.id);
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  runBrandIdentityPostCommitEffect(req.params.workspaceId, 'activity', () => {
+    addActivity(req.params.workspaceId, 'brand_deliverable_refined', `Refined ${result.deliverableType.replace(/_/g, ' ')} deliverable`);
+  });
+  runBrandIdentityPostCommitEffect(req.params.workspaceId, 'broadcast', () => {
+    broadcastToWorkspace(req.params.workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, BRAND_IDENTITY_UPDATED_PAYLOAD);
+  });
+  runBrandIdentityPostCommitEffect(req.params.workspaceId, 'intelligence-cache', () => {
+    invalidateIntelligenceCache(req.params.workspaceId);
+  });
+  return res.json(result);
 });
 
 // Update status (approve / revert to draft)
@@ -148,7 +191,12 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
   }
 
   if (typeof status !== 'undefined') {
-    result = setDeliverableStatus(workspaceId, deliverableId, status);
+    try {
+      result = setDeliverableStatus(workspaceId, deliverableId, status);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
+      throw err;
+    }
     if (!result) return res.status(404).json({ error: 'Not found' });
     const typeLabel = result.deliverableType.replace(/_/g, ' ');
     if (status === 'approved') {
@@ -159,7 +207,7 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
   }
 
   if (!result) return res.status(404).json({ error: 'Not found' });
-  broadcastToWorkspace(workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, { deliverableId, status, contentUpdated: typeof content !== 'undefined' });
+  broadcastToWorkspace(workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, BRAND_IDENTITY_UPDATED_PAYLOAD);
   invalidateIntelligenceCache(workspaceId);
   res.json(result);
 });

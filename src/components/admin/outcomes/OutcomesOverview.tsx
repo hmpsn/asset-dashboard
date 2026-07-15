@@ -143,6 +143,18 @@ function WorkspaceRow({
         {ws.scoredLast30d}
       </td>
 
+      {/* R9 (B15): admin-only coverage funnel summary — measured/tracked outcome rows.
+          `measured` (not `reconciled`) is the FIRST funnel stage to populate when the gated
+          measurement-provenance writer lands, so the at-a-glance column becomes meaningful
+          sooner. Both read 0/N today (the writer is flagged/future per the audit). */}
+      <td className="py-3 px-4">
+        {ws.coverage && ws.coverage.tracked > 0 ? (
+          <Badge label={`${ws.coverage.measured}/${ws.coverage.tracked} measured`} tone="zinc" />
+        ) : (
+          <span className="t-caption-sm text-[var(--brand-text-muted)]">—</span>
+        )}
+      </td>
+
       {/* Top win summary */}
       <td className="py-3 px-4 max-w-xs">
         {ws.topWin ? (
@@ -246,7 +258,7 @@ export default function OutcomesOverview() {
                 </div>
 
                 <div className="overflow-x-auto -mx-1">
-                  <table className="w-full text-left min-w-[640px]">
+                  <table className="w-full text-left min-w-[760px]">
                     <thead>
                       <tr className="t-caption-sm font-medium uppercase tracking-wider text-[var(--brand-text-muted)]">
                         <th scope="col" className="pb-2 px-4">Workspace</th>
@@ -254,6 +266,7 @@ export default function OutcomesOverview() {
                         <th scope="col" className="pb-2 px-4">Trend</th>
                         <th scope="col" className="pb-2 px-4">Active</th>
                         <th scope="col" className="pb-2 px-4">Scored (30d)</th>
+                        <th scope="col" className="pb-2 px-4">Coverage</th>
                         <th scope="col" className="pb-2 px-4">Top win</th>
                         <th scope="col" className="pb-2 px-4">Status</th>
                       </tr>

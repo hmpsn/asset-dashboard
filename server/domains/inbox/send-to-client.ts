@@ -8,7 +8,8 @@
  *
  *   sendToClient guarantees:
  *     0. adapter.validateSendable(input) — reject not-ready inputs before anything else
- *     1. state-machine-guarded insert (draft → awaiting_client), sets sent_at
+ *     1. state-machine-guarded insert/resend (normally → awaiting_client; grouped
+ *        review adapters may honestly retain partial), sets sent_at
  *     2. adapter.buildPayload(input) — typed payload (+ child items)
  *     3. client notification (email + broadcast DELIVERABLE_SENT)
  *     4. (response time) team notification on EVERY outcome + apply only if the adapter opted in
@@ -75,6 +76,26 @@ export interface SendToClientOptions {
 }
 
 /**
+ * The deliverable row is authoritative once upsertDeliverable returns. A
+ * notification/broadcast/cache failure after that boundary must not turn the
+ * committed send into an HTTP/MCP failure or suppress the effects that follow.
+ */
+function runSendPostCommitEffect(
+  deliverable: ClientDeliverable,
+  effect: 'client-notification' | 'deliverable-broadcast' | 'intelligence-cache',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn(
+      { err, workspaceId: deliverable.workspaceId, deliverableId: deliverable.id, effect },
+      'send-to-client post-commit effect failed',
+    );
+  }
+}
+
+/**
  * Send a deliverable of `type` to the client. Runs the five guarantees and returns the
  * persisted deliverable. Throws SendToClientError(422) if the adapter rejects the input.
  */
@@ -99,30 +120,34 @@ export async function sendToClient<TInput>(
   // per-type machine (notification types are never sendable through this path):
   //   (a) FRESH send: the new row is born at draft → awaiting_client.
   //   (b) RESEND (sourceRef collides with an existing row): upsertDeliverable's
-  //       ON CONFLICT DO UPDATE will overwrite the existing row's status back to
-  //       awaiting_client. We MUST therefore guard from the row's ACTUAL current
-  //       status — a resend onto a still-pending awaiting_client/changes_requested row
-  //       is the intended "supersede", but a resend onto a terminal
+  //       ON CONFLICT DO UPDATE will overwrite the existing row's status with the
+  //       adapter-resolved send state. We MUST therefore guard from the row's ACTUAL current
+  //       status — a resend onto a still-pending row is the intended "supersede",
+  //       and grouped reviews may remain partial when approved children survive;
+  //       a resend onto a terminal
   //       approved/applied/declined/completed row must throw InvalidTransitionError
   //       rather than silently revert (and null decided_at/applied_at/note).
   const transitions = getDeliverableTransitions(type);
   const sourceRef = adapter.sourceRef(input);
   const existing = sourceRef != null ? findBySourceRef(workspaceId, type, sourceRef) : null;
-  validateTransition('deliverable', transitions, existing ? existing.status : 'draft', 'awaiting_client');
+  const sendStatus = adapter.resolveSendStatus?.(input, existing) ?? 'awaiting_client';
+  validateTransition('deliverable', transitions, existing ? existing.status : 'draft', sendStatus);
 
   const nowIso = opts.sentAt ?? new Date().toISOString();
   const upsertInput: UpsertDeliverableInput = {
     workspaceId,
     type,
     kind: built.kind,
-    status: 'awaiting_client',
+    status: sendStatus,
     title: built.title,
     summary: built.summary ?? null,
     payload: built.payload,
-    note: opts.note ?? null,
+    note: opts.note ?? (sendStatus === 'partial' ? existing?.note ?? null : null),
+    clientResponseNote: sendStatus === 'partial' ? existing?.clientResponseNote ?? null : null,
     externalRef: built.externalRef ?? null,
     parentDeliverableId: built.parentDeliverableId ?? null,
     sentAt: nowIso,
+    decidedAt: sendStatus === 'partial' ? existing?.decidedAt ?? null : null,
     generatedAt: nowIso,
     source: opts.source ?? null,
     sourceRef,
@@ -130,13 +155,21 @@ export async function sendToClient<TInput>(
   };
   const deliverable = upsertDeliverable(upsertInput);
 
-  // Guarantee 3: client notification (email guarded + broadcast).
-  notifyClientOfSend(workspaceId, deliverable);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_SENT, {
-    deliverableId: deliverable.id,
-    type,
+  // Guarantee 3: client notification (email guarded + broadcast). These are
+  // isolated after the authoritative write so one failed effect neither lies
+  // about the committed send nor prevents later effects from running.
+  runSendPostCommitEffect(deliverable, 'client-notification', () => {
+    notifyClientOfSend(workspaceId, deliverable);
   });
-  invalidateIntelligenceCache(workspaceId);
+  runSendPostCommitEffect(deliverable, 'deliverable-broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.DELIVERABLE_SENT, {
+      deliverableId: deliverable.id,
+      type,
+    });
+  });
+  runSendPostCommitEffect(deliverable, 'intelligence-cache', () => {
+    invalidateIntelligenceCache(workspaceId);
+  });
 
   log.debug({ workspaceId, type, deliverableId: deliverable.id }, 'deliverable sent to client');
   return deliverable;
@@ -180,6 +213,22 @@ export async function respondToDeliverable(
   const current = getDeliverable(deliverableId);
   if (!current || current.workspaceId !== workspaceId) {
     throw new SendToClientError('Deliverable not found', 404);
+  }
+
+  // Recommendation deliverables are a RESPOND-only mirror (see the recommendation adapter):
+  // the canonical client decision enters through the public act-on route
+  // (POST /api/public/recommendations/:workspaceId/:recId/act-on), which flips the rec's
+  // clientStatus AND advances this mirror in lockstep via syncRecommendationDeliverableStatus.
+  // The adapter deliberately has NO respondToSource, so a generic respond here would flip ONLY
+  // the mirror — no content request, no attribution TrackedAction — a dead greenlight that can
+  // also desync mirror vs. rec (rec-approved / mirror-declined). Reject before any mutation.
+  if (current.type === 'recommendation' || current.type === 'brand_generation') {
+    throw new SendToClientError(
+      current.type === 'recommendation'
+        ? 'Recommendations are responded to via the act-on route, not the generic deliverable respond endpoint.'
+        : 'Brand generation reviews require a per-item decision, not a whole-deliverable response.',
+      409,
+    );
   }
 
   const adapter = getAdapter(current.type);
@@ -390,32 +439,54 @@ async function notifyClientOfReminder(workspaceId: string, deliverable: ClientDe
   upsertReminder(reminderKey);
 }
 
-function notifyTeamOfResponse(
+export interface TeamDeliverableResponseNotification {
+  decision: DeliverableResponseDecision;
+  title: string;
+  sourceType: string;
+  summary: string;
+  clientNote?: string;
+}
+
+/** Canonical Guarantee 4 notifier for response paths with bespoke atomic commits. */
+export function notifyTeamOfDeliverableResponse(
   workspaceId: string,
-  deliverable: ClientDeliverable,
-  decision: DeliverableResponseDecision,
+  response: TeamDeliverableResponseNotification,
 ): void {
   if (!isEmailConfigured()) return;
   const ws = getWorkspace(workspaceId);
   if (!ws) return;
-  if (decision === 'approved') {
+  if (response.decision === 'approved') {
     notifyTeamActionApproved({
       workspaceName: ws.name,
       workspaceId,
-      actionTitle: deliverable.title,
-      sourceType: deliverable.type,
-      actionSummary: deliverable.summary ?? '',
-      clientNote: deliverable.clientResponseNote ?? undefined,
+      actionTitle: response.title,
+      sourceType: response.sourceType,
+      actionSummary: response.summary,
+      clientNote: response.clientNote,
     });
   } else {
     // changes_requested / declined → a team-facing "client asked for changes" signal.
     notifyTeamChangesRequested({
       workspaceName: ws.name,
       workspaceId,
-      topic: deliverable.title,
-      targetKeyword: deliverable.type,
+      topic: response.title,
+      targetKeyword: response.sourceType,
       feedback:
-        (decision === 'declined' ? '[declined] ' : '') + (deliverable.clientResponseNote ?? ''),
+        (response.decision === 'declined' ? '[declined] ' : '') + (response.clientNote ?? ''),
     });
   }
+}
+
+function notifyTeamOfResponse(
+  workspaceId: string,
+  deliverable: ClientDeliverable,
+  decision: DeliverableResponseDecision,
+): void {
+  notifyTeamOfDeliverableResponse(workspaceId, {
+    decision,
+    title: deliverable.title,
+    sourceType: deliverable.type,
+    summary: deliverable.summary ?? '',
+    clientNote: deliverable.clientResponseNote ?? undefined,
+  });
 }

@@ -7,30 +7,9 @@ import { Icon } from '../ui/Icon';
 import { TierGate } from '../ui/TierGate';
 import { useClientOutcomeSummary } from '../../hooks/client/useClientOutcomes';
 // scoreColor helpers used locally via winRateColor()
+import { clientActionLabel } from '../../../shared/types/client-vocabulary';
 import type { Tier } from '../ui/TierGate';
-import type { OutcomeScorecard, ActionType, LearningsTrend } from '../../../shared/types/outcome-tracking';
-
-const ACTION_TYPE_LABELS: Record<ActionType, string> = {
-  insight_acted_on: 'Insight applied',
-  content_published: 'Content published',
-  brief_created: 'Content brief created',
-  strategy_keyword_added: 'Keyword added',
-  schema_deployed: 'Schema deployed',
-  audit_fix_applied: 'Technical fix',
-  content_refreshed: 'Content refreshed',
-  internal_link_added: 'Internal link added',
-  meta_updated: 'Meta update',
-  voice_calibrated: 'Voice calibrated',
-  competitor_gap_closed: 'Keyword gap closed',
-  cluster_published: 'Topic cluster filled',
-  cannibalization_resolved: 'Cannibalization resolved',
-  local_visibility_won: 'Local visibility won',
-  local_service_added: 'Local service targeted',
-  // Strategy redesign P2 pre-commit — managed-set keep markers (internal curation, never
-  // recorded as a client-facing outcome; present only to keep this Record exhaustive).
-  topic_cluster_keep: 'Topic cluster prioritized',
-  content_gap_keep: 'Content opportunity prioritized',
-};
+import type { OutcomeScorecard, LearningsTrend } from '../../../shared/types/outcome-tracking';
 
 function TrendIcon({ trend }: { trend: LearningsTrend }) {
   if (trend === 'improving') return <Icon as={ArrowUp} size="md" className="text-accent-success" />;
@@ -78,7 +57,7 @@ function TopThreeWins({ scorecard }: { scorecard: OutcomeScorecard }) {
           <Icon as={CheckCircle2} size="md" className="text-accent-success flex-shrink-0 mt-0.5" />
           <span>
             <span className="font-medium text-[var(--brand-text-bright)]">
-              {ACTION_TYPE_LABELS[cat.actionType]}
+              {clientActionLabel(cat.actionType)}
             </span>
             {' '}worked {Math.round(cat.winRate * 100)}% of the time
             {' '}across {cat.scored} measured {cat.scored === 1 ? 'action' : 'actions'}.
@@ -145,7 +124,7 @@ function FullScorecard({ scorecard }: { scorecard: OutcomeScorecard }) {
                     key={cat.actionType}
                     className={`flex items-center justify-between px-3 py-2 rounded-[var(--radius-md)] border t-body ${winRateBg(cat.winRate)}`}
                   >
-                    <span className="text-[var(--brand-text-bright)]">{ACTION_TYPE_LABELS[cat.actionType]}</span>
+                    <span className="text-[var(--brand-text-bright)]">{clientActionLabel(cat.actionType)}</span>
                     <div className="flex items-center gap-3 text-right">
                       <span className={`font-semibold ${winRateColor(cat.winRate)}`}>{pct}%</span>
                       <span className="t-caption text-[var(--brand-text-muted)]">{cat.scored} scored</span>
@@ -203,6 +182,9 @@ function PremiumBreakdown({ scorecard }: { scorecard: OutcomeScorecard }) {
 // --- Main component -----------------------------------------------------
 
 export default function OutcomeSummary({ workspaceId, tier }: OutcomeSummaryProps) {
+  // C4 (attribution honesty): useClientOutcomeSummary reads GET /api/public/outcomes/:ws/summary,
+  // which computes the scorecard with not_acted_on actions EXCLUDED — so the win rate, scored /
+  // confirmed-wins counts, and category breakdown below never count unexecuted proposals as wins.
   const { data, isLoading } = useClientOutcomeSummary(workspaceId);
   // A scorecard with nothing scored yet renders as a wall of 0% — that reads as
   // failure, not "too early". Treat it the same as no data: show the empty state.

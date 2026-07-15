@@ -1,12 +1,32 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, Layers, FileText, Grid3X3, AlertTriangle } from 'lucide-react';
-import { SectionCard, Badge, EmptyState, PageHeader, Icon, Button, ClickableRow, InlineBanner } from './ui';
-import { TemplateEditor, MatrixBuilder, MatrixGrid } from './matrix';
+import {
+  SectionCard,
+  Badge,
+  EmptyState,
+  PageHeader,
+  Icon,
+  Button,
+  ClickableRow,
+  ConfirmDialog,
+  InlineBanner,
+  ProgressIndicator,
+} from './ui';
+import { TemplateEditor, MatrixBuilder, MatrixGrid, MatrixGenerationStatus } from './matrix';
 import { contentTemplates, contentMatrices } from '../api/content';
 import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { queryKeys } from '../lib/queryKeys';
+import { useMatrixGeneration } from '../hooks/admin/useMatrixGeneration';
+import { useWorkspaceFeatureFlags } from '../hooks/admin/useWorkspaceFeatureFlags';
+import { adminPath } from '../routes';
 import type { ContentTemplate, ContentMatrix, MatrixCell } from './matrix';
+import type {
+  MatrixGenerationCostEstimate,
+  MatrixGenerationItemRead,
+  StartMatrixGenerationSelection,
+} from '../../shared/types/matrix-generation';
 
 type View =
   | { mode: 'list' }
@@ -16,12 +36,41 @@ type View =
 
 interface ContentPlannerProps {
   workspaceId: string;
+  embedded?: boolean;
 }
 
-export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
+interface PendingMatrixGeneration {
+  selections: StartMatrixGenerationSelection[];
+  estimate: MatrixGenerationCostEstimate;
+  idempotencyKey: string;
+}
+
+interface PendingMatrixApproval {
+  item: MatrixGenerationItemRead;
+  expectedRunRevision: number;
+}
+
+export function ContentPlanner({ workspaceId, embedded = false }: ContentPlannerProps) {
   const queryClient = useQueryClient();
-  const [view, setView] = useState<View>({ mode: 'list' });
+  const [searchParams] = useSearchParams();
+  const linkedMatrixId = searchParams.get('matrix') ?? '';
+  const linkedRunId = searchParams.get('run');
+  const [view, setView] = useState<View>(() => (
+    linkedMatrixId ? { mode: 'matrix-grid', matrixId: linkedMatrixId } : { mode: 'list' }
+  ));
   const [error, setError] = useState<string | null>(null);
+  const [generationBlocker, setGenerationBlocker] = useState<string | null>(null);
+  const [pendingGeneration, setPendingGeneration] = useState<PendingMatrixGeneration | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<PendingMatrixApproval | null>(null);
+  const workspaceFlags = useWorkspaceFeatureFlags(workspaceId);
+  const matrixGenerationEnabled = workspaceFlags.data
+    ?.find(flag => flag.key === 'content-matrix-generation')?.enabled ?? false;
+  const activeMatrixId = view.mode === 'matrix-grid' ? view.matrixId : '';
+  const matrixGeneration = useMatrixGeneration(
+    workspaceId,
+    activeMatrixId,
+    activeMatrixId === linkedMatrixId ? linkedRunId : null,
+  );
 
   const templatesQuery = useQuery({
     queryKey: queryKeys.admin.contentTemplates(workspaceId),
@@ -51,8 +100,9 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
 
   const handleTemplateSave = useCallback(async (template: ContentTemplate) => {
     try {
-      if (template.id && templates.some(t => t.id === template.id)) {
-        await contentTemplates.update(workspaceId, template.id, template);
+      setError(null);
+      if (view.mode === 'template-editor' && view.templateId) {
+        await contentTemplates.update(workspaceId, view.templateId, template);
       } else {
         await contentTemplates.create(workspaceId, template);
       }
@@ -61,12 +111,13 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     } catch (err) {
       setError(extractErrorMessage(err, 'Failed to save template'));
     }
-  }, [workspaceId, templates, loadData]);
+  }, [workspaceId, view, loadData]);
 
   // ── Matrix callbacks ──
 
   const handleMatrixComplete = useCallback(async (matrix: ContentMatrix) => {
     try {
+      setError(null);
       await contentMatrices.create(workspaceId, {
         name: matrix.name,
         templateId: matrix.templateId,
@@ -89,6 +140,72 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     action: 'optimize' | 'generate_briefs' | 'generate_posts' | 'send_review' | 'export_csv' | 'export_docx',
     cellIds: string[],
   ) => {
+    if (action === 'generate_briefs') {
+      if (!matrixGenerationEnabled || view.mode !== 'matrix-grid') return;
+      if (matrixGeneration.preview.isPending || matrixGeneration.start.isPending) return;
+      const matrix = matrices.find(item => item.id === view.matrixId);
+      const template = matrix
+        ? templates.find(item => item.id === matrix.templateId)
+        : undefined;
+      if (!matrix || !template) {
+        setError('The matrix template is unavailable. Refresh the planner and try again.');
+        return;
+      }
+      const selectedCells = cellIds.flatMap(cellId => {
+        const cell = matrix.cells.find(item => item.id === cellId);
+        return cell ? [cell] : [];
+      });
+      if (selectedCells.length !== cellIds.length) {
+        setError('One or more selected pages changed. Refresh the planner and try again.');
+        return;
+      }
+      try {
+        setError(null);
+        setGenerationBlocker(null);
+        const preview = await matrixGeneration.preview.mutateAsync(selectedCells.map(cell => ({
+          cellId: cell.id,
+          expectedSourceRevision: {
+            matrixRevision: matrix.revision ?? 0,
+            templateRevision: template.revision ?? 0,
+            cellRevision: cell.revision ?? 0,
+          },
+        })));
+        const readyResults = preview.results.flatMap(result => (
+          result.status === 'ready' ? [result] : []
+        ));
+        if (!preview.estimatedBatchBudget || readyResults.length !== selectedCells.length) {
+          const firstProblem = preview.results.find(result => result.status !== 'ready');
+          if (firstProblem?.status === 'upgrade_required') {
+            setGenerationBlocker('This template needs its generation structure approved before pages can be generated.');
+          } else if (firstProblem?.status === 'blocked') {
+            const requirement = firstProblem.evidenceRequirements.find(item => (
+              firstProblem.blockingRequirementIds.includes(item.id)
+            ));
+            setGenerationBlocker(
+              requirement?.clientSafePrompt
+                ?? requirement?.reason
+                ?? 'At least one selected page needs grounded source information before generation can start.',
+            );
+          } else {
+            setGenerationBlocker('At least one selected page is not ready to generate.');
+          }
+          setPendingGeneration(null);
+          return;
+        }
+        setPendingGeneration({
+          selections: readyResults.map(result => ({
+            cellId: result.cellId,
+            expectedSourceRevision: result.sourceRevision,
+            expectedPreviewFingerprint: result.target.effectiveInputFingerprint,
+          })),
+          estimate: preview.estimatedBatchBudget,
+          idempotencyKey: crypto.randomUUID(),
+        });
+      } catch (err) {
+        setError(extractErrorMessage(err, 'Failed to preview selected pages'));
+      }
+      return;
+    }
     if (action === 'export_csv') {
       window.open(contentMatrices.exportMatricesCsv(workspaceId), '_blank');
       return;
@@ -103,13 +220,107 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
         setError(extractErrorMessage(err, 'Failed to send selected pages for review'));
       }
     }
-    // Other bulk actions will be wired to specific endpoints as they're implemented
-  }, [workspaceId, view, queryClient]);
+    // Remaining bulk actions will be wired to specific endpoints as they're implemented.
+  }, [
+    workspaceId,
+    view,
+    queryClient,
+    matrixGenerationEnabled,
+    matrixGeneration.preview,
+    matrixGeneration.start.isPending,
+    matrices,
+    templates,
+  ]);
+
+  const handleConfirmGeneration = useCallback(async () => {
+    if (!pendingGeneration) return;
+    const request = pendingGeneration;
+    setPendingGeneration(null);
+    try {
+      setError(null);
+      await matrixGeneration.start.mutateAsync({
+        selections: request.selections,
+        acceptedBudget: {
+          maxProviderCalls: request.estimate.providerCalls,
+          maxInputTokens: request.estimate.inputTokens,
+          maxOutputTokens: request.estimate.outputTokens,
+          maxEstimatedUsd: request.estimate.estimatedUsd,
+          maxConcurrency: request.estimate.maxConcurrency,
+        },
+        idempotencyKey: request.idempotencyKey,
+      });
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to start matrix generation'));
+    }
+  }, [matrixGeneration.start, pendingGeneration]);
+
+  const handleRetryGeneration = useCallback(async (
+    items: MatrixGenerationItemRead[],
+  ) => {
+    const run = matrixGeneration.run.data?.run;
+    if (!run) return;
+    try {
+      setError(null);
+      await matrixGeneration.retry.mutateAsync({
+        expectedRunRevision: run.revision,
+        items: items.map(item => ({
+          itemId: item.id,
+          expectedItemRevision: item.revision,
+          sourceRevision: item.sourceRevision,
+          expectedArtifactRevisions: item.currentArtifactRevisions,
+          reusableCheckpointFingerprint: item.reusableCheckpointFingerprint,
+        })),
+        idempotencyKey: crypto.randomUUID(),
+      });
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to retry selected pages'));
+    }
+  }, [matrixGeneration.retry, matrixGeneration.run.data?.run]);
+
+  const handleReviewGeneratedPage = useCallback((item: MatrixGenerationItemRead) => {
+    if (!item.postId) return;
+    const url = `${adminPath(workspaceId, 'content-pipeline')}?tab=posts&post=${encodeURIComponent(item.postId)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [workspaceId]);
+
+  const handleApproveGeneratedPage = useCallback((item: MatrixGenerationItemRead) => {
+    const run = matrixGeneration.run.data?.run;
+    if (!run) return;
+    setPendingApproval({ item, expectedRunRevision: run.revision });
+  }, [matrixGeneration.run.data?.run]);
+
+  const handleConfirmApproval = useCallback(async () => {
+    if (!pendingApproval) return;
+    const request = pendingApproval;
+    setPendingApproval(null);
+    try {
+      setError(null);
+      await matrixGeneration.approve.mutateAsync({
+        itemId: request.item.id,
+        expectedRunRevision: request.expectedRunRevision,
+        expectedItemRevision: request.item.revision,
+        expectedPostRevision: request.item.currentArtifactRevisions.post.generationRevision,
+      });
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to approve this page'));
+    }
+  }, [matrixGeneration.approve, pendingApproval]);
 
   const handleCellUpdate = useCallback(async (cellId: string, updates: Partial<MatrixCell>) => {
     if (view.mode !== 'matrix-grid') return;
     try {
-      const updated = await contentMatrices.updateCell(workspaceId, view.matrixId, cellId, updates);
+      setError(null);
+      const currentCell = matrices
+        .find(matrix => matrix.id === view.matrixId)
+        ?.cells.find(cell => cell.id === cellId);
+      if (!currentCell) {
+        setError('This page changed or was removed. Refresh the planner and try again.');
+        return;
+      }
+      const updated = await contentMatrices.updateCell(workspaceId, view.matrixId, cellId, {
+        ...updates,
+        expectedCellRevision: currentCell.revision ?? 0,
+      });
       queryClient.setQueryData<ContentMatrix[]>(
         queryKeys.admin.contentMatrices(workspaceId),
         prev => (prev ?? []).map(m => m.id === view.matrixId ? updated : m),
@@ -117,29 +328,45 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     } catch (err) {
       setError(extractErrorMessage(err, 'Failed to update cell'));
     }
-  }, [workspaceId, view, queryClient]);
+  }, [workspaceId, view, matrices, queryClient]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 gap-3">
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
+        <span className="t-caption-sm text-[var(--brand-text)]">Loading content planner…</span>
+      </div>
+    );
+  }
 
   // ── Render sub-views ──
 
   if (view.mode === 'template-editor') {
     return (
-      <TemplateEditor
-        workspaceId={workspaceId}
-        templateId={view.templateId}
-        onSave={handleTemplateSave}
-        onCancel={() => setView({ mode: 'list' })}
-      />
+      <div className="space-y-3">
+        {error && <InlineBanner>{error}</InlineBanner>}
+        <TemplateEditor
+          workspaceId={workspaceId}
+          templateId={view.templateId}
+          template={templates.find(item => item.id === view.templateId)}
+          onSave={handleTemplateSave}
+          onCancel={() => setView({ mode: 'list' })}
+        />
+      </div>
     );
   }
 
   if (view.mode === 'matrix-builder') {
     return (
-      <MatrixBuilder
-        workspaceId={workspaceId}
-        templates={templates}
-        onComplete={handleMatrixComplete}
-        onCancel={() => setView({ mode: 'list' })}
-      />
+      <div className="space-y-3">
+        {error && <InlineBanner>{error}</InlineBanner>}
+        <MatrixBuilder
+          workspaceId={workspaceId}
+          templates={templates}
+          onComplete={handleMatrixComplete}
+          onCancel={() => setView({ mode: 'list' })}
+        />
+      </div>
     );
   }
 
@@ -167,34 +394,91 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
     return (
       <div className="space-y-2">
         <Button
-          onClick={() => setView({ mode: 'list' })}
+          onClick={() => {
+            setView({ mode: 'list' });
+            setGenerationBlocker(null);
+            setPendingGeneration(null);
+          }}
           size="sm"
           variant="ghost"
           className="h-auto px-0 py-0 text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] hover:bg-transparent"
         >
           ← Back to Planner
         </Button>
+        {error && <InlineBanner>{error}</InlineBanner>}
+        {generationBlocker && (
+          <InlineBanner
+            tone="warning"
+            title="Generation needs input"
+            message={generationBlocker}
+            onDismiss={() => setGenerationBlocker(null)}
+          />
+        )}
+        {(matrixGeneration.preview.isPending || matrixGeneration.start.isPending || matrixGeneration.run.isLoading) && (
+          <ProgressIndicator
+            status="running"
+            step={matrixGeneration.preview.isPending
+              ? 'Checking selected pages'
+              : matrixGeneration.start.isPending
+                ? 'Starting matrix generation'
+                : 'Loading generation status'}
+            detail="No paid generation starts until the previewed budget is confirmed."
+          />
+        )}
+        {matrixGeneration.run.isError && (
+          <InlineBanner
+            title="Generation status unavailable"
+            message={extractErrorMessage(matrixGeneration.run.error, 'Refresh the planner and try again.')}
+          />
+        )}
+        {matrixGeneration.run.data && (
+          <MatrixGenerationStatus
+            result={matrixGeneration.run.data}
+            retrying={matrixGeneration.retry.isPending}
+            onRetry={handleRetryGeneration}
+            approvingItemId={matrixGeneration.approve.isPending
+              ? matrixGeneration.approve.variables?.itemId ?? null
+              : null}
+            onReview={handleReviewGeneratedPage}
+            onApprove={handleApproveGeneratedPage}
+          />
+        )}
         <MatrixGrid
           workspaceId={workspaceId}
           matrix={matrix}
+          generationEnabled={matrixGenerationEnabled}
+          generationBusy={matrixGeneration.preview.isPending || matrixGeneration.start.isPending}
           onCellClick={handleCellClick}
           onBulkAction={handleBulkAction}
           onCellUpdate={handleCellUpdate}
+        />
+        <ConfirmDialog
+          open={Boolean(pendingGeneration)}
+          title="Generate selected pages?"
+          message={pendingGeneration
+            ? `Generate ${pendingGeneration.selections.length} ${pendingGeneration.selections.length === 1 ? 'page' : 'pages'} using up to ${pendingGeneration.estimate.providerCalls} provider calls, ${pendingGeneration.estimate.inputTokens.toLocaleString()} input tokens, ${pendingGeneration.estimate.outputTokens.toLocaleString()} output tokens, and an estimated $${pendingGeneration.estimate.estimatedUsd.toFixed(2)}. Pages remain drafts and are never sent or published automatically.`
+            : ''}
+          confirmLabel={pendingGeneration
+            ? `Generate ${pendingGeneration.selections.length} ${pendingGeneration.selections.length === 1 ? 'page' : 'pages'}`
+            : 'Generate pages'}
+          onConfirm={() => { void handleConfirmGeneration(); }}
+          onCancel={() => setPendingGeneration(null)}
+        />
+        <ConfirmDialog
+          open={Boolean(pendingApproval)}
+          title="Approve this page for export?"
+          message={pendingApproval
+            ? `Approve “${pendingApproval.item.target?.targetKeyword ?? pendingApproval.item.cellId}” after review. This records human approval and marks the page ready for export. It does not send or publish the page.`
+            : ''}
+          confirmLabel="Approve for export"
+          onConfirm={() => { void handleConfirmApproval(); }}
+          onCancel={() => setPendingApproval(null)}
         />
       </div>
     );
   }
 
   // ── List view (default) ──
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24 gap-3">
-        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
-        <span className="t-caption-sm text-[var(--brand-text)]">Loading content planner…</span>
-      </div>
-    );
-  }
 
   if ((error || queryError) && !templates.length && !matrices.length) {
     return (
@@ -221,11 +505,13 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
   if (!hasData) {
     return (
       <div className="space-y-4">
-        <PageHeader
-          title="Content Planner"
-          subtitle="Create templates and build content matrices at scale"
-          icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
-        />
+        {!embedded && (
+          <PageHeader
+            title="Content Planner"
+            subtitle="Create templates and build content matrices at scale"
+            icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
+          />
+        )}
         <EmptyState
           icon={Layers}
           title="No templates or matrices yet"
@@ -248,38 +534,45 @@ export function ContentPlanner({ workspaceId }: ContentPlannerProps) {
 
   const totalCells = matrices.reduce((sum, m) => sum + m.cells.length, 0);
   const publishedCells = matrices.reduce((sum, m) => sum + m.cells.filter(c => c.status === 'published').length, 0);
+  const plannerActions = (
+    <div className="flex items-center gap-2">
+      <Button
+        onClick={() => setView({ mode: 'template-editor' })}
+        icon={FileText}
+        size="sm"
+        variant="secondary"
+        className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)]"
+      >
+        New Template
+      </Button>
+      {templates.length > 0 && (
+        <Button
+          onClick={() => setView({ mode: 'matrix-builder' })}
+          icon={Grid3X3}
+          size="sm"
+          variant="secondary"
+          className="rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 border-0"
+        >
+          Build Matrix
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Content Planner"
-        subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''} · ${matrices.length} matri${matrices.length !== 1 ? 'ces' : 'x'} · ${totalCells} pages planned`}
-        icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setView({ mode: 'template-editor' })}
-              icon={FileText}
-              size="sm"
-              variant="secondary"
-              className="rounded-[var(--radius-lg)] bg-[var(--surface-3)] text-[var(--brand-text-bright)] hover:bg-[var(--brand-border-hover)]"
-            >
-              New Template
-            </Button>
-            {templates.length > 0 && (
-              <Button
-                onClick={() => setView({ mode: 'matrix-builder' })}
-                icon={Grid3X3}
-                size="sm"
-                variant="secondary"
-                className="rounded-[var(--radius-lg)] bg-teal-500/10 text-accent-brand hover:bg-teal-500/15 border-0"
-              >
-                Build Matrix
-              </Button>
-            )}
-          </div>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Content Planner"
+          subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''} · ${matrices.length} matri${matrices.length !== 1 ? 'ces' : 'x'} · ${totalCells} pages planned`}
+          icon={<Icon as={Layers} size="lg" className="text-accent-brand" />}
+          actions={plannerActions}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center justify-end gap-2" aria-label="Content planner controls">
+          {plannerActions}
+        </div>
+      )}
 
       {error && (
         <InlineBanner>{error}</InlineBanner>

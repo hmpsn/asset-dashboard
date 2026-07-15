@@ -9,6 +9,7 @@ import { DecisionCard } from '../DecisionCard';
 import { DeliverableDetailModal } from '../DeliverableDetailModal';
 import { InlineApprovalCard } from './InlineApprovalCard';
 import { GbpReviewResponseApprovalCard } from './GbpReviewResponseApprovalCard';
+import { BrandGenerationReview } from './BrandGenerationReview';
 import { ProjectedReviewModal } from './ProjectedReviewModal';
 import { RequestsTab } from '../RequestsTab';
 import { SubmitRequestChooserModal } from './SubmitRequestChooserModal';
@@ -408,8 +409,27 @@ export function UnifiedInbox({
   useWorkspaceEvents(workspaceId, wsHandlers);
 
   const actionable = useMemo(
-    () => deliverables.filter((d) => ACTIONABLE_STATUSES.has(d.status)),
+    () => deliverables.filter((d) => d.type !== 'brand_generation' && ACTIONABLE_STATUSES.has(d.status)),
     [deliverables],
+  );
+
+  // B3 — brand-generation review bundles have their own item-level response contract and retain
+  // decided children for honest partial/completed readback. Keep them entirely outside the generic
+  // actionable renderer so the whole-bundle `/respond` shape can never be invoked for this type.
+  const brandReviews = useMemo(
+    () => deliverables.filter((d) => (
+      d.type === 'brand_generation'
+      && d.kind === 'review'
+      && (d.status === 'awaiting_client'
+        || d.status === 'partial'
+        || d.status === 'approved'
+        || d.status === 'changes_requested')
+    )),
+    [deliverables],
+  );
+  const actionableBrandReviews = useMemo(
+    () => brandReviews.filter((d) => d.items?.some((item) => item.status === 'awaiting_client')),
+    [brandReviews],
   );
 
   // R3b "Ready to publish": already-approved deliverables that are client-applyable through the
@@ -525,7 +545,7 @@ export function UnifiedInbox({
     }
   };
 
-  const priorityItems: PriorityItem[] = actionable.map((d) => {
+  const priorityItems: PriorityItem[] = [...actionable, ...actionableBrandReviews].map((d) => {
     const { icon } = sectionForKind(d.kind);
     const section = sectionForDeliverable(d);
     return {
@@ -544,7 +564,14 @@ export function UnifiedInbox({
   const renderActionableDeliverable = (d: ClientDeliverable) => {
     const decision: NormalizedDecision = normalizeDeliverable(d);
     const projected = isProjectedDeliverable(d.type);
-    const inlineApproval = !projected && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
+    // Recommendation deliverables are a RESPOND-only mirror (server/domains/inbox/send-to-client.ts
+    // now 409s the generic /respond for this type): the canonical client decision is the "Act on
+    // this" greenlight on the recommendation's own card elsewhere (the-issue client surface), not
+    // this generic Approve/Decline. Gate the write verbs off exactly like a projected deliverable;
+    // onReview is wired below to a read-only nudge instead of the write-capable detail modal.
+    const isRecommendation = d.type === 'recommendation';
+    const writeVerbsDisabled = projected || isRecommendation;
+    const inlineApproval = !writeVerbsDisabled && d.kind === 'batch' && (d.items?.length ?? 0) > 0;
     if (d.type === 'gbp_review_response') {
       return (
         <div key={d.id} id={`unified-decision-${d.id}`}>
@@ -578,20 +605,33 @@ export function UnifiedInbox({
             uniformVerbs
             submitting={submittingId === d.id}
             ageLabel={ageLabel(d.sentAt)}
-            onReview={projected ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' }) : undefined}
-            onOpen={projected ? () => {} : () => setDetailId(d.id)}
+            onReview={
+              projected
+                ? () => setReviewProjected({ type: d.type, externalRef: d.externalRef ?? '' })
+                : isRecommendation
+                  // No in-inbox review surface for a recommendation mirror — the real decision
+                  // ("Act on this") lives on its Strategy card. Reusing the generic onReview slot
+                  // (rather than falling into uniformActions) keeps this card from rendering dead
+                  // Approve/Request-changes buttons that would no-op or 409 if ever wired live.
+                  ? () => setToast({
+                      message: 'Review and act on this recommendation from your Strategy hub.',
+                      type: 'success',
+                    })
+                  : undefined
+            }
+            onOpen={writeVerbsDisabled ? () => {} : () => setDetailId(d.id)}
             onApprove={
-              projected || submittingId === d.id
+              writeVerbsDisabled || submittingId === d.id
                 ? undefined
                 : () => void handleRespond(d, 'approved')
             }
             onFlagWithNote={
-              projected || submittingId === d.id
+              writeVerbsDisabled || submittingId === d.id
                 ? undefined
                 : (note) => void handleRespond(d, 'changes_requested', note || undefined)
             }
             onDecline={
-              projected || submittingId === d.id
+              writeVerbsDisabled || submittingId === d.id
                 ? undefined
                 : (note) => void handleRespond(d, 'declined', note || undefined)
             }
@@ -639,6 +679,7 @@ export function UnifiedInbox({
           priorityItems.length === 0 &&
           (!sectionIsVisible('decisions') || readyToApply.length === 0) &&
           (!sectionIsVisible('decisions') || workOrders.length === 0) &&
+          (!sectionIsVisible('reviews') || brandReviews.length === 0) &&
           (!sectionIsVisible('conversations') || requests.length === 0)
         }
       />
@@ -650,10 +691,18 @@ export function UnifiedInbox({
         </section>
       )}
 
-      {sectionIsVisible('reviews') && reviewDeliverables.length > 0 && (
+      {sectionIsVisible('reviews') && (reviewDeliverables.length > 0 || brandReviews.length > 0) && (
         <section aria-label="Reviews" className="space-y-3">
-          <SectionHeading title="Reviews" subtitle="Items ready for your review" />
+          <SectionHeading title="Reviews" subtitle="Drafts and feedback shared with you" />
           {reviewDeliverables.map(renderActionableDeliverable)}
+          {brandReviews.map((deliverable) => (
+            <BrandGenerationReview
+              key={deliverable.id}
+              workspaceId={workspaceId}
+              deliverable={deliverable}
+              ageLabel={ageLabel(deliverable.sentAt)}
+            />
+          ))}
         </section>
       )}
 
@@ -679,6 +728,7 @@ export function UnifiedInbox({
           lane being empty — matching the F2 PriorityStrip guard, so the line never renders above a
           populated "Ready to publish" section (same false-empty class). */}
       {priorityItems.length === 0 &&
+        (!sectionIsVisible('reviews') || brandReviews.length === 0) &&
         (!sectionIsVisible('conversations') || requests.length === 0) &&
         (!sectionIsVisible('decisions') || (workOrders.length === 0 && readyToApply.length === 0)) && (
         <div className="flex items-center gap-3 px-4 py-3 t-caption text-[var(--brand-text-muted)]">

@@ -37,9 +37,12 @@ const bulkMutateMock = vi.fn();
 const rowActionMutateMock = vi.fn();
 const hardDeleteMutateMock = vi.fn();
 const workspaceEventsMock = vi.fn();
+const initialRefetchMock = vi.fn();
+const rowsRefetchMock = vi.fn();
+const initialHookMock = vi.fn();
 
 vi.mock('../../src/hooks/admin/useKeywordCommandCenter', () => ({
-  useKeywordCommandCenterInitialView: () => ({ data: undefined, isLoading: false, isError: true, error: new Error('initial disabled in test') }),
+  useKeywordCommandCenterInitialView: (...args: unknown[]) => initialHookMock(...args),
   useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),
@@ -96,6 +99,7 @@ vi.mock('../../src/components/keyword-hub/HubKeywordList', () => ({
     onToggleKey: (k: string) => void;
     onBulkAction: (action: string) => void;
     onSort: (key: string) => void;
+    onRetry?: () => void;
   }) => (
     <div data-testid="hub-keyword-list">
       <span data-testid="list-loading">{props.isLoading ? 'loading' : 'ready'}</span>
@@ -117,6 +121,9 @@ vi.mock('../../src/components/keyword-hub/HubKeywordList', () => ({
       {/* Drives the real useKeywordHubState.setSort, exercising the direction toggle. */}
       <button data-testid="sort-clicks" onClick={() => props.onSort('clicks')}>
         sort clicks
+      </button>
+      <button data-testid="retry-rows" onClick={() => props.onRetry?.()}>
+        retry rows
       </button>
     </div>
   ),
@@ -183,6 +190,13 @@ function setupHooks(
     summary?: Partial<KeywordCommandCenterSummaryResponse>;
   } = {},
 ) {
+  initialHookMock.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: true,
+    error: new Error('initial disabled in test'),
+    refetch: initialRefetchMock,
+  });
   summaryHookMock.mockReturnValue({
     data: { ...summaryPayload, ...opts.summary },
     isLoading: false,
@@ -193,6 +207,7 @@ function setupHooks(
     isLoading: opts.rowsLoading ?? false,
     isError: false,
     error: null,
+    refetch: rowsRefetchMock,
   });
 }
 
@@ -264,6 +279,13 @@ describe('KeywordHub', () => {
     renderHub();
     expect(screen.getByTestId('list-loading')).toHaveTextContent('ready');
     expect(screen.getByTestId('list-row-count')).toHaveTextContent('1');
+  });
+
+  it('retries canonical rows without replaying the initial transport', () => {
+    renderHub();
+    fireEvent.click(screen.getByTestId('retry-rows'));
+    expect(rowsRefetchMock).toHaveBeenCalledTimes(1);
+    expect(initialRefetchMock).not.toHaveBeenCalled();
   });
 
   it('passes loading state to the list when rows are pending', () => {

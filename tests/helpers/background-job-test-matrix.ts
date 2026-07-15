@@ -123,6 +123,15 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/content-post-generation-mutation-safety.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.CONTENT_MATRIX_GENERATION]: entry(
+    'CONTENT_MATRIX_GENERATION',
+    {
+      expectedLabel: 'Content Matrix Generation',
+      expectedCancellable: true,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/contract/content-matrix-generation-m3-contracts.test.ts',
+  ),
   [BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION]: entry(
     'COPY_BATCH_GENERATION',
     {
@@ -149,6 +158,15 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
       expectedResultBehavior: 'ephemeral',
     },
     'tests/integration/workspace-context-job-mutation-safety.test.ts',
+  ),
+  [BACKGROUND_JOB_TYPES.BRAND_DELIVERABLE_GENERATION]: entry(
+    'BRAND_DELIVERABLE_GENERATION',
+    {
+      expectedLabel: 'Brand Deliverable Generation',
+      expectedCancellable: true,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/integration/brand-generation.test.ts',
   ),
   [BACKGROUND_JOB_TYPES.PERSONA_GENERATION]: entry(
     'PERSONA_GENERATION',
@@ -331,5 +349,16 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
       expectedResultBehavior: 'domain-store',
     },
     'tests/unit/intelligence-recompute-job.test.ts',
+  ),
+  // Reconcile R6 (B12): read-only sweep reporting dangling tracked_actions source refs.
+  // Findings live in job.result (ephemeral) — there is no domain table to write to.
+  [BACKGROUND_JOB_TYPES.OUTCOME_SOURCE_INTEGRITY_SWEEP]: entry(
+    'OUTCOME_SOURCE_INTEGRITY_SWEEP',
+    {
+      expectedLabel: 'Outcome Source Integrity Sweep',
+      expectedCancellable: true,
+      expectedResultBehavior: 'ephemeral',
+    },
+    'tests/unit/outcome-source-integrity-sweep.test.ts',
   ),
 };

@@ -124,8 +124,9 @@ export async function handleClientTool(
         };
       }
 
-      // Cross-workspace mode (no workspaceId provided)
-      const allWorkspaces = listWorkspaces();
+      // Cross-workspace mode (no workspaceId provided) — include archived so workspace
+      // context stays consistent with listRequests() below, which returns requests across ALL workspaces
+      const allWorkspaces = listWorkspaces({ includeArchived: true });
       // listRequests with no arg returns all requests across workspaces
       const allRequests = listRequests();
       const pendingRequestsAll = allRequests.filter(r => r.status === 'new');

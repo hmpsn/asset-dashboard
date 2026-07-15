@@ -18,9 +18,13 @@ import { loadDecayAnalysis } from '../content-decay.js';
 import { getContentVelocityTrend } from '../content-posts.js';
 import { createLogger } from '../logger.js';
 import { parsePositiveIntQuery } from '../query-param-parsers.js';
+import { getLatestEffectiveSnapshot } from '../audit-snapshot-views.js';
+import { classifyWorkQueue } from '../domains/work-queue.js';
+import { buildCockpitVerdict } from '../domains/cockpit-verdict.js';
+import { loadAdminMoneyFrame } from '../money-frame-store.js';
+import { requireWorkspaceAccess } from '../auth.js';
 
 const log = createLogger('workspace-home');
-import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
 
 /**
@@ -80,6 +84,22 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
   let contentDecay = null;
   try { contentDecay = loadDecayAnalysis(req.params.id)?.summary ?? null; } catch (err) { log.warn({ err }, 'workspace-home partial fetch failed'); }
 
+  let audit = null;
+  try {
+    const snapshot = ws.webflowSiteId
+      ? getLatestEffectiveSnapshot(ws.webflowSiteId, ws.auditSuppressions || [])
+      : null;
+    audit = snapshot
+      ? {
+        errors: snapshot.audit.errors,
+        warnings: snapshot.audit.warnings,
+        siteScore: snapshot.audit.siteScore,
+      }
+      : null;
+  } catch (err) {
+    log.warn({ err }, 'workspace-home partial fetch failed');
+  }
+
   // Weekly accomplishments — aggregate activity from last 7 days
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const recentActivity = (activity as Array<{ type: string; createdAt: string }>)
@@ -92,6 +112,7 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     requestsResolved: recentActivity.filter(a => a.type === 'request_resolved').length,
   };
   const weeklyTotal = Object.values(weeklySummary).reduce((s, n) => s + n, 0);
+  const weeklySummaryPayload = weeklyTotal > 0 ? weeklySummary : null;
 
   // Derive content pipeline summary
   const allCells = (matrices as Array<{ cells?: Array<{ status: string }> }>).flatMap(m => m.cells || []);
@@ -104,6 +125,39 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     approvedCells: allCells.filter(c => c.status === 'approved').length,
     inProgressCells: allCells.filter(c => c.status === 'brief_generated' || c.status === 'in_progress').length,
   };
+
+  const workQueue = classifyWorkQueue({
+    clientId: ws.id,
+    requests,
+    workOrders,
+    contentRequests,
+    ranks,
+    contentPipeline,
+    contentDecay,
+    audit,
+    churnSignals,
+    setup: {
+      webflowSiteId: ws.webflowSiteId,
+      gscPropertyUrl: ws.gscPropertyUrl,
+      ga4PropertyId: ws.ga4PropertyId,
+      includeGaps: true,
+    },
+  });
+
+  let moneyFrame = null;
+  try {
+    moneyFrame = loadAdminMoneyFrame(ws.id);
+  } catch (err) {
+    log.warn({ err }, 'workspace-home partial fetch failed');
+  }
+
+  const cockpitVerdict = buildCockpitVerdict({
+    workQueue,
+    audit,
+    weeklySummary: weeklySummaryPayload,
+    moneyFrame,
+    contentVelocity,
+  });
 
   res.json({
     ranks,
@@ -119,7 +173,10 @@ router.get('/api/workspace-home/:id', requireWorkspaceAccess(), async (req, res)
     contentPipeline,
     contentVelocity,
     contentDecay,
-    weeklySummary: weeklyTotal > 0 ? weeklySummary : null,
+    workQueue,
+    cockpitVerdict,
+    moneyFrame,
+    weeklySummary: weeklySummaryPayload,
   });
 });
 

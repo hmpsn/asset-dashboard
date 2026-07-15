@@ -74,25 +74,31 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
     ],
     promptAssemblyModules: [
       'server/content-brief.ts',
+      'server/content-posts-ai-jobs.ts',
       'server/prompt-assembly.ts',
       'server/workspace-intelligence.ts',
+      'server/domains/content/matrix-generation/operations.ts',
     ],
     dispatcherModules: [
       'server/ai.ts',
       'server/content-brief.ts',
       'server/content-posts-ai.ts',
+      'server/content-posts-ai-jobs.ts',
       'server/content-posts-db.ts',
+      'server/domains/content/matrix-generation/operations.ts',
     ],
     parserOrValidationSignals: [
       'zod schema validation',
       "responseFormat: { type: 'json_object' }",
       'validateTransition',
+      'parseMatrixGenerationModelAuditAIOutput',
     ],
     writeSideEffects: [
       'saveBrief',
       'savePost',
       'addActivity',
       'broadcastToWorkspace',
+      'commitMatrixGenerationRevision',
     ],
     wsEvents: [
       'CONTENT_UPDATED',
@@ -107,6 +113,8 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'tests/integration/content-posts-ai-fix.test.ts',
       'tests/integration/content-posts-workflow.test.ts',
       'tests/integration/public-content-request-workflow-broadcasts.test.ts',
+      'tests/unit/content-matrix-generation-audit.test.ts',
+      'tests/unit/content-matrix-generation-item-audit.test.ts',
     ],
   },
   {
@@ -323,26 +331,35 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
     entryRoutes: [
       'server/routes/brand-identity.ts',
       'server/routes/voice-calibration.ts',
+      'server/routes/brand-generation.ts',
+      'server/mcp/tools/brand-generation-actions.ts',
       'server/routes/content-posts.ts',
     ],
     promptAssemblyModules: [
       'server/prompt-assembly.ts',
       'server/voice-calibration.ts',
-      'server/routes/content-posts.ts',
+      'server/domains/brand/generation/prompt.ts',
+      'server/domains/brand/generation/snapshots.ts',
+      'server/content-posts-ai-jobs.ts',
     ],
     dispatcherModules: [
       'server/ai.ts',
       'server/routes/brand-identity.ts',
-      'server/routes/content-posts.ts',
+      'server/domains/brand/generation/operations.ts',
+      'server/domains/brand/generation/worker.ts',
+      'server/content-posts-ai-jobs.ts',
     ],
     parserOrValidationSignals: [
       'researchMode: true',
       'sanitizeErrorMessage',
       'human source review required',
+      'parseBrandDeliverableAIOutput',
+      'runBrandGenerationDeterministicAudit',
     ],
     writeSideEffects: [
       'addActivity',
       'broadcastToWorkspace',
+      'commitBrandGenerationDeliverableCandidate',
       'updatePostField',
     ],
     wsEvents: [
@@ -360,6 +377,9 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
       'tests/integration/voice-calibration-hardening.test.ts',
       'tests/integration/content-posts-ai-fix.test.ts',
       'tests/contract/factual-ai-output-contracts.test.ts',
+      'tests/unit/brand-generation-operations.test.ts',
+      'tests/unit/brand-generation-repository.test.ts',
+      'tests/unit/brand-generation-worker.test.ts',
     ],
   },
 ];
@@ -496,6 +516,23 @@ export const AI_RELIABILITY_SCENARIOS: AiReliabilityScenario[] = [
     ],
     notes: 'Protects provenance-sensitive review gates and voice-quality failure handling.',
   },
+  {
+    id: 'brand-generation-required-stage-no-phantom-artifact',
+    pipelineId: 'brand-voice-provenance',
+    title: 'Brand generation failures and conflicts never produce phantom review-ready artifacts',
+    failureClass: 'side_effect_hygiene',
+    severity: 'hard',
+    evidenceFiles: [
+      'tests/unit/brand-generation-operations.test.ts',
+      'tests/unit/brand-generation-repository.test.ts',
+      'tests/unit/brand-generation-worker.test.ts',
+    ],
+    assertions: [
+      { allOf: ['withholds attention output from legacy deliverables', 'preserves a newer operator artifact'] },
+      { anyOf: ['rejects unsupported evidence keys', 'required-stage failure', 'no phantom artifact'] },
+    ],
+    notes: 'Pins output validation, required-stage failure truth, and version-conditional artifact commits for the B2 pipeline.',
+  },
 ];
 
 export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
@@ -514,6 +551,23 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
       { allOf: ['Voice profile for this client:', 'Voice guardrails:', "not.toContain('VOICE DNA:')"] },
     ],
     notes: 'Pins the post-voice-sprint authority contract: calibrated voice lives in Layer 2 and prompt-facing context blocks do not duplicate DNA/guardrails.',
+  },
+  {
+    id: 'brand-generation-grounding-and-exact-voice',
+    pipelineId: 'brand-voice-provenance',
+    title: 'Brand generation preserves exact-once voice authority, typed placeholders, and provenance',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/domains/brand/generation/prompt.ts',
+      'tests/unit/brand-generation-operations.test.ts',
+      'tests/unit/brand-generation-snapshots.test.ts',
+    ],
+    assertions: [
+      { allOf: ['FINALIZED_VOICE_PROMPT_BEGIN', 'toHaveLength(2)', 'preserves real execution provenance'] },
+      { allOf: ['NEEDS CLIENT INPUT', 'exact non-current voice authority'] },
+    ],
+    notes: 'Deterministically pins the frozen authority and missing-fact contracts without live-model scoring.',
   },
   {
     id: 'universal-prose-quality-layer',
@@ -539,7 +593,7 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     dimension: 'evidence_grounding',
     severity: 'hard',
     evidenceFiles: [
-      'server/routes/content-posts.ts',
+      'server/content-posts-ai-jobs.ts',
       'tests/contract/factual-ai-output-contracts.test.ts',
     ],
     assertions: [
@@ -547,6 +601,41 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
       { allOf: ["responseFormat: { type: 'json_object' }"], anyOf: ['parseAIJson', 'safeParse'] },
     ],
     notes: 'Protects the factual-review path from quietly treating provenance-sensitive checklist items as auto-verified.',
+  },
+  {
+    id: 'content-context-v2-grounding-and-authority',
+    pipelineId: 'content-brief-review',
+    title: 'Content context v2 keeps evidence grounded and voice authority exact-once',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/intelligence/generation-context-builders.ts',
+      'server/content-brief.ts',
+      'tests/unit/content-generation-context-v2.test.ts',
+      'tests/integration/content-brief-generation.test.ts',
+    ],
+    assertions: [
+      { allOf: ['buildContentGenerationContextV2', '<untrusted_user_content>', 'unknown / needs_research'] },
+      { allOf: ['buildSystemPromptFromAuthority', "not.toContain('[V2 system voice]')", 'toHaveLength(1)'] },
+    ],
+    notes: 'Pins target-only context, untrusted evidence, honest missing facts, and separate exact-once system voice authority for C3.',
+  },
+  {
+    id: 'content-matrix-audit-grounding-and-format',
+    pipelineId: 'content-brief-review',
+    title: 'Matrix page audit keeps structured output, evidence placeholders, and human provenance gates',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/domains/content/matrix-generation/operations.ts',
+      'tests/unit/content-matrix-generation-audit.test.ts',
+      'tests/unit/content-matrix-generation-item-audit.test.ts',
+    ],
+    assertions: [
+      { allOf: ['parseMatrixGenerationModelAuditAIOutput', 'Return only JSON in this exact shape', 'responseFormat'] },
+      { allOf: ['NEEDS CLIENT INPUT', 'Factual accuracy and no-hallucination remain human-review tasks', 'added or changed a link'] },
+    ],
+    notes: 'Pins M2 audit/revision authority and output contracts without a live-model quality score.',
   },
   {
     id: 'seo-editor-assist-format-sanitization',

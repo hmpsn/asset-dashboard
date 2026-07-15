@@ -3,7 +3,17 @@ import type { NormalizedDecision } from '../../shared/types/decision.js';
 import type { ClientDeliverable, DeliverableType } from '../../shared/types/client-deliverable.js';
 
 // ── Badge labels ───────────────────────────────────────────────────────────
-
+//
+// R5-PR2 (B9) scope note: these badges are CLIENT-VISIBLE (the sole real call site,
+// collaborationArtifactFromAction in src/lib/collaboration-artifacts.ts, tags its output
+// `visibility: 'client-visible'`). The action catalog's client_action-context labels
+// (shared/types/action-catalog.ts, e.g. 'AEO Change', 'Redirect Proposal') are longer,
+// differently-worded admin-style labels — NOT interchangeable with these short client
+// badge words ('AEO', 'Redirects') without a client wording sign-off pass (C2/R12a).
+// Also `keyword_strategy` is a deprecated/archived value that isn't a member of
+// ClientActionSourceType at all, so the catalog (which only covers the 5 live union
+// members) cannot represent it. Deliberately NOT re-sourced from the catalog — see
+// docs/rules/action-catalog.md and tests/unit/lib-utilities.test.ts (pinned strings).
 const CLIENT_ACTION_BADGES: Record<string, string> = {
   aeo_change:        'AEO',
   internal_link:     'Internal Links',
@@ -78,6 +88,7 @@ const DELIVERABLE_TYPE_BADGES: Record<DeliverableType, string> = {
   content_request:       'Content',
   recommendation:        'Recommendation',
   gbp_review_response:   'Google Review',
+  brand_generation:      'Brand',
 };
 
 export function deliverableTypeBadge(type: DeliverableType | string): string {

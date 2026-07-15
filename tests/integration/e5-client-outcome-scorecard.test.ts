@@ -60,6 +60,10 @@ function insertOutcomeRow(opts: {
 async function recordActionViaApi(wsId: string, body: Record<string, unknown>): Promise<string> {
   const r = await postJson(`/api/outcomes/${wsId}/actions`, {
     baselineSnapshot: { position: 8, clicks: 10, impressions: 200 },
+    // B14: default to platform_executed — these tests seed platform-executed wins that must
+    // surface in the client scorecard/wins feed. Since B14 a missing attribution stores the
+    // honest 'not_acted_on', which is EXCLUDED from win surfaces. Tests can override.
+    attribution: 'platform_executed',
     ...body,
   });
   expect(r.status).toBe(200);
@@ -132,6 +136,85 @@ describe('public summary returns the full scorecard the client component renders
     expect(body.overallWinRate).toBeCloseTo(1.0, 5);
     expect(body.totalScored).toBe(1);
     expect(Array.isArray(body.byCategory)).toBe(true);
+  });
+
+  // C4 (attribution honesty): a `not_acted_on` action — an unexecuted proposal — must NOT
+  // count toward the client scorecard win rate or scored/confirmed-wins totals, even when its
+  // outcome scored a win. The PUBLIC summary route computes the scorecard with not_acted_on
+  // EXCLUDED (excludeNotActedOn: true); the admin route keeps them.
+  it('excludes not_acted_on actions from the client win rate and scored counts', async () => {
+    const seeded = seedWorkspace({ clientPassword: '' });
+    const isolatedWs = seeded.workspaceId;
+    try {
+      // 1 executed win — counts.
+      const executedId = await recordActionViaApi(isolatedWs, {
+        actionType: 'meta_updated',
+        sourceType: 'c4-executed',
+        sourceId: `c4-exec-${RUN_ID}`,
+        attribution: 'platform_executed',
+      });
+      insertOutcomeRow({ actionId: executedId, score: 'strong_win' });
+
+      // 1 unexecuted proposal that ALSO scored a win — must be excluded.
+      const proposalId = await recordActionViaApi(isolatedWs, {
+        actionType: 'meta_updated',
+        sourceType: 'c4-proposal',
+        sourceId: `c4-prop-${RUN_ID}`,
+        attribution: 'not_acted_on',
+      });
+      insertOutcomeRow({ actionId: proposalId, score: 'strong_win' });
+
+      const res = await api(`/api/public/outcomes/${isolatedWs}/summary`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      // Only the executed win counts: 1 scored, 100% win rate — NOT 2 scored / diluted.
+      expect(body.totalScored).toBe(1);
+      expect(body.overallWinRate).toBeCloseTo(1.0, 5);
+      expect(body.strongWinRate).toBeCloseTo(1.0, 5);
+      // The proposal is dropped from totalTracked too (client sees only executed work).
+      expect(body.totalTracked).toBe(1);
+    } finally {
+      seeded.cleanup();
+    }
+  });
+
+  // C4: the not_acted_on proposal must also never appear in the "we called it" wins feed,
+  // and every entry carries its honest attribution field.
+  it('excludes not_acted_on from the wins feed and carries attribution on each entry', async () => {
+    const seeded = seedWorkspace({ clientPassword: '' });
+    const isolatedWs = seeded.workspaceId;
+    try {
+      const executedId = await recordActionViaApi(isolatedWs, {
+        actionType: 'content_refreshed',
+        sourceType: 'c4-wins-exec',
+        sourceId: `c4-wins-exec-${RUN_ID}`,
+        attribution: 'platform_executed',
+      });
+      insertOutcomeRow({ actionId: executedId, score: 'win', attributedValue: 50 });
+
+      const proposalId = await recordActionViaApi(isolatedWs, {
+        actionType: 'content_refreshed',
+        sourceType: 'c4-wins-prop',
+        sourceId: `c4-wins-prop-${RUN_ID}`,
+        attribution: 'not_acted_on',
+      });
+      insertOutcomeRow({ actionId: proposalId, score: 'strong_win', attributedValue: 999 });
+
+      const res = await api(`/api/public/outcomes/${isolatedWs}/wins`);
+      expect(res.status).toBe(200);
+      const wins = await res.json() as Array<Record<string, unknown>>;
+
+      expect(wins.find(w => w.actionId === executedId)).toBeDefined();
+      expect(wins.find(w => w.actionId === proposalId)).toBeUndefined();
+      // Every surfaced win carries an honest, non-not_acted_on attribution.
+      for (const w of wins) {
+        expect(w.attribution).toBeDefined();
+        expect(w.attribution).not.toBe('not_acted_on');
+      }
+    } finally {
+      seeded.cleanup();
+    }
   });
 });
 
@@ -219,7 +302,8 @@ describe('public wins resolve real source titles and surface attributed value', 
     expect(entry).toBeDefined();
     // The legacy fabrication was `${actionType.replace(/_/g, ' ')} action`
     expect(entry!.recommendation).not.toBe('schema deployed action');
-    expect(entry!.recommendation).toBe('Deployed structured data');
+    // C2/R12a: canonical client-vocabulary wording (shared/types/client-vocabulary.ts).
+    expect(entry!.recommendation).toBe('Added structured data');
   });
 
   it('recommendation sourceId that no longer exists falls back honestly', async () => {
@@ -234,7 +318,49 @@ describe('public wins resolve real source titles and surface attributed value', 
     const wins = await res.json() as Array<Record<string, unknown>>;
     const entry = wins.find(w => w.actionId === actionId);
     expect(entry).toBeDefined();
-    expect(entry!.recommendation).toBe('Applied a technical fix');
+    // C2/R12a: canonical client-vocabulary wording (shared/types/client-vocabulary.ts).
+    expect(entry!.recommendation).toBe('Fixed audit issue');
     expect(entry!.recommendation).not.toMatch(/ action$/);
+  });
+
+  // R6-PR1 (B11): resolution order is snapshot → live → generic.
+  it('snapshot-first: uses the write-time source_label even when the LIVE source is gone', async () => {
+    // No recommendation set is saved for this sourceId — the live lookup would fail and
+    // degrade to the generic label. The snapshot captured at record time must win instead.
+    const actionId = await recordActionViaApi(wsId, {
+      actionType: 'content_published',
+      sourceType: 'recommendation',
+      sourceId: `snap-gone-${RUN_ID}`,
+      source: {
+        label: 'Snapshotted headline that outlived its source',
+        snapshot: { title: 'Snapshotted headline that outlived its source', type: 'recommendation' },
+      },
+    });
+    insertOutcomeRow({ actionId, score: 'win' });
+
+    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    const wins = await res.json() as Array<Record<string, unknown>>;
+    const entry = wins.find(w => w.actionId === actionId);
+    expect(entry).toBeDefined();
+    // Snapshot beats both the (missing) live lookup AND the generic fallback.
+    expect(entry!.recommendation).toBe('Snapshotted headline that outlived its source');
+  });
+
+  it('generic fallback stays INTACT when neither snapshot nor live source resolves (B12 demotes it, not B11)', async () => {
+    const actionId = await recordActionViaApi(wsId, {
+      actionType: 'meta_updated',
+      sourceType: 'unknown_system',
+      sourceId: `no-snap-${RUN_ID}`,
+      // no `source` threaded → no snapshot; unknown_system → no live lookup.
+    });
+    insertOutcomeRow({ actionId, score: 'win' });
+
+    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    const wins = await res.json() as Array<Record<string, unknown>>;
+    const entry = wins.find(w => w.actionId === actionId);
+    expect(entry).toBeDefined();
+    // The honest generic per-action-type label is still served — the fallback is NOT deleted.
+    // C2/R12a: canonical client-vocabulary wording (shared/types/client-vocabulary.ts).
+    expect(entry!.recommendation).toBe('Updated meta description');
   });
 });

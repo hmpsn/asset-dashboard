@@ -7,6 +7,7 @@ import {
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { updateTrackedKeywords } from '../../server/rank-tracking.js';
+import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../shared/types/rank-tracking.js';
 import type {
   KeywordCommandCenterInitialViewResponse,
@@ -32,6 +33,30 @@ afterAll(async () => {
 });
 
 describe('Keyword Command Center routes', () => {
+  it('preserves stored page intent and CPC through the real rows route', async () => {
+    upsertPageKeyword(workspaceId, {
+      pagePath: '/emergency-dentist',
+      pageTitle: 'Emergency Dentist',
+      primaryKeyword: 'emergency dentist near me',
+      secondaryKeywords: [],
+      searchIntent: 'transactional',
+      volume: 720,
+      difficulty: 29,
+      cpc: 12.75,
+    });
+
+    const res = await api(`/api/webflow/keyword-command-center/${workspaceId}/rows?search=${encodeURIComponent('emergency dentist near me')}`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as KeywordCommandCenterRowsResponse;
+    const row = body.rows.find(item => item.normalizedKeyword === 'emergency dentist near me');
+    expect(row).toBeDefined();
+    expect(row?.metrics.intent).toBe('transactional');
+    expect(row?.metrics.cpc).toBe(12.75);
+    expect(row?.sourceLabels).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'page_assignment' }),
+    ]));
+  });
+
   it('legacy full GET endpoint is removed so callers use split read models', async () => {
     const res = await api(`/api/webflow/keyword-command-center/${workspaceId}`);
     expect(res.status).toBe(404);
@@ -98,7 +123,7 @@ describe('Keyword Command Center routes', () => {
     expect(track.status).toBe(200);
     await expect(track.json()).resolves.toEqual(expect.objectContaining({
       ok: true,
-      keyword: 'route test keyword',
+      keyword: 'Route Test Keyword',
     }));
 
     const pause = await postJson(`/api/webflow/keyword-command-center/${workspaceId}/actions`, {

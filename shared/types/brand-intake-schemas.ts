@@ -1,0 +1,401 @@
+import { z } from 'zod';
+import {
+  BRAND_INTAKE_BUYING_STAGES,
+  BRAND_INTAKE_FIELD_PATHS,
+  BRAND_INTAKE_FIELD_POLICY,
+  BRAND_INTAKE_LIMITS,
+  BRAND_INTAKE_RESOLUTION_SOURCE_TYPES,
+  BRAND_INTAKE_SCHEMA_VERSION,
+  BRAND_INTAKE_SOURCES,
+  brandIntakeEvidenceRequirementId,
+  type BrandIntakeEvidenceRequirementId,
+  type BrandIntakeEvidenceValue,
+  type BrandIntakeFieldPath,
+  type BrandIntakeQuestionnaireData,
+} from './brand-intake.js';
+import { AUTHENTIC_VOICE_SAMPLE_SOURCES } from './brand-engine.js';
+import { AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES } from './generation-evidence.js';
+
+function normalizeEmpty(value: unknown, fallback: unknown): unknown {
+  return value == null ? fallback : value;
+}
+
+function clearableText(max: number) {
+  return z.preprocess(
+    value => normalizeEmpty(value, ''),
+    z.string().trim().max(max),
+  );
+}
+
+function normalizedStringList() {
+  return z.preprocess(
+    value => {
+      if (value == null) return [];
+      if (!Array.isArray(value)) return value;
+      return value
+        .map(item => (typeof item === 'string' ? item.trim() : item))
+        .filter(item => item !== '');
+    },
+    z.array(z.string().min(1).max(BRAND_INTAKE_LIMITS.maxListItemLength))
+      .max(BRAND_INTAKE_LIMITS.maxListItems)
+      .transform(values => [...new Set(values)]),
+  );
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+const httpUrlSchema = z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxUrlLength)
+  .refine(isHttpUrl, 'must be an absolute HTTP(S) URL');
+
+const clearableHttpUrlSchema = clearableText(BRAND_INTAKE_LIMITS.maxUrlLength)
+  .refine(value => value === '' || isHttpUrl(value), 'must be empty or an absolute HTTP(S) URL');
+
+const referenceUrlsSchema = clearableText(
+  BRAND_INTAKE_LIMITS.maxUrlLength * BRAND_INTAKE_LIMITS.maxListItems,
+).superRefine((value, ctx) => {
+  if (value === '') return;
+  const urls = value.split(/\r?\n/).map(url => url.trim()).filter(Boolean);
+  if (urls.length > BRAND_INTAKE_LIMITS.maxListItems) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.too_big,
+      type: 'array',
+      maximum: BRAND_INTAKE_LIMITS.maxListItems,
+      inclusive: true,
+      message: `referenceUrls may contain at most ${BRAND_INTAKE_LIMITS.maxListItems} URLs`,
+    });
+  }
+  urls.forEach((url, index) => {
+    if (url.length > BRAND_INTAKE_LIMITS.maxUrlLength || !isHttpUrl(url)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index],
+        message: 'each reference URL must be an absolute HTTP(S) URL within the size limit',
+      });
+    }
+  });
+});
+
+const businessSchema = z.object({
+  businessName: clearableText(BRAND_INTAKE_LIMITS.maxShortTextLength),
+  industry: clearableText(BRAND_INTAKE_LIMITS.maxShortTextLength),
+  description: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  services: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  locations: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  differentiators: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  website: clearableHttpUrlSchema,
+}).strict();
+
+const audienceSchema = z.object({
+  primaryAudience: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  painPoints: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  goals: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  objections: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  buyingStage: z.preprocess(
+    value => (value == null ? '' : typeof value === 'string' ? value.trim() : value),
+    z.union([z.enum(BRAND_INTAKE_BUYING_STAGES), z.literal('')]),
+  ),
+  secondaryAudience: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+}).strict();
+
+const voiceSchema = z.object({
+  tone: clearableText(BRAND_INTAKE_LIMITS.maxToneLength),
+  personality: normalizedStringList(),
+  avoidWords: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  contentFormats: normalizedStringList(),
+  existingExamples: clearableText(BRAND_INTAKE_LIMITS.maxExampleLength),
+}).strict();
+
+const competitorSchema = z.object({
+  competitors: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  whatTheyDoBetter: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  whatYouDoBetter: clearableText(BRAND_INTAKE_LIMITS.maxTextLength),
+  referenceUrls: referenceUrlsSchema,
+}).strict();
+
+function sectionOrEmpty<TSchema extends z.AnyZodObject>(
+  schema: TSchema,
+): z.ZodEffects<TSchema, z.output<TSchema>, unknown> {
+  return z.preprocess(value => normalizeEmpty(value, {}), schema);
+}
+
+export const publicOnboardingQuestionnaireSchema = z.object({
+  business: sectionOrEmpty(businessSchema),
+  audience: sectionOrEmpty(audienceSchema),
+  brand: sectionOrEmpty(voiceSchema),
+  competitors: sectionOrEmpty(competitorSchema),
+}).strict();
+
+const commonEvidenceSourceFields = {
+  sourceId: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdLength),
+  sourceRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  fieldPath: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxShortTextLength).optional(),
+  label: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxActorLabelLength).optional(),
+  uri: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxUrlLength).optional(),
+  capturedAt: z.string().datetime(),
+};
+
+const nonVoiceAuthenticSourceTypes = AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES.filter(
+  sourceType => sourceType !== 'voice_sample',
+) as [
+  Exclude<(typeof AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES)[number], 'voice_sample'>,
+  ...Exclude<(typeof AUTHENTIC_VOICE_EVIDENCE_SOURCE_TYPES)[number], 'voice_sample'>[],
+];
+
+const authenticSourceRefSchema = z.union([
+  z.object({
+    sourceType: z.enum(nonVoiceAuthenticSourceTypes),
+    ...commonEvidenceSourceFields,
+  }).strict(),
+  z.object({
+    sourceType: z.literal('voice_sample'),
+    voiceSampleSource: z.enum(AUTHENTIC_VOICE_SAMPLE_SOURCES),
+    ...commonEvidenceSourceFields,
+  }).strict(),
+]);
+
+export const brandIntakeAuthenticSampleSchema = z.object({
+  id: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdLength),
+  kind: z.enum(['client_written', 'approved_existing_copy', 'accepted_source_excerpt']),
+  content: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxExampleLength),
+  context: z.enum(['headline', 'body', 'cta', 'about', 'service', 'social', 'seo']),
+  sourceRef: authenticSourceRefSchema,
+}).strict();
+
+export const brandIntakePayloadSchema = publicOnboardingQuestionnaireSchema.extend({
+  schemaVersion: z.literal(BRAND_INTAKE_SCHEMA_VERSION),
+  authenticSamples: z.array(brandIntakeAuthenticSampleSchema)
+    .max(BRAND_INTAKE_LIMITS.maxAuthenticSamples),
+}).strict().superRefine((value, ctx) => {
+  const size = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  if (size > BRAND_INTAKE_LIMITS.maxPayloadBytes) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `normalized brand intake exceeds ${BRAND_INTAKE_LIMITS.maxPayloadBytes} UTF-8 bytes`,
+    });
+  }
+});
+
+export const brandIntakeEvidenceValueSchema = z.discriminatedUnion('kind', [
+  // The unpaired value contract admits the widest legal text field. Every
+  // field-addressed boundary below applies the canonical field schema too.
+  z.object({ kind: z.literal('text'), value: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxExampleLength) }).strict(),
+  z.object({
+    kind: z.literal('text_list'),
+    value: z.array(z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxListItemLength))
+      .min(1)
+      .max(BRAND_INTAKE_LIMITS.maxListItems)
+      .transform(values => [...new Set(values)]),
+  }).strict(),
+  z.object({ kind: z.literal('url'), value: httpUrlSchema }).strict(),
+  z.object({ kind: z.literal('url_list'), value: z.array(httpUrlSchema).min(1).max(BRAND_INTAKE_LIMITS.maxListItems) }).strict(),
+  z.object({ kind: z.literal('buying_stage'), value: z.enum(BRAND_INTAKE_BUYING_STAGES) }).strict(),
+]);
+
+const NEEDS_CLIENT_INPUT_PLACEHOLDER = /\[NEEDS CLIENT INPUT:[^\]]*\]/;
+
+function evidenceStrings(value: BrandIntakeEvidenceValue): string[] {
+  switch (value.kind) {
+    case 'text':
+    case 'url':
+      return [value.value];
+    case 'text_list':
+    case 'url_list':
+      return value.value;
+    case 'buying_stage':
+      return [value.value];
+  }
+}
+
+function canonicalQuestionnaireValue(value: BrandIntakeEvidenceValue): string | string[] {
+  switch (value.kind) {
+    case 'url_list':
+      return value.value.join('\n');
+    default:
+      return value.value;
+  }
+}
+
+/**
+ * Single authority for validating a typed resolution against its addressed
+ * questionnaire field. The public questionnaire schemas remain canonical for
+ * field limits/URL rules, while resolution-only placeholder rejection prevents
+ * a rendered evidence gap from being persisted as verified fact.
+ */
+export function refineBrandIntakeEvidenceFieldValue(
+  input: { fieldPath: BrandIntakeFieldPath; value: BrandIntakeEvidenceValue },
+  ctx: z.RefinementCtx,
+  path: Array<string | number> = ['value'],
+): void {
+  const expectedKind = BRAND_INTAKE_FIELD_POLICY[input.fieldPath].valueKind;
+  if (input.value.kind !== expectedKind) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [...path, 'kind'],
+      message: `${input.fieldPath} requires evidence value kind ${expectedKind}`,
+    });
+    return;
+  }
+
+  if (evidenceStrings(input.value).some(value => NEEDS_CLIENT_INPUT_PLACEHOLDER.test(value))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [...path, 'value'],
+      message: `${input.fieldPath} cannot be resolved with a [NEEDS CLIENT INPUT: ...] placeholder`,
+    });
+    return;
+  }
+
+  const [section, field] = input.fieldPath.split('.') as [
+    keyof BrandIntakeQuestionnaireData,
+    string,
+  ];
+  const canonical = publicOnboardingQuestionnaireSchema.safeParse({
+    [section]: { [field]: canonicalQuestionnaireValue(input.value) },
+  });
+  if (canonical.success) return;
+
+  const fieldIssue = canonical.error.issues.find(
+    issue => issue.path[0] === section && issue.path[1] === field,
+  ) ?? canonical.error.issues[0];
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: [...path, 'value'],
+    message: `${input.fieldPath} evidence value is invalid: ${fieldIssue?.message ?? 'invalid value'}`,
+  });
+}
+
+export const brandIntakeEvidenceRequirementIdSchema = z.string()
+  .trim()
+  .min(1)
+  .max(BRAND_INTAKE_LIMITS.maxIdLength)
+  .refine(
+    (value): value is BrandIntakeEvidenceRequirementId => BRAND_INTAKE_FIELD_PATHS.some(
+      fieldPath => value === brandIntakeEvidenceRequirementId(fieldPath),
+    ),
+    'must be a stable brand-intake field requirement ID',
+  );
+
+export const brandIntakeResolutionSourceRefSchema = z.object({
+  sourceType: z.enum(BRAND_INTAKE_RESOLUTION_SOURCE_TYPES),
+  ...commonEvidenceSourceFields,
+}).strict();
+
+export const brandIntakeSubmitterSchema = z.object({
+  actorType: z.enum(['client', 'operator', 'mcp', 'system']),
+  actorId: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdLength),
+  actorLabel: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxActorLabelLength).optional(),
+}).strict();
+
+export const brandIntakeResolverAttributionSchema = z.object({
+  actorType: z.enum(['operator', 'client', 'mcp']),
+  actorId: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdLength),
+  actorLabel: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxActorLabelLength).optional(),
+}).strict();
+
+export const brandIntakeEvidenceResolutionSchema = z.object({
+  id: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdLength),
+  requirementId: brandIntakeEvidenceRequirementIdSchema,
+  fieldPath: z.enum(BRAND_INTAKE_FIELD_PATHS),
+  value: brandIntakeEvidenceValueSchema,
+  sourceRef: brandIntakeResolutionSourceRefSchema,
+  resolvedBy: brandIntakeResolverAttributionSchema,
+  expectedSourceRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  expectedArtifactRevisions: z.tuple([]),
+  resolvedAt: z.string().datetime(),
+}).strict().superRefine((value, ctx) => {
+  refineBrandIntakeEvidenceFieldValue(value, ctx);
+  if (value.requirementId !== brandIntakeEvidenceRequirementId(value.fieldPath)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['requirementId'],
+      message: `requirementId must address ${value.fieldPath}`,
+    });
+  }
+});
+
+export const brandIntakeEvidenceResolutionsSchema = z.array(
+  brandIntakeEvidenceResolutionSchema,
+).max(BRAND_INTAKE_LIMITS.maxEvidenceResolutions).superRefine((value, ctx) => {
+  const size = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  if (size > BRAND_INTAKE_LIMITS.maxEvidenceSnapshotBytes) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `brand intake evidence snapshot exceeds ${BRAND_INTAKE_LIMITS.maxEvidenceSnapshotBytes} UTF-8 bytes`,
+    });
+  }
+});
+
+export const brandIntakeCompatibilityProjectionStateSchema = z.object({
+  preservedCompetitorDomains: z.array(
+    z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxUrlLength),
+  ),
+  intakeOwnedCompetitorDomains: z.array(
+    z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxUrlLength),
+  ),
+}).strict().superRefine((value, ctx) => {
+  for (const [field, domains] of Object.entries(value) as Array<
+    [keyof typeof value, string[]]
+  >) {
+    if (new Set(domains).size !== domains.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [field],
+        message: 'projection domain snapshots must not contain duplicates',
+      });
+    }
+  }
+  const preserved = new Set(value.preservedCompetitorDomains);
+  const overlap = value.intakeOwnedCompetitorDomains.find(domain => preserved.has(domain));
+  if (overlap) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['intakeOwnedCompetitorDomains'],
+      message: 'a projected competitor domain cannot be both preserved and intake-owned',
+    });
+  }
+  const size = new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  if (size > BRAND_INTAKE_LIMITS.maxPayloadBytes) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `brand intake projection state exceeds ${BRAND_INTAKE_LIMITS.maxPayloadBytes} UTF-8 bytes`,
+    });
+  }
+});
+
+/** Authenticated admin evidence-resolution body; workspace/revision identity stays in the URL. */
+export const resolveBrandIntakeEvidenceBodySchema = z.object({
+  expectedRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  requirementId: brandIntakeEvidenceRequirementIdSchema,
+  fieldPath: z.enum(BRAND_INTAKE_FIELD_PATHS),
+  value: brandIntakeEvidenceValueSchema,
+  sourceRef: brandIntakeResolutionSourceRefSchema,
+  idempotencyKey: z.string().trim().min(1).max(BRAND_INTAKE_LIMITS.maxIdempotencyKeyLength),
+}).strict().superRefine((value, ctx) => {
+  refineBrandIntakeEvidenceFieldValue(value, ctx);
+  if (value.requirementId !== brandIntakeEvidenceRequirementId(value.fieldPath)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['requirementId'],
+      message: `requirementId must address ${value.fieldPath}`,
+    });
+  }
+});
+
+export const brandIntakeSourceSchema = z.enum(BRAND_INTAKE_SOURCES);
+
+export type PublicOnboardingQuestionnaireInput = z.input<
+  typeof publicOnboardingQuestionnaireSchema
+>;
+export type NormalizedPublicOnboardingQuestionnaire = z.output<
+  typeof publicOnboardingQuestionnaireSchema
+>;
+export type ResolveBrandIntakeEvidenceBody = z.infer<
+  typeof resolveBrandIntakeEvidenceBodySchema
+>;

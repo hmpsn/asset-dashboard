@@ -70,18 +70,23 @@ describe('lexicon registry — real registry ↔ GLOSSARY parity', () => {
     expect(bad.term).toBe('X');
   });
 
-  it('seeds the full duplicate-name census into the allowlist', () => {
+  it('seeds the duplicate-name census into the allowlist (Deliverable* burned down by R2)', () => {
     // The pre-plan census (inventories JSON §R1) verified 30 duplicate exported
     // names across shared/ + server/. The allowlist must be complete on day one
-    // (pr-check --all runs nightly). Deliverable* resolve via R2; the rest are
-    // documented-permanent mirror/twin pairs.
+    // (pr-check --all runs nightly). Deliverable* have since been RESOLVED by R2
+    // (brand-engine pair renamed to BrandDeliverableType/BrandDeliverableStatus),
+    // so their allowlist entries were burned down — this is the allowlist
+    // burn-down contract in action (docs/rules/lexicon.md).
     const names = new Set(DUPLICATE_NAME_ALLOWLIST.map(e => e.name));
-    expect(names.has('DeliverableType')).toBe(true);
-    expect(names.has('DeliverableStatus')).toBe(true);
+    // R2 resolved the collision by rename, not allowlisting — the entries are gone.
+    expect(names.has('DeliverableType')).toBe(false);
+    expect(names.has('DeliverableStatus')).toBe(false);
     expect(names.size).toBe(DUPLICATE_NAME_ALLOWLIST.length);
-    // Deliverable* carry R2; the analytics mirror block is permanent.
-    const deliverableType = DUPLICATE_NAME_ALLOWLIST.find(e => e.name === 'DeliverableType');
-    expect(deliverableType?.resolvingTicket).toBe('R2');
+    // No allowlist entry may carry the now-resolved R2 ticket. Assert on the
+    // filtered set directly to avoid a vacuous whole-array predicate.
+    const r2Entries = DUPLICATE_NAME_ALLOWLIST.filter(e => e.resolvingTicket === 'R2');
+    expect(r2Entries).toEqual([]);
+    // The analytics mirror block is documented-permanent and remains seeded.
     const ga4 = DUPLICATE_NAME_ALLOWLIST.find(e => e.name === 'GA4Overview');
     expect(ga4?.resolvingTicket).toBe('permanent');
   });
@@ -247,9 +252,12 @@ describe('lexicon registry — duplicate-name scan (fixture-driven)', () => {
   });
 
   it('does not flag an allowlisted duplicate name', () => {
+    // ROIData is a documented-permanent server↔shared mirror pair in the allowlist.
+    // (DeliverableType was previously used here but R2 burned its allowlist entry
+    // down after renaming the brand-engine pair — it is no longer allowlisted.)
     const files: DuplicateNameScanInput[] = [
-      { path: 'shared/types/brand-engine.ts', source: 'export type DeliverableType = "a" | "b";\n' },
-      { path: 'shared/types/client-deliverable.ts', source: 'export type DeliverableType = "c" | "d";\n' },
+      { path: 'server/roi.ts', source: 'export interface ROIData { total: number; }\n' },
+      { path: 'shared/types/roi.ts', source: 'export interface ROIData { total: number; }\n' },
     ];
     const scan = scanDuplicateExportedNames(files);
     const report = buildLexiconRegistryReport({
@@ -259,7 +267,7 @@ describe('lexicon registry — duplicate-name scan (fixture-driven)', () => {
       duplicateScan: scan,
     });
     const unregistered = report.unregisteredDuplicateNames.map(d => d.name);
-    expect(unregistered).not.toContain('DeliverableType');
+    expect(unregistered).not.toContain('ROIData');
   });
 
   it('only counts anchored top-level export declarations (no re-exports / indented)', () => {

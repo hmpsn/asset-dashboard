@@ -219,6 +219,22 @@ describe('respondToDeliverable', () => {
     await expect(respondToDeliverable(WS, d.id, { decision: 'approved' })).rejects.toThrow();
     expect(getDeliverable(d.id)!.status).toBe('declined');
   });
+
+  it('rejects a whole-bundle brand response before mutating the mirror', async () => {
+    const d = upsertDeliverable({
+      workspaceId: WS,
+      type: 'brand_generation',
+      kind: 'review',
+      status: 'awaiting_client',
+      title: 'Brand system review',
+      payload: { family: 'brand_generation' },
+      sourceRef: 'brand_generation:brand_suite:run-1',
+    });
+
+    await expect(respondToDeliverable(WS, d.id, { decision: 'approved' }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(getDeliverable(d.id)!.status).toBe('awaiting_client');
+  });
 });
 
 describe('remindDeliverable', () => {

@@ -7,7 +7,12 @@
 import { getGlobalToken } from './google-auth.js';
 import { googleJson, isGoogleProviderError } from './google-provider-client.js';
 import { createLogger } from './logger.js';
+import { normalizePageUrl } from './utils/page-address.js';
 import type { AnalyticsDateRange } from '../shared/types/analytics-contract.js';
+import {
+  buildLocalGa4FixtureReport,
+  isLocalProviderFixtureProperty,
+} from './providers/local-provider-fixtures.js';
 const log = createLogger('ga4');
 
 const GA4_API = 'https://analyticsdata.googleapis.com/v1beta';
@@ -114,6 +119,9 @@ export async function listGA4Properties(): Promise<GA4Property[]> {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runReport(propertyId: string, body: Record<string, unknown>): Promise<any> {
+  if (isLocalProviderFixtureProperty(propertyId)) {
+    return buildLocalGa4FixtureReport(body);
+  }
   const token = await getGlobalToken();
   if (!token) throw new Error('Google not connected');
 
@@ -612,6 +620,20 @@ export async function getGA4LandingPages(
       conversions: parseIntSafe(metricValue(r, 4)),
     };
   });
+}
+
+export async function getGA4PageOrganicTrafficMap(
+  propertyId: string,
+  days: number = 28,
+  limit: number = 500,
+  dateRange?: CustomDateRange,
+): Promise<Map<string, number>> {
+  const pages = await getGA4LandingPages(propertyId, days, limit, true, dateRange);
+  const trafficByPath = new Map<string, number>();
+  for (const page of pages) {
+    trafficByPath.set(normalizePageUrl(page.landingPage).toLowerCase(), page.sessions);
+  }
+  return trafficByPath;
 }
 
 export interface GA4OrganicOverview {

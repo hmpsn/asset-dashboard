@@ -515,6 +515,15 @@ describe('buildBriefContextBlock', () => {
     expect(result).toContain('All internal links MUST use the domain https://example.com');
   });
 
+  it('does not double-prefix a protocol already stored on the site domain', () => {
+    const result = buildBriefContextBlock(
+      makeBrief({ internalLinkSuggestions: ['/services/dental-seo'] }),
+      'https://example.com/',
+    );
+    expect(result).toContain('https://example.com/services/dental-seo');
+    expect(result).not.toContain('https://https://');
+  });
+
   it('adds leading slash to internal link suggestions that lack one', () => {
     const result = buildBriefContextBlock(
       makeBrief({ internalLinkSuggestions: ['services/dental-seo'] }),

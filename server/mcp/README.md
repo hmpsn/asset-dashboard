@@ -17,20 +17,26 @@ update this file in the same commit.
 - **Transport:** MCP over **stateless Streamable HTTP**. `handleMcpRequest` (`server/mcp/server.ts`)
   builds a **fresh `Server` + `StreamableHTTPServerTransport` per request** (`sessionIdGenerator:
   undefined`, `enableJsonResponse: true`) — the SDK's stateless transport cannot be reused across
-  requests (message-ID collisions), so tool definitions are declared once (`ALL_TOOLS`) and applied
-  to each new `Server` instance. Responses are returned as JSON-RPC objects, not SSE streams.
+  requests (message-ID collisions), so tool definitions are declared once in the canonical
+  `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) and applied to each new `Server` instance.
+  Responses are returned as JSON-RPC objects, not SSE streams.
 - **Handshake instructions:** every `initialize` response carries `MCP_SERVER_INSTRUCTIONS`
   (`server/mcp/instructions.ts`) — the agent-facing orientation string (workspace-id requirement,
-  the casing split, the content-authoring handle pipeline, paid-API and destructive-tool warnings).
+  the casing split, content-authoring, immutable brand-intake, operator-authorized brand-voice,
+  and gated brand-to-content onboarding workflows, paid-API and destructive-tool warnings).
   Its concrete claims are asserted by `tests/unit/mcp-instructions.test.ts`; keep it in sync with
   the tool schemas.
 - **Clients:** Claude.ai (remote MCP connector) and Claude Code connect over this endpoint with a
   Bearer token.
 - **Server identity:** `{ name: 'hmpsn-studio', version: '1.0.0' }`.
 
-### Workspace-id parameter casing (gotcha)
+### Workspace scope and parameter casing (gotcha)
 
-Every tool operates on **one** client workspace. The parameter name is **not** uniform:
+Most tools operate on **one** client workspace. Two tools are explicitly global and therefore
+master-key only: `list_workspaces` and `create_workspace`. `get_pending_work` has a declared,
+optional `workspaceId`; omitting it requests a cross-workspace summary and is also master-key only.
+
+For workspace-scoped tools, the parameter name is **not** uniform:
 
 - Most tools use **`workspace_id`** (snake_case).
 - A number of **read** tools use **`workspaceId`** (camelCase): `get_workspace_overview`, insights,
@@ -38,16 +44,17 @@ Every tool operates on **one** client workspace. The parameter name is **not** u
   `get_seo_context` / `get_content_performance`), client signals (`get_client_signals` /
   `get_pending_work`), and brand (`get_brand_identity` / `update_brand_deliverable`).
 
-Match each tool's own schema. Scope enforcement reads **both** casings, so a workspace-scoped key
-can never reach a sibling workspace through whichever casing a tool happens to use.
+Match each tool's own schema. The registry records the one workspace field each tool actually
+declares and rejects conflicting aliases, so an undeclared decoy field cannot authorize access to
+a sibling workspace.
 
 ---
 
 ## Auth
 
 Auth is **fail-closed** at every step. Implemented in `server/mcp/auth.ts` (`mcpAuthMiddleware`) and
-`server/mcp/api-keys.ts`; the per-workspace scope is enforced in `handleMcpRequest`
-(`server/mcp/server.ts`).
+`server/mcp/api-keys.ts`; the per-workspace scope is enforced at the canonical registry execution
+boundary (`executeMcpTool` in `server/mcp/tool-registry.ts`).
 
 Send the key as a Bearer token: `Authorization: Bearer <key>`.
 
@@ -58,14 +65,15 @@ Send the key as a Bearer token: `Authorization: Bearer <key>`.
 
 ### Scope enforcement (security-critical)
 
-For a per-workspace key (`auth.scope !== 'all'`), `handleMcpRequest` checks the tool's
-`workspace_id` / `workspaceId` argument **after** parsing, because the workspace id lives in the
-JSON body, not a header/URL. Fail-closed:
+For a per-workspace key (`auth.scope !== 'all'`), `executeMcpTool` checks the workspace field
+declared by the registered tool **after** parsing, because the workspace id lives in the JSON body,
+not a header/URL. Fail-closed:
 
 - **Cross-workspace** id (`argWorkspaceId !== auth.scope`) → rejected.
-- **No-`workspace_id` tools** (e.g. `list_workspaces`, the cross-workspace `get_pending_work`) →
-  **rejected** for scoped keys, since a workspace key must not enumerate or act across all
-  workspaces.
+- **Explicit global tools** (`list_workspaces`, `create_workspace`) → rejected for scoped keys.
+- **Optional workspace field omitted** (`get_pending_work`) → rejected for scoped keys, since a
+  workspace key must not enumerate across all workspaces.
+- **Conflicting `workspaceId` / `workspace_id` aliases** → rejected for every caller.
 
 The master key (`scope: 'all'`) bypasses both checks.
 
@@ -77,14 +85,44 @@ The master key (`scope: 'all'`) bypasses both checks.
 > Operators mint / list / revoke per-workspace keys from the dashboard at **Settings → MCP API Keys**
 > (`src/components/McpApiKeysSettings.tsx` → `GET/POST/DELETE /api/admin/mcp-api-keys`, HMAC-only).
 
+Workspace mutations retain an internal MCP execution attribution record: bounded request
+correlation id, tool name, target workspace, and authenticated key id/label. That identity is
+available to operators in the durable activity log but is stripped from client-facing activity
+projections and workspace live broadcasts. Request correlation is diagnostic only—never an
+idempotency or uniqueness authority. The server generates the UUID used by HTTP logs, the response
+header, and durable attribution; every caller-supplied `X-Request-ID` value is ignored rather than
+retained, reflected, or classified by a finite credential denylist.
+
+### Error compatibility
+
+The registry assigns each tool an explicit error contract:
+
+- The original **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
+  Registry-owned unknown-tool and authorization rejections are deliberately generic so caller
+  tool/workspace values cannot be reflected as secrets.
+- The eleven content-matrix tools, two brand-intake tools, two brand-voice tools, four
+  brand-generation tools, and three brand-content-onboarding tools use `json_v1`: an error is a text content item containing a JSON
+  `{ code, message, retryable, details? }` envelope.
+
+`server/mcp/tool-errors.ts` builds and privately marks the `json_v1` response and filters optional
+details as defense in depth. The registry rejects any JSON-tool error that did not cross that
+constructor, including a raw handler result, and maps thrown failures to the generic envelope.
+Raw arguments, prompts, evidence, secrets, exception messages, and stacks must enter neither MCP
+responses nor registry logs. Registry rejection logs use only registered tool names and stable
+failure classes; unknown names and mismatched workspace values are never logged or reflected.
+
 ---
 
 ## Tool inventory
 
-`ALL_TOOLS` (`server/mcp/server.ts`) composes **12 categories** for a total of **60 tools**. Each
-category is a `*Tools: Tool[]` array + a `handle*Tool(name, args)` dispatcher in
-`server/mcp/tools/<category>.ts`. The per-request dispatcher in `server.ts` routes a call to the
-first category whose `*.some(t => t.name === name)` matches.
+`MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
+dispatch, workspace scope, and error compatibility. It composes **18 categories** for a total of
+**83 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
+connects each one to its category handler. A production dispatch census calls every registered
+name with inert invalid input, asserts the exact 18 family-array→handler identities, and pins the
+handled-name manifests for families that validate workspace input before dispatch. Discovery
+therefore cannot silently outgrow or be paired with the wrong family switch.
 
 Legend: **W** = write/mutation (broadcasts + logs activity), **R** = read-only, **[Paid API]** =
 increments the paid-call counter.
@@ -126,6 +164,45 @@ increments the paid-call counter.
 | `get_brand_identity` | R | Structured brand identity + voice status; `includeDeliverables:true` adds every deliverable with `version`. |
 | `update_brand_deliverable` | W | Edit a deliverable's content. Optimistic concurrency via `expectedVersion`; resets to `draft`. |
 
+### brand-intake-actions (`tools/brand-intake-actions.ts`) — immutable evidence authority
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `get_brand_intake` | R | Read the current or named immutable intake revision with field-level evidence availability. |
+| `resolve_brand_intake_evidence` | W | Create/reuse a version-safe superseding revision for one exact typed field requirement and factual source. |
+
+### brand-voice-actions (`tools/brand-voice-actions.ts`) — operator-authorized voice authority
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `get_brand_voice` | R | Read the current profile, authority readiness, one bounded page of eligible authentic anchors, and a bounded latest-finalization summary without returning raw intake or frozen snapshot detail. |
+| `finalize_brand_voice` | W | Consume a short-lived, one-time authorization created by a human operator and bound to the exact profile revision, voice fields, anchors, ratings, and idempotency key. The MCP key remains internal execution provenance only and is never returned. |
+
+Voice finalization is deliberately a two-boundary workflow:
+
+1. Call `get_brand_voice` and present the current readiness plus eligible authentic samples to the operator. It returns one page in `eligible_anchors.items`; while `eligible_anchors.has_more` is true, pass `eligible_anchors.next_cursor` back as `anchor_cursor`. Generated calibration-loop, identity-approved, and copy-approved samples are forbidden as anchors.
+2. A human operator creates the exact, short-lived authorization through the authenticated `POST /api/voice/:workspaceId/finalization-authorizations` HTTP boundary. MCP cannot create it or submit a caller-authored operator identity.
+3. Call `finalize_brand_voice` with only `workspace_id` and the one-time `authorization_token`. A replay returns the original finalization without duplicating activity or broadcasts. On a revision conflict, or when an anchor cursor conflicts because its profile/intake revision changed, restart `get_brand_voice` from the first page and request a new authorization; never retry the stale authorization.
+
+### brand-generation-actions (`tools/brand-generation-actions.ts`) — grounded, review-gated brand generation
+
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `start_brand_deliverable_generation` | W | **[Paid API]** Start one atomic deliverable, an ordered preset, or the voice-foundation stage of a full brand system from one exact immutable intake revision. Durable deliverables require the exact finalized voice version/fingerprint. |
+| `get_brand_generation` | R | Read one durable run plus a cursor-paged item slice. Returns public attribution and bounded summaries; never exposes idempotency keys, MCP key identity, raw prompts, or evidence bodies. |
+| `resume_brand_deliverable_generation` | W | **[Paid API]** Resume a paused `full_brand_system` run after explicit human voice finalization, using the exact run revision and finalized voice version/fingerprint. |
+| `start_brand_deliverable_revision` | W | **[Paid API]** Start one review-directed revision using exact run, item, and deliverable versions. A newer human edit always wins the conditional save. |
+
+Brand generation is a durable background workflow, not a synchronous copy endpoint. Start returns `run_id` and `job_id`; poll `get_job_status`, then read paged detail with `get_brand_generation`. A `full_brand_system` start creates only a provisional `voice_foundation`, truthfully finishes its first job at `awaiting_voice_finalization`, and creates no dependent deliverables until a human finalizes voice and calls `resume_brand_deliverable_generation`. Every generated deliverable stops at `ready_for_human_review` or a truthful attention/error state. These tools never approve, send, publish, claim name availability, or treat placeholder prose as evidence. Reuse the same idempotency key only for the byte-equivalent business command; on revision conflicts, re-read before retrying.
+
+### brand-content-onboarding-actions (`tools/brand-content-onboarding-actions.ts`) — gated intake→brand→content coordination
+
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `start_brand_content_onboarding` | W | **[Paid API]** Create one durable coordinator from an exact intake revision and non-empty exact matrix-cell selection, then start only the existing `full_brand_system` child. |
+| `get_brand_content_onboarding` | R | Read the current onboarding status, gate, frozen brand authority, and child references without operational idempotency or MCP key identity. |
+| `resume_brand_content_onboarding` | W | **[Conditionally paid]** Evaluate one durable gate and, only after human voice finalization, potentially resume the existing dependent-brand child. |
+
+The coordinator does not replace the underlying generators or review systems. A non-empty page selection is required; standalone brand-only work uses the brand-generation tools. Brand reviews still use `send_to_client`; voice finalization still requires the existing human-operator authorization; content generation requires an authenticated human authorization at the HTTP boundary; and each generated page still needs the existing review-only matrix approval. MCP cannot supply those human decisions. A returned `paid_job_id` is an accepted child job to poll with `get_job_status`. `ready_to_publish` is a verified handoff state, never an automatic publish.
+
 ### clients (`tools/clients.ts`) — inbox / client signals
 | Tool | R/W | Purpose |
 |------|-----|---------|
@@ -157,7 +234,7 @@ increments the paid-call counter.
 | `save_brief` | W | Persist a brief (consumes `brief_request_handle`); **issues `brief_handle`**. |
 | `prepare_post_context` | R | Build post-drafting context from a saved brief; **issues `post_request_handle`**. |
 | `save_post` | W | Persist a post (consumes `post_request_handle`); **issues `post_handle`**. |
-| `send_to_client` | W | Turn a saved brief/post into a client-facing request **and email the client**. |
+| `send_to_client` | W | Turn a saved brief/post into a client-facing request, or send an exact ready brand-generation run as a grouped Inbox review; **emails the client**. |
 | `list_content_requests` | R | List content topic requests. |
 | `get_content_request` | R | One content request by id. |
 | `create_content_request` | W | Create a content topic request. |
@@ -180,12 +257,32 @@ increments the paid-call counter.
 | `start_brief_generation` | W | **[Paid API]** Background job: full research-backed brief generation. Returns `job_id`. |
 | `start_post_generation` | W | **[Paid API]** Background job: full post generation from a saved brief. Returns `job_id`. |
 
+### content-matrix-actions (`tools/content-matrix-actions.ts`) — structural planning and bounded generation
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `list_content_matrices` | R | Cursor-paged matrix summaries, optionally filtered by template. |
+| `get_content_matrix` | R | Matrix metadata plus a revision-bound cursor page of cells. |
+| `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
+| `accept_content_template_generation_upgrade` | W | Explicitly accept or reject the exact version-conditional deterministic template upgrade proposal. |
+| `preview_content_matrix_generation` | R | Freeze exact generation inputs and return bounded call, token, and cost estimates without paid work. |
+| `resolve_content_matrix_evidence` | W | Resolve one typed factual requirement and invalidate the prior preview. |
+| `start_content_matrix_generation` | W | **[Paid API]** Start one bounded, idempotent background batch from exact preview fingerprints and accepted budget ceilings. |
+| `get_content_matrix_generation` | R | Read one durable batch plus cursor-paged item outcomes, audit findings, artifact revisions, and approval evidence. |
+| `retry_content_matrix_generation` | W | **[Paid API]** Resume selected failed or needs-attention checkpoints from exact revisions. |
+| `get_pseo_matrix_plan` | R | Read one collection entry, linked template variables, and exact source authority for safe materialization. |
+| `create_content_matrix_from_pseo_plan` | W | Idempotently create and link one validated matrix from exact source authority plus explicit dimensions. Never starts generation. |
+
 ### schema-actions (`tools/schema-actions.ts`)
 | Tool | R/W | Purpose |
 |------|-----|---------|
 | `generate_schema` | W | Generate JSON-LD `@graph` for a page + validation findings; persists to the snapshot (does not publish). |
 | `validate_schema` | R | Validate structural + Google Rich Results rules (`page_id` or raw `schema_json`). |
 | `publish_schema` | W | Publish schema to the **LIVE** site. **Validate-first**: refuses to publish on validation errors. |
+
+### analytics-read-actions (`tools/analytics-read-actions.ts`)
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `get_search_performance` | R | Read GSC clicks, impressions, CTR, position, daily trend, top queries/pages, and optional previous-period comparison for an explicit or trailing date range. |
 
 ### job-actions (`tools/job-actions.ts`) — background jobs
 | Tool | R/W | Purpose |
@@ -209,7 +306,9 @@ giant inline blob; a follow-up tool redeems it. Implemented in `server/mcp/handl
 - **Issuers:** `research_keywords` (`keyword-research`), `prepare_brief_context` (`brief-request`),
   `save_brief` (`brief`), `prepare_post_context` (`post-request`), `save_post` (`post`).
 - **Consumers:** `add_keyword_to_strategy` (research handle), `save_brief` (brief-request handle),
-  `save_post` (post-request handle), `send_to_client` (brief/post handle).
+  `save_post` (post-request handle), `send_to_client` (brief/post handle). The independent
+  `send_to_client.brand_generation` target uses durable run identity and an exact revision, not a
+  handle.
 
 Canonical content-authoring flow:
 
@@ -232,7 +331,9 @@ prepare_post_context  → post_request_handle ─┐        │
   minutes (`.unref()`'d; off under `NODE_ENV=test`).
 - **`MAX_HANDLES`:** capped at 10,000 (override via `MCP_MAX_HANDLES`); the oldest rows are evicted
   by insertion order when the cap is exceeded.
-- **Single-use:** a successful `consumeHandle` deletes the row.
+- **Single-use:** a successful `consumeHandle` deletes the row. Saved-artifact
+  handles used by `send_to_client` are consumed inside the same transaction as
+  the durable send, so a failed send leaves the handle available for retry.
 - **Scoped:** each handle is bound to one **workspace** and one **kind**; a kind or workspace
   mismatch is rejected.
 
@@ -261,6 +362,10 @@ consumer with a stale handle.
 - `start_local_seo_refresh`
 - `start_brief_generation`
 - `start_post_generation`
+- `start_content_matrix_generation` and `retry_content_matrix_generation` (one event per accepted job;
+  exact idempotent replays repair or reuse the same durable event)
+- `start_brand_deliverable_generation`, `resume_brand_deliverable_generation`, and
+  `start_brand_deliverable_revision` (one event per accepted job)
 - `get_workspace_intelligence` — only when `enrich_with_backlinks` or `resolve_entity_references`
   is set (per the handshake instructions; the counter is incremented inside the enrichment path).
 
@@ -285,20 +390,28 @@ The `/mcp` endpoint has its own per-IP limiter (`mcpLimiter` in `server/middlewa
 
 Four steps, all in the same commit:
 
-1. **Define the input schema** in `shared/types/mcp-action-schemas.ts`. Every top-level property
+1. **Define the input schema** in `shared/types/mcp-action-schemas.ts` or a bounded MCP schema
+   module such as `shared/types/mcp-matrix-schemas.ts`. Every top-level property
    needs a `.describe()` (enforced by the contract test below). Build the MCP JSON Schema with
    `toMcpJsonSchema(...)`.
 2. **Add the tool def + handler** in the right `server/mcp/tools/<category>.ts` file: push a
    `{ name, description, inputSchema }` entry onto the category's `*Tools` array and add a `case`/`if`
    branch to its `handle*Tool` dispatcher. Validate args with the Zod schema, return
-   `mcpSuccess(...)` / `mcpError(...)` (or the `{ content: [...], isError? }` shape).
-3. **Wire a NEW category into `server.ts`** — only if you created a new category file: add it to
-   the `ALL_TOOLS` spread **and** the per-request dispatch chain in `handleMcpRequest`. Existing
-   categories need no `server.ts` change.
+   `mcpSuccess(...)`; legacy tools keep `mcpError(...)`, while new `json_v1` tools use
+   `mcpJsonV1Error(...)` with a stable public envelope. If the family validates workspace/external
+   state before switching on `name`, also update its exported handled-name manifest; the census
+   requires that manifest to equal the advertised definitions.
+3. **Register compatibility in `server/mcp/tool-registry.ts`.** A new category supplies its name,
+   definitions, handler, global-tool declarations (normally none), and default error contract once.
+   A new `json_v1` tool added to an existing legacy category adds its name to that registration's
+   `errorContractOverrides`. Discovery, scope resolution, and dispatch are derived from the one
+   registration; do not add a second spread or dispatch chain.
 4. **Register in the tests** so coverage stays complete:
    - `tests/contract/mcp-tool-input-schema-properties.test.ts` (every top-level schema prop is
      `.describe()`'d)
-   - `tests/unit/mcp-server-routing.test.ts` (the tool routes to the right category handler)
+   - `tests/contract/mcp-tool-dispatch-census.test.ts` (every discovered name reaches its handler)
+   - `tests/unit/mcp-tool-registry.test.ts` (registry invariants and category routing)
+   - `tests/unit/mcp-server-routing.test.ts` (the transport delegates to the registry)
 
 **pr-check guardrails to respect inside `server/mcp/tools/`:**
 
@@ -310,4 +423,6 @@ Four steps, all in the same commit:
   caches where relevant, so admin and client UIs stay live.
 
 Use the shared helpers in `server/mcp/tool-helpers.ts` (`requireWorkspace`, `mcpSuccess`,
-`mcpError`, `zodErrorToMcp`, `buildDashboardUrl`) rather than hand-rolling responses.
+`mcpError`, `zodErrorToMcp`, `buildDashboardUrl`) rather than hand-rolling responses. `mcpError`
+and `zodErrorToMcp` are legacy-only; a `json_v1` handler uses the constructors in
+`server/mcp/tool-errors.ts` so the registry can verify the result.

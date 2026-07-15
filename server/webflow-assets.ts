@@ -7,6 +7,7 @@ import path from 'path';
 import { createLogger } from './logger.js';
 import { resolvePagePath } from './utils/page-address.js';
 import { getToken, paginateWebflow, webflowFetch, webflowJson, webflowMutation } from './webflow-client.js';
+import { applyCachedAssetDimensions, scheduleAssetDimensionDerivation } from './webflow-asset-dimensions.js';
 import { getWorkspacePages, getWorkspaceAllPages } from './workspace-data.js';
 import { getWorkspaceBySiteId } from './workspaces.js';
 import type * as WebflowPages from './webflow-pages.js';
@@ -28,17 +29,23 @@ export interface WebflowAsset {
   parentFolder?: string | null;
   createdOn?: string;
   lastUpdated?: string;
+  width?: number;
+  height?: number;
+  dimensionsDerivedAt?: string;
 }
 
 // --- List all assets (paginated) ---
 export async function listAssets(siteId: string, tokenOverride?: string): Promise<WebflowAsset[]> {
   const token = tokenOverride || getToken();
   if (!token) return [];
-  return paginateWebflow<{ assets?: WebflowAsset[] }, WebflowAsset>({
+  const assets = await paginateWebflow<{ assets?: WebflowAsset[] }, WebflowAsset>({
     buildEndpoint: (offset, limit) => `/sites/${siteId}/assets?limit=${limit}&offset=${offset}`,
     extractItems: page => page.assets,
     tokenOverride: token,
   });
+  const hydrated = applyCachedAssetDimensions(siteId, assets);
+  scheduleAssetDimensionDerivation(siteId, assets);
+  return hydrated;
 }
 
 // --- Get single asset ---

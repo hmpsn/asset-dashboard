@@ -28,6 +28,7 @@ import { scoringConfigOverrideSchema } from './schemas/outcome-schemas.js';
 import { normalizeSocialProfiles } from './social-profiles.js';
 import { normalizeRuntimeSeoDataProvider } from './seo-data-provider.js';
 import { z } from 'zod';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
 
 // ── Brand name resolution ──
 
@@ -168,6 +169,7 @@ interface WorkspaceRow {
   last_briefing_run_week_of: string | null;
   last_issue_pushed_week_of: string | null;
   last_return_hook_sent_week_of: string | null;
+  archived_at: string | null;
   created_at: string;
 }
 
@@ -291,6 +293,7 @@ function rowToWorkspace(row: WorkspaceRow): Workspace {
   ws.lastBriefingRunWeekOf = row.last_briefing_run_week_of ?? null;
   ws.lastIssuePushedWeekOf = row.last_issue_pushed_week_of ?? null;
   ws.lastReturnHookSentWeekOf = row.last_return_hook_sent_week_of ?? null;
+  ws.archivedAt = row.archived_at ?? null;
   return ws;
 }
 
@@ -325,6 +328,7 @@ function attachPageStates(ws: Workspace): Workspace {
 
 const stmts = createStmtCache(() => ({
   listAll: db.prepare(`SELECT * FROM workspaces`),
+  listActive: db.prepare(`SELECT * FROM workspaces WHERE archived_at IS NULL`),
   getById: db.prepare<[id: string]>(`SELECT * FROM workspaces WHERE id = ?`),
   getBySiteId: db.prepare<[siteId: string]>(`SELECT * FROM workspaces WHERE webflow_site_id = ?`),
   setIssuePushedWeek: db.prepare<[weekOf: string | null, id: string]>(
@@ -440,6 +444,7 @@ function workspaceToParams(ws: Workspace) {
     last_briefing_run_week_of: ws.lastBriefingRunWeekOf ?? null,
     last_issue_pushed_week_of: ws.lastIssuePushedWeekOf ?? null,
     last_return_hook_sent_week_of: ws.lastReturnHookSentWeekOf ?? null,
+    archived_at: ws.archivedAt ?? null,
     created_at: ws.createdAt,
   };
 }
@@ -480,8 +485,8 @@ export function getTokenForSite(siteId: string): string | null {
   return row?.webflow_token || process.env.WEBFLOW_API_TOKEN || null;
 }
 
-export function listWorkspaces(): Workspace[] {
-  const rows = stmts().listAll.all() as WorkspaceRow[];
+export function listWorkspaces(options: { includeArchived?: boolean } = {}): Workspace[] {
+  const rows = (options.includeArchived ? stmts().listAll.all() : stmts().listActive.all()) as WorkspaceRow[];
   return rows.map(r => attachPageStates(rowToWorkspace(r)));
 }
 
@@ -518,12 +523,15 @@ export function createWorkspace(name: string, webflowSiteId?: string, webflowSit
   return workspace;
 }
 
-export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'targetGeo' | 'webflowFormSources' |'conversionTrackingConfirmedAt' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf' | 'lastReturnHookSentWeekOf'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'name' | 'webflowSiteId' | 'webflowSiteName' | 'webflowToken' | 'gscPropertyUrl' | 'ga4PropertyId' | 'clientPassword' | 'clientEmail' | 'liveDomain' | 'eventConfig' | 'eventGroups' | 'keywordStrategy' | 'competitorDomains' | 'competitorLastFetchedAt' | 'competitorDomainsAtLastFetch' | 'personas' | 'clientPortalEnabled' | 'seoClientView' | 'analyticsClientView' | 'autoReports' | 'autoReportFrequency' | 'brandVoice' | 'knowledgeBase' | 'brandLogoUrl' | 'brandAccentColor' | 'contentPricing' | 'stripeCustomerId' | 'stripeSubscriptionId' | 'billingMode' | 'tier' | 'trialEndsAt' | 'onboardingEnabled' | 'onboardingCompleted' | 'portalContacts' | 'auditSuppressions' | 'pageEditStates' | 'publishTarget' | 'seoDataProvider' | 'businessProfile' | 'intelligenceProfile' | 'outcomeValue' | 'segmentConfig' | 'targetGeo' | 'webflowFormSources' |'conversionTrackingConfirmedAt' | 'siteIntelligenceClientView' | 'siteHasSearch' | 'businessPriorities' | 'customPromptNotes' | 'autoPublishBriefings' | 'autoPublishAfterHours' | 'lastBriefingRunWeekOf' | 'lastIssuePushedWeekOf' | 'lastReturnHookSentWeekOf' | 'archivedAt'>>): Workspace | null {
   const row = stmts().getById.get(id) as WorkspaceRow | undefined;
   if (!row) return null;
 
   const existing = rowToWorkspace(row);
   const normalizedUpdates = { ...updates };
+  const digestInputsChanged = (
+    ['webflowSiteId', 'gscPropertyUrl', 'ga4PropertyId', 'customPromptNotes'] as const
+  ).some(key => key in normalizedUpdates);
   if (normalizedUpdates.businessProfile) {
     const normalizedSocialProfiles = normalizeSocialProfiles(normalizedUpdates.businessProfile.socialProfiles);
     normalizedUpdates.businessProfile = {
@@ -565,6 +573,7 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     autoPublishBriefings: 'auto_publish_briefings', autoPublishAfterHours: 'auto_publish_after_hours', lastBriefingRunWeekOf: 'last_briefing_run_week_of',
     lastIssuePushedWeekOf: 'last_issue_pushed_week_of',
     lastReturnHookSentWeekOf: 'last_return_hook_sent_week_of',
+    archivedAt: 'archived_at',
   };
 
   const ALLOWED_COLUMNS = new Set(Object.values(columnMap));
@@ -621,11 +630,14 @@ export function updateWorkspace(id: string, updates: Partial<Pick<Workspace, 'na
     db.prepare(sql).run(params);
   }
 
-  return attachPageStates(rowToWorkspace(stmts().getById.get(id) as WorkspaceRow));
+  const updated = attachPageStates(rowToWorkspace(stmts().getById.get(id) as WorkspaceRow));
+  if (digestInputsChanged) invalidateMonthlyDigestCache(id);
+  return updated;
 }
 
 export function deleteWorkspace(id: string): boolean {
   const result = stmts().deleteById.run(id);
+  if (result.changes > 0) invalidateMonthlyDigestCache(id);
   return result.changes > 0;
 }
 

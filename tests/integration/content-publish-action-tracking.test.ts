@@ -72,10 +72,18 @@ async function postJson(
   path: string,
   body: unknown,
 ): Promise<{ status: number; body: unknown }> {
+  const match = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)\/publish-to-webflow$/);
+  const row = match
+    ? db.prepare('SELECT generation_revision FROM content_posts WHERE workspace_id = ? AND id = ?')
+        .get(match[1], match[2]) as { generation_revision: number } | undefined
+    : undefined;
+  const requestBody = match && body && typeof body === 'object' && !('expectedRevision' in body)
+    ? { ...body, expectedRevision: row?.generation_revision ?? 0 }
+    : body;
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
   return { status: res.status, body: await res.json().catch(() => ({})) };
 }
@@ -88,7 +96,27 @@ function seedPublishableContent(): SeededContent {
      SET webflow_site_id = ?, webflow_token = ?, publish_target = ?
      WHERE id = ?`,
   ).run(TEST_SITE_ID, TEST_TOKEN, PUBLISH_TARGET, seeded.workspaceId);
-  db.prepare(`UPDATE content_posts SET status = 'draft' WHERE id = ?`).run(seeded.postId);
+  db.prepare(`
+    UPDATE content_posts
+    SET status = 'draft',
+        introduction = ?,
+        sections = ?,
+        conclusion = ?
+    WHERE id = ?
+  `).run(
+    '<p>This practical guide explains the publishing workflow and its measurable value.</p>',
+    JSON.stringify([{
+      index: 0,
+      heading: 'A complete publishing workflow',
+      content: '<p>Use a reviewed draft, verify the destination, and publish the approved article.</p>',
+      wordCount: 12,
+      targetWordCount: 120,
+      keywords: ['publishing workflow'],
+      status: 'done',
+    }]),
+    '<p>With each required stage complete, the article is ready to publish and track.</p>',
+    seeded.postId,
+  );
   return seeded;
 }
 

@@ -1,5 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { Button } from './Button';
+import { Modal } from './overlay/Modal';
+import { isTopmostOverlay } from './overlay/overlayUtils';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -22,31 +24,49 @@ export function ConfirmDialog({
   onCancel,
   variant = 'default',
 }: ConfirmDialogProps) {
+  const titleId = useId();
+  const messageId = useId();
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-      // Skip Enter if a button inside the dialog has focus — its onClick fires natively, avoiding a double-call.
-      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) onConfirm();
+      const titleElement = document.getElementById(titleId);
+      const panel = titleElement?.closest<HTMLElement>('[data-overlay-panel="true"]') ?? null;
+      if (!isTopmostOverlay(panel)) return;
+      if (e.key !== 'Enter') return;
+      if (variant === 'destructive') {
+        // Destructive dialogs let the Modal auto-focus Cancel, which owns Enter (safe default).
+        // Only confirm on Enter when focus is NOT on a dialog button, so a focused button's native
+        // onClick isn't double-invoked.
+        if (!(e.target instanceof HTMLButtonElement)) {
+          e.stopImmediatePropagation();
+          onConfirm();
+        }
+        return;
+      }
+      // Non-destructive: Enter confirms regardless of which control holds focus. The Modal
+      // auto-focuses Cancel (first focusable), so preventDefault stops its native activation and
+      // keeps Enter from falling through to onCancel.
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      onConfirm();
     };
-    document.addEventListener('keydown', handler); // keydown-ok — modal overlay, Escape/Enter are intentional regardless of focus state
+    document.addEventListener('keydown', handler); // keydown-ok — topmost confirmation owns Enter regardless of focus state
     return () => document.removeEventListener('keydown', handler);
-  }, [open, onConfirm, onCancel]);
-
-  if (!open) return null;
+  }, [open, onConfirm, titleId, variant]);
 
   return (
-    <div
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center"
-      style={{ background: 'var(--brand-overlay, rgba(15,23,42,0.35))' }}
-      onClick={onCancel}
+    <Modal
+      open={open}
+      onClose={onCancel}
+      size="sm"
+      labelledById={titleId}
+      describedById={messageId}
     >
       <div
-        className="bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-xl)] p-6 w-full max-w-sm mx-4 shadow-xl"
-        onClick={e => e.stopPropagation()}
+        className="p-6"
       >
-        <h3 className="text-[var(--brand-text-bright)] font-semibold text-base mb-2">{title}</h3>
-        <p className="text-[var(--brand-text)] t-body mb-6">{message}</p>
+        <h3 id={titleId} className="text-[var(--brand-text-bright)] font-semibold text-base mb-2">{title}</h3>
+        <p id={messageId} className="text-[var(--brand-text)] t-body mb-6">{message}</p>
         <div className="flex gap-3 justify-end">
           <Button
             onClick={onCancel}
@@ -66,6 +86,6 @@ export function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

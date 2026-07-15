@@ -5,6 +5,10 @@ import type { WorkspaceIntegrationHealth } from '../../shared/types/integration-
 import type { WorkspaceObservabilityReport } from '../../shared/types/platform-observability';
 import type { RoadmapData, RoadmapItem, RoadmapItemPatch } from '../../shared/types/roadmap';
 import type { FeatureFlagKey, WorkspaceFeatureFlagMeta } from '../../shared/types/feature-flags';
+import type { WorkQueueClassification } from '../../shared/types/work-queue';
+import type { WorkspaceOverviewItem } from '../../shared/types/workspace-overview';
+import type { CockpitVerdict } from '../../shared/types/cockpit';
+import type { AdminMoneyFrame } from '../../shared/types/outcome-tracking';
 
 // ── Jobs ────────────────────────────────────────────────────────
 export const jobs = {
@@ -62,7 +66,7 @@ export const notifications = {
 
 // ── Workspace overview (notification aggregation) ───────────────
 export const workspaceOverview = {
-  list: () => getSafe<unknown[]>('/api/workspace-overview', []),
+  list: () => getSafe<WorkspaceOverviewItem[]>('/api/workspace-overview', []),
 };
 
 // ── Workspace home (aggregated) ─────────────────────────────────
@@ -86,6 +90,9 @@ export interface WorkspaceHomeData {
     trendPct: number | null;
   } | null;
   contentDecay?: { critical: number; warning: number; watch: number; totalDecaying: number; avgDeclinePct: number } | null;
+  workQueue?: WorkQueueClassification;
+  cockpitVerdict?: CockpitVerdict | null;
+  moneyFrame?: AdminMoneyFrame | null;
   weeklySummary?: { seoUpdates: number; auditsRun: number; contentGenerated: number; contentPublished: number; requestsResolved: number } | null;
 }
 

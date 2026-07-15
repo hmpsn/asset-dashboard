@@ -1,0 +1,517 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "S1 sub-tab set (4 tabs incl. Overview)",
+        "resolution": "open-question",
+        "note": "Overview tab fate is OQ1; other 3 tabs are ui-only."
+      },
+      {
+        "capability": "S2 keyboard shortcut '3'",
+        "resolution": "ui-only",
+        "note": "Re-bind in rebuilt shell keymap; no server."
+      },
+      {
+        "capability": "S3 needsSite nav gating",
+        "resolution": "ui-only",
+        "note": "Gating exists in navRegistry; rebuild must render a locked state."
+      },
+      {
+        "capability": "S4 no ?tab= deep link",
+        "resolution": "ui-only",
+        "note": "If rebuild adds ?tab=, follow the two-halves contract (CLAUDE.md rule 12)."
+      },
+      {
+        "capability": "S5 page header / narrative headline",
+        "resolution": "ui-only",
+        "note": "Delta narrative from existing server-computed changePercent (SearchComparison); no client-computed verdicts."
+      },
+      {
+        "capability": "O1 unified cross-source MetricToggleCard row",
+        "resolution": "open-question",
+        "note": "Blocked on OQ1 (Overview tab kept or cut)."
+      },
+      {
+        "capability": "O2 merged GSC+GA4 trend chart",
+        "resolution": "open-question",
+        "note": "Blocked on OQ1; data merge already lives in useAnalyticsOverview.ts:59-104."
+      },
+      {
+        "capability": "O3 integration-aware card/line pruning",
+        "resolution": "ui-only",
+        "note": "Reads existing gscConfigured/ga4Configured signals; applies wherever tabs land."
+      },
+      {
+        "capability": "O4 priority insight feed on Overview",
+        "resolution": "open-question",
+        "note": "Blocked on OQ2 (feed home: this surface vs Insights Engine)."
+      },
+      {
+        "capability": "O5 delta chips vs previous period",
+        "resolution": "ui-only",
+        "note": "search-comparison + analytics-comparison endpoints verified (google.ts:311-322,405-415)."
+      },
+      {
+        "capability": "O6 CTR delta omitted (shows —)",
+        "resolution": "ui-only",
+        "note": "Improvable for free: SearchComparison.changePercent.ctr already exists server-side (shared/types/analytics.ts:47-52)."
+      },
+      {
+        "capability": "O7 date presets incl. 7d + 16mo",
+        "resolution": "ui-only",
+        "note": "Full preset sets exist in ui/constants.ts:154-169; ship full set day one (OQ7 is a confirm, not a blocker)."
+      },
+      {
+        "capability": "O8 loading / no-integrations states",
+        "resolution": "ui-only",
+        "note": "Rebuild with Skeleton/EmptyState per Build Conventions."
+      },
+      {
+        "capability": "Q1 GSC KPI cards with deltas + line toggles",
+        "resolution": "ui-only",
+        "note": "MetricTile+Sparkline; toggle interaction rebuilt; data verified."
+      },
+      {
+        "capability": "Q2 search trend chart (multi-line, annotations, prior-period overlay)",
+        "resolution": "needs-server-work",
+        "note": "Multi-line + annotate is ui-only; the N4 prior-period dashed series needs sn-search-traffic-1 (comparison endpoint is totals-only)."
+      },
+      {
+        "capability": "Q3 ranking-drop callout bubbles on chart",
+        "resolution": "ui-only",
+        "note": "Feeds off existing ranking_mover insights via useInsightFeed; render in carried-over AnnotatedTrendChart."
+      },
+      {
+        "capability": "Q4 queries⇄pages toggle",
+        "resolution": "ui-only",
+        "note": "Segmented primitive."
+      },
+      {
+        "capability": "Q5 sortable sticky-header tables",
+        "resolution": "ui-only",
+        "note": "DataTable primitive; full topQueries/topPages already returned by search-overview."
+      },
+      {
+        "capability": "Q6 insight badges on query/page rows",
+        "resolution": "ui-only",
+        "note": "Client-side join of useInsightFeed results onto rows, as at HEAD (SearchDetail.tsx:37-61)."
+      },
+      {
+        "capability": "Q7 CTR per row + CTR KPI",
+        "resolution": "ui-only",
+        "note": "avgCtr/row ctr already in SearchOverview payload; restore despite prototype omission."
+      },
+      {
+        "capability": "Q8 external-link page rows + URL normalization",
+        "resolution": "ui-only",
+        "note": "normalizePageUrl exists; DataTable cell renderer."
+      },
+      {
+        "capability": "Q9 GSC devices breakdown",
+        "resolution": "open-question",
+        "note": "Endpoint verified (google.ts:271-282); home (drawer/explorer vs card) is OQ9."
+      },
+      {
+        "capability": "Q10 GSC top countries",
+        "resolution": "open-question",
+        "note": "Endpoint verified (google.ts:284-297); home is OQ9."
+      },
+      {
+        "capability": "Q11 GSC search types",
+        "resolution": "open-question",
+        "note": "Endpoint verified (google.ts:299-309); home is OQ9."
+      },
+      {
+        "capability": "Q12 domain-filtered insight feed on Search tab",
+        "resolution": "open-question",
+        "note": "Blocked on OQ2."
+      },
+      {
+        "capability": "Q13 GSC not-configured/error/loading states",
+        "resolution": "ui-only",
+        "note": "EmptyState + error banner rebuild."
+      },
+      {
+        "capability": "Q14 full-row query text (no truncation)",
+        "resolution": "ui-only",
+        "note": "Keep truncateKeyword={false} behavior or tooltip."
+      },
+      {
+        "capability": "G1 GA4 KPI cards (users/sessions/bounce/duration)",
+        "resolution": "ui-only",
+        "note": "analytics-overview + comparison endpoints verified; toggles rebuilt."
+      },
+      {
+        "capability": "G2 traffic trend chart incl. pageviews line + annotate",
+        "resolution": "ui-only",
+        "note": "HEAD trend already carries pageviews; annotate via carried-over chart."
+      },
+      {
+        "capability": "G3 exact date-range readout + full presets",
+        "resolution": "ui-only",
+        "note": "DATE_PRESETS_FULL exists in constants.ts; readout is render-only."
+      },
+      {
+        "capability": "G4 domain-filtered insight feed on Traffic tab",
+        "resolution": "open-question",
+        "note": "Blocked on OQ2."
+      },
+      {
+        "capability": "G5 Growth Signals card",
+        "resolution": "ui-only",
+        "note": "Derived from analytics-comparison payload; KeyValueRow/MetricTile."
+      },
+      {
+        "capability": "G6 Engagement Analysis card",
+        "resolution": "ui-only",
+        "note": "Data in existing GA4 hook responses; keep top-page + organic engagement comparisons."
+      },
+      {
+        "capability": "G7 Organic vs All Traffic card",
+        "resolution": "ui-only",
+        "note": "analytics-organic endpoint verified (google.ts:429-439); core agency proof metric — hard keep."
+      },
+      {
+        "capability": "G8 Top Pages (all pageviews) table",
+        "resolution": "ui-only",
+        "note": "analytics-top-pages endpoint exists (D2, google.ts:332-473); keep alongside landing pages."
+      },
+      {
+        "capability": "G9 Traffic Sources",
+        "resolution": "ui-only",
+        "note": "Existing endpoint; Meter share bars."
+      },
+      {
+        "capability": "G10 GA4 Devices",
+        "resolution": "ui-only",
+        "note": "analytics-devices verified (google.ts:380-391)."
+      },
+      {
+        "capability": "G11 GA4 Top Countries",
+        "resolution": "open-question",
+        "note": "analytics-countries verified (google.ts:393-403); home is OQ9."
+      },
+      {
+        "capability": "G12 New vs Returning segments",
+        "resolution": "ui-only",
+        "note": "analytics-new-vs-returning verified (google.ts:417-427)."
+      },
+      {
+        "capability": "G13 Events & Conversions + landing pages table",
+        "resolution": "ui-only",
+        "note": "analytics-conversions + analytics-landing-pages verified (organic/limit params available); keep per-row users column (additive parity)."
+      },
+      {
+        "capability": "G14 GA4 error-with-Retry / empty states",
+        "resolution": "ui-only",
+        "note": "React Query invalidate retry pattern, rebuilt."
+      },
+      {
+        "capability": "A1 annotation CRUD UI",
+        "resolution": "ui-only",
+        "note": "Full GET/POST/PATCH/DELETE verified in google.ts (annotations section); full CRUD must ship, not the prototype's toast stub."
+      },
+      {
+        "capability": "A2 category filter pills + sort + count",
+        "resolution": "ui-only",
+        "note": "Client-side filter as at HEAD; FilterChip primitive."
+      },
+      {
+        "capability": "A3 click-chart-to-annotate popover",
+        "resolution": "ui-only",
+        "note": "Signature interaction; carry over AnnotatedTrendChart (T1) so it ships same phase."
+      },
+      {
+        "capability": "A4 annotation markers + hover tooltip",
+        "resolution": "ui-only",
+        "note": "Preserved in carried-over chart."
+      },
+      {
+        "capability": "A5 shared category color system",
+        "resolution": "open-question",
+        "note": "OQ8: prototype's purple campaign color violates Four Laws; proposed default = keep HEAD teal/brand."
+      },
+      {
+        "capability": "A6 ANNOTATION_BRIDGE_CREATED broadcast wiring",
+        "resolution": "ui-only",
+        "note": "Server half verified (google.ts POST/PATCH/DELETE broadcast); rebuild re-wires useWorkspaceEvents receiver."
+      },
+      {
+        "capability": "A7 public + intelligence annotation consumers (pageUrl)",
+        "resolution": "ui-only",
+        "note": "Backend untouched; pageUrl accepted by API but form-less — see newly-found OQ on exposing it."
+      },
+      {
+        "capability": "A8 server-side annotation query filtering",
+        "resolution": "ui-only",
+        "note": "getAnnotations({startDate,endDate,category}) verified; API capability survives regardless of UI filter choice."
+      },
+      {
+        "capability": "I1 typed insight renderers (20+ transforms)",
+        "resolution": "open-question",
+        "note": "Blocked on OQ2; bridge plan = reuse live InsightFeed component unstyled (doc quick-win, low risk)."
+      },
+      {
+        "capability": "I2 severity summary pills",
+        "resolution": "open-question",
+        "note": "Blocked on OQ2."
+      },
+      {
+        "capability": "I3 domain filter chips",
+        "resolution": "open-question",
+        "note": "Blocked on OQ2."
+      },
+      {
+        "capability": "I4 expandable insight details",
+        "resolution": "open-question",
+        "note": "Blocked on OQ2."
+      },
+      {
+        "capability": "I5 Run Deep Diagnostic CTA + ?report= deep link",
+        "resolution": "open-question",
+        "note": "OQ3 — the ledger's one Gap; diagnostics Page still exists at HEAD (routes.ts:23, navRegistry.tsx:177)."
+      },
+      {
+        "capability": "I6 impact sort + stale-time + WS invalidation",
+        "resolution": "ui-only",
+        "note": "Backend/registry preserved; rebuild re-registers insightFeed key invalidation."
+      },
+      {
+        "capability": "D1 admin GSC endpoints ×6",
+        "resolution": "ui-only",
+        "note": "All six verified in google.ts:245-322; avgCtr already a percentage — do not re-multiply."
+      },
+      {
+        "capability": "D2 admin GA4 endpoints ×11",
+        "resolution": "ui-only",
+        "note": "Verified google.ts:332-473; landing-pages organic=true + limit params confirmed available for rebuild."
+      },
+      {
+        "capability": "D3 React Query hooks + keys",
+        "resolution": "ui-only",
+        "note": "All five hook exports verified by grep; rebuild composes them unchanged."
+      },
+      {
+        "capability": "D4 dormant admin GSC chat endpoint",
+        "resolution": "open-question",
+        "note": "OQ5: endpoint (google.ts:192) + wrapper (src/api/analytics.ts:148-149) exist, zero component callers — retire or re-home."
+      },
+      {
+        "capability": "D5 AnomalyAlerts ownership",
+        "resolution": "open-question",
+        "note": "OQ6: HEAD mounts it on WorkspaceHome, not analytics-hub — coordinate with Home/cockpit auditor."
+      },
+      {
+        "capability": "D6 ChartPointDetail (orphaned)",
+        "resolution": "ui-only",
+        "note": "Unmounted at HEAD, ledger overclaims; nothing to rebuild — note only."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-search-traffic-1",
+        "kind": "derivation",
+        "description": "Prior-period dated trend series for the N4 dashed comparison overlay. Either extend fetchPerformanceTrend with an offset/startDate window, or ship client-side by fetching 2×days and splitting into halves (zero server change).",
+        "existsToday": "partial",
+        "evidence": "search-comparison returns aggregate totals only (SearchComparison, shared/types/analytics.ts:47-52); performance-trend accepts only `days` ending today (server/routes/google.ts:258-270) — the doc's 'comparison data already exists' claim is wrong for a per-date series.",
+        "effort": "S",
+        "whereItLives": "server/routes/google.ts + the fetchPerformanceTrend helper (or client-side split in src/hooks/admin/useAdminSearch.ts)",
+        "likelySharedWith": [
+          "performance",
+          "client-portal"
+        ]
+      },
+      {
+        "id": "sn-search-traffic-2",
+        "kind": "endpoint",
+        "description": "Cross-workspace GSC roll-up endpoint (aggregate clicks/traffic/position across all workspaces + per-client rows) for the N1 'Across your book' scope. Only needed if N1 is adopted.",
+        "existsToday": "no",
+        "evidence": "grep 'cross-workspace|allWorkspaces|aggregate' in server/routes/google.ts came up empty; every GSC endpoint is per-site behind requireWorkspaceSiteAccessFromQuery (google.ts:245-322).",
+        "effort": "M",
+        "whereItLives": "new module, e.g. server/domains/analytics/book-rollup.ts + route in server/routes/google.ts or a global-ops route",
+        "likelySharedWith": [
+          "global-ops"
+        ]
+      },
+      {
+        "id": "sn-search-traffic-3",
+        "kind": "other",
+        "description": "Wins→proof-points write contract for the N3 graduation bridge (stage a search win into the Insights Engine as a proof point). Only needed if N3 is adopted.",
+        "existsToday": "no",
+        "evidence": "grep 'proof_point|proofPoint' across server/, shared/, src/ returned zero code hits; the only mentions are 'proposed'-class lexicon entries describing mockup concepts (shared/types/lexicon.ts:497,521).",
+        "effort": "M",
+        "whereItLives": "server/domains (insights/outcomes seam) + shared/types contract; cross-surface with Insights Engine",
+        "likelySharedWith": [
+          "insights",
+          "cockpit"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "OQ1: Overview tab — is the unified GSC+GA4 view (merged chart, cross-source toggle cards, feed) cut in favor of narrative headers, or does the rebuild keep a 4th sub-view? (O1-O4)",
+        "proposedDefault": "Keep Overview as a 4th lens — data merge already exists in useAnalyticsOverview; cutting it is a capability deletion without a named home (hard floor).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ2: Insight feed home — inside Search & Traffic (pills, chips, row badges) or exclusively in the Insights Engine? (I1-I4, Q6, Q12, G4)",
+        "proposedDefault": "Reuse the live InsightFeed component unstyled inside the rebuilt tabs (doc's recommended bridge); restyle in a later pass.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ3: Diagnostics — keep the Run Deep Diagnostic CTA + ?report= deep link (destination page still exists at HEAD), or cut deliberately? The ledger's only Gap.",
+        "proposedDefault": "Keep CTA pointing at the existing diagnostics page unchanged; re-home the page as its own decision.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ4: Sign off scope + data contracts for N1 book roll-up, N2 rank movers, N3 graduation bridge before build.",
+        "proposedDefault": "Defer N1/N3 (need sn-2/sn-3); N2 ships as link-out to Keyword Hub, embedded panel later.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ5: Dormant admin GSC chat endpoint (POST /api/google/search-chat/:siteId + gscAdmin.chat) — retire or re-home?",
+        "proposedDefault": "Retire the api wrapper; keep the server op until a deliberate server-side removal PR (public portal uses a separate route).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ6: AnomalyAlerts ownership — Search & Traffic (per ledger) or Home/Command Center (per HEAD mount at WorkspaceHome.tsx:614)?",
+        "proposedDefault": "Home surface owns it; record the hand-off so neither surface drops it.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ7: Confirm full date-preset sets (incl. 7d and 16mo GSC lookback) ship despite the prototype showing only 28d/90d/12m.",
+        "proposedDefault": "Ship full sets day one — presets are cheap and the reduction is a regression (O7/G3).",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ8: Annotation campaign color — prototype uses purple, which is admin-AI-only under the Four Laws.",
+        "proposedDefault": "Keep HEAD palette (campaign=brand/teal); translate the prototype's ACAT map at port time.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "OQ9: Homes for GSC devices/countries/search-types (Q9-Q11) and GA4 top pages/countries (G8/G11) — all endpoints exist but the prototype omits the cards.",
+        "proposedDefault": "A 'Breakdowns' Drawer per tab (F3 Drawer) holding the omitted cards — preserves parity without cluttering the prototype layout.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Newly found: expose the annotation pageUrl field in the rebuilt create/edit form? The API + intelligence slices accept it (createAnnotationSchema, google.ts) but the admin form never sends it.",
+        "proposedDefault": "Yes — add an optional page-URL field; trivial cost, closes the form-less gap.",
+        "needsOwner": false,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "N1 Book roll-up scope (cross-client traffic table + aggregate KPIs)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Needs sn-search-traffic-2 (no cross-workspace GSC endpoint exists); deferring loses nothing at HEAD and it overlaps global-ops."
+      },
+      {
+        "proposal": "N2 Rank movers panels (gains / needs attention)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Ship link-out to Keyword Hub now; embedded panel later, fed by existing ranking_mover insights (RankingMoverData already carries previous/current position) to avoid a second rank-data source."
+      },
+      {
+        "proposal": "N3 'Stage wins as proof' graduation bridge",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New cross-surface write with no existing proof-point contract (sn-search-traffic-3); needs owner-signed contract with Insights Engine first."
+      },
+      {
+        "proposal": "N4 Prior-period comparison line on trend chart",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Real improvement; solvable via sn-search-traffic-1 (small param or client-side 2× window split)."
+      },
+      {
+        "proposal": "N5 Per-KPI sparklines",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Trend data already fetched; Sparkline primitive exists — zero server work."
+      },
+      {
+        "proposal": "N6 Strategy-keyword 'fav' dot on query rows",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Client-side set-membership join against the existing GET /api/webflow/keyword-strategy/:workspaceId/keyword-set (keyword-strategy.ts:775); no new server work."
+      },
+      {
+        "proposal": "N7 'View all queries/pages' full explorer",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Stub in prototype; HEAD already shows the full list scrollably, so parity holds without it."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Overview (pending OQ1)",
+        "Search Performance (GSC)",
+        "Site Traffic (GA4)",
+        "Annotations"
+      ],
+      "primitives": [
+        "LensSwitcher (sub-tabs)",
+        "PageContainer + Toolbar",
+        "MetricTile + Sparkline (KPI rows, N5)",
+        "DataTable (queries/pages/landing/top-pages/countries)",
+        "Segmented (queries⇄pages, landing⇄events)",
+        "Meter (device/source share bars)",
+        "FilterChip (insight domain + annotation category filters)",
+        "Drawer (proposed Breakdowns home per OQ9)",
+        "KeyValueRow/DefinitionList (growth/engagement/organic-vs-all cards)",
+        "GroupBlock (card sections)"
+      ],
+      "dataHooks": [
+        "useAdminSearch (src/hooks/admin/useAdminSearch.ts:20)",
+        "useAdminGA4 (useAdminGA4.ts:25)",
+        "useAnalyticsOverview (useAnalyticsOverview.ts:43)",
+        "useAnalyticsAnnotations + useCreate/Update/DeleteAnnotation (useAnalyticsAnnotations.ts:19-53)",
+        "useInsightFeed (useInsightFeed.ts:492)",
+        "ga4Admin/gscAdmin wrappers in src/api/analytics.ts"
+      ],
+      "statesPlan": "Per-source not-configured EmptyState (GSC and GA4 gate independently), Skeleton loading per tab, error banner with React Query Retry, needsSite nav-level locked state.",
+      "mountNote": "In-place behind ui-rebuild-shell flag with @ds-rebuilt markers (D2); AnnotatedTrendChart is carried-over-then-reskinned (T1) so click-to-annotate, line toggles, and callouts ship in the same phase — a static-chart quick win is a parity failure per the doc's own trade-off table."
+    },
+    "crossSurfaceDeps": [
+      "Insights Engine surface: OQ2 feed home + N3 proof-point contract",
+      "Home/cockpit surface: OQ6 AnomalyAlerts ownership hand-off (D5)",
+      "Diagnostics page: OQ3 Gap — I5 CTA deep-links to it (?report= param)",
+      "Keyword Hub: N2 must consume its rank read path (docs/rules/keyword-hub.md); N6 reads the strategy keyword-set endpoint",
+      "global-ops: N1 book roll-up overlaps its cross-workspace scope",
+      "client-portal: /api/public/analytics-annotations + ANNOTATION_BRIDGE_CREATED consumers must not break (A6/A7)"
+    ],
+    "unknowns": [
+      "Whether the Insights Engine / cockpit prototype actually re-homes the in-surface insight feed (I1-I5) — verifying requires reading other surfaces' docs, which was out of bounds; carried as OQ2 rather than assumed.",
+      "Whether the rebuilt shell reserves the '3' keyboard shortcut for this surface (S2) — global keymap for RebuiltAppChrome not defined in any file this audit was permitted to read."
+    ],
+    "effortEstimate": "L",
+    "surface": "search-traffic"
+  },
+  "verify": {
+    "surface": "search-traffic",
+    "verdicts": [
+      {
+        "needId": "sn-search-traffic-1",
+        "verdict": "ADJUSTED",
+        "evidence": "server/analytics-data.ts:27-33 (fetchPerformanceTrend already accepts dateRange? and forwards it); server/search-console.ts:730-734 (getPerformanceTrend signature includes dateRange?: CustomDateRange); server/search-console.ts:685-696 (gscDateRange honors a custom startDate/endDate window); server/search-console.ts:721-727 (getPreviousGscWindow already computes the prior-period window); server/routes/google.ts:258-270 (route reads only `days`, never threads dateRange).",
+        "correction": "existsToday=partial is directionally right but the evidence's rationale is wrong. The claim says you must 'extend fetchPerformanceTrend with an offset/startDate window' — but that helper ALREADY takes an optional dateRange (analytics-data.ts:27-33) that flows into getPerformanceTrend → gscDateRange, which already returns per-date rows for an arbitrary window (dimensions:['date']). getPreviousGscWindow (search-console.ts:721) already derives the prior window. The ONLY missing piece is route wiring: server/routes/google.ts:258-270 doesn't read startDate/endDate (or an offset) query params and pass a dateRange through. So this is a ~1-line route change plus a client that requests the prior window — no helper extension needed. Effort S stands, but scope is 'thread dateRange through the existing route', not 'extend the fetcher'. The 'comparison data already exists as a per-date series' claim remains correctly refuted: search-comparison returns only aggregate current/previous totals (shared/types/analytics.ts:47-52)."
+      },
+      {
+        "needId": "sn-search-traffic-2",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/google.ts:245-322 (every GSC endpoint is per-site behind requireWorkspaceSiteAccessFromQuery + requireWorkspaceGscPropertyAccess, keyed to one siteId/gscSiteUrl); GSC fetchers (getSearchOverview/getPerformanceTrend et al.) are consumed only by analytics-data.ts, content-brief-generation-job.ts (single-workspace), and search-console.ts — no listWorkspaces() loop reads GSC to aggregate clicks/traffic/position across clients; server/workspaces.ts showPortfolioRollup is a per-workspace multi-location (locations WITHIN one client) rollup, not cross-client; server/mcp/tools/clients.ts cross-client tool aggregates pending approvals/requests/actions, not GSC metrics.",
+        "correction": "existsToday=no holds. Nearest-neighbor constructs (showPortfolioRollup, the clients.ts omit-workspaceId global summary) exist but neither aggregates GSC clicks/traffic/position across workspaces. Effort M is fair — new roll-up module + route, reads live GSC per site so no migration/mapper lockstep is required."
+      },
+      {
+        "needId": "sn-search-traffic-3",
+        "verdict": "CONFIRMED",
+        "evidence": "grep for proof_point|proofPoint|proof-point across server/ shared/ src/ returns zero code hits; the only occurrences are shared/types/lexicon.ts:497 and :521, both wordClass:'proposed' with resolvingTicket:'reconcile-P2', explicitly describing mockup concepts (store.js / cockpit.js ck-tech 'graduate into the Insights Engine as proof points'). No graduation/promote-win write path exists.",
+        "correction": "existsToday=no holds; the wins→proof-point graduation bridge is unimplemented (mockup-only, proposed lexicon). Effort M is defensible but borderline: a persisted proof-point ledger row would pull in a migration + row mapper + serialization lockstep (per the DB column+mapper lockstep rule), which could push it to L. Flag as M/L, not clearly M."
+      }
+    ]
+  }
+}

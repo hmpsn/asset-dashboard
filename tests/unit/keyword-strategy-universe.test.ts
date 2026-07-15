@@ -173,7 +173,7 @@ describe('buildKeywordUniverse — flag-OFF parity (drives the REAL legacy fold)
       gscData: [{ query: 'cloud backup solutions', impressions: 1200 }, { query: 'declined brand term', impressions: 400 }],
       competitorKeywords: [{ keyword: 'cybersecurity services', volume: 700, difficulty: 40, domain: 'rival.com', position: 3 }],
       keywordGaps: [{ keyword: 'disaster recovery plan', volume: 600, difficulty: 35, competitorPosition: 2, competitorDomain: 'rival.com' }],
-      discoveryKeywords: [{ keyword: 'network monitoring tools', volume: 500, difficulty: 30, cpc: 4, provider: 'dataforseo', sourceKind: 'keyword_ideas' as const }],
+      discoveryKeywords: [{ keyword: 'network monitoring tools', volume: 500, difficulty: 30, cpc: 4, intent: 'commercial', provider: 'dataforseo', sourceKind: 'keyword_ideas' as const }],
       relatedKeywords: [{ keyword: 'cloud migration', volume: 450, difficulty: 28, cpc: 5 }],
       requestedKeywords: ['voip phone systems'],
       declinedKeywords: ['declined brand term'],
@@ -182,7 +182,7 @@ describe('buildKeywordUniverse — flag-OFF parity (drives the REAL legacy fold)
 
     const expected = legacyPool({ ...fixture, clientTracked: getTrackedKeywords(workspaceId).map(t => ({ query: t.query })) });
 
-    const { pool: actual } = await buildKeywordUniverse(workspaceId, baseOpts({ ...fixture, provider: null }));
+    const { pool: actual, universe } = await buildKeywordUniverse(workspaceId, baseOpts({ ...fixture, provider: null }));
 
     // Same keys
     expect([...actual.keys()].sort()).toEqual([...expected.keys()].sort());
@@ -190,6 +190,20 @@ describe('buildKeywordUniverse — flag-OFF parity (drives the REAL legacy fold)
     for (const [key, value] of expected.entries()) {
       expect(actual.get(key)).toEqual(value);
     }
+    expect(actual.get('network monitoring tools')).toEqual(expect.objectContaining({
+      cpc: 4,
+      cpcSource: 'discovery:keyword_ideas',
+      intent: 'commercial',
+      intentSource: 'discovery:keyword_ideas',
+      source: 'discovery:keyword_ideas',
+    }));
+    expect(universe.candidates.find(candidate => candidate.keyword === 'network monitoring tools')).toEqual(expect.objectContaining({
+      cpc: 4,
+      cpcSource: 'discovery:keyword_ideas',
+      intent: 'commercial',
+      intentSource: 'discovery:keyword_ideas',
+      source: 'discovery:keyword_ideas',
+    }));
   });
 
   // ── C2: the drop-a-candidate divergence ──

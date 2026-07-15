@@ -61,6 +61,8 @@ interface WorkspaceData {
 interface Props {
   workspaceId: string;
   webflowSiteId?: string;
+  chromeless?: boolean;
+  activeTab?: BrandHubTab;
 }
 
 type BrandHubLegacyTab = 'business-profile' | 'locations';
@@ -116,6 +118,11 @@ function textToEditorHtml(value: string): string {
     const line = rawLine.trim();
     if (!line) {
       flushList();
+      continue;
+    }
+    if (/^-{3,}$/.test(line)) {
+      flushList();
+      blocks.push('<hr>');
       continue;
     }
     const h3 = line.match(/^###\s+(.+)$/);
@@ -195,6 +202,10 @@ function editorHtmlToText(value: string): string {
       pushBlock(`### ${renderInline(el).trim()}`);
       return;
     }
+    if (tag === 'hr') {
+      pushBlock('---');
+      return;
+    }
     if (tag === 'ul') {
       const items = Array.from(el.querySelectorAll(':scope > li'));
       for (const item of items) pushBlock(`- ${renderInline(item).trim()}`);
@@ -230,7 +241,7 @@ function editorHtmlToBrandVoice(value: string): string {
   return stripLegacyPreviewBlock(editorHtmlToText(value));
 }
 
-export function BrandHub({ workspaceId, webflowSiteId }: Props) {
+export function BrandHub({ workspaceId, webflowSiteId, chromeless = false, activeTab: controlledActiveTab }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { jobs, startJob, findActiveJob } = useBackgroundTasks();
@@ -245,6 +256,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
     fallback: 'overview',
     legacyAliases: BRAND_TAB_ALIASES,
   }));
+  const renderedTab = controlledActiveTab ?? activeTab;
 
   // Workspace data (React Query)
   const { data: ws } = useQuery({
@@ -493,34 +505,38 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
   return (
     <ErrorBoundary label="Brand Hub">
     <div className="space-y-8">
-      <PageHeader
-        title="Brand & AI Context"
-        subtitle="Everything that feeds into AI content generation — voice, knowledge, and audience"
-        icon={<Icon as={Sparkles} size="lg" className="text-accent-brand" />}
-      />
+      {!chromeless && (
+        <>
+          <PageHeader
+            title="Brand & AI Context"
+            subtitle="Everything that feeds into AI content generation — voice, knowledge, and audience"
+            icon={<Icon as={Sparkles} size="lg" className="text-accent-brand" />}
+          />
 
-      {/* Supports ?tab= deep links (e.g., Brand & AI sub-panels like business-profile/locations). */}
-      <TabBar
-        active={activeTab}
-        onChange={(id) => setActiveTab(id as BrandHubTab)}
-        tabs={[
-          { id: 'overview', label: 'Overview', icon: Sparkles },
-          { id: 'context', label: 'Context', icon: MessageSquare },
-          { id: 'brandscript', label: 'Brandscript', icon: BookOpen },
-          { id: 'discovery', label: 'Discovery', icon: Upload },
-          { id: 'voice', label: 'Voice', icon: Mic },
-          { id: 'identity', label: 'Identity', icon: Award },
-          { id: 'business-footprint', label: 'Business Footprint', icon: Building2 },
-          { id: 'eeat-assets', label: 'E-E-A-T Assets', icon: Map },
-          { id: 'intelligence-profile', label: 'Intelligence Profile', icon: BrainCircuit },
-        ]}
-      />
+          {/* Supports ?tab= deep links (e.g., Brand & AI sub-panels like business-profile/locations). */}
+          <TabBar
+            active={renderedTab}
+            onChange={(id) => setActiveTab(id as BrandHubTab)}
+            tabs={[
+              { id: 'overview', label: 'Overview', icon: Sparkles },
+              { id: 'context', label: 'Context', icon: MessageSquare },
+              { id: 'brandscript', label: 'Brandscript', icon: BookOpen },
+              { id: 'discovery', label: 'Discovery', icon: Upload },
+              { id: 'voice', label: 'Voice', icon: Mic },
+              { id: 'identity', label: 'Identity', icon: Award },
+              { id: 'business-footprint', label: 'Business Footprint', icon: Building2 },
+              { id: 'eeat-assets', label: 'E-E-A-T Assets', icon: Map },
+              { id: 'intelligence-profile', label: 'Intelligence Profile', icon: BrainCircuit },
+            ]}
+          />
+        </>
+      )}
 
-      {activeTab === 'brandscript' && <BrandscriptTab workspaceId={workspaceId} />}
-      {activeTab === 'discovery' && <DiscoveryTab workspaceId={workspaceId} />}
-      {activeTab === 'voice' && <VoiceTab workspaceId={workspaceId} />}
-      {activeTab === 'identity' && <IdentityTab workspaceId={workspaceId} />}
-      {activeTab === 'business-footprint' && (
+      {renderedTab === 'brandscript' && <BrandscriptTab workspaceId={workspaceId} />}
+      {renderedTab === 'discovery' && <DiscoveryTab workspaceId={workspaceId} />}
+      {renderedTab === 'voice' && <VoiceTab workspaceId={workspaceId} />}
+      {renderedTab === 'identity' && <IdentityTab workspaceId={workspaceId} />}
+      {renderedTab === 'business-footprint' && (
         <BusinessFootprintTab
           workspaceId={workspaceId}
           workspaceName={ws?.name || 'Workspace'}
@@ -537,8 +553,8 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           }}
         />
       )}
-      {activeTab === 'eeat-assets' && <EeatAssetsTab workspaceId={workspaceId} toast={toast} />}
-      {activeTab === 'intelligence-profile' && (
+      {renderedTab === 'eeat-assets' && <EeatAssetsTab workspaceId={workspaceId} toast={toast} />}
+      {renderedTab === 'intelligence-profile' && (
         <IntelligenceProfileTab
           workspaceId={workspaceId}
           intelligenceProfile={ws?.intelligenceProfile}
@@ -548,7 +564,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
           }}
         />
       )}
-      {activeTab === 'overview' && (
+      {renderedTab === 'overview' && (
         <BrandOverviewTab
           workspaceId={workspaceId}
           brandVoice={ws?.brandVoice}
@@ -560,7 +576,7 @@ export function BrandHub({ workspaceId, webflowSiteId }: Props) {
         />
       )}
 
-      {activeTab === 'context' && (
+      {renderedTab === 'context' && (
       <div id="brand-hub-current-context" className="space-y-8">
       {/* ═══ BRAND VOICE ═══ */}
       <SectionCard

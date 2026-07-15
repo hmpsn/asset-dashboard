@@ -34,7 +34,7 @@ import {
 import { isStrategyPoolEligibleKeyword, normalizeKeyword, type KeywordEvaluationContext } from './keyword-intelligence/index.js';
 import type { SeoDataProvider, DomainKeyword, KeywordGapEntry, RelatedKeyword } from './seo-data-provider.js';
 import type { CompetitorKeywordData, QuestionKeywordGroup } from './keyword-strategy-seo-data.js';
-import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
+import { isKeywordSearchIntent, type KeywordSourceEvidence } from '../shared/types/keywords.js';
 import {
   KEYWORD_CANDIDATE_SOURCE,
   type KeywordCandidate,
@@ -343,8 +343,8 @@ export async function buildKeywordUniverse(
     if (norm && !coarseSource.has(norm)) coarseSource.set(norm, source);
   };
   // P7.2 — side-map (normalizedKeyword → marketId) for the market-scoped local
-  // candidates. The canonical pool Map value (`KeywordPoolCandidate`) intentionally
-  // carries only {volume,difficulty,source}; marketId rides this side-map and is
+  // candidates. Market identity is separate from the canonical evidence fields
+  // carried by `KeywordPoolCandidate`; marketId rides this side-map and is
   // threaded onto the typed `KeywordCandidate` during candidate derivation below.
   const marketByKeyword = new Map<string, string | null>();
 
@@ -352,7 +352,7 @@ export async function buildKeywordUniverse(
   for (const k of domainKeywords) {
     if (!eligible({ keyword: k.keyword, volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' })) continue;
     const norm = normalizeKeyword(k.keyword);
-    if (upsertKeywordPoolCandidate(pool, k.keyword, { volume: k.volume, difficulty: k.difficulty, source: provider?.name ?? 'seo-provider' })) {
+    if (upsertKeywordPoolCandidate(pool, k.keyword, { volume: k.volume, difficulty: k.difficulty, cpc: k.cpc, source: provider?.name ?? 'seo-provider' })) {
       tag(norm, KEYWORD_CANDIDATE_SOURCE.DOMAIN);
     }
   }
@@ -371,7 +371,7 @@ export async function buildKeywordUniverse(
   for (const ck of competitorKeywords) {
     const kw = normalizeKeyword(ck.keyword);
     if (ck.volume > 0 && eligible({ keyword: kw, volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` })) {
-      if (upsertKeywordPoolCandidate(pool, kw, { volume: ck.volume, difficulty: ck.difficulty, source: `competitor:${ck.domain}` })) {
+      if (upsertKeywordPoolCandidate(pool, kw, { volume: ck.volume, difficulty: ck.difficulty, cpc: ck.cpc ?? undefined, source: `competitor:${ck.domain}` })) {
         tag(kw, KEYWORD_CANDIDATE_SOURCE.COMPETITOR_GAP);
       }
     }
@@ -400,7 +400,7 @@ export async function buildKeywordUniverse(
   for (const dk of [...discoveryKeywords, ...fetchedDiscovery]) {
     const kw = normalizeKeyword(dk.keyword);
     if (isStrategyQualityDiscoveryKeyword(dk, relaxConservatism) && eligible(dk)) {
-      if (upsertKeywordPoolCandidate(pool, kw, { volume: dk.volume, difficulty: dk.difficulty, source: `discovery:${dk.sourceKind}` })) {
+      if (upsertKeywordPoolCandidate(pool, kw, { volume: dk.volume, difficulty: dk.difficulty, cpc: dk.cpc, intent: isKeywordSearchIntent(dk.intent) ? dk.intent : undefined, source: `discovery:${dk.sourceKind}` })) {
         tag(kw, dk.sourceKind === 'keyword_suggestions' ? KEYWORD_CANDIDATE_SOURCE.QUESTION : KEYWORD_CANDIDATE_SOURCE.PROVIDER_DISCOVERY);
       }
     }
@@ -411,7 +411,7 @@ export async function buildKeywordUniverse(
   for (const rk of [...relatedKeywords, ...fetchedRelated]) {
     const kw = normalizeKeyword(rk.keyword);
     if (rk.volume > 0 && eligible({ keyword: kw, volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
-      if (upsertKeywordPoolCandidate(pool, kw, { volume: rk.volume, difficulty: rk.difficulty, source: 'related' })) {
+      if (upsertKeywordPoolCandidate(pool, kw, { volume: rk.volume, difficulty: rk.difficulty, cpc: rk.cpc, source: 'related' })) {
         tag(kw, KEYWORD_CANDIDATE_SOURCE.RELATED);
       }
     }
@@ -502,6 +502,10 @@ export async function buildKeywordUniverse(
     const declined = declinedSet.has(kw);
     const voteWeight = voteByKeyword.get(kw);
     const candidate: KeywordCandidate = { keyword: kw, source: m.source, volume: m.volume, difficulty: m.difficulty };
+    if (m.cpc != null) candidate.cpc = m.cpc;
+    if (m.intent != null) candidate.intent = m.intent;
+    if (m.cpcSource != null) candidate.cpcSource = m.cpcSource;
+    if (m.intentSource != null) candidate.intentSource = m.intentSource;
     // P7.2 — preserve the local market relevance from the local source's side-map.
     const marketId = marketByKeyword.get(kw);
     if (marketId != null) candidate.marketId = marketId;

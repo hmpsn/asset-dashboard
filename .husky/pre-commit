@@ -12,7 +12,8 @@ set -e
 npm run typecheck
 npm run pr-check
 
-# Run only tests affected by staged changes (fast subset of full 35s suite).
-# Full suite runs in CI; this catches the obvious local regressions.
+# Run only tests affected by staged changes. A shared source edit can still
+# select hundreds of integration suites, so bound workers to leave capacity
+# for their spawned servers. Full suite runs in CI.
 # Exits 0 cleanly when no test files are affected by the changes.
-npx vitest run --changed HEAD
+npx vitest run --changed HEAD --maxWorkers=4

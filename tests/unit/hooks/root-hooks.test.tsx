@@ -205,19 +205,18 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
   });
 
   it('returns the static default (false) for a known flag while loading', () => {
-    // Probe uses keyword-universe-full: keyword-hub flipped to default-true at the
-    // Phase B cutover (2026-06-11), so it no longer works as a false-default probe.
+    // Probe uses national-serp-tracking, a dark-launched (default-false) flag.
     const { result } = renderHook(
-      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
+      () => useFeatureFlag('national-serp-tracking' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
-    expect(result.current).toBe(FEATURE_FLAGS['keyword-universe-full']);
+    expect(result.current).toBe(FEATURE_FLAGS['national-serp-tracking']);
     expect(result.current).toBe(false);
   });
 
-  it('returns false for "smart-placeholders" while loading', () => {
+  it('returns false for "local-gbp" while loading', () => {
     const { result } = renderHook(
-      () => useFeatureFlag('smart-placeholders' as FeatureFlagKey),
+      () => useFeatureFlag('local-gbp' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
     expect(result.current).toBe(false);
@@ -227,12 +226,12 @@ describe('useFeatureFlag — static defaults (loading state)', () => {
 describe('useFeatureFlag — server response overrides defaults', () => {
   it('returns true for a flag the server has enabled', async () => {
     const serverFlags = Object.fromEntries(
-      Object.keys(FEATURE_FLAGS).map(k => [k, k === 'keyword-universe-full']),
+      Object.keys(FEATURE_FLAGS).map(k => [k, k === 'national-serp-tracking']),
     ) as Record<FeatureFlagKey, boolean>;
     mockGet.mockResolvedValue(serverFlags);
 
     const { result } = renderHook(
-      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
+      () => useFeatureFlag('national-serp-tracking' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
@@ -246,7 +245,7 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     mockGet.mockResolvedValue(serverFlags);
 
     const { result } = renderHook(
-      () => useFeatureFlag('smart-placeholders' as FeatureFlagKey),
+      () => useFeatureFlag('local-gbp' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
@@ -260,13 +259,13 @@ describe('useFeatureFlag — server response overrides defaults', () => {
     mockGet.mockRejectedValue(new Error('Failed to fetch feature flags'));
 
     const { result } = renderHook(
-      () => useFeatureFlag('keyword-universe-full' as FeatureFlagKey),
+      () => useFeatureFlag('national-serp-tracking' as FeatureFlagKey),
       { wrapper: makeWrapper() },
     );
 
     // Error path: no data → falls back to FEATURE_FLAGS default
     await waitFor(() => {
-      expect(result.current).toBe(FEATURE_FLAGS['keyword-universe-full']);
+      expect(result.current).toBe(FEATURE_FLAGS['national-serp-tracking']);
     });
   });
 });

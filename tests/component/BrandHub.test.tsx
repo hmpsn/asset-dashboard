@@ -261,6 +261,27 @@ describe('BrandHub', () => {
     });
   });
 
+  it('renders standalone Markdown separators as rules and preserves their stored form', async () => {
+    mockGetById.mockResolvedValue({
+      ...mockWorkspace,
+      brandVoice: 'Warm and precise.\n\n---\n\nFriendly and reassuring.',
+    });
+    const { container } = renderBrandHub({ activeTab: 'context' });
+
+    await waitFor(() => {
+      expect(container.querySelector('#brand-voice-textarea hr')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('---')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /save brand voice/i }));
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'ws-test',
+        expect.objectContaining({ brandVoice: expect.stringContaining('---') }),
+      );
+    });
+  });
+
   it('shows (configured) badge next to Brand Voice when brandVoice is set', async () => {
     renderBrandHub();
     fireEvent.click(screen.getByRole('tab', { name: /context/i }));

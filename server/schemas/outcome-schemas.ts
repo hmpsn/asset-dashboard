@@ -14,17 +14,33 @@ export const actionTypeEnum = z.enum([
   'voice_calibrated', 'competitor_gap_closed', 'cluster_published',
   'cannibalization_resolved', 'local_visibility_won', 'local_service_added',
   'content_gap_keep', 'topic_cluster_keep',
+  // Reconcile R8-PR1 (B13) — ships dark; see shared/types/outcome-tracking.ts.
+  'gbp_review_reply',
 ]);
 
 export const attributionEnum = z.enum([
   'platform_executed', 'externally_executed', 'not_acted_on',
 ]);
 
+// R8-PR2 (B14): the POST /api/outcomes/:ws/actions body keeps `attribution` OPTIONAL on
+// purpose — this is a tolerate-old contract for external/programmatic recorders (MCP holders
+// of persistent API keys) that predate the field. A missing attribution is NOT a 400; the
+// route (server/routes/outcomes.ts) stores the HONEST `not_acted_on` default + logs a
+// deprecation warn, never the silent `platform_executed`. recordAction()'s param is REQUIRED
+// (compile-time) — only this external HTTP seam applies the honest fallback.
+
 export const outcomeScoreEnum = z.enum([
   'strong_win', 'win', 'neutral', 'loss', 'insufficient_data', 'inconclusive',
 ]);
 
 export const earlySignalEnum = z.enum(['on_track', 'no_movement', 'too_early']);
+
+// Reconcile R9 (Task B15) — must stay in lockstep with OutcomeCoverageProvenance in
+// shared/types/outcome-tracking.ts. Distinct from (do not merge with) the client-facing
+// OutcomeProvenance type in the same file — see that type's doc comment for the split rationale.
+export const outcomeCoverageProvenanceEnum = z.enum([
+  'estimate_ga4', 'measured_action', 'actual_reconciled',
+]);
 
 // --- Baseline Snapshot ---
 export const baselineSnapshotSchema = z.object({
@@ -44,6 +60,17 @@ export const baselineSnapshotSchema = z.object({
   rich_result_eligible: z.boolean().optional(),
   rich_result_appearing: z.boolean().optional(),
   voice_score: z.number().min(0).max(100).optional(),
+});
+
+// --- Source Snapshot (Reconcile R6 / B11) ---
+// The ephemeral source's identity snapshotted onto the durable tracked_actions row at
+// record time. Read from the nullable `source_snapshot` JSON column via parseJsonSafe.
+// All fields optional (a page-ref source may only carry `page`); `type` stays a free
+// string to mirror the advisory SourceRef union (no hard enum break for new sourceTypes).
+export const trackedActionSourceSnapshotSchema = z.object({
+  title: z.string().optional(),
+  type: z.string().optional(),
+  page: z.string().optional(),
 });
 
 // --- Trailing History ---

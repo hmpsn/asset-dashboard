@@ -116,8 +116,10 @@ describe('OutcomeSummary — free tier', () => {
   it('shows top category wins in free tier', () => {
     mockUseClientOutcomeSummary.mockReturnValue({ data: makeScorecard(), isLoading: false });
     render(<OutcomeSummary workspaceId={WORKSPACE_ID} tier="free" />);
-    // "Content published" label appears inside a <span> in the TopThreeWins list
-    expect(screen.getAllByText('Content published').length).toBeGreaterThan(0);
+    // C2/R12a: OutcomeSummary now reads the canonical client vocabulary map
+    // (shared/types/client-vocabulary.ts), which unifies toward the fuller client-facing
+    // sentence — "Published new post", not the old admin-ish "Content published".
+    expect(screen.getAllByText('Published new post').length).toBeGreaterThan(0);
   });
 
   it('shows win rate percentage in free tier', () => {

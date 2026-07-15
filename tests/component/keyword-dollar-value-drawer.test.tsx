@@ -40,6 +40,8 @@ vi.mock('../../src/api/client', async (importOriginal) => {
 function makeStrategyRow(money?: { currentMonthly?: number; upsideMonthly?: number }): StrategyKeywordTableRow {
   return {
     label: 'Cosmetic Dentistry',
+    identityKey: 'cosmetic dentistry',
+    actionKeyword: 'Cosmetic Dentistry',
     normalized: 'cosmetic dentistry',
     role: 'page',
     roleLabel: 'Page Opportunity',

@@ -43,6 +43,7 @@ import {
   getGA4Conversions,
   getGA4EventsByPage,
   getGA4LandingPages,
+  getGA4PageOrganicTrafficMap,
   getGA4OrganicOverview,
   getGA4PeriodComparison,
   getGA4NewVsReturning,
@@ -810,6 +811,22 @@ describe('getGA4LandingPages', () => {
     mockFetchOk({});
     const result = await getGA4LandingPages('prop123');
     expect(result).toEqual([]);
+  });
+});
+
+describe('getGA4PageOrganicTrafficMap', () => {
+  it('returns a normalized organic landing-page sessions map', async () => {
+    mockFetchOk({
+      rows: [
+        makeRow(['/Services/SEO/'], ['123', '100', '0.2', '400', '4']),
+        makeRow(['https://example.com/blog/post?utm=ignored'], ['45', '40', '0.3', '300', '1']),
+      ],
+    });
+
+    const result = await getGA4PageOrganicTrafficMap('prop123', 28, 500);
+    expect(result.get('/services/seo')).toBe(123);
+    expect(result.get('/blog/post')).toBe(45);
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
 });
 

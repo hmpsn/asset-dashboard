@@ -1,7 +1,7 @@
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import type {
-  BrandDeliverable, DeliverableVersion, DeliverableType, DeliverableTier, DeliverableStatus,
+  BrandDeliverable, DeliverableVersion, BrandDeliverableType, DeliverableTier, BrandDeliverableStatus,
 } from '../shared/types/brand-engine.js';
 
 export interface DeliverableRow {
@@ -28,9 +28,9 @@ const stmts = createStmtCache(() => ({
 export function rowToDeliverable(row: DeliverableRow): BrandDeliverable {
   return {
     id: row.id, workspaceId: row.workspace_id,
-    deliverableType: row.deliverable_type as DeliverableType,
+    deliverableType: row.deliverable_type as BrandDeliverableType,
     content: row.content,
-    status: row.status as DeliverableStatus,
+    status: row.status as BrandDeliverableStatus,
     version: row.version,
     tier: row.tier as DeliverableTier,
     createdAt: row.created_at, updatedAt: row.updated_at,

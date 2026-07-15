@@ -12,10 +12,11 @@ import { getDataDir } from '../data-dir.js';
 import { isProgrammingError } from '../errors.js';
 import { createLogger } from '../logger.js';
 import { validate, z } from '../middleware/validate.js';
+import { ROADMAP_STATUSES } from '../../shared/types/roadmap.js';
 
 const patchItemSchema = z
   .object({
-    status: z.enum(['done', 'in_progress', 'pending']).optional(),
+    status: z.enum(ROADMAP_STATUSES).optional(),
     notes: z.string().optional(),
     shippedAt: z.string().optional(),
   })
@@ -125,8 +126,17 @@ router.patch('/api/roadmap/item/:id', validate(patchItemSchema), (req, res) => {
     if (!sprint) return res.status(404).json({ error: 'Sprint not found' });
     const item = sprint.items.find((i: { id: number | string }) => String(i.id) === itemId);
     if (!item) return res.status(404).json({ error: 'Item not found' });
+    const nextStatus = req.body.status ?? item.status;
+    if (req.body.shippedAt !== undefined && nextStatus !== 'done') {
+      return res.status(400).json({ error: 'shippedAt is valid only for done roadmap items' });
+    }
     // Schema enforces field whitelist + status enum; id/title/source cannot be overwritten.
     Object.assign(item, req.body);
+    if (req.body.status === 'done') {
+      item.shippedAt ??= new Date().toISOString().slice(0, 10);
+    } else if (req.body.status !== undefined) {
+      delete item.shippedAt;
+    }
     fs.writeFileSync(ROADMAP_RUNTIME_FILE, JSON.stringify(data, null, 2));
     res.json({ ok: true, item });
   } catch (err) {

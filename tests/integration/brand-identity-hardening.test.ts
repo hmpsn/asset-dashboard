@@ -14,6 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { getUsageCount } from '../../server/usage-tracking.js';
+import db from '../../server/db/index.js';
 
 // Dedicated port — no other test file uses 13226
 const ctx = createEphemeralTestContext(import.meta.url);
@@ -54,6 +55,60 @@ afterAll(async () => {
   await ctx.stopServer();
   cleanupFree?.();
   cleanupGrowth?.();
+});
+
+// P0 contract: naming is durable vocabulary, not a legacy paid generator.
+describe('P0 – naming stays closed on /api/brand-identity/:workspaceId/generate', () => {
+  it('returns 400 before usage accounting or paid AI work', async () => {
+    const ws = seedWorkspace({ tier: 'growth' });
+    try {
+      const before = getUsageCount(ws.workspaceId, 'brandscript_generations');
+      expect(before).toBe(0);
+
+      const res = await postJson(`/api/brand-identity/${ws.workspaceId}/generate`, {
+        deliverableType: 'naming',
+      });
+
+      expect(res.status).toBe(400);
+      expect(getUsageCount(ws.workspaceId, 'brandscript_generations')).toBe(before);
+    } finally {
+      ws.cleanup();
+    }
+  });
+
+  it('returns 400 on refine before usage accounting or paid AI work', async () => {
+    const ws = seedWorkspace({ tier: 'growth' });
+    const deliverableId = `bid_naming_refine_${Date.now()}`;
+    try {
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO brand_identity_deliverables
+          (id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        deliverableId,
+        ws.workspaceId,
+        'naming',
+        'Reserved naming proposal',
+        'draft',
+        1,
+        'premium',
+        now,
+        now,
+      );
+      const before = getUsageCount(ws.workspaceId, 'brandscript_generations');
+
+      const res = await postJson(
+        `/api/brand-identity/${ws.workspaceId}/${deliverableId}/refine`,
+        { direction: 'Make it shorter' },
+      );
+
+      expect(res.status).toBe(400);
+      expect(getUsageCount(ws.workspaceId, 'brandscript_generations')).toBe(before);
+    } finally {
+      ws.cleanup();
+    }
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -82,16 +82,19 @@ describe('publish service (C3): BOTH publish paths enqueue rec regen via the sha
     expect(serviceSrc).toContain('queueKeywordStrategyPostUpdateFollowOns({ workspaceId });');
   });
 
-  it('the MANUAL publish route consumes the shared publishPostToWebflow service', () => {
-    expect(manualRouteSrc).toContain("from '../domains/content/publish-post-to-webflow.js'");
-    expect(manualRouteSrc).toContain('publishPostToWebflow(workspaceId, postId');
+  it('the MANUAL publish route consumes the claimed shared publish service', () => {
+    expect(manualRouteSrc).toContain("from '../content-publish-job.js'");
+    expect(manualRouteSrc).toContain('publishPostToWebflowWithClaim({');
+    expect(jobSrc).toContain("from './domains/content/publish-post-to-webflow.js'");
+    expect(jobSrc).toContain('publishPostToWebflow(workspaceId, postId');
   });
 
   it('the AUTO-publish-on-approval path dispatches the CONTENT_PUBLISH job (which calls the service)', () => {
     expect(autoRouteSrc).toContain("from '../content-publish-job.js'");
-    expect(autoRouteSrc).toContain('BACKGROUND_JOB_TYPES.CONTENT_PUBLISH');
+    expect(autoRouteSrc).toContain('createContentPublishJob({');
     expect(autoRouteSrc).toContain('runContentPublishJob({');
     // The job runner is the bridge from the auto path to the shared service.
+    expect(jobSrc).toContain('BACKGROUND_JOB_TYPES.CONTENT_PUBLISH');
     expect(jobSrc).toContain("from './domains/content/publish-post-to-webflow.js'");
     expect(jobSrc).toContain('publishPostToWebflow(workspaceId, postId');
   });

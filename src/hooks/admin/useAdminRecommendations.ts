@@ -9,7 +9,7 @@
  * subset).
  *
  * useAdminUndismissRecommendation — PATCH .../undismiss mutation with
- * optimistic invalidation of the admin cache on success.
+ * awaited invalidation of every recommendation consumer on success.
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, patch } from '../../api/client.js';
@@ -33,9 +33,32 @@ export function useAdminUndismissRecommendation(workspaceId: string) {
   return useMutation({
     mutationFn: (recId: string): Promise<Recommendation> =>
       patch<Recommendation>(`/api/recommendations/${workspaceId}/${recId}/undismiss`, {}),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.admin.recommendations(workspaceId) });
-      qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) });
+    onSuccess: (updated) => {
+      // Apply the authoritative status response before refetching. If a refresh
+      // fails, the history row cannot remain visibly dismissed and invite the
+      // same mutation twice; independent lifecycle axes (for example `struck`)
+      // remain intact because the response is merged onto the cached row.
+      qc.setQueryData<RecommendationSet>(
+        queryKeys.admin.recommendations(workspaceId),
+        current => current
+          ? {
+              ...current,
+              recommendations: current.recommendations.map(recommendation => (
+                recommendation.id === updated.id
+                  ? { ...recommendation, ...updated }
+                  : recommendation
+              )),
+            }
+          : current,
+      );
+
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.admin.recommendations(workspaceId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.shared.recommendations(workspaceId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.admin.intelligenceAll(workspaceId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.admin.issueLenses(workspaceId) }),
+      ]);
     },
   });
 }

@@ -47,7 +47,7 @@ export async function buildWorkspaceIntelligence(
     log.debug({ workspaceId, cache_hit: true, stale: true }, 'Intelligence cache hit (stale)');
   }
 
-  return singleFlight(cacheKey, async () => {
+  return singleFlight(cacheKey, async (isCurrent = () => true) => {
     const start = Date.now();
     const requestedSlices = opts?.slices ?? ALL_INTELLIGENCE_SLICES;
 
@@ -70,7 +70,14 @@ export async function buildWorkspaceIntelligence(
       if (assembled) Object.assign(result, assembled);
     }
 
-    intelligenceCache.set(cacheKey, result, INTELLIGENCE_CACHE_TTL);
+    if (isCurrent()) {
+      intelligenceCache.set(cacheKey, result, INTELLIGENCE_CACHE_TTL);
+    } else {
+      log.info(
+        { workspaceId },
+        'Intelligence cache invalidated during assembly — discarded stale cache write',
+      );
+    }
 
     log.info({
       workspaceId,

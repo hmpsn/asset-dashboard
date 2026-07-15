@@ -2,7 +2,7 @@
  * public-portal routes — extracted from server/index.ts
  *
  * @reads workspaces, snapshots, keyword_feedback, client_business_priorities, content_gap_votes, copy_sections, briefing_store, recommendations, stripe_products, search_console, google_analytics
- * @writes workspaces, keyword_feedback, rank_tracking_config, client_business_priorities, content_gap_votes, copy_sections, client_suggestions, activities, intelligence_cache
+ * @writes workspaces, brand_intake_revisions, keyword_feedback, rank_tracking_config, client_business_priorities, content_gap_votes, copy_sections, client_suggestions, activities, intelligence_cache
  */
 import { Router, type RequestHandler } from 'express';
 
@@ -12,13 +12,20 @@ import { validate, z } from '../middleware/validate.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { hasClientUsers, verifyClientToken } from '../client-users.js';
-import { requireAuthenticatedClientPortalAuth, requireClientPortalAuth } from '../middleware.js';
+import {
+  getClientActor,
+  requireAuthenticatedClientPortalAuth,
+  requireClientPortalAuth,
+  verifyAdminToken,
+  verifyClientSession,
+} from '../middleware.js';
 
 import { getLatestSnapshotBefore } from '../reports.js';
 import { getEffectiveAudit, getLatestEffectiveSnapshot, listEffectiveSnapshotSummaries } from '../audit-snapshot-views.js';
 import { getAuditTrafficForWorkspace } from '../audit-traffic.js';
 import { isStripeConfigured, listProducts } from '../stripe.js';
 import { updateWorkspace, getWorkspace, computeEffectiveTier } from '../workspaces.js';
+import { bumpKeywordStrategyGenerationRevision, invalidateKeywordStrategyGenerationInputs } from '../keyword-strategy-generation-store.js';
 import { buildClientBriefingView } from '../client-insight-briefing-view-model.js';
 import { createLogger } from '../logger.js';
 import db from '../db/index.js';
@@ -27,6 +34,10 @@ import { addActivity } from '../activity-log.js';
 import { debouncedStrategyInvalidate, invalidateSubCachePrefix } from '../bridge-infrastructure.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
 import { getBookingUrl } from '../studio-config.js';
+import {
+  submitBrandIntake,
+  type BrandIntakePostCommitEffect,
+} from '../domains/brand/intake/index.js';
 import { listBlueprints } from '../page-strategy.js';
 import {
   clearKeywordFeedback,
@@ -36,10 +47,19 @@ import {
   saveBulkKeywordFeedback,
   saveKeywordFeedback,
 } from '../keyword-feedback.js';
+import { clearContentGapVote, listContentGapVotes, setContentGapVote } from '../content-gap-votes.js';
 import { parsePaginationParams } from '../pagination.js';
 import { listKeywordGaps } from '../keyword-gaps.js';
 import { projectCompetitorGaps } from '../competitor-gaps-projection.js';
-import { getSection, getSectionsForEntry, getEntryCopyStatus, updateSectionStatus, addClientSuggestion } from '../copy-review.js';
+import {
+  addClientSuggestion,
+  CopySuggestionOriginalMismatchError,
+  getEntryCopyStatus,
+  getSection,
+  getSectionsForEntry,
+  updateSectionStatus,
+} from '../copy-review.js';
+import { GenerationRevisionConflictError } from '../generation-provenance.js';
 import {
   CLIENT_BUSINESS_PRIORITIES_MARKER,
   clientBusinessPrioritiesBodySchema,
@@ -59,10 +79,18 @@ import { normalizeSocialProfiles } from '../social-profiles.js';
 import { computeTrialState } from '../billing/trial-state.js';
 import { toPublicWorkspaceView } from '../serializers/client-safe.js';
 import { isFeatureEnabled } from '../feature-flags.js';
-import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
-import { getVoiceProfile } from '../voice-calibration.js';
+import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
 import { sendSanitizedProviderError } from '../provider-error-sanitizer.js';
 import { buildMatricesExportRows, MATRICES_EXPORT_HEADERS, sendExport } from './data-export.js';
+import {
+  BRAND_INTAKE_SCHEMA_VERSION,
+  type BrandIntakeSource,
+  type BrandIntakeSubmitter,
+} from '../../shared/types/brand-intake.js';
+import {
+  publicOnboardingQuestionnaireSchema,
+  type NormalizedPublicOnboardingQuestionnaire,
+} from '../../shared/types/brand-intake-schemas.js';
 import type {
   BusinessPrioritiesConflictResponse,
   BusinessPrioritiesResponse,
@@ -70,6 +98,120 @@ import type {
 } from '../../shared/types/business-priorities.js';
 
 const log = createLogger('public-portal');
+
+function runBrandIntakePostCommitEffect(
+  workspaceId: string,
+  effectName: 'activity' | 'workspace-broadcast' | 'intelligence-cache',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn({ err, workspaceId, effectName }, 'brand intake post-commit effect failed');
+  }
+}
+
+function runPublicCopyReviewPostCommitEffect(
+  workspaceId: string,
+  sectionId: string,
+  effect: 'broadcast' | 'activity' | 'audit-log',
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    try {
+      log.warn(
+        { err, workspaceId, sectionId, effect },
+        'public copy review post-commit effect failed',
+      );
+    } catch { // catch-ok -- failure reporting cannot rewrite a committed public mutation as failed.
+    }
+  }
+}
+
+function applyBrandIntakePostCommitEffect(
+  workspaceId: string,
+  effect: BrandIntakePostCommitEffect,
+  actor?: { id?: string; name?: string },
+): void {
+  runBrandIntakePostCommitEffect(workspaceId, 'activity', () => {
+    addActivity(
+      workspaceId,
+      effect.activity.type,
+      effect.activity.title,
+      effect.activity.description,
+      { ...effect.workspaceUpdated },
+      actor,
+    );
+  });
+  runBrandIntakePostCommitEffect(workspaceId, 'workspace-broadcast', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.WORKSPACE_UPDATED, effect.workspaceUpdated);
+  });
+  runBrandIntakePostCommitEffect(workspaceId, 'intelligence-cache', () => {
+    invalidateIntelligenceCache(workspaceId);
+  });
+}
+
+interface BrandIntakeRequestIdentity {
+  source: Extract<BrandIntakeSource, 'client_portal' | 'admin'>;
+  submitter: BrandIntakeSubmitter;
+  activityActor: { id?: string; name?: string };
+}
+
+/** Mirror the auth guard's priority so operator writes never count as client engagement. */
+function brandIntakeRequestIdentity(
+  req: Parameters<typeof getClientActor>[0],
+  workspaceId: string,
+): BrandIntakeRequestIdentity {
+  const adminToken = (req.headers['x-auth-token'] || req.cookies?.auth_token || '') as string;
+  if (adminToken && verifyAdminToken(adminToken)) {
+    return {
+      source: 'admin',
+      submitter: {
+        actorType: 'operator',
+        actorId: 'admin-hmac',
+        actorLabel: 'Admin operator',
+      },
+      activityActor: { id: 'admin-hmac', name: 'Admin operator' },
+    };
+  }
+
+  const clientActor = getClientActor(req, workspaceId);
+  if (clientActor) {
+    const actorId = clientActor.id ?? `client:${workspaceId}`;
+    const actorLabel = clientActor.name ?? 'Client portal';
+    return {
+      source: 'client_portal',
+      submitter: { actorType: 'client', actorId, actorLabel },
+      activityActor: { id: actorId, name: actorLabel },
+    };
+  }
+
+  const legacySession = req.cookies?.[`client_session_${workspaceId}`];
+  if (legacySession && verifyClientSession(workspaceId, legacySession)) {
+    const actorId = `client:${workspaceId}`;
+    return {
+      source: 'client_portal',
+      submitter: { actorType: 'client', actorId, actorLabel: 'Legacy client portal' },
+      activityActor: { id: actorId, name: 'Legacy client portal' },
+    };
+  }
+
+  if (req.user) {
+    return {
+      source: 'admin',
+      submitter: {
+        actorType: 'operator',
+        actorId: req.user.id,
+        actorLabel: req.user.name,
+      },
+      activityActor: { id: req.user.id, name: req.user.name },
+    };
+  }
+
+  throw new Error('Authenticated brand-intake actor could not be derived');
+}
 
 const attachClientEmail: RequestHandler = (req, res, next) => {
   const wsId = req.params.workspaceId;
@@ -97,115 +239,44 @@ router.get('/api/public/workspace/:id', (req, res) => { // portal-auth-public-ok
   }));
 });
 
-// Public onboarding questionnaire submission — transforms responses into KB, brand voice, personas
-router.post('/api/public/onboarding/:id', requireAuthenticatedClientPortalAuth('id'), async (req, res) => {
-  try {
-    const ws = getWorkspace(req.params.id);
-    if (!ws) return res.status(404).json({ error: 'Workspace not found' });
+// Public onboarding questionnaire submission — durable source of truth with compatibility projection.
+router.post( // activity-ok — the durable post-commit effect calls addActivity exactly once for a created revision.
+  '/api/public/onboarding/:id',
+  requireAuthenticatedClientPortalAuth('id'),
+  validate(publicOnboardingQuestionnaireSchema),
+  (req, res) => {
+    try {
+      const ws = getWorkspace(req.params.id);
+      if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-    const { business, audience, brand, competitors } = req.body;
+      const questionnaire = req.body as NormalizedPublicOnboardingQuestionnaire;
+      const identity = brandIntakeRequestIdentity(req, ws.id);
+      const result = submitBrandIntake({
+        workspaceId: ws.id,
+        payload: {
+          schemaVersion: BRAND_INTAKE_SCHEMA_VERSION,
+          ...questionnaire,
+          authenticSamples: [],
+        },
+        source: identity.source,
+        submitter: identity.submitter,
+      });
 
-    // 1. Build knowledge base from business info
-    const kbParts: string[] = [];
-    if (business?.businessName) kbParts.push(`Business Name: ${business.businessName}`);
-    if (business?.industry) kbParts.push(`Industry: ${business.industry}`);
-    if (business?.description) kbParts.push(`About: ${business.description}`);
-    if (business?.services) kbParts.push(`Key Services/Products:\n${business.services}`);
-    if (business?.locations) kbParts.push(`Service Locations: ${business.locations}`);
-    if (business?.differentiators) kbParts.push(`Differentiators: ${business.differentiators}`);
-    if (business?.website) kbParts.push(`Website: ${business.website}`);
-    if (competitors?.competitors) kbParts.push(`Competitors:\n${competitors.competitors}`);
-    if (competitors?.whatTheyDoBetter) kbParts.push(`Competitor Strengths: ${competitors.whatTheyDoBetter}`);
-    if (competitors?.whatYouDoBetter) kbParts.push(`Our Advantages: ${competitors.whatYouDoBetter}`);
-
-    // Merge with existing knowledge base (don't overwrite)
-    const existingKb = ws.knowledgeBase || '';
-    const onboardingKb = kbParts.join('\n\n');
-    const mergedKb = existingKb
-      ? `${existingKb}\n\n--- Client Onboarding Responses ---\n${onboardingKb}`
-      : onboardingKb;
-
-    // 2. Build brand voice from brand info
-    const voiceParts: string[] = [];
-    if (brand?.personality?.length) voiceParts.push(`Brand Personality: ${brand.personality.join(', ')}`);
-    if (brand?.tone) voiceParts.push(`Tone: ${brand.tone}`);
-    if (brand?.avoidWords) voiceParts.push(`Words to Avoid: ${brand.avoidWords}`);
-    if (brand?.contentFormats?.length) voiceParts.push(`Preferred Content Formats: ${brand.contentFormats.join(', ')}`);
-    if (brand?.existingExamples) voiceParts.push(`Reference Examples:\n${brand.existingExamples}`);
-
-    const existingVoice = ws.brandVoice || '';
-    const onboardingVoice = voiceParts.join('\n');
-    const mergedVoice = existingVoice
-      ? `${existingVoice}\n\n--- Client Onboarding Responses ---\n${onboardingVoice}`
-      : onboardingVoice;
-
-    // 3. Build personas from audience info
-    const personas = [...(ws.personas || [])];
-    if (audience?.primaryAudience || audience?.painPoints || audience?.goals) {
-      const primaryPersona = {
-        id: `persona_onboard_${Date.now()}`,
-        name: audience.primaryAudience?.split(/[,.\n]/)[0]?.trim()?.slice(0, 60) || 'Primary Audience',
-        description: audience.primaryAudience || '',
-        painPoints: audience.painPoints ? audience.painPoints.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
-        goals: audience.goals ? audience.goals.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
-        objections: audience.objections ? audience.objections.split('\n').map((s: string) => s.trim()).filter(Boolean) : [],
-        preferredContentFormat: brand?.contentFormats?.join(', ') || undefined,
-        buyingStage: (audience.buyingStage === 'mixed' ? undefined : audience.buyingStage) as 'awareness' | 'consideration' | 'decision' | undefined,
-      };
-      personas.push(primaryPersona);
-    }
-    if (audience?.secondaryAudience) {
-      const secondaryPersona = {
-        id: `persona_onboard2_${Date.now()}`,
-        name: audience.secondaryAudience.split(/[,.\n]/)[0]?.trim()?.slice(0, 60) || 'Secondary Audience',
-        description: audience.secondaryAudience,
-        painPoints: [] as string[],
-        goals: [] as string[],
-        objections: [] as string[],
-      };
-      personas.push(secondaryPersona);
-    }
-
-    // 4. Save competitor domains if provided
-    const competitorDomains = [...(ws.competitorDomains || [])];
-    if (competitors?.competitors) {
-      const urls = competitors.competitors.split('\n')
-        .map((line: string) => {
-          const match = line.match(/https?:\/\/([^/\s]+)/);
-          return match ? match[1].replace(/^www\./, '') : null;
-        })
-        .filter(Boolean) as string[];
-      for (const d of urls) {
-        if (!competitorDomains.includes(d)) competitorDomains.push(d);
+      if (result.created && result.postCommitEffect) {
+        applyBrandIntakePostCommitEffect(
+          ws.id,
+          result.postCommitEffect,
+          identity.activityActor,
+        );
       }
-    }
 
-    // 5. Update workspace — route brand voice through authority chain
-    const voiceProfile = getVoiceProfile(req.params.id);
-    const voiceProfileIsAuthoritative = voiceProfile?.status === 'calibrated';
-    const updates: Record<string, unknown> = {
-      knowledgeBase: voiceProfileIsAuthoritative
-        ? `${mergedKb}\n\n--- Brand Voice (from onboarding) ---\n${onboardingVoice}`
-        : mergedKb,
-      personas,
-      competitorDomains: competitorDomains.length > 0 ? competitorDomains : ws.competitorDomains,
-      onboardingCompleted: true,
-    };
-    if (!voiceProfileIsAuthoritative) {
-      updates.brandVoice = mergedVoice;
-    } else {
-      log.info({ workspaceId: req.params.id }, 'Voice profile is calibrated — onboarding brand voice data folded into knowledgeBase instead of brandVoice');
+      res.json({ ok: true, message: 'Onboarding responses saved successfully' });
+    } catch (err) {
+      log.error({ err }, 'Error saving responses');
+      res.status(500).json({ error: 'Failed to save onboarding responses' });
     }
-    updateWorkspace(req.params.id, updates);
-
-    // client-visibility-ok: onboarding completion is internal audit history, not client timeline content.
-    addActivity(ws.id, 'client_onboarding_submitted', 'Client completed onboarding questionnaire', 'Via client portal');
-    res.json({ ok: true, message: 'Onboarding responses saved successfully' });
-  } catch (err) {
-    log.error({ err: err }, 'Error saving responses');
-    res.status(500).json({ error: 'Failed to save onboarding responses' });
-  }
-});
+  },
+);
 
 // Public tier endpoint — returns effective tier for a workspace
 router.get('/api/public/tier/:id', (req, res) => { // portal-auth-public-ok — login screen bootstrap endpoint
@@ -266,6 +337,8 @@ router.get('/api/public/audit-summary/:workspaceId', requireClientPortalAuth('wo
     errors: filtered.errors,
     warnings: filtered.warnings,
     infos: filtered.infos,
+    categoryScoreVersion: filtered.categoryScoreVersion,
+    categoryScores: filtered.categoryScores,
     previousScore: latest.previousScore,
   });
 });
@@ -430,7 +503,7 @@ router.delete('/api/public/keyword-feedback/:workspaceId', ...requireClientStrat
       : typeof req.body?.keyword === 'string'
         ? req.body.keyword
         : '';
-  const keyword = keywordComparisonKey(rawKeyword);
+  const keyword = rawKeyword.trim();
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
   const result = clearKeywordFeedback(ws.id, keyword);
   if (!result.existed) return res.json(result);
@@ -507,28 +580,22 @@ router.post('/api/public/business-priorities/:workspaceId', ...requireClientStra
   }));
   const updatedAt = new Date().toISOString();
 
-  // Upsert into db
-  db.prepare(`
-    INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
-    VALUES (?, ?, ?)
-    ON CONFLICT(workspace_id) DO UPDATE SET
-      priorities = excluded.priorities,
-      updated_at = excluded.updated_at
-  `).run(wsId, JSON.stringify(clean), updatedAt);
-
-  // Also inject a summary into workspace businessContext so it's available for AI prompts
-  if (ws.keywordStrategy) {
-    const existingContext = ws.keywordStrategy.businessContext || '';
-    const base = existingContext.includes(CLIENT_BUSINESS_PRIORITIES_MARKER)
-      ? existingContext.split(CLIENT_BUSINESS_PRIORITIES_MARKER)[0]
-      : existingContext;
-    const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
-    const businessContext = priorityText
-      ? `${base}${CLIENT_BUSINESS_PRIORITIES_MARKER}${priorityText}`
-      : base;
-
-    updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
-  }
+  db.transaction(() => {
+    bumpKeywordStrategyGenerationRevision(wsId);
+    db.prepare(`
+      INSERT INTO client_business_priorities (workspace_id, priorities, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(workspace_id) DO UPDATE SET priorities = excluded.priorities, updated_at = excluded.updated_at
+    `).run(wsId, JSON.stringify(clean), updatedAt);
+    if (ws.keywordStrategy) {
+      const existingContext = ws.keywordStrategy.businessContext || '';
+      const base = existingContext.includes(CLIENT_BUSINESS_PRIORITIES_MARKER)
+        ? existingContext.split(CLIENT_BUSINESS_PRIORITIES_MARKER)[0] : existingContext;
+      const priorityText = clean.map(p => `[${p.category}] ${p.text}`).join('; ');
+      const businessContext = priorityText ? `${base}${CLIENT_BUSINESS_PRIORITIES_MARKER}${priorityText}` : base;
+      updateWorkspace(wsId, { keywordStrategy: { ...ws.keywordStrategy, businessContext } });
+    }
+  }).immediate();
   // Bridge #3: business priorities updated — immediate flush + debounced
   // defense-in-depth. Priorities are also read directly by clientSignals, so
   // this must run even before a workspace has a keywordStrategy blob.
@@ -609,33 +676,34 @@ router.post('/api/public/content-gap-vote/:workspaceId', ...requireClientStrateg
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
   const { keyword, vote } = req.body as ContentGapVoteBody;
-  const kw = keywordComparisonKey(keyword);
+  const rawKeyword = keyword.trim();
+  if (!keywordIdentityKeyV2(rawKeyword)) {
+    return res.status(400).json({ error: 'keyword must contain searchable characters' });
+  }
+  let changed = false;
+  db.transaction(() => {
+    changed = vote === 'none'
+      ? clearContentGapVote(wsId, rawKeyword)
+      : setContentGapVote(
+          wsId,
+          rawKeyword,
+          vote,
+          typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client',
+        ).changed;
+    if (changed) invalidateKeywordStrategyGenerationInputs(wsId);
+  }).immediate();
 
-  // The two write paths below (DELETE for "clear" + INSERT/UPDATE for
-  // "set") are mutually exclusive — only one runs per request — but the
-  // multi-step-txn rule scans by line proximity and can't know that.
-  // Wrapping the if/else in a single db.transaction() satisfies the rule
-  // AND adds defence-in-depth: any future expansion of either branch
-  // (e.g. an audit-log INSERT) inherits atomicity automatically.
-  const recordVote = db.transaction(() => {
-    if (vote === 'none') {
-      db.prepare('DELETE FROM content_gap_votes WHERE workspace_id = ? AND keyword = ?').run(wsId, kw);
-    } else {
-      db.prepare(`
-        INSERT INTO content_gap_votes (workspace_id, keyword, vote, voted_by, updated_at)
-        VALUES (?, ?, ?, ?, datetime('now'))
-        ON CONFLICT(workspace_id, keyword) DO UPDATE SET
-          vote = excluded.vote,
-          voted_by = excluded.voted_by,
-          updated_at = datetime('now')
-      `).run(wsId, kw, vote, typeof res.locals.clientEmail === 'string' ? res.locals.clientEmail : 'client');
-    }
+  if (!changed) return res.json({ ok: true });
+
+  invalidateIntelligenceCache(wsId);
+  broadcastToWorkspace(wsId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+    workspaceId: wsId,
+    reason: 'content_gap_vote',
+    updatedAt: new Date().toISOString(),
   });
-  recordVote();
-
-  broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { keyword: kw, vote });
+  broadcastToWorkspace(wsId, WS_EVENTS.STRATEGY_UPDATED, { keyword: rawKeyword, vote });
   // client-visibility-ok: this activity is for internal audit history, not client timeline display.
-  addActivity(wsId, 'client_content_gap_vote', `Client voted ${vote} on keyword: ${kw}`, 'Via client portal');
+  addActivity(wsId, 'client_content_gap_vote', `Client voted ${vote} on keyword: ${rawKeyword}`, 'Via client portal');
   res.json({ ok: true });
 });
 
@@ -644,9 +712,8 @@ router.get('/api/public/content-gap-votes/:workspaceId', requireClientPortalAuth
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-  const rows = db.prepare('SELECT keyword, vote FROM content_gap_votes WHERE workspace_id = ?').all(wsId) as { keyword: string; vote: string }[];
-  const votes: Record<string, string> = {};
-  for (const r of rows) votes[r.keyword] = r.vote;
+  const votes = Object.create(null) as Record<string, string>;
+  for (const row of listContentGapVotes(wsId)) votes[row.keyword] = row.vote;
   res.json({ votes });
 });
 
@@ -669,8 +736,19 @@ function toClientSection(s: { id: string; entryId: string; sectionPlanItemId: st
   };
 }
 
+const publicCopyRevisionSchema = {
+  // Public copy payloads omit the internal generation revision. The client
+  // echoes the existing updatedAt field and this route resolves it to CAS.
+  expectedUpdatedAt: z.string().datetime(),
+};
+
+const copyApprovalSchema = z.object(publicCopyRevisionSchema).strict();
+
 const copySuggestionSchema = z.object({
-  originalText: z.string().trim().min(1, 'originalText is required').max(5000),
+  ...publicCopyRevisionSchema,
+  // This is an optimistic source snapshot, so preserve whitespace exactly for
+  // the domain-level equality check against the authoritative generated copy.
+  originalText: z.string().min(1, 'originalText is required').max(5000),
   suggestedText: z.string().trim().min(1, 'suggestedText is required').max(5000),
 }).strict();
 
@@ -735,7 +813,7 @@ router.get('/api/public/copy/:workspaceId/entry/:entryId/sections', requireClien
 });
 
 // Client approves a section
-router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireClientCopyReviewAuth, (req, res) => {
+router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireClientCopyReviewAuth, validate(copyApprovalSchema), (req, res, next) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
@@ -750,48 +828,100 @@ router.post('/api/public/copy/:workspaceId/section/:sectionId/approve', requireC
   if (!existing || existing.status !== 'client_review') {
     return res.status(400).json({ error: 'Could not approve section. It may not be in a reviewable state.' });
   }
+  if (existing.updatedAt !== req.body.expectedUpdatedAt) {
+    return res.status(409).json({
+      error: 'This section changed since you opened it. Refresh before approving.',
+      code: 'copy_section_changed',
+    });
+  }
 
-  const section = updateSectionStatus(sectionId, wsId, 'approved');
+  let section;
+  try {
+    section = updateSectionStatus(sectionId, wsId, 'approved', existing.generationRevision);
+  } catch (err) {
+    if (err instanceof GenerationRevisionConflictError) {
+      return res.status(409).json({
+        error: 'This section changed while approval was saving. Refresh before trying again.',
+        code: err.code,
+      });
+    }
+    return next(err);
+  }
   if (!section) {
     return res.status(400).json({ error: 'Could not approve section. It may not be in a reviewable state.' });
   }
 
-  broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
-  // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
-  addActivity(wsId, 'copy_approved', `Client approved copy section`, 'Via client portal');
-  log.info({ wsId, sectionId }, 'Client approved copy section');
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'broadcast', () => {
+    broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+  });
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'activity', () => {
+    // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
+    addActivity(wsId, 'copy_approved', `Client approved copy section`, 'Via client portal');
+  });
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'audit-log', () => {
+    log.info({ wsId, sectionId }, 'Client approved copy section');
+  });
   // Strip internal-only fields before returning to client
   res.json({ section: toClientSection(section) });
 });
 
 // Client suggests an edit on a section
-router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireClientCopyReviewAuth, validate(copySuggestionSchema), (req, res) => {
+router.post('/api/public/copy/:workspaceId/section/:sectionId/suggest', requireClientCopyReviewAuth, validate(copySuggestionSchema), (req, res, next) => {
   const wsId = req.params.workspaceId;
   const ws = getWorkspace(wsId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.clientPortalEnabled != null && !ws.clientPortalEnabled) return res.status(403).json({ error: 'Client portal is disabled for this workspace' });
 
   const { sectionId } = req.params;
-  const { originalText, suggestedText } = req.body;
+  const { expectedUpdatedAt, originalText, suggestedText } = req.body;
 
   // Only client_review sections accept suggestions via the client portal
   const existing = getSection(sectionId, wsId);
   if (!existing || existing.status !== 'client_review') {
     return res.status(400).json({ error: 'Section is not in a reviewable state.' });
   }
+  if (existing.updatedAt !== expectedUpdatedAt) {
+    return res.status(409).json({
+      error: 'This section changed since you opened it. Refresh before suggesting an edit.',
+      code: 'copy_section_changed',
+    });
+  }
 
-  const section = addClientSuggestion(sectionId, wsId, {
-    originalText,
-    suggestedText,
-  });
+  let section;
+  try {
+    section = addClientSuggestion(sectionId, wsId, {
+      originalText,
+      suggestedText,
+    }, existing.generationRevision);
+  } catch (err) {
+    if (err instanceof GenerationRevisionConflictError) {
+      return res.status(409).json({
+        error: 'This section changed while your suggestion was saving. Refresh before trying again.',
+        code: err.code,
+      });
+    }
+    if (err instanceof CopySuggestionOriginalMismatchError) {
+      return res.status(409).json({
+        error: 'The original copy no longer matches this section. Refresh before suggesting an edit.',
+        code: err.code,
+      });
+    }
+    return next(err);
+  }
   if (!section) {
     return res.status(400).json({ error: 'Could not add suggestion. Section not found.' });
   }
 
-  broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
-  // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
-  addActivity(wsId, 'copy_suggestion_added', `Client suggested copy edit`, 'Via client portal');
-  log.info({ wsId, sectionId }, 'Client suggested copy edit');
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'broadcast', () => {
+    broadcastToWorkspace(wsId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+  });
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'activity', () => {
+    // client-visibility-ok: copy review actions update the copy UI directly; activity is internal audit history.
+    addActivity(wsId, 'copy_suggestion_added', `Client suggested copy edit`, 'Via client portal');
+  });
+  runPublicCopyReviewPostCommitEffect(wsId, sectionId, 'audit-log', () => {
+    log.info({ wsId, sectionId }, 'Client suggested copy edit');
+  });
   // Strip internal-only fields before returning to client
   res.json({ section: toClientSection(section) });
 });

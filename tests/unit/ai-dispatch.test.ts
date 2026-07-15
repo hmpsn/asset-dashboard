@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   callOpenAI: vi.fn(),
   callAnthropic: vi.fn(),
+  recordOperationTrace: vi.fn(),
 }));
 
 vi.mock('../../server/openai-helpers.js', () => ({
@@ -12,6 +13,7 @@ vi.mock('../../server/openai-helpers.js', () => ({
 vi.mock('../../server/anthropic-helpers.js', () => ({
   callAnthropic: mocks.callAnthropic,
 }));
+vi.mock('../../server/platform-observability.js', () => ({ recordOperationTrace: mocks.recordOperationTrace }));
 
 import { callAI } from '../../server/ai.js';
 
@@ -19,6 +21,7 @@ describe('callAI', () => {
   beforeEach(() => {
     mocks.callOpenAI.mockReset();
     mocks.callAnthropic.mockReset();
+    mocks.recordOperationTrace.mockReset();
   });
 
   it('passes OpenAI JSON response format through the dispatcher', async () => {
@@ -89,6 +92,7 @@ describe('callAI', () => {
       maxRetries: 1,
       timeoutMs: 12_000,
       signal: controller.signal,
+      cachePolicy: { mode: 'none' },
     }));
   });
 
@@ -165,6 +169,7 @@ describe('callAI', () => {
       maxRetries: 2,
       timeoutMs: 45_000,
       signal: controller.signal,
+      cachePolicy: { mode: 'none' },
     }));
   });
 
@@ -188,7 +193,69 @@ describe('callAI', () => {
       maxRetries: 3,
       timeoutMs: 90_000,
       responseFormat: { type: 'json_object' },
+      cachePolicy: { mode: 'ttl', ttlMs: 300_000 },
+      runId: expect.any(String),
+      operation: 'schema-plan',
     }));
+  });
+
+  it('preserves the result shape and adds safe execution metadata', async () => {
+    mocks.callAnthropic.mockResolvedValue({
+      text: 'ok', promptTokens: 9, completionTokens: 3, totalTokens: 12,
+      execution: { attempts: 1, cacheOutcome: 'miss' },
+    });
+
+    const result = await callAI({
+      operation: 'copy-generation',
+      messages: [{ role: 'user', content: 'Draft.' }],
+      workspaceId: 'ws_metadata',
+    });
+
+    expect(result).toMatchObject({
+      text: 'ok',
+      tokens: { prompt: 9, completion: 3, total: 12 },
+      execution: {
+        runId: expect.any(String),
+        operation: 'copy-generation',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        attempts: 1,
+        cacheOutcome: 'miss',
+        startedAt: expect.any(String),
+        completedAt: expect.any(String),
+        durationMs: expect.any(Number),
+      },
+    });
+    expect(mocks.callAnthropic).toHaveBeenCalledWith(expect.objectContaining({
+      cachePolicy: { mode: 'inflight' },
+      runId: expect.any(String),
+      operation: 'copy-generation',
+    }));
+    expect(result.execution).not.toHaveProperty('fallbackUsed');
+  });
+
+  it('links a cache consumer run to the provider run that produced the result', async () => {
+    mocks.callOpenAI.mockResolvedValue({
+      text: 'cached', promptTokens: 2, completionTokens: 1, totalTokens: 3,
+      execution: { attempts: 1, cacheOutcome: 'hit', originRunId: 'origin-run' },
+    });
+    const result = await callAI({ operation: 'schema-plan', messages: [{ role: 'user', content: 'same' }] });
+    expect(result.execution).toMatchObject({ cacheOutcome: 'hit', originRunId: 'origin-run' });
+    expect(result.execution.runId).not.toBe('origin-run');
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      runId: result.execution.runId, originRunId: 'origin-run', cacheOutcome: 'hit', provider: 'openai',
+    }));
+  });
+
+  it('reports a proven fallback on execution metadata and provider options', async () => {
+    mocks.callOpenAI.mockResolvedValue({ text: 'fallback', promptTokens: 2, completionTokens: 1, totalTokens: 3 });
+    const result = await callAI({
+      operation: 'copy-generation', messages: [{ role: 'user', content: 'draft' }],
+      provider: 'openai',
+      executionChainId: 'creative-chain', fallbackUsed: true,
+    });
+    expect(result.execution).toMatchObject({ executionChainId: 'creative-chain', fallbackUsed: true });
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({ executionChainId: 'creative-chain', fallbackUsed: true }));
   });
 
   it('lets explicit options override registry defaults', async () => {
@@ -212,6 +279,8 @@ describe('callAI', () => {
     expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
       model: 'gpt-5.4',
       feature: 'schema-plan-override',
+      operation: 'schema-plan',
+      cachePolicy: { mode: 'ttl', ttlMs: 300_000 },
       maxRetries: 1,
       timeoutMs: 12_000,
     }));
@@ -221,5 +290,14 @@ describe('callAI', () => {
     await expect(callAI({
       messages: [{ role: 'user', content: 'missing metadata' }],
     })).rejects.toThrow('callAI requires either feature or operation');
+  });
+
+  it('defaults unregistered feature calls to inflight-only caching', async () => {
+    mocks.callOpenAI.mockResolvedValue({ text: 'ok', promptTokens: 1, completionTokens: 1, totalTokens: 2 });
+    await callAI({ feature: 'legacy-generation', messages: [{ role: 'user', content: 'Generate.' }] });
+    expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'legacy-generation',
+      cachePolicy: { mode: 'inflight' },
+    }));
   });
 });

@@ -56,6 +56,17 @@ vi.mock('../../server/broadcast.js', () => ({
   broadcastToWorkspace: vi.fn(),
 }));
 
+const mockInvalidateMonthlyDigestCache = vi.hoisted(() => vi.fn());
+const mockClearIntelligenceCache = vi.hoisted(() => vi.fn());
+
+vi.mock('../../server/monthly-digest-cache.js', () => ({
+  invalidateMonthlyDigestCache: mockInvalidateMonthlyDigestCache,
+}));
+
+vi.mock('../../server/intelligence/cache-clear.js', () => ({
+  clearIntelligenceCache: mockClearIntelligenceCache,
+}));
+
 // Mutable state captured in vi.hoisted so it can be mutated by individual tests
 const googleAuthState = vi.hoisted(() => ({
   globalAuthUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=_global',
@@ -138,6 +149,15 @@ const analyticsDataState = vi.hoisted(() => ({
   countries: [{ country: 'usa', clicks: 90, impressions: 900 }],
   types: [{ searchType: 'web', clicks: 95, impressions: 950 }],
   comparison: { current: { clicks: 100 }, previous: { clicks: 80 } },
+  brandedDemand: {
+    status: 'ready' as const,
+    denominator: 'impressions' as const,
+    tokens: ['example'],
+    queryRowsSampled: 3,
+    total: { clicks: 100, impressions: 1000 },
+    branded: { clicks: 40, impressions: 400, sharePct: 40 },
+    nonBranded: { clicks: 60, impressions: 600, sharePct: 60 },
+  },
   shouldThrow: false,
 }));
 
@@ -146,6 +166,7 @@ vi.mock('../../server/analytics-data.js', () => ({
     if (analyticsDataState.shouldThrow) throw new Error('Search overview API error');
     return analyticsDataState.overview;
   }),
+  fetchBrandedDemandSplit: vi.fn(async () => analyticsDataState.brandedDemand),
   fetchPerformanceTrend: vi.fn(async () => analyticsDataState.trend),
   fetchSearchDevices: vi.fn(async () => analyticsDataState.devices),
   fetchSearchCountries: vi.fn(async () => analyticsDataState.countries),
@@ -415,6 +436,8 @@ describe('GET /api/google/callback — OAuth callback edge cases', () => {
   beforeEach(async () => {
     ws = seedWorkspace();
     googleAuthState.exchangeResult = { success: true };
+    mockInvalidateMonthlyDigestCache.mockClear();
+    mockClearIntelligenceCache.mockClear();
     const srv = await startTestServer();
     baseUrl = srv.baseUrl;
     stop = srv.stop;
@@ -457,6 +480,8 @@ describe('GET /api/google/callback — OAuth callback edge cases', () => {
     const location = headers.get('location') ?? '';
     expect(location).toContain('google=connected');
     expect(location).toContain(ws.webflowSiteId);
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(ws.workspaceId);
+    expect(mockClearIntelligenceCache).toHaveBeenCalledWith(ws.workspaceId);
   });
 
   it('returns 500 when code exchange fails', async () => {

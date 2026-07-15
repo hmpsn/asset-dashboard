@@ -11,7 +11,10 @@ describe('deliverable websocket subscriber wiring', () => {
 
     expect(source).toContain('[WS_EVENTS.DELIVERABLE_SENT]: () => invalidateRegistry(WS_EVENTS.DELIVERABLE_SENT)');
     expect(source).toContain('[WS_EVENTS.DELIVERABLE_UPDATED]: () => invalidateRegistry(WS_EVENTS.DELIVERABLE_UPDATED)');
-    expect(keys).toEqual([queryKeys.admin.workspaceDeliverables('ws-deliverables')]);
+    expect(keys).toEqual([
+      queryKeys.admin.workspaceDeliverables('ws-deliverables'),
+      queryKeys.admin.brandGenerationAll('ws-deliverables'),
+    ]);
   });
 
   it('ClientDashboard keeps unified inbox cache fresh even when the inbox tab is not mounted', () => {
@@ -32,6 +35,7 @@ describe('deliverable websocket subscriber wiring', () => {
       queryKeys.client.unifiedInbox('ws-deliverables'),
       queryKeys.client.theIssue('ws-deliverables'),
       queryKeys.client.recResponses('ws-deliverables'),
+      queryKeys.client.brandSummary('ws-deliverables'),
     ]);
   });
 

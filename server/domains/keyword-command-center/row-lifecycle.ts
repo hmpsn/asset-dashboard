@@ -18,6 +18,7 @@ import {
   type TrackedKeyword,
 } from '../../../shared/types/rank-tracking.js';
 import type { KeywordGapItem } from '../../../shared/types/workspace.js';
+import type { TrackedKeywordIdentityMetadata } from '../../../shared/types/keyword-identity.js';
 import type { KeywordStrategyExplanation } from '../../../shared/types/keyword-strategy-ux.js';
 import type { DraftRow, FeedbackRow } from './types.js';
 
@@ -85,7 +86,9 @@ export function isInactiveTracking(keyword: TrackedKeyword): boolean {
   return (keyword.status ?? TRACKED_KEYWORD_STATUS.ACTIVE) !== TRACKED_KEYWORD_STATUS.ACTIVE;
 }
 
-export function protectedReason(keyword: TrackedKeyword | undefined): string | undefined {
+export function protectedReason(
+  keyword: (TrackedKeyword & TrackedKeywordIdentityMetadata) | undefined,
+): string | undefined {
   if (!keyword) return undefined;
   if (keyword.pinned) return 'Pinned keyword';
   if (keyword.source === TRACKED_KEYWORD_SOURCE.CLIENT_REQUESTED) return 'Client-requested keyword';
@@ -93,7 +96,7 @@ export function protectedReason(keyword: TrackedKeyword | undefined): string | u
   // Wave 3d-ii (Decision B): any gap-provenanced approval (sourceGapKey present) is
   // hard-protected — a client approved it off a content/keyword gap surface, so it
   // must never be auto-deprecated regardless of its current source label.
-  if (keyword.sourceGapKey) return 'Gap-approved keyword';
+  if (keyword.sourceGapKey || keyword.sourceGapKeyV2) return 'Gap-approved keyword';
   return undefined;
 }
 

@@ -84,11 +84,41 @@ function api(path: string, opts?: RequestInit): Promise<Response> {
   return fetch(`${baseUrl}${path}`, opts);
 }
 
+function withObservedCopyAuthority(path: string, body: unknown): unknown {
+  const sectionMatch = path.match(/\/section\/([^/]+)\/(?:status|text|suggest)$/);
+  if (sectionMatch && body && typeof body === 'object' && !Array.isArray(body)) {
+    if ('expectedRevision' in body) return body;
+    const row = db.prepare('SELECT generation_revision FROM copy_sections WHERE id = ?')
+      .get(sectionMatch[1]) as { generation_revision: number } | undefined;
+    return { ...body, expectedRevision: row?.generation_revision ?? 0 };
+  }
+
+  const sendMatch = path.match(/\/api\/copy\/[^/]+\/[^/]+\/([^/]+)\/send-to-client$/);
+  if (sendMatch) {
+    if (body && typeof body === 'object' && !Array.isArray(body) && 'sectionRevisions' in body) {
+      return body;
+    }
+    const rows = db.prepare(`
+      SELECT id, generation_revision
+      FROM copy_sections
+      WHERE entry_id = ? AND status = 'draft'
+      ORDER BY rowid ASC
+    `).all(sendMatch[1]) as Array<{ id: string; generation_revision: number }>;
+    return {
+      sectionRevisions: rows.map(row => ({
+        sectionId: row.id,
+        expectedRevision: row.generation_revision,
+      })),
+    };
+  }
+  return body;
+}
+
 function patchJson(path: string, body: unknown): Promise<Response> {
   return api(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(withObservedCopyAuthority(path, body)),
   });
 }
 
@@ -96,7 +126,7 @@ function postJson(path: string, body: unknown): Promise<Response> {
   return api(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(withObservedCopyAuthority(path, body)),
   });
 }
 
@@ -138,10 +168,34 @@ function sectionVersion(sectionId: string): number | undefined {
   return row?.version;
 }
 
+function sectionGenerationRevision(sectionId: string): number | undefined {
+  const row = db.prepare('SELECT generation_revision FROM copy_sections WHERE id = ?')
+    .get(sectionId) as { generation_revision: number } | undefined;
+  return row?.generation_revision;
+}
+
 /** Read section copy from the DB. */
 function sectionCopy(sectionId: string): string | null | undefined {
   const row = db.prepare('SELECT generated_copy FROM copy_sections WHERE id = ?').get(sectionId) as { generated_copy: string | null } | undefined;
   return row?.generated_copy;
+}
+
+function sentToClientActivityCount(workspaceId: string): number {
+  const row = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM activity_log
+    WHERE workspace_id = ? AND type = 'copy_sent_to_client'
+  `).get(workspaceId) as { count: number };
+  return row.count;
+}
+
+function copyEditActivityCount(workspaceId: string): number {
+  const row = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM activity_log
+    WHERE workspace_id = ? AND type = 'copy_section_edited'
+  `).get(workspaceId) as { count: number };
+  return row.count;
 }
 
 /** Create a blueprint + entry in the DB (no sections). */
@@ -234,7 +288,7 @@ describe('State machine full path: pending → draft → client_review → appro
   });
 
   it('completes revision path: draft→client_review→revision_requested→draft→approved', async () => {
-    const sId = insertSection(ws.workspaceId, sharedEntryId, 'draft');
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'draft', 'Hero copy text');
 
     // draft → client_review
     await patchJson(`/api/copy/${ws.workspaceId}/section/${sId}/status`, { status: 'client_review' });
@@ -392,6 +446,150 @@ describe('COPY_SECTION_UPDATED broadcast payload shape', () => {
   });
 });
 
+describe('Strict expected-revision mutation boundary', () => {
+  it('rejects a stale status mutation without changing version, revision, or broadcasting', async () => {
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'draft', 'Observed copy');
+    const edit = await patchJson(`/api/copy/${ws.workspaceId}/section/${sId}/text`, {
+      copy: 'Newer operator copy',
+      expectedRevision: 0,
+    });
+    expect(edit.status).toBe(200);
+    broadcastState.calls = [];
+
+    const stale = await patchJson(`/api/copy/${ws.workspaceId}/section/${sId}/status`, {
+      status: 'client_review',
+      expectedRevision: 0,
+    });
+
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ code: 'generation_revision_conflict' });
+    expect(sectionStatus(sId)).toBe('draft');
+    expect(sectionCopy(sId)).toBe('Newer operator copy');
+    expect(sectionVersion(sId)).toBe(2);
+    expect(sectionGenerationRevision(sId)).toBe(1);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('rejects stale text and suggestion mutations without partial writes', async () => {
+    const textSection = insertSection(ws.workspaceId, sharedEntryId, 'draft', 'Current text');
+    const suggestionSection = insertSection(ws.workspaceId, sharedEntryId, 'client_review', 'Review text');
+    db.prepare(`
+      UPDATE copy_sections
+      SET generation_revision = generation_revision + 1
+      WHERE id IN (?, ?)
+    `).run(textSection, suggestionSection);
+    broadcastState.calls = [];
+
+    const [textRes, suggestionRes] = await Promise.all([
+      patchJson(`/api/copy/${ws.workspaceId}/section/${textSection}/text`, {
+        copy: 'Stale replacement',
+        expectedRevision: 0,
+      }),
+      postJson(`/api/copy/${ws.workspaceId}/section/${suggestionSection}/suggest`, {
+        originalText: 'Review text',
+        suggestedText: 'Stale suggestion',
+        expectedRevision: 0,
+      }),
+    ]);
+
+    expect(textRes.status).toBe(409);
+    expect(suggestionRes.status).toBe(409);
+    expect(sectionCopy(textSection)).toBe('Current text');
+    expect(sectionVersion(textSection)).toBe(1);
+    expect(sectionGenerationRevision(textSection)).toBe(1);
+    const suggestionRow = db.prepare(`
+      SELECT status, client_suggestions, generation_revision
+      FROM copy_sections
+      WHERE id = ?
+    `).get(suggestionSection) as {
+      status: string;
+      client_suggestions: string | null;
+      generation_revision: number;
+    };
+    expect(suggestionRow).toMatchObject({
+      status: 'client_review',
+      client_suggestions: null,
+      generation_revision: 1,
+    });
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('returns 409 for stale regeneration even after copy enters a protected review state', async () => {
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'client_review', 'Reviewed copy');
+    db.prepare(`
+      UPDATE copy_sections
+      SET generation_revision = 1
+      WHERE id = ?
+    `).run(sId);
+    broadcastState.calls = [];
+
+    const res = await postJson(
+      `/api/copy/${ws.workspaceId}/${sharedBlueprintId}/${sharedEntryId}/regenerate/${sId}`,
+      { note: 'Stale regeneration request', expectedRevision: 0 },
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'generation_revision_conflict' });
+    expect(sectionStatus(sId)).toBe('client_review');
+    expect(sectionCopy(sId)).toBe('Reviewed copy');
+    expect(sectionGenerationRevision(sId)).toBe(1);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('treats a same-status request as a no-op without incrementing either counter', async () => {
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'draft');
+    broadcastState.calls = [];
+
+    const res = await patchJson(`/api/copy/${ws.workspaceId}/section/${sId}/status`, {
+      status: 'draft',
+      expectedRevision: 0,
+    });
+
+    expect(res.status).toBe(404);
+    expect(sectionVersion(sId)).toBe(1);
+    expect(sectionGenerationRevision(sId)).toBe(0);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('returns identical text as a no-op without revision or success side effects', async () => {
+    const currentCopy = 'Identical operator copy';
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'draft', currentCopy);
+    const activityCountBefore = copyEditActivityCount(ws.workspaceId);
+    broadcastState.calls = [];
+
+    const res = await patchJson(`/api/copy/${ws.workspaceId}/section/${sId}/text`, {
+      copy: currentCopy,
+      expectedRevision: 0,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as CopySection;
+    expect(body.generatedCopy).toBe(currentCopy);
+    expect(body.version).toBe(1);
+    expect(body.generationRevision).toBe(0);
+    expect(sectionVersion(sId)).toBe(1);
+    expect(sectionGenerationRevision(sId)).toBe(0);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(copyEditActivityCount(ws.workspaceId)).toBe(activityCountBefore);
+  });
+
+  it('increments generationRevision for status only while preserving business version', async () => {
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'draft');
+
+    const res = await patchJson(`/api/copy/${ws.workspaceId}/section/${sId}/status`, {
+      status: 'client_review',
+      expectedRevision: 0,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as CopySection;
+    expect(body.version).toBe(1);
+    expect(body.generationRevision).toBe(1);
+    expect(sectionVersion(sId)).toBe(1);
+    expect(sectionGenerationRevision(sId)).toBe(1);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // 5. Send-to-client batch transitions
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -411,6 +609,8 @@ describe('POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client batch
     expect(sectionStatus(s1)).toBe('client_review');
     expect(sectionStatus(s2)).toBe('client_review');
     expect(sectionStatus(s3)).toBe('client_review');
+    expect(sectionGenerationRevision(s1)).toBe(1);
+    expect(sectionVersion(s1)).toBe(1);
   });
 
   it('broadcasts a single COPY_SECTION_UPDATED with action:sent_to_client and entryId', async () => {
@@ -449,6 +649,75 @@ describe('POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client batch
     expect(sectionStatus(sDraft)).toBe('client_review');
     expect(sectionStatus(sClientReview)).toBe('client_review'); // unchanged
     expect(sectionStatus(sApproved)).toBe('approved'); // unchanged
+  });
+
+  it('rejects a stale or incomplete draft census atomically without success side effects', async () => {
+    const { blueprintId, entryId } = createEntry(ws.workspaceId);
+    const s1 = insertSection(ws.workspaceId, entryId, 'draft');
+    const s2 = insertSection(ws.workspaceId, entryId, 'draft');
+    const activityCountBefore = sentToClientActivityCount(ws.workspaceId);
+    broadcastState.calls = [];
+
+    const res = await postJson(
+      `/api/copy/${ws.workspaceId}/${blueprintId}/${entryId}/send-to-client`,
+      { sectionRevisions: [{ sectionId: s1, expectedRevision: 0 }] },
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'generation_revision_conflict' });
+    expect(sectionStatus(s1)).toBe('draft');
+    expect(sectionStatus(s2)).toBe('draft');
+    expect(sectionGenerationRevision(s1)).toBe(0);
+    expect(sectionGenerationRevision(s2)).toBe(0);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(sentToClientActivityCount(ws.workspaceId)).toBe(activityCountBefore);
+  });
+
+  it('rolls back every section when one expected revision is stale', async () => {
+    const { blueprintId, entryId } = createEntry(ws.workspaceId);
+    const s1 = insertSection(ws.workspaceId, entryId, 'draft');
+    const s2 = insertSection(ws.workspaceId, entryId, 'draft');
+    db.prepare(`
+      UPDATE copy_sections
+      SET generation_revision = generation_revision + 1
+      WHERE id = ?
+    `).run(s2);
+    const activityCountBefore = sentToClientActivityCount(ws.workspaceId);
+    broadcastState.calls = [];
+
+    const res = await postJson(
+      `/api/copy/${ws.workspaceId}/${blueprintId}/${entryId}/send-to-client`,
+      {
+        sectionRevisions: [
+          { sectionId: s1, expectedRevision: 0 },
+          { sectionId: s2, expectedRevision: 0 },
+        ],
+      },
+    );
+
+    expect(res.status).toBe(409);
+    expect(sectionStatus(s1)).toBe('draft');
+    expect(sectionStatus(s2)).toBe('draft');
+    expect(sectionGenerationRevision(s1)).toBe(0);
+    expect(sectionGenerationRevision(s2)).toBe(1);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(sentToClientActivityCount(ws.workspaceId)).toBe(activityCountBefore);
+  });
+
+  it('treats an empty entry send as a no-op with no success side effects', async () => {
+    const { blueprintId, entryId } = createEntry(ws.workspaceId);
+    const activityCountBefore = sentToClientActivityCount(ws.workspaceId);
+    broadcastState.calls = [];
+
+    const res = await postJson(
+      `/api/copy/${ws.workspaceId}/${blueprintId}/${entryId}/send-to-client`,
+      { sectionRevisions: [] },
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'No draft sections to send' });
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(sentToClientActivityCount(ws.workspaceId)).toBe(activityCountBefore);
   });
 });
 
@@ -545,7 +814,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text — status and ve
 
 describe('POST /api/copy/:workspaceId/section/:sectionId/suggest — suggestion lifecycle', () => {
   it('suggestion on client_review transitions to revision_requested and stores suggestion', async () => {
-    const sId = insertSection(ws.workspaceId, sharedEntryId, 'client_review');
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'client_review', 'Original hero text');
 
     const res = await postJson(`/api/copy/${ws.workspaceId}/section/${sId}/suggest`, {
       originalText: 'Original hero text',
@@ -563,7 +832,7 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest — suggestion 
   });
 
   it('suggestion on draft section does NOT change status (draft stays draft)', async () => {
-    const sId = insertSection(ws.workspaceId, sharedEntryId, 'draft');
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'draft', 'Draft text');
 
     const res = await postJson(`/api/copy/${ws.workspaceId}/section/${sId}/suggest`, {
       originalText: 'Draft text',
@@ -576,7 +845,7 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest — suggestion 
   });
 
   it('multiple suggestions accumulate in client_suggestions array', async () => {
-    const sId = insertSection(ws.workspaceId, sharedEntryId, 'client_review');
+    const sId = insertSection(ws.workspaceId, sharedEntryId, 'client_review', 'Text A');
 
     await postJson(`/api/copy/${ws.workspaceId}/section/${sId}/suggest`, {
       originalText: 'Text A',
@@ -584,7 +853,7 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest — suggestion 
     });
     // After first suggestion, section is revision_requested — add another
     await postJson(`/api/copy/${ws.workspaceId}/section/${sId}/suggest`, {
-      originalText: 'Text B',
+      originalText: 'Text A',
       suggestedText: 'Suggestion 2',
     });
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link2Off, Download, ArrowRight, Wrench, Plus, X } from 'lucide-react';
-import { redirects as redirectsApi } from '../../api/misc';
+import { downloadRedirectRulesCsv } from '../../lib/redirectCsv';
 import { adminPath, type Page } from '../../routes';
 import type { DeadLinkItem } from './types';
 import { Button, FormInput, Icon, IconButton, SectionCard, cn } from '../ui';
@@ -12,12 +12,11 @@ interface DeadLinkPanelProps {
   workspaceId?: string;
 }
 
-export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLinkPanelProps) {
+export function DeadLinkPanel({ deadLinkDetails, workspaceId }: DeadLinkPanelProps) {
   const navigate = useNavigate();
   const [redirectFormUrl, setRedirectFormUrl] = useState<string | null>(null);
   const [redirectFormTo, setRedirectFormTo] = useState('');
   const [pendingRedirects, setPendingRedirects] = useState<Map<string, string>>(new Map());
-  const [savingRedirect, setSavingRedirect] = useState(false);
 
   const exportDeadLinksCSV = () => {
     if (deadLinkDetails.length === 0) return;
@@ -37,20 +36,19 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
     URL.revokeObjectURL(url);
   };
 
-  const saveRedirect = async (fromUrl: string) => {
+  const exportPendingRedirectsCSV = () => {
+    if (pendingRedirects.size === 0) return;
+    downloadRedirectRulesCsv(
+      Array.from(pendingRedirects, ([from, to]) => ({ from, to })),
+    );
+  };
+
+  const queueRedirect = (fromUrl: string) => {
     const toUrl = redirectFormTo.trim();
     if (!toUrl) return;
-    setSavingRedirect(true);
-    try {
-      setPendingRedirects(prev => new Map(prev).set(fromUrl, toUrl));
-      try {
-        await redirectsApi.save(siteId, { rules: [{ from: fromUrl, to: toUrl }] });
-      } catch { /* server save is best-effort */ }
-      setRedirectFormUrl(null);
-      setRedirectFormTo('');
-    } finally {
-      setSavingRedirect(false);
-    }
+    setPendingRedirects(prev => new Map(prev).set(fromUrl, toUrl));
+    setRedirectFormUrl(null);
+    setRedirectFormTo('');
   };
 
   return (
@@ -68,16 +66,30 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
             </span>
           )}
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={exportDeadLinksCSV}
-          icon={Download}
-          className="gap-1 t-caption-sm px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20"
-        >
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          {pendingRedirects.size > 0 && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={exportPendingRedirectsCSV}
+              icon={Download}
+              className="gap-1 t-caption-sm px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20"
+            >
+              Export redirects (CSV)
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={exportDeadLinksCSV}
+            icon={Download}
+            className="gap-1 t-caption-sm px-2 py-1 rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20"
+          >
+            Export CSV
+          </Button>
+        </div>
       </div>
       <div className="space-y-1.5">
         {deadLinkDetails.map((link, idx) => {
@@ -158,7 +170,7 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                     value={redirectFormTo}
                     onChange={setRedirectFormTo}
                     onKeyDown={e => {
-                      if (e.key === 'Enter') saveRedirect(link.url);
+                      if (e.key === 'Enter') queueRedirect(link.url);
                       if (e.key === 'Escape') { setRedirectFormUrl(null); setRedirectFormTo(''); }
                     }}
                     placeholder="/new-path or https://example.com/new"
@@ -169,11 +181,11 @@ export function DeadLinkPanel({ deadLinkDetails, siteId, workspaceId }: DeadLink
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={() => saveRedirect(link.url)}
-                    disabled={!redirectFormTo.trim() || savingRedirect}
+                    onClick={() => queueRedirect(link.url)}
+                    disabled={!redirectFormTo.trim()}
                     className="px-2.5 py-1 rounded t-caption font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50"
                   >
-                    {savingRedirect ? 'Saving...' : 'Save'}
+                    Queue
                   </Button>
                   <IconButton
                     type="button"

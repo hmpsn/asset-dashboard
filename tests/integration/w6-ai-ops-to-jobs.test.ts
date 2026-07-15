@@ -31,6 +31,60 @@ import {
 
 setupOpenAIMocks();
 
+const postAiEffectFailureState = vi.hoisted(() => ({
+  failActivityType: null as 'post_ai_review' | 'post_voice_scored' | null,
+  failIntelligenceInvalidation: false,
+}));
+
+const postAiJobTerminalFailureState = vi.hoisted(() => ({
+  failNextDone: false,
+}));
+
+vi.mock('../../server/jobs.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/jobs.js')>();
+  return {
+    ...actual,
+    updateJob: vi.fn((
+      id: string,
+      update: Parameters<typeof actual.updateJob>[1],
+    ) => {
+      if (postAiJobTerminalFailureState.failNextDone && update.status === 'done') {
+        postAiJobTerminalFailureState.failNextDone = false;
+        throw new Error('injected job completion persistence failure');
+      }
+      return actual.updateJob(id, update);
+    }),
+  };
+});
+
+vi.mock('../../server/activity-log.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/activity-log.js')>();
+  return {
+    ...actual,
+    addActivity: vi.fn((...args: Parameters<typeof actual.addActivity>) => {
+      if (postAiEffectFailureState.failActivityType === args[1]) {
+        postAiEffectFailureState.failActivityType = null;
+        throw new Error(`injected ${args[1]} activity failure`);
+      }
+      return actual.addActivity(...args);
+    }),
+  };
+});
+
+vi.mock('../../server/intelligence-freshness.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/intelligence-freshness.js')>();
+  return {
+    ...actual,
+    invalidateContentPipelineIntelligence: vi.fn((workspaceId: string) => {
+      if (postAiEffectFailureState.failIntelligenceInvalidation) {
+        postAiEffectFailureState.failIntelligenceInvalidation = false;
+        throw new Error('injected intelligence invalidation failure');
+      }
+      return actual.invalidateContentPipelineIntelligence(workspaceId);
+    }),
+  };
+});
+
 vi.mock('../../server/workspace-intelligence.js', () => ({
   buildWorkspaceIntelligence: vi.fn(async () => ({})),
   buildIntelPrompt: vi.fn(async () => ''),
@@ -55,7 +109,10 @@ vi.mock('../../server/broadcast.js', () => ({
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { getPost, savePost } from '../../server/content-posts-db.js';
 import { getBrief } from '../../server/content-brief.js';
+import { addActivity } from '../../server/activity-log.js';
+import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
 import db from '../../server/db/index.js';
 
 // ── Server bootstrap ────────────────────────────────────────────────────────
@@ -65,6 +122,7 @@ let stopServer: () => void;
 let wsId = '';
 let briefId = '';
 let postId = '';
+const SOURCE_POST_FINGERPRINT = 'b'.repeat(64);
 const originalAppPassword = process.env.APP_PASSWORD;
 const originalOpenAIKey = process.env.OPENAI_API_KEY;
 
@@ -81,10 +139,14 @@ async function startTestServer(): Promise<void> {
 }
 
 function postJson(path: string, body: unknown): Promise<Response> {
+  const briefMatch = path.match(/^\/api\/content-briefs\/([^/]+)\/([^/]+)\/regenerate(?:-outline)?$/);
+  const requestBody = briefMatch && body && typeof body === 'object' && !('expectedRevision' in body)
+    ? { ...body, expectedRevision: getBrief(briefMatch[1], briefMatch[2])?.generationRevision ?? 0 }
+    : body;
   return fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
 }
 
@@ -172,6 +234,16 @@ function seedPost(id: string): void {
     totalWordCount: 20,
     targetWordCount: 500,
     status: 'draft',
+    generationRevision: 0,
+    generationProvenance: {
+      runId: 'seed-post-run',
+      operation: 'seed-post',
+      provider: 'deterministic',
+      model: 'fixture',
+      inputFingerprint: SOURCE_POST_FINGERPRINT,
+      startedAt: '2026-07-14T00:00:00.000Z',
+      completedAt: '2026-07-14T00:00:00.000Z',
+    },
     createdAt: now,
     updatedAt: now,
   });
@@ -242,6 +314,13 @@ afterAll(() => {
 
 beforeEach(() => {
   resetOpenAIMocks();
+  postAiEffectFailureState.failActivityType = null;
+  postAiEffectFailureState.failIntelligenceInvalidation = false;
+  postAiJobTerminalFailureState.failNextDone = false;
+  vi.mocked(addActivity).mockClear();
+  vi.mocked(broadcastToWorkspace).mockClear();
+  db.prepare('UPDATE content_briefs SET superseded_by = NULL WHERE workspace_id = ? AND id = ?')
+    .run(wsId, briefId);
 });
 
 // ── 1. Brief regenerate ────────────────────────────────────────────────────
@@ -262,6 +341,59 @@ describe('POST /api/content-briefs/:ws/:brief/regenerate — CONTENT_BRIEF_REGEN
     // New brief is persisted to the content_briefs store with the regenerated title.
     const persisted = getBrief(wsId, result!.briefId!);
     expect(persisted?.suggestedTitle).toBe('Regenerated Title');
+  });
+
+  it('keeps the committed successor and done job when a post-commit event throws', async () => {
+    mockOpenAIJsonResponse('content-brief-regenerate', BRIEF_JSON);
+    vi.mocked(broadcastToWorkspace).mockClear();
+    vi.mocked(broadcastToWorkspace).mockImplementationOnce(() => {
+      throw new Error('injected brief event failure');
+    });
+
+    const { startRes, job } = await startAndWait(
+      `/api/content-briefs/${wsId}/${briefId}/regenerate`,
+      { feedback: 'retain success through event failure' },
+    );
+
+    expect(startRes.status).toBe(202);
+    expect(job?.status).toBe('done');
+    expect(job?.error).toBeFalsy();
+    const result = job?.result as { briefId?: string } | undefined;
+    expect(getBrief(wsId, result?.briefId ?? '')?.suggestedTitle).toBe('Regenerated Title');
+    // The failed CONTENT_UPDATED event does not suppress BRIEF_UPDATED.
+    expect(vi.mocked(broadcastToWorkspace).mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('preserves a committed successor when terminal bookkeeping fails', async () => {
+    mockOpenAIJsonResponse('content-brief-regenerate', BRIEF_JSON);
+    postAiJobTerminalFailureState.failNextDone = true;
+
+    const { startRes, job } = await startAndWait(
+      `/api/content-briefs/${wsId}/${briefId}/regenerate`,
+      { feedback: 'terminal truth' },
+    );
+
+    expect(startRes.status).toBe(202);
+    expect(job?.status).toBe('error');
+    expect(job?.message).toBe('Brief regeneration committed, but completion tracking failed');
+    expect(job?.error).toContain('completion persistence failure');
+    const result = job?.result as {
+      briefId?: string;
+      code?: string;
+      artifactCommitted?: boolean;
+    } | undefined;
+    expect(result).toMatchObject({
+      code: 'completion_tracking_failed',
+      artifactCommitted: true,
+    });
+    expect(getBrief(wsId, result?.briefId ?? '')?.suggestedTitle).toBe('Regenerated Title');
+    expect(vi.mocked(addActivity)).not.toHaveBeenCalledWith(
+      wsId,
+      'brief_generated',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it('missing feedback → 400 (no job created)', async () => {
@@ -326,23 +458,95 @@ describe('POST /api/content-posts/:ws/:post/ai-review — CONTENT_POST_REVIEW jo
     mockOpenAIJsonResponse('content-review', REVIEW_JSON);
     const { startRes, startBody, job } = await startAndWait(
       `/api/content-posts/${wsId}/${postId}/ai-review`,
-      {},
+      { expectedRevision: getPost(wsId, postId)!.generationRevision },
     );
     expect(startRes.status).toBe(202);
     expect(typeof startBody.jobId).toBe('string');
     expect(job?.status).toBe('done');
     expect(job?.type).toBe(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW);
-    const result = job?.result as { review?: Record<string, unknown> } | undefined;
+    const result = job?.result as {
+      review?: Record<string, unknown>;
+      sourceRevision?: number;
+      provenance?: { operation?: string; inputFingerprint?: string };
+    } | undefined;
     expect(result?.review).toBeTruthy();
+    expect(result?.sourceRevision).toEqual(expect.any(Number));
+    expect(result?.provenance).toMatchObject({
+      operation: 'content-post-review',
+      inputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
     // Verdicts persisted to the post (domain store).
     const persisted = getPost(wsId, postId);
     expect(persisted?.aiReview?.review).toBeTruthy();
     // Provenance-sensitive items are forced to human review.
     expect(persisted?.aiReview?.review.factual_accuracy.pass).toBe(false);
+    expect(persisted?.generationProvenance?.inputFingerprint).toBe(SOURCE_POST_FINGERPRINT);
+  });
+
+  it('keeps the committed review and done job when activity recording throws', async () => {
+    mockOpenAIJsonResponse('content-review', REVIEW_JSON);
+    postAiEffectFailureState.failActivityType = 'post_ai_review';
+    const revisionBefore = getPost(wsId, postId)!.generationRevision;
+
+    const { startRes, job } = await startAndWait(
+      `/api/content-posts/${wsId}/${postId}/ai-review`,
+      { expectedRevision: revisionBefore },
+    );
+
+    expect(startRes.status).toBe(202);
+    expect(job?.status).toBe('done');
+    expect(job?.error).toBeFalsy();
+    expect(getPost(wsId, postId)).toMatchObject({
+      generationRevision: revisionBefore + 1,
+      aiReview: { review: expect.any(Object) },
+    });
+    expect(postAiEffectFailureState.failActivityType).toBeNull();
+    expect(vi.mocked(broadcastToWorkspace)).toHaveBeenCalledWith(
+      wsId,
+      WS_EVENTS.CONTENT_UPDATED,
+      expect.objectContaining({ postId, action: 'ai_review_completed' }),
+    );
+  });
+
+  it('emits no review-success effects before terminal job persistence succeeds', async () => {
+    mockOpenAIJsonResponse('content-review', REVIEW_JSON);
+    postAiJobTerminalFailureState.failNextDone = true;
+    const revisionBefore = getPost(wsId, postId)!.generationRevision;
+
+    const { startRes, job } = await startAndWait(
+      `/api/content-posts/${wsId}/${postId}/ai-review`,
+      { expectedRevision: revisionBefore },
+    );
+
+    expect(startRes.status).toBe(202);
+    expect(job?.status).toBe('error');
+    expect(job?.error).toContain('completion persistence failure');
+    expect(job?.message).toBe('AI review complete, but completion tracking failed');
+    expect(job?.result).toMatchObject({
+      code: 'completion_tracking_failed',
+      artifactCommitted: true,
+      review: expect.any(Object),
+    });
+    expect(getPost(wsId, postId)).toMatchObject({
+      generationRevision: revisionBefore + 1,
+      aiReview: { review: expect.any(Object) },
+    });
+    expect(vi.mocked(addActivity)).not.toHaveBeenCalledWith(
+      wsId,
+      'post_ai_review',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(vi.mocked(broadcastToWorkspace)).not.toHaveBeenCalledWith(
+      wsId,
+      WS_EVENTS.CONTENT_UPDATED,
+      expect.objectContaining({ postId, action: 'ai_review_completed' }),
+    );
   });
 
   it('unknown post → 404', async () => {
-    const res = await postJson(`/api/content-posts/${wsId}/not_a_post/ai-review`, {});
+    const res = await postJson(`/api/content-posts/${wsId}/not_a_post/ai-review`, { expectedRevision: 0 });
     expect(res.status).toBe(404);
   });
 
@@ -350,7 +554,7 @@ describe('POST /api/content-posts/:ws/:post/ai-review — CONTENT_POST_REVIEW jo
     mockOpenAIError('content-review', 'AI provider unavailable');
     const { startRes, job } = await startAndWait(
       `/api/content-posts/${wsId}/${postId}/ai-review`,
-      {},
+      { expectedRevision: getPost(wsId, postId)!.generationRevision },
     );
     expect(startRes.status).toBe(202);
     expect(job?.status).toBe('error');
@@ -365,21 +569,36 @@ describe('POST /api/content-posts/:ws/:post/ai-fix — CONTENT_POST_FIX job', ()
     mockOpenAIResponse('content-post-feedback-fix', '<p>Rewritten introduction.</p>');
     const { startRes, startBody, job } = await startAndWait(
       `/api/content-posts/${wsId}/${postId}/ai-fix`,
-      { issueKey: 'brand_voice', reason: 'voice mismatch' },
+      {
+        issueKey: 'brand_voice',
+        reason: 'voice mismatch',
+        expectedRevision: getPost(wsId, postId)!.generationRevision,
+      },
     );
     expect(startRes.status).toBe(202);
     expect(typeof startBody.jobId).toBe('string');
     expect(job?.status).toBe('done');
     expect(job?.type).toBe(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX);
-    const result = job?.result as { field?: string; suggestedText?: string } | undefined;
+    const result = job?.result as {
+      field?: string;
+      suggestedText?: string;
+      sourceRevision?: number;
+      provenance?: { operation?: string; inputFingerprint?: string };
+    } | undefined;
     expect(result?.field).toBe('introduction');
     expect(result?.suggestedText).toContain('Rewritten introduction');
+    expect(result?.sourceRevision).toEqual(expect.any(Number));
+    expect(result?.provenance).toMatchObject({
+      operation: 'content-post-feedback-fix',
+      inputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
   });
 
   it('unknown issueKey → 400 (no job created)', async () => {
     const res = await postJson(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
       issueKey: 'not_a_real_key',
       reason: 'x',
+      expectedRevision: getPost(wsId, postId)!.generationRevision,
     });
     expect(res.status).toBe(400);
   });
@@ -388,6 +607,7 @@ describe('POST /api/content-posts/:ws/:post/ai-fix — CONTENT_POST_FIX job', ()
     const res = await postJson(`/api/content-posts/${wsId}/not_a_post/ai-fix`, {
       issueKey: 'brand_voice',
       reason: 'x',
+      expectedRevision: 0,
     });
     expect(res.status).toBe(404);
   });
@@ -396,7 +616,11 @@ describe('POST /api/content-posts/:ws/:post/ai-fix — CONTENT_POST_FIX job', ()
     mockOpenAIError('content-post-feedback-fix', 'AI provider unavailable');
     const { startRes, job } = await startAndWait(
       `/api/content-posts/${wsId}/${postId}/ai-fix`,
-      { issueKey: 'brand_voice', reason: 'fail' },
+      {
+        issueKey: 'brand_voice',
+        reason: 'fail',
+        expectedRevision: getPost(wsId, postId)!.generationRevision,
+      },
     );
     expect(startRes.status).toBe(202);
     expect(job?.status).toBe('error');
@@ -410,19 +634,105 @@ describe('POST /api/content-posts/:ws/:post/score-voice — CONTENT_POST_VOICE_S
     mockOpenAIJsonResponse('voice-scoring', { voiceScore: 82, voiceFeedback: 'Strong brand voice match.' });
     const { startRes, startBody, job } = await startAndWait(
       `/api/content-posts/${wsId}/${postId}/score-voice`,
-      {},
+      { expectedRevision: getPost(wsId, postId)!.generationRevision },
     );
     expect(startRes.status).toBe(202);
     expect(typeof startBody.jobId).toBe('string');
     expect(job?.status).toBe('done');
     expect(job?.type).toBe(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE);
+    expect(job?.result).toMatchObject({
+      sourceRevision: expect.any(Number),
+      provenance: {
+        operation: 'voice-scoring',
+        inputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
+    });
     const persisted = getPost(wsId, postId);
     expect(persisted?.voiceScore).toBe(82);
     expect(persisted?.voiceFeedback).toContain('Strong brand voice');
+    expect(persisted?.generationProvenance?.inputFingerprint).toBe(SOURCE_POST_FINGERPRINT);
+  });
+
+  it('keeps the committed voice score and done job when cache invalidation throws', async () => {
+    mockOpenAIJsonResponse('voice-scoring', {
+      voiceScore: 88,
+      voiceFeedback: 'Voice result survives optional effect failures.',
+    });
+    postAiEffectFailureState.failIntelligenceInvalidation = true;
+    const revisionBefore = getPost(wsId, postId)!.generationRevision;
+
+    const { startRes, job } = await startAndWait(
+      `/api/content-posts/${wsId}/${postId}/score-voice`,
+      { expectedRevision: revisionBefore },
+    );
+
+    expect(startRes.status).toBe(202);
+    expect(job?.status).toBe('done');
+    expect(job?.error).toBeFalsy();
+    expect(getPost(wsId, postId)).toMatchObject({
+      generationRevision: revisionBefore + 1,
+      voiceScore: 88,
+      voiceFeedback: 'Voice result survives optional effect failures.',
+    });
+    expect(postAiEffectFailureState.failIntelligenceInvalidation).toBe(false);
+    expect(vi.mocked(broadcastToWorkspace)).toHaveBeenCalledWith(
+      wsId,
+      WS_EVENTS.POST_UPDATED,
+      { postId },
+    );
+    expect(vi.mocked(addActivity)).toHaveBeenCalledWith(
+      wsId,
+      'post_voice_scored',
+      expect.any(String),
+      'Score: 88',
+      expect.objectContaining({ postId, voiceScore: 88, action: 'voice_score_completed' }),
+    );
+  });
+
+  it('emits no voice-success effects before terminal job persistence succeeds', async () => {
+    mockOpenAIJsonResponse('voice-scoring', {
+      voiceScore: 91,
+      voiceFeedback: 'Committed before terminal tracking failed.',
+    });
+    postAiJobTerminalFailureState.failNextDone = true;
+    const revisionBefore = getPost(wsId, postId)!.generationRevision;
+
+    const { startRes, job } = await startAndWait(
+      `/api/content-posts/${wsId}/${postId}/score-voice`,
+      { expectedRevision: revisionBefore },
+    );
+
+    expect(startRes.status).toBe(202);
+    expect(job?.status).toBe('error');
+    expect(job?.error).toContain('completion persistence failure');
+    expect(job?.message).toBe('Brand voice scored, but completion tracking failed');
+    expect(job?.result).toMatchObject({
+      code: 'completion_tracking_failed',
+      artifactCommitted: true,
+      postId,
+      post: expect.objectContaining({ voiceScore: 91 }),
+    });
+    expect(getPost(wsId, postId)).toMatchObject({
+      generationRevision: revisionBefore + 1,
+      voiceScore: 91,
+      voiceFeedback: 'Committed before terminal tracking failed.',
+    });
+    expect(vi.mocked(addActivity)).not.toHaveBeenCalledWith(
+      wsId,
+      'post_voice_scored',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(vi.mocked(broadcastToWorkspace)).not.toHaveBeenCalledWith(
+      wsId,
+      WS_EVENTS.POST_UPDATED,
+      { postId },
+    );
   });
 
   it('unknown post → 404', async () => {
-    const res = await postJson(`/api/content-posts/${wsId}/not_a_post/score-voice`, {});
+    const res = await postJson(`/api/content-posts/${wsId}/not_a_post/score-voice`, { expectedRevision: 0 });
     expect(res.status).toBe(404);
   });
 
@@ -430,7 +740,7 @@ describe('POST /api/content-posts/:ws/:post/score-voice — CONTENT_POST_VOICE_S
     mockOpenAIError('voice-scoring', 'AI provider unavailable');
     const { startRes, job } = await startAndWait(
       `/api/content-posts/${wsId}/${postId}/score-voice`,
-      {},
+      { expectedRevision: getPost(wsId, postId)!.generationRevision },
     );
     expect(startRes.status).toBe(202);
     expect(job?.status).toBe('error');

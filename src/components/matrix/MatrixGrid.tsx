@@ -10,6 +10,8 @@ import { CellDetailPanel } from './CellDetailPanel';
 interface MatrixGridProps {
   workspaceId: string;
   matrix: ContentMatrix;
+  generationEnabled?: boolean;
+  generationBusy?: boolean;
   onCellClick: (cell: MatrixCell) => void;
   onBulkAction: (action: 'optimize' | 'generate_briefs' | 'generate_posts' | 'send_review' | 'export_csv' | 'export_docx', cellIds: string[]) => void;
   onCellUpdate: (cellId: string, updates: Partial<MatrixCell>) => void;
@@ -30,7 +32,14 @@ const ALL_STATUSES: MatrixCell['status'][] = ['planned', 'keyword_validated', 'b
 
 type SortKey = 'status' | 'volume' | 'difficulty' | 'alphabetical';
 
-export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: MatrixGridProps) {
+export function MatrixGrid({
+  matrix,
+  generationEnabled = false,
+  generationBusy = false,
+  onCellClick,
+  onBulkAction,
+  onCellUpdate,
+}: MatrixGridProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [detailCellId, setDetailCellId] = useState<string | null>(null);
   const detailCell = detailCellId ? matrix.cells.find(c => c.id === detailCellId) ?? null : null;
@@ -261,7 +270,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                   <div className="absolute top-full right-0 mt-1 w-52 bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-xl z-[var(--z-dropdown)] py-1">
                     {[
                       { key: 'optimize' as const, label: 'Optimize Keywords', icon: Sparkles },
-                      { key: 'generate_briefs' as const, label: 'Generate Briefs', icon: FileText },
+                      ...(generationEnabled ? [{ key: 'generate_briefs' as const, label: 'Generate Pages', icon: FileText }] : []),
                       { key: 'send_review' as const, label: 'Send to client', icon: Send },
                       { key: 'export_csv' as const, label: 'Export CSV', icon: Download },
                       { key: 'export_docx' as const, label: 'Export Word Doc', icon: FileDown },
@@ -269,6 +278,7 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
                       <ClickableRow
                         key={action.key}
                         onClick={() => { onBulkAction(action.key, [...selectedIds]); setShowBulkMenu(false); }}
+                        disabled={action.key === 'generate_briefs' && generationBusy}
                         className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--brand-text-bright)]"
                       >
                         <action.icon className="w-3.5 h-3.5 text-[var(--brand-text-muted)]" />
@@ -377,7 +387,8 @@ export function MatrixGrid({ matrix, onCellClick, onBulkAction, onCellUpdate }: 
           cell={detailCell}
           onClose={() => setDetailCellId(null)}
           onCellUpdate={onCellUpdate}
-          onGenerateBrief={id => onBulkAction('generate_briefs', [id])}
+          onGenerateBrief={generationEnabled ? id => onBulkAction('generate_briefs', [id]) : undefined}
+          generationBusy={generationBusy}
           onSendReview={id => onBulkAction('send_review', [id])}
         />
       )}

@@ -56,18 +56,42 @@ export interface SnapshotSummary {
 let _insertSnapshot: ReturnType<typeof db.prepare> | null = null;
 function insertSnapshotStmt() {
   if (!_insertSnapshot) {
+    // C1 (D3): write workspace_id forward on every new snapshot. Migration 167
+    // backfilled it on existing rows and advertises an FK ON DELETE CASCADE, but the
+    // writer only ever set the legacy site_id columns, so every post-167 row landed
+    // with workspace_id NULL — the cascade never fired and orphan class C1 re-accumulated.
     _insertSnapshot = db.prepare(`
       INSERT INTO audit_snapshots
-        (id, site_id, site_name, created_at, audit, logo_url, action_items, previous_score)
-      VALUES (@id, @site_id, @site_name, @created_at, @audit, @logo_url, @action_items, @previous_score)
+        (id, site_id, workspace_id, site_name, created_at, audit, logo_url, action_items, previous_score)
+      VALUES (@id, @site_id, @workspace_id, @site_name, @created_at, @audit, @logo_url, @action_items, @previous_score)
     `);
   }
   return _insertSnapshot;
 }
 
+// C1 (D3): resolve site_id -> workspace_id ONLY when exactly one workspace owns the
+// site_id (COUNT=1). A zero-match (unresolvable) or >1-match (ambiguous) resolves to
+// NULL — never a guessed/arbitrary workspace — mirroring migration 167's quarantine
+// logic and resolveWorkspaceIdBySiteId in server/db/migrate-json.ts. webflow_site_id
+// has no UNIQUE constraint, so the ambiguity guard is load-bearing, not defensive.
+let _resolveWorkspaceIdBySiteId: ReturnType<typeof db.prepare> | null = null;
+function resolveWorkspaceIdForSnapshot(siteId: string): string | null {
+  if (!siteId) return null;
+  if (!_resolveWorkspaceIdBySiteId) {
+    _resolveWorkspaceIdBySiteId = db.prepare(
+      `SELECT COUNT(*) AS n, MIN(id) AS id FROM workspaces WHERE webflow_site_id = ?`,
+    );
+  }
+  const row = _resolveWorkspaceIdBySiteId.get(siteId) as { n: number; id: string | null } | undefined;
+  return row && row.n === 1 ? row.id : null;
+}
+
 let _updateSnapshot: ReturnType<typeof db.prepare> | null = null;
 function updateSnapshotStmt() {
   if (!_updateSnapshot) {
+    // id is crypto.randomBytes(8).toString('hex') — a 16-char random primary key,
+    // already workspace-unique (see saveSnapshot() below).
+    // ws-scope-ok
     _updateSnapshot = db.prepare(`
       UPDATE audit_snapshots SET action_items = @action_items WHERE id = @id
     `);
@@ -131,6 +155,10 @@ function latestSnapshotBeforeStmt() {
 let _cleanupOldSnapshots: ReturnType<typeof db.prepare> | null = null;
 function cleanupOldSnapshotsStmt() {
   if (!_cleanupOldSnapshots) {
+    // Intentional global age-based retention sweep across every workspace
+    // (server/data-retention.ts cleanupOldSnapshots), not a per-request mutation —
+    // same pattern as cleanupOldSends / pruneOldest / deleteExpiredTokens.
+    // ws-scope-ok
     _cleanupOldSnapshots = db.prepare(`
       DELETE FROM audit_snapshots WHERE created_at < datetime('now', ? || ' days')
     `);
@@ -198,6 +226,8 @@ export function saveSnapshot(siteId: string, siteName: string, audit: SeoAuditRe
   insertSnapshotStmt().run({
     id,
     site_id: siteId,
+    // C1 (D3): thread the 1:1-resolved workspace_id so the FK CASCADE actually fires.
+    workspace_id: resolveWorkspaceIdForSnapshot(siteId),
     site_name: siteName,
     created_at: snapshot.createdAt,
     audit: JSON.stringify(audit),

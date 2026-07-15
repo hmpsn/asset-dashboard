@@ -1,5 +1,6 @@
 // ── Content domain types ────────────────────────────────────────
 
+import type { GenerationProvenance, GenerationTrackedArtifact } from './ai-execution.js';
 import type { OutcomeReadback } from './outcome-tracking.js';
 
 export const CONTENT_GENERATION_STYLES = ['standard', 'concise', 'hybrid'] as const;
@@ -69,7 +70,14 @@ export interface ContentBrief {
   sourceEvidence?: BriefSourceEvidence;
   // W2.5 lineage: set to the new brief's id when this brief is superseded by a regeneration
   supersededBy?: string;
+  /** Internal concurrency token. Public/client serializers must omit this field. */
+  generationRevision?: number;
+  /** Internal generation attribution. Public/client serializers must omit this field. */
+  generationProvenance?: GenerationProvenance | null;
 }
+
+/** Internal persisted brief shape returned by server storage adapters. */
+export type PersistedContentBrief = ContentBrief & GenerationTrackedArtifact;
 
 export interface BriefTemplateCrossrefSection {
   id: string;
@@ -105,6 +113,30 @@ export interface PostSection {
   keywords: string[];
   status: 'pending' | 'generating' | 'done' | 'error';
   error?: string;
+}
+
+export const CONTENT_POST_GENERATION_STAGES = [
+  'generation',
+  'introduction',
+  'section',
+  'conclusion',
+] as const;
+export type ContentPostGenerationStage = typeof CONTENT_POST_GENERATION_STAGES[number];
+
+export const CONTENT_POST_GENERATION_DIAGNOSTIC_CODES = [
+  'provider_error',
+  'invalid_output',
+  'cancelled',
+] as const;
+export type ContentPostGenerationDiagnosticCode = typeof CONTENT_POST_GENERATION_DIAGNOSTIC_CODES[number];
+
+/** Internal generation failure detail. Public/client serializers must omit this field. */
+export interface ContentPostGenerationDiagnostic {
+  stage: ContentPostGenerationStage;
+  code: ContentPostGenerationDiagnosticCode;
+  message: string;
+  sectionIndex?: number;
+  occurredAt: string;
 }
 
 export interface ReviewChecklist {
@@ -239,8 +271,28 @@ export interface PostSummary {
   totalWordCount: number;
   status: string;
   generationStyle?: ContentGenerationStyle;
+  /** Internal concurrency token used by admin mutation preconditions. */
+  generationRevision?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Server-authored calendar proposal. `generationRevision` is the exact post
+ * authority observed while the proposal was assembled and must be used
+ * verbatim when applying it; clients must not reconstruct it from cache.
+ */
+export interface ContentCalendarDateSuggestion {
+  draftId: string;
+  suggestedDate: string;
+  reason: string;
+  title: string;
+  generationRevision: number;
+}
+
+export interface ContentCalendarDateSuggestionsResponse {
+  suggestions: ContentCalendarDateSuggestion[];
+  unscheduledCount: number;
 }
 
 export interface GeneratedPost {
@@ -257,7 +309,9 @@ export interface GeneratedPost {
   seoMetaDescription?: string; // SEO meta description (150-160 chars)
   totalWordCount: number;
   targetWordCount: number;
-  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
+  status: 'generating' | 'needs_attention' | 'draft' | 'review' | 'approved' | 'error';
+  /** Internal-only structured diagnostics for an incomplete initial generation. */
+  generationDiagnostics?: ContentPostGenerationDiagnostic[];
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
   reviewChecklist?: ReviewChecklist;
@@ -289,9 +343,30 @@ export interface GeneratedPost {
    * read-side decoration. Positions are honest (lower=better); trust `direction`.
    */
   outcome?: OutcomeReadback;
+  /** Internal concurrency token. Public/client serializers must omit this field. */
+  generationRevision?: number;
+  /** Internal generation attribution. Public/client serializers must omit this field. */
+  generationProvenance?: GenerationProvenance | null;
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * Client-review projection. Internal diagnostics, scheduling intent, and
+ * generation authority never cross the public API boundary. `updatedAt` is the
+ * existing opaque precondition token used by public mutations.
+ */
+export type PublicContentPost = Omit<
+  GeneratedPost,
+  | 'aiReview'
+  | 'generationDiagnostics'
+  | 'generationRevision'
+  | 'generationProvenance'
+  | 'plannedPublishAt'
+>;
+
+/** Internal persisted post shape returned by server storage adapters. */
+export type PersistedGeneratedPost = GeneratedPost & GenerationTrackedArtifact;
 
 export interface ContentRequestComment {
   id: string;
@@ -337,6 +412,32 @@ export interface ContentTopicRequest {
   updatedAt: string;
 }
 
+/**
+ * Client-safe content-request contract shared by public reads and mutations.
+ * Workspace identity, operator notes/reasoning, targeting internals, and
+ * recommendation context are intentionally absent from this boundary.
+ */
+export interface PublicContentTopicRequest {
+  id: string;
+  topic: string;
+  targetKeyword: string;
+  intent: string;
+  priority: string;
+  status: ContentTopicRequest['status'];
+  source?: ContentTopicRequest['source'];
+  serviceType: NonNullable<ContentTopicRequest['serviceType']>;
+  pageType: NonNullable<ContentTopicRequest['pageType']>;
+  upgradedAt?: string;
+  comments: ContentRequestComment[];
+  requestedAt: string;
+  updatedAt: string;
+  deliveryUrl?: string;
+  deliveryNotes?: string;
+  briefId?: string;
+  postId?: string;
+  clientFeedback?: string;
+}
+
 export interface ContentPerformanceGscMetrics {
   clicks: number;
   impressions: number;
@@ -353,7 +454,43 @@ export interface ContentPerformanceGa4Metrics {
 }
 
 export type ContentPerformanceSource = 'request' | 'matrix';
+export type ContentPerformanceTrendAvailability =
+  | 'available'
+  | 'insufficient_data'
+  | 'gsc_not_configured'
+  | 'page_unmapped'
+  | 'provider_unavailable'
+  | 'source_unsupported';
 export type ContentTermCoverageStatus = 'strong' | 'partial' | 'weak' | 'unavailable';
+
+export interface ContentPerformanceTrendPoint {
+  date: string;
+  clicks: number;
+  impressions: number;
+  /** Already a percentage. */
+  ctr: number;
+  position: number;
+}
+
+export interface ContentPerformanceTrendResponse {
+  availability: ContentPerformanceTrendAvailability;
+  reason?: string;
+  trend: ContentPerformanceTrendPoint[];
+}
+
+export interface ContentPerformanceSummary {
+  piecesTracked: number;
+  piecesPublished: number;
+  piecesDelivered: number;
+  totalClicks: number;
+  totalImpressions: number;
+  totalSessions: number;
+  averagePosition: number | null;
+  measuredOutcomes: number;
+  wins: number;
+  /** Positive means ranking positions improved; null means no position-based readback exists. */
+  averagePositionGain: number | null;
+}
 
 export interface ContentTermCoverageGrade {
   status: ContentTermCoverageStatus;
@@ -382,6 +519,8 @@ export interface ContentPerformanceJoinback {
 }
 
 export interface ContentPerformanceItem {
+  /** Stable identity across request-backed and matrix-backed published work. */
+  itemId: string;
   requestId: string;
   topic: string;
   targetKeyword: string;
@@ -392,12 +531,22 @@ export interface ContentPerformanceItem {
   daysSincePublish: number;
   gsc: ContentPerformanceGscMetrics | null;
   ga4: ContentPerformanceGa4Metrics | null;
-  source?: ContentPerformanceSource;
+  source: ContentPerformanceSource;
   coverage: ContentTermCoverageGrade;
   joinback?: ContentPerformanceJoinback;
+  /**
+   * SB-006 (UI-rebuild W1.2) — server-computed win/early/flat verdict for this item's tracked
+   * action, REUSING the existing OutcomeReadback (score + direction). Wired at the read boundary
+   * by joining source-id (`post::<id>`) then targetKeyword to the scored read-back — the exact
+   * pattern already proven for GeneratedPost.outcome (server/content-posts-db.ts enrichPostsWithOutcomes).
+   * NOT a new enum and NOT persisted; absent when no scored action exists yet (honest absence).
+   * The client maps OutcomeScore → its win/early/flat label; the server never composes prose (AD-002).
+   */
+  outcome?: OutcomeReadback;
 }
 
 export interface ContentPerformanceResponse {
+  summary: ContentPerformanceSummary;
   items: ContentPerformanceItem[];
 }
 
@@ -446,6 +595,30 @@ export interface TemplateVariable {
   description?: string;
 }
 
+/** Explicit role used by locked page-generation manifests. */
+export const TEMPLATE_SECTION_GENERATION_ROLES = [
+  'body',
+  'answer_first',
+  'definition',
+  'proof',
+  'process',
+  'faq',
+  'cta',
+] as const;
+
+export type TemplateSectionGenerationRole =
+  (typeof TEMPLATE_SECTION_GENERATION_ROLES)[number];
+
+export interface TemplateAeoContract {
+  modes: Array<'answer_first' | 'definition' | 'faq' | 'paa'>;
+  required: boolean;
+}
+
+export interface TemplateCtaContract {
+  role: 'none' | 'primary' | 'secondary';
+  required: boolean;
+}
+
 export interface TemplateSection {
   id: string;
   name: string;
@@ -457,6 +630,12 @@ export interface TemplateSection {
   narrativeRole?: string;   // StoryBrand or custom narrative role
   brandNote?: string;        // one-line brand purpose
   seoNote?: string;          // one-line SEO purpose
+  /** Absent on legacy templates until an explicit generation upgrade is accepted. */
+  generationRole?: TemplateSectionGenerationRole;
+  /** Absent on legacy templates until an explicit generation upgrade is accepted. */
+  aeoContract?: TemplateAeoContract;
+  /** Absent on legacy templates until an explicit generation upgrade is accepted. */
+  ctaContract?: TemplateCtaContract;
 }
 
 export type ContentPageType =
@@ -479,6 +658,10 @@ export interface ContentTemplate {
   cmsFieldMap?: Record<string, string>;
   toneAndStyle?: string;
   schemaTypes?: string[];  // e.g. ['BlogPosting', 'BreadcrumbList'] — auto-populated from pageType via PAGE_TYPE_SCHEMA_MAP
+  /** Monotonic source revision; legacy rows read as 0 until M0 persists the column. */
+  revision?: number;
+  /** Absent on legacy templates until an explicit generation upgrade is accepted. */
+  generationContractVersion?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -546,6 +729,8 @@ export interface StatusHistoryEntry {
 
 export interface MatrixCell {
   id: string;
+  /** Monotonic cell-scoped source revision; legacy JSON absence is interpreted as 0. */
+  revision?: number;
   variableValues: Record<string, string>;
   targetKeyword: string;
   customKeyword?: string;
@@ -570,6 +755,8 @@ export interface MatrixCell {
 export interface ContentMatrix {
   id: string;
   workspaceId: string;
+  /** Monotonic definition/selection revision; legacy rows read as 0 until M0. */
+  revision?: number;
   name: string;
   templateId: string;
   dimensions: MatrixDimension[];
@@ -658,6 +845,14 @@ export interface AiFixResult {
   originalText: string;
   suggestedText: string;
   explanation: string;
+}
+
+/** Durable background-job result used as the authority for explicit AI-fix adoption. */
+export interface AiFixJobResult extends AiFixResult {
+  /** Exact post revision the worker read when it produced this suggestion. */
+  sourceRevision: number;
+  /** Accepted worker execution persisted only when this stored suggestion is adopted. */
+  provenance: GenerationProvenance;
 }
 
 export const AI_FEEDBACK_TARGETS = ['section', 'post', 'meta'] as const;

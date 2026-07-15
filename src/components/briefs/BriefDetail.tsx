@@ -1,10 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Loader2, Trash2, Download, Copy, Search,
   Target, MessageSquare, BarChart3, BookOpen, Users, TrendingUp,
   Pencil, Check, PenLine, RefreshCw, Send,
 } from 'lucide-react';
-import { Badge, Icon, Button, ClickableRow, FormInput, FormSelect, FormTextarea } from '../ui';
+import {
+  Badge,
+  Icon,
+  Button,
+  ClickableRow,
+  FormInput,
+  FormSelect,
+  FormTextarea,
+  type FormInputProps,
+  type FormTextareaProps,
+} from '../ui';
 import {
   CONTENT_GENERATION_STYLE_LABELS,
   CONTENT_GENERATION_STYLE_OPTIONS,
@@ -19,19 +29,195 @@ interface BriefDetailProps {
   generatingPostFor: string | null;
   regeneratingBrief: string | null;
   sendingToClient: string | null;
-  onSaveBriefField: (briefId: string, updates: Partial<ContentBrief>) => void;
+  onSaveBriefField: (
+    briefId: string,
+    updates: Partial<ContentBrief>,
+    expectedRevision?: number,
+  ) => boolean | void | Promise<boolean | void>;
   onSetEditingBrief: (id: string | null) => void;
-  onGeneratePost: (briefId: string, generationStyle?: ContentGenerationStyle) => void | Promise<void>;
-  onRegenerate: (briefId: string, feedback: string) => void;
-  onRegenerateOutline?: (briefId: string, feedback?: string) => void;
+  onGeneratePost: (
+    briefId: string,
+    generationStyle?: ContentGenerationStyle,
+    expectedBriefRevision?: number,
+  ) => void | Promise<void>;
+  onRegenerate: (briefId: string, feedback: string, expectedRevision?: number) => void;
+  onRegenerateOutline?: (briefId: string, feedback?: string, expectedRevision?: number) => void;
   regeneratingOutline?: string | null;
   onCopyAsMarkdown: (brief: ContentBrief) => void;
   onExportClientHTML: (brief: ContentBrief) => void;
-  onSendToClient: (brief: ContentBrief, note?: string) => void;
+  onSendToClient: (brief: ContentBrief, note?: string, expectedRevision?: number) => void;
   onConfirmDelete: (brief: ContentBrief) => void;
   hideActions?: ('sendToClient' | 'generatePost' | 'delete')[];
   defaultFeedback?: string;
   autoShowRegenerate?: boolean;
+}
+
+interface BriefFormAuthority {
+  briefId: string;
+  expectedRevision: number;
+}
+
+const briefFormAuthority = (brief: ContentBrief): BriefFormAuthority => ({
+  briefId: brief.id,
+  expectedRevision: brief.generationRevision ?? 0,
+});
+
+const hasCurrentBriefAuthority = (authority: BriefFormAuthority | null, brief: ContentBrief): boolean =>
+  authority?.briefId === brief.id
+  && authority.expectedRevision === (brief.generationRevision ?? 0);
+
+export function StaleBriefFormNotice() {
+  return (
+    <div role="alert" className="t-caption-sm text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-md)] px-3 py-2">
+      This brief changed while the form was open. Close and reopen the form to review the latest version before continuing.
+    </div>
+  );
+}
+
+interface BriefEditBuffer {
+  authority: BriefFormAuthority;
+  initialValue: string;
+  draft: string;
+  saveFailed: boolean;
+}
+
+interface AuthorityPinnedEditProps {
+  briefId: string;
+  generationRevision: number;
+  value: string;
+  onPinnedCommit: (value: string, expectedRevision: number) => boolean | void | Promise<boolean | void>;
+  containerClassName?: string;
+}
+
+type AuthorityPinnedInputProps = AuthorityPinnedEditProps & Omit<
+  FormInputProps,
+  'commitOnBlur' | 'onBlur' | 'onChange' | 'onCommit' | 'onFocus' | 'value'
+>;
+
+type AuthorityPinnedTextareaProps = AuthorityPinnedEditProps & Omit<
+  FormTextareaProps,
+  'commitOnBlur' | 'onBlur' | 'onChange' | 'onCommit' | 'onFocus' | 'value'
+>;
+
+const editAuthorityMatches = (
+  authority: BriefFormAuthority,
+  briefId: string,
+  generationRevision: number,
+): boolean => authority.briefId === briefId && authority.expectedRevision === generationRevision;
+
+function PinnedEditNotice({ stale }: { stale: boolean }) {
+  return (
+    <div role="alert" className="mt-1 t-caption-sm text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-md)] px-3 py-2">
+      {stale
+        ? 'This brief changed while you were editing. Your draft is preserved but was not saved. Copy it, exit editing, and review the latest version before trying again.'
+        : 'This edit could not be saved. Your draft is preserved; try again after checking your connection.'}
+    </div>
+  );
+}
+
+function StalePostGenerationNotice() {
+  return (
+    <div role="alert" className="t-caption-sm text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-[var(--radius-md)] px-3 py-2">
+      This brief changed after the writing style was selected. Review the latest brief and choose the style again before generating.
+    </div>
+  );
+}
+
+function useAuthorityPinnedEdit({
+  briefId,
+  generationRevision,
+  value,
+  onPinnedCommit,
+}: AuthorityPinnedEditProps) {
+  const [buffer, setBuffer] = useState<BriefEditBuffer | null>(null);
+  const stale = buffer !== null && !editAuthorityMatches(buffer.authority, briefId, generationRevision);
+  const displayedValue = buffer?.draft ?? value;
+
+  const begin = () => {
+    setBuffer(current => current ?? {
+      authority: { briefId, expectedRevision: generationRevision },
+      initialValue: value,
+      draft: value,
+      saveFailed: false,
+    });
+  };
+
+  const change = (draft: string) => {
+    setBuffer(current => current
+      ? { ...current, draft, saveFailed: false }
+      : {
+          authority: { briefId, expectedRevision: generationRevision },
+          initialValue: value,
+          draft,
+          saveFailed: false,
+        });
+  };
+
+  const commit = async () => {
+    if (!buffer) return;
+    if (buffer.draft === buffer.initialValue) {
+      setBuffer(null);
+      return;
+    }
+    if (!editAuthorityMatches(buffer.authority, briefId, generationRevision)) {
+      setBuffer(current => current ? { ...current, saveFailed: true } : current);
+      return;
+    }
+
+    const committing = buffer;
+    const saved = await onPinnedCommit(committing.draft, committing.authority.expectedRevision);
+    setBuffer(current => {
+      if (!current) return current;
+      const isSameAttempt = current.authority.briefId === committing.authority.briefId
+        && current.authority.expectedRevision === committing.authority.expectedRevision
+        && current.draft === committing.draft;
+      if (!isSameAttempt) return current;
+      return saved === false ? { ...current, saveFailed: true } : null;
+    });
+  };
+
+  return {
+    displayedValue,
+    begin,
+    change,
+    commit,
+    showNotice: stale || buffer?.saveFailed === true,
+    stale,
+  };
+}
+
+function AuthorityPinnedInput(props: AuthorityPinnedInputProps) {
+  const { briefId, generationRevision, value, onPinnedCommit, containerClassName, ...inputProps } = props;
+  const edit = useAuthorityPinnedEdit({ briefId, generationRevision, value, onPinnedCommit });
+  return (
+    <div className={containerClassName ?? 'w-full'}>
+      <FormInput
+        {...inputProps}
+        value={edit.displayedValue}
+        onFocus={edit.begin}
+        onChange={edit.change}
+        onBlur={() => { void edit.commit(); }}
+      />
+      {edit.showNotice && <PinnedEditNotice stale={edit.stale} />}
+    </div>
+  );
+}
+
+function AuthorityPinnedTextarea(props: AuthorityPinnedTextareaProps) {
+  const { briefId, generationRevision, value, onPinnedCommit, containerClassName, ...textareaProps } = props;
+  const edit = useAuthorityPinnedEdit({ briefId, generationRevision, value, onPinnedCommit });
+  return (
+    <div className={containerClassName ?? 'w-full'}>
+      <FormTextarea
+        {...textareaProps}
+        value={edit.displayedValue}
+        onFocus={edit.begin}
+        onChange={edit.change}
+        onBlur={() => { void edit.commit(); }}
+      />
+      {edit.showNotice && <PinnedEditNotice stale={edit.stale} />}
+    </div>
+  );
 }
 
 export function BriefDetail({
@@ -43,36 +229,63 @@ export function BriefDetail({
 }: BriefDetailProps) {
   const [showRegenerate, setShowRegenerate] = useState(autoShowRegenerate ?? false);
   const [regenFeedback, setRegenFeedback] = useState(defaultFeedback ?? '');
+  const [regenAuthority, setRegenAuthority] = useState<BriefFormAuthority | null>(() =>
+    autoShowRegenerate ? briefFormAuthority(brief) : null,
+  );
   const [showSendNote, setShowSendNote] = useState(false);
   const [sendNote, setSendNote] = useState('');
+  const [sendAuthority, setSendAuthority] = useState<BriefFormAuthority | null>(null);
   const [showOutlineRegen, setShowOutlineRegen] = useState(false);
   const [outlineRegenFeedback, setOutlineRegenFeedback] = useState('');
-  const [postGenerationStyle, setPostGenerationStyle] = useState<ContentGenerationStyle>(
-    brief.generationStyle ?? DEFAULT_CONTENT_GENERATION_STYLE,
-  );
+  const [outlineRegenAuthority, setOutlineRegenAuthority] = useState<BriefFormAuthority | null>(null);
+  const [postGenerationSelection, setPostGenerationSelection] = useState(() => ({
+    ...briefFormAuthority(brief),
+    style: brief.generationStyle ?? DEFAULT_CONTENT_GENERATION_STYLE,
+  }));
+  const currentBriefRevision = brief.generationRevision ?? 0;
+  const stalePostGenerationSelection = !hasCurrentBriefAuthority(postGenerationSelection, brief);
 
-  useEffect(() => {
-    setPostGenerationStyle(brief.generationStyle ?? DEFAULT_CONTENT_GENERATION_STYLE);
-  }, [brief.id, brief.generationStyle]);
+  const staleRegenerateAuthority = showRegenerate && !hasCurrentBriefAuthority(regenAuthority, brief);
+  const staleSendAuthority = showSendNote && !hasCurrentBriefAuthority(sendAuthority, brief);
+  const staleOutlineAuthority = showOutlineRegen && !hasCurrentBriefAuthority(outlineRegenAuthority, brief);
 
   return (
     <div className="px-4 pb-4 space-y-4 border-t border-[var(--brand-border)]">
       {/* Action buttons */}
       <div className="pt-3 flex items-center gap-2 flex-wrap">
         {!hideActions?.includes('generatePost') && (
-          <div className="flex items-center gap-1.5 rounded-[var(--radius-lg)] bg-teal-600/10 border border-teal-500/25 px-1.5 py-1">
-            <FormSelect
-              value={postGenerationStyle}
-              onChange={value => setPostGenerationStyle(value as ContentGenerationStyle)}
-              options={CONTENT_GENERATION_STYLE_OPTIONS}
-              aria-label="Post writing style"
-              className="h-7 w-28 py-0 pl-2 pr-7 t-caption-sm bg-[var(--surface-2)] border-teal-500/25 cursor-pointer"
-              disabled={generatingPostFor === brief.id}
-            />
-            <Button onClick={() => onGeneratePost(brief.id, postGenerationStyle)} disabled={generatingPostFor === brief.id} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50">
-              <Icon as={generatingPostFor === brief.id ? Loader2 : PenLine} size="sm" className={generatingPostFor === brief.id ? 'animate-spin' : ''} />
-              {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
-            </Button>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 rounded-[var(--radius-lg)] bg-teal-600/10 border border-teal-500/25 px-1.5 py-1">
+              <FormSelect
+                value={postGenerationSelection.style}
+                onChange={value => setPostGenerationSelection({
+                  ...briefFormAuthority(brief),
+                  style: value as ContentGenerationStyle,
+                })}
+                options={CONTENT_GENERATION_STYLE_OPTIONS}
+                aria-label="Post writing style"
+                className="h-7 w-28 py-0 pl-2 pr-7 t-caption-sm bg-[var(--surface-2)] border-teal-500/25 cursor-pointer"
+                disabled={generatingPostFor === brief.id}
+              />
+              <Button
+                onClick={() => {
+                  if (stalePostGenerationSelection) return;
+                  onGeneratePost(
+                    brief.id,
+                    postGenerationSelection.style,
+                    postGenerationSelection.expectedRevision,
+                  );
+                }}
+                disabled={generatingPostFor === brief.id || stalePostGenerationSelection}
+                variant="ghost"
+                size="sm"
+                className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+              >
+                <Icon as={generatingPostFor === brief.id ? Loader2 : PenLine} size="sm" className={generatingPostFor === brief.id ? 'animate-spin' : ''} />
+                {generatingPostFor === brief.id ? 'Starting...' : 'Generate Full Post'}
+              </Button>
+            </div>
+            {stalePostGenerationSelection && <StalePostGenerationNotice />}
           </div>
         )}
         <Button onClick={() => onSetEditingBrief(editingBrief === brief.id ? null : brief.id)} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors ${editingBrief === brief.id ? 'bg-amber-600/20 border border-amber-500/30 text-amber-300 hover:bg-amber-600/30' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'}`}>
@@ -85,7 +298,16 @@ export function BriefDetail({
           <Icon as={Download} size="sm" /> Export PDF
         </Button>
         {!hideActions?.includes('sendToClient') && (
-        <Button onClick={() => setShowSendNote(v => !v)} disabled={sendingToClient === brief.id} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${showSendNote ? 'bg-teal-600/30 border border-teal-500/40 text-teal-200' : 'bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30'}`}>
+        <Button onClick={() => {
+          if (showSendNote) {
+            setShowSendNote(false);
+            setSendNote('');
+            setSendAuthority(null);
+            return;
+          }
+          setSendAuthority(briefFormAuthority(brief));
+          setShowSendNote(true);
+        }} disabled={sendingToClient === brief.id} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${showSendNote ? 'bg-teal-600/30 border border-teal-500/40 text-teal-200' : 'bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30'}`}>
           <Icon as={sendingToClient === brief.id ? Loader2 : Send} size="sm" className={sendingToClient === brief.id ? 'animate-spin' : ''} />
           {sendingToClient === brief.id ? 'Sending...' : 'Send brief to client'}
         </Button>
@@ -93,7 +315,16 @@ export function BriefDetail({
         <Button onClick={() => { navigator.clipboard.writeText(JSON.stringify(brief, null, 2)); }} variant="ghost" size="sm" className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] transition-colors">
           <Icon as={Copy} size="sm" /> Copy JSON
         </Button>
-        <Button onClick={() => setShowRegenerate(!showRegenerate)} disabled={regeneratingBrief === brief.id} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${
+        <Button onClick={() => {
+          if (showRegenerate) {
+            setShowRegenerate(false);
+            setRegenFeedback('');
+            setRegenAuthority(null);
+            return;
+          }
+          setRegenAuthority(briefFormAuthority(brief));
+          setShowRegenerate(true);
+        }} disabled={regeneratingBrief === brief.id} variant="ghost" size="sm" className={`rounded-[var(--radius-lg)] t-caption-sm font-medium transition-colors disabled:opacity-50 ${
           showRegenerate ? 'bg-teal-600/20 border border-teal-500/30 text-teal-300' : 'bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] border border-[var(--brand-border)]'
         }`}>
           <Icon as={RefreshCw} size="sm" className={regeneratingBrief === brief.id ? 'animate-spin' : ''} />
@@ -116,10 +347,17 @@ export function BriefDetail({
             aria-label="Optional note for the client"
             className="w-full"
           />
+          {staleSendAuthority && <StaleBriefFormNotice />}
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => { onSendToClient(brief, sendNote.trim() || undefined); setShowSendNote(false); setSendNote(''); }}
-              disabled={sendingToClient === brief.id}
+              onClick={() => {
+                if (!sendAuthority || !hasCurrentBriefAuthority(sendAuthority, brief)) return;
+                onSendToClient(brief, sendNote.trim() || undefined, sendAuthority.expectedRevision);
+                setShowSendNote(false);
+                setSendNote('');
+                setSendAuthority(null);
+              }}
+              disabled={sendingToClient === brief.id || staleSendAuthority}
               variant="ghost"
               size="sm"
               className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-50"
@@ -127,7 +365,7 @@ export function BriefDetail({
               <Icon as={Send} size="sm" /> Send brief to client
             </Button>
             <Button
-              onClick={() => { setShowSendNote(false); setSendNote(''); }}
+              onClick={() => { setShowSendNote(false); setSendNote(''); setSendAuthority(null); }}
               variant="ghost"
               size="sm"
               className="rounded-[var(--radius-lg)] t-caption-sm text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] transition-colors"
@@ -149,10 +387,17 @@ export function BriefDetail({
             className="w-full min-h-[60px]"
             rows={2}
           />
+          {staleRegenerateAuthority && <StaleBriefFormNotice />}
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => { if (regenFeedback.trim()) { onRegenerate(brief.id, regenFeedback.trim()); setShowRegenerate(false); setRegenFeedback(''); } }}
-              disabled={!regenFeedback.trim()}
+              onClick={() => {
+                if (!regenFeedback.trim() || !regenAuthority || !hasCurrentBriefAuthority(regenAuthority, brief)) return;
+                onRegenerate(brief.id, regenFeedback.trim(), regenAuthority.expectedRevision);
+                setShowRegenerate(false);
+                setRegenFeedback('');
+                setRegenAuthority(null);
+              }}
+              disabled={!regenFeedback.trim() || staleRegenerateAuthority}
               variant="ghost"
               size="sm"
               className="rounded-[var(--radius-lg)] t-caption-sm font-medium bg-teal-600/20 border border-teal-500/30 text-teal-300 hover:bg-teal-600/30 transition-colors disabled:opacity-40"
@@ -169,7 +414,14 @@ export function BriefDetail({
         <div className="bg-teal-500/5 border border-teal-500/20 rounded-[var(--radius-lg)] px-4 py-3">
           <div className="flex items-center gap-1.5 mb-1.5"><Icon as={BookOpen} size="md" className="text-teal-400" /><span className="t-caption-sm uppercase tracking-wider text-teal-400 font-medium">Executive Summary</span></div>
           {editingBrief === brief.id ? (
-            <FormTextarea value={brief.executiveSummary || ''} commitOnBlur onCommit={value => { if (value !== brief.executiveSummary) onSaveBriefField(brief.id, { executiveSummary: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] leading-relaxed min-h-[60px]" rows={3} />
+            <AuthorityPinnedTextarea
+              briefId={brief.id}
+              generationRevision={currentBriefRevision}
+              value={brief.executiveSummary || ''}
+              onPinnedCommit={(value, expectedRevision) => onSaveBriefField(brief.id, { executiveSummary: value }, expectedRevision)}
+              className="w-full text-xs text-[var(--brand-text-bright)] leading-relaxed min-h-[60px]"
+              rows={3}
+            />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] leading-relaxed">{brief.executiveSummary}</div>
           )}
@@ -181,7 +433,14 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Suggested Title</div>
           {editingBrief === brief.id ? (
-            <FormInput type="text" value={brief.suggestedTitle || ''} commitOnBlur onCommit={value => { if (value !== brief.suggestedTitle) onSaveBriefField(brief.id, { suggestedTitle: value }); }} className="w-full text-xs text-teal-400" />
+            <AuthorityPinnedInput
+              type="text"
+              briefId={brief.id}
+              generationRevision={currentBriefRevision}
+              value={brief.suggestedTitle || ''}
+              onPinnedCommit={(value, expectedRevision) => onSaveBriefField(brief.id, { suggestedTitle: value }, expectedRevision)}
+              className="w-full text-xs text-teal-400"
+            />
           ) : (
             <div className="text-xs text-teal-400 bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.suggestedTitle}</div>
           )}
@@ -194,7 +453,7 @@ export function BriefDetail({
                   onClick={() => onSaveBriefField(brief.id, {
                     suggestedTitle: variant,
                     titleVariants: [brief.suggestedTitle, ...brief.titleVariants!.filter((_, j) => j !== i)],
-                  })}
+                  }, currentBriefRevision)}
                   className="text-xs text-[var(--brand-text)] hover:text-teal-400 bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
                 >
                   <span className="group-hover:text-teal-400">{variant}</span>
@@ -207,7 +466,14 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Meta Description</div>
           {editingBrief === brief.id ? (
-            <FormTextarea value={brief.suggestedMetaDesc || ''} commitOnBlur onCommit={value => { if (value !== brief.suggestedMetaDesc) onSaveBriefField(brief.id, { suggestedMetaDesc: value }); }} className="w-full text-xs text-[var(--brand-text-bright)]" rows={2} />
+            <AuthorityPinnedTextarea
+              briefId={brief.id}
+              generationRevision={currentBriefRevision}
+              value={brief.suggestedMetaDesc || ''}
+              onPinnedCommit={(value, expectedRevision) => onSaveBriefField(brief.id, { suggestedMetaDesc: value }, expectedRevision)}
+              className="w-full text-xs text-[var(--brand-text-bright)]"
+              rows={2}
+            />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.suggestedMetaDesc}</div>
           )}
@@ -220,7 +486,7 @@ export function BriefDetail({
                   onClick={() => onSaveBriefField(brief.id, {
                     suggestedMetaDesc: variant,
                     metaDescVariants: [brief.suggestedMetaDesc, ...brief.metaDescVariants!.filter((_, j) => j !== i)],
-                  })}
+                  }, currentBriefRevision)}
                   className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] bg-[var(--surface-1)]/50 hover:bg-[var(--surface-2)] rounded-[var(--radius-lg)] px-3 py-1.5 border border-[var(--brand-border)]/50 hover:border-teal-500/30 transition-colors group"
                 >
                   <span className="group-hover:text-[var(--brand-text-bright)]">{variant}</span>
@@ -237,7 +503,18 @@ export function BriefDetail({
         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Word Count</div>
           {editingBrief === brief.id ? (
-            <FormInput type="number" value={brief.wordCountTarget} commitOnBlur onCommit={value => { const v = parseInt(value, 10); if (!isNaN(v) && v !== brief.wordCountTarget) onSaveBriefField(brief.id, { wordCountTarget: v }); }} className="w-full text-sm font-bold text-blue-400" />
+            <AuthorityPinnedInput
+              type="number"
+              briefId={brief.id}
+              generationRevision={currentBriefRevision}
+              value={String(brief.wordCountTarget)}
+              onPinnedCommit={(value, expectedRevision) => {
+                const wordCountTarget = parseInt(value, 10);
+                if (Number.isNaN(wordCountTarget)) return false;
+                return onSaveBriefField(brief.id, { wordCountTarget }, expectedRevision);
+              }}
+              className="w-full text-sm font-bold text-blue-400"
+            />
           ) : (
             <div className="text-sm font-bold text-blue-400">{brief.wordCountTarget.toLocaleString()}</div>
           )}
@@ -245,7 +522,14 @@ export function BriefDetail({
         <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Intent</div>
           {editingBrief === brief.id ? (
-            <FormInput type="text" value={brief.intent || ''} commitOnBlur onCommit={value => { if (value !== brief.intent) onSaveBriefField(brief.id, { intent: value }); }} className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium" />
+            <AuthorityPinnedInput
+              type="text"
+              briefId={brief.id}
+              generationRevision={currentBriefRevision}
+              value={brief.intent || ''}
+              onPinnedCommit={(value, expectedRevision) => onSaveBriefField(brief.id, { intent: value }, expectedRevision)}
+              className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium"
+            />
           ) : (
             <div className="text-xs text-[var(--brand-text-bright)] capitalize font-medium">{brief.intent}</div>
           )}
@@ -255,8 +539,13 @@ export function BriefDetail({
           {editingBrief === brief.id ? (
             <FormSelect
               value={brief.generationStyle ?? DEFAULT_CONTENT_GENERATION_STYLE}
-              onChange={value => onSaveBriefField(brief.id, { generationStyle: value as ContentGenerationStyle })}
+              onChange={value => onSaveBriefField(
+                brief.id,
+                { generationStyle: value as ContentGenerationStyle },
+                currentBriefRevision,
+              )}
               options={CONTENT_GENERATION_STYLE_OPTIONS}
+              aria-label="Brief generation style"
               className="w-full text-xs text-[var(--brand-text-bright)] capitalize font-medium cursor-pointer"
             />
           ) : (
@@ -269,7 +558,17 @@ export function BriefDetail({
           <div className="bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">
             <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-0.5">Format</div>
             {editingBrief === brief.id ? (
-              <FormSelect value={brief.contentFormat} onChange={value => onSaveBriefField(brief.id, { contentFormat: value })} options={['guide', 'listicle', 'how-to', 'comparison', 'FAQ', 'case-study', 'pillar-page', 'landing-page', 'blog-post'].map(f => ({ value: f, label: f }))} className="w-full text-xs text-amber-400 capitalize font-medium cursor-pointer" />
+              <FormSelect
+                value={brief.contentFormat}
+                onChange={value => onSaveBriefField(
+                  brief.id,
+                  { contentFormat: value },
+                  currentBriefRevision,
+                )}
+                options={['guide', 'listicle', 'how-to', 'comparison', 'FAQ', 'case-study', 'pillar-page', 'landing-page', 'blog-post'].map(f => ({ value: f, label: f }))}
+                aria-label="Brief content format"
+                className="w-full text-xs text-amber-400 capitalize font-medium cursor-pointer"
+              />
             ) : (
               <div className="text-xs text-amber-400 capitalize font-medium">{brief.contentFormat}</div>
             )}
@@ -296,7 +595,14 @@ export function BriefDetail({
         <div>
           <div className="flex items-center gap-1.5 mb-1"><Icon as={Users} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Audience</span></div>
           {editingBrief === brief.id ? (
-            <FormTextarea value={brief.audience || ''} commitOnBlur onCommit={value => { if (value !== brief.audience) onSaveBriefField(brief.id, { audience: value }); }} className="w-full text-xs text-[var(--brand-text)]" rows={2} />
+            <AuthorityPinnedTextarea
+              briefId={brief.id}
+              generationRevision={currentBriefRevision}
+              value={brief.audience || ''}
+              onPinnedCommit={(value, expectedRevision) => onSaveBriefField(brief.id, { audience: value }, expectedRevision)}
+              className="w-full text-xs text-[var(--brand-text)]"
+              rows={2}
+            />
           ) : (
             <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.audience}</div>
           )}
@@ -305,7 +611,14 @@ export function BriefDetail({
           <div>
             <div className="flex items-center gap-1.5 mb-1"><Icon as={MessageSquare} size="sm" className="text-[var(--brand-text-muted)]" /><span className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Tone & Style</span></div>
             {editingBrief === brief.id ? (
-              <FormTextarea value={brief.toneAndStyle || ''} commitOnBlur onCommit={value => { if (value !== brief.toneAndStyle) onSaveBriefField(brief.id, { toneAndStyle: value }); }} className="w-full text-xs text-[var(--brand-text)]" rows={2} />
+              <AuthorityPinnedTextarea
+                briefId={brief.id}
+                generationRevision={currentBriefRevision}
+                value={brief.toneAndStyle || ''}
+                onPinnedCommit={(value, expectedRevision) => onSaveBriefField(brief.id, { toneAndStyle: value }, expectedRevision)}
+                className="w-full text-xs text-[var(--brand-text)]"
+                rows={2}
+              />
             ) : (
               <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)]">{brief.toneAndStyle}</div>
             )}
@@ -408,7 +721,16 @@ export function BriefDetail({
             <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium">Content Outline</div>
             {onRegenerateOutline && (
               <Button
-                onClick={() => setShowOutlineRegen(!showOutlineRegen)}
+                onClick={() => {
+                  if (showOutlineRegen) {
+                    setShowOutlineRegen(false);
+                    setOutlineRegenFeedback('');
+                    setOutlineRegenAuthority(null);
+                    return;
+                  }
+                  setOutlineRegenAuthority(briefFormAuthority(brief));
+                  setShowOutlineRegen(true);
+                }}
                 disabled={regeneratingOutline === brief.id}
                 variant="ghost"
                 size="sm"
@@ -428,10 +750,17 @@ export function BriefDetail({
                 className="w-full"
                 rows={2}
               />
+              {staleOutlineAuthority && <StaleBriefFormNotice />}
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => { onRegenerateOutline(brief.id, outlineRegenFeedback.trim() || undefined); setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
-                  disabled={regeneratingOutline === brief.id}
+                  onClick={() => {
+                    if (!outlineRegenAuthority || !hasCurrentBriefAuthority(outlineRegenAuthority, brief)) return;
+                    onRegenerateOutline(brief.id, outlineRegenFeedback.trim() || undefined, outlineRegenAuthority.expectedRevision);
+                    setShowOutlineRegen(false);
+                    setOutlineRegenFeedback('');
+                    setOutlineRegenAuthority(null);
+                  }}
+                  disabled={regeneratingOutline === brief.id || staleOutlineAuthority}
                   variant="ghost"
                   size="sm"
                   className="rounded-[var(--radius-lg)] text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition-colors text-white"
@@ -439,7 +768,7 @@ export function BriefDetail({
                   Regenerate
                 </Button>
                 <Button
-                  onClick={() => { setShowOutlineRegen(false); setOutlineRegenFeedback(''); }}
+                  onClick={() => { setShowOutlineRegen(false); setOutlineRegenFeedback(''); setOutlineRegenAuthority(null); }}
                   variant="ghost"
                   size="sm"
                   className="rounded-[var(--radius-lg)] text-xs font-medium bg-[var(--surface-3)] hover:bg-[var(--brand-border-hover)] text-[var(--brand-text)] transition-colors"
@@ -456,10 +785,50 @@ export function BriefDetail({
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="t-caption-sm text-[var(--brand-text-muted)] flex-shrink-0">H2:</span>
-                      <FormInput type="text" value={section.heading || ''} commitOnBlur onCommit={value => { if (value !== section.heading) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], heading: value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="flex-1 text-xs font-medium text-[var(--brand-text-bright)]" />
-                      <FormInput type="number" value={section.wordCount || ''} placeholder="words" commitOnBlur onCommit={value => { const v = parseInt(value, 10); const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], wordCount: isNaN(v) ? undefined : v }; onSaveBriefField(brief.id, { outline: newOutline }); }} className="w-20 t-caption-sm text-[var(--brand-text-muted)] text-right" />
+                      <AuthorityPinnedInput
+                        type="text"
+                        briefId={brief.id}
+                        generationRevision={currentBriefRevision}
+                        value={section.heading || ''}
+                        onPinnedCommit={(value, expectedRevision) => {
+                          const newOutline = [...brief.outline];
+                          newOutline[i] = { ...newOutline[i], heading: value };
+                          return onSaveBriefField(brief.id, { outline: newOutline }, expectedRevision);
+                        }}
+                        containerClassName="min-w-0 flex-1"
+                        className="w-full text-xs font-medium text-[var(--brand-text-bright)]"
+                      />
+                      <AuthorityPinnedInput
+                        type="number"
+                        briefId={brief.id}
+                        generationRevision={currentBriefRevision}
+                        value={String(section.wordCount || '')}
+                        placeholder="words"
+                        onPinnedCommit={(value, expectedRevision) => {
+                          const parsedWordCount = parseInt(value, 10);
+                          const newOutline = [...brief.outline];
+                          newOutline[i] = {
+                            ...newOutline[i],
+                            wordCount: Number.isNaN(parsedWordCount) ? undefined : parsedWordCount,
+                          };
+                          return onSaveBriefField(brief.id, { outline: newOutline }, expectedRevision);
+                        }}
+                        containerClassName="w-20 flex-shrink-0"
+                        className="w-full t-caption-sm text-[var(--brand-text-muted)] text-right"
+                      />
                     </div>
-                    <FormTextarea value={section.notes || ''} commitOnBlur onCommit={value => { if (value !== section.notes) { const newOutline = [...brief.outline]; newOutline[i] = { ...newOutline[i], notes: value }; onSaveBriefField(brief.id, { outline: newOutline }); } }} className="w-full t-caption-sm text-[var(--brand-text-muted)] leading-relaxed" rows={2} />
+                    <AuthorityPinnedTextarea
+                      briefId={brief.id}
+                      generationRevision={currentBriefRevision}
+                      value={section.notes || ''}
+                      onPinnedCommit={(value, expectedRevision) => {
+                        const newOutline = [...brief.outline];
+                        newOutline[i] = { ...newOutline[i], notes: value };
+                        return onSaveBriefField(brief.id, { outline: newOutline }, expectedRevision);
+                      }}
+                      className="w-full t-caption-sm text-[var(--brand-text-muted)] leading-relaxed"
+                      rows={2}
+                    />
                   </div>
                 ) : (
                   <>
@@ -487,7 +856,19 @@ export function BriefDetail({
             <div key={i} className="text-xs text-[var(--brand-text-bright)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] flex items-start gap-2">
               <Badge label={i === 0 ? 'Primary' : 'Secondary'} tone={i === 0 ? 'teal' : 'zinc'} className="flex-shrink-0" />
               {editingBrief === brief.id ? (
-                <FormInput type="text" value={cta || ''} commitOnBlur onCommit={value => { if (value !== cta) { const newCtas = [...(brief.ctaRecommendations || [])]; newCtas[i] = value; onSaveBriefField(brief.id, { ctaRecommendations: newCtas }); } }} className="flex-1 text-xs text-[var(--brand-text-bright)]" />
+                <AuthorityPinnedInput
+                  type="text"
+                  briefId={brief.id}
+                  generationRevision={currentBriefRevision}
+                  value={cta || ''}
+                  onPinnedCommit={(value, expectedRevision) => {
+                    const newCtas = [...(brief.ctaRecommendations || [])];
+                    newCtas[i] = value;
+                    return onSaveBriefField(brief.id, { ctaRecommendations: newCtas }, expectedRevision);
+                  }}
+                  containerClassName="min-w-0 flex-1"
+                  className="w-full text-xs text-[var(--brand-text-bright)]"
+                />
               ) : cta}
             </div>
           ))}</div>
@@ -499,7 +880,14 @@ export function BriefDetail({
         <div>
           <div className="t-caption-sm uppercase tracking-wider text-[var(--brand-text-muted)] font-medium mb-1">Competitor Insights</div>
           {editingBrief === brief.id ? (
-            <FormTextarea value={brief.competitorInsights || ''} commitOnBlur onCommit={value => { if (value !== brief.competitorInsights) onSaveBriefField(brief.id, { competitorInsights: value }); }} className="w-full text-xs text-[var(--brand-text)] leading-relaxed" rows={3} />
+            <AuthorityPinnedTextarea
+              briefId={brief.id}
+              generationRevision={currentBriefRevision}
+              value={brief.competitorInsights || ''}
+              onPinnedCommit={(value, expectedRevision) => onSaveBriefField(brief.id, { competitorInsights: value }, expectedRevision)}
+              className="w-full text-xs text-[var(--brand-text)] leading-relaxed"
+              rows={3}
+            />
           ) : (
             <div className="text-xs text-[var(--brand-text)] bg-[var(--surface-1)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--brand-border)] leading-relaxed">{brief.competitorInsights}</div>
           )}

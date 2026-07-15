@@ -6,6 +6,7 @@ import type {
 import type { KeywordStrategyExplanation } from './keyword-strategy-ux.ts';
 import type { LocalSeoKeywordVisibilitySummary } from './local-seo.ts';
 import type { OutcomeReadback } from './outcome-tracking.ts';
+import type { CannibalizationItem, TopicCluster } from './workspace.ts';
 
 export const KEYWORD_COMMAND_CENTER_STATUS = {
   IN_STRATEGY: 'in_strategy',
@@ -18,6 +19,17 @@ export const KEYWORD_COMMAND_CENTER_STATUS = {
 
 export type KeywordCommandCenterStatus =
   typeof KEYWORD_COMMAND_CENTER_STATUS[keyof typeof KEYWORD_COMMAND_CENTER_STATUS];
+
+export const KEYWORD_LIFECYCLE_STAGES = {
+  DISCOVERED: 'discovered',
+  TARGETED: 'targeted',
+  PUBLISHED: 'published',
+  RANKING: 'ranking',
+  WINNING: 'winning',
+} as const;
+
+export type KeywordLifecycleStage =
+  typeof KEYWORD_LIFECYCLE_STAGES[keyof typeof KEYWORD_LIFECYCLE_STAGES];
 
 export const KEYWORD_COMMAND_CENTER_FILTERS = {
   ALL: 'all',
@@ -49,6 +61,12 @@ export const KEYWORD_COMMAND_CENTER_FILTERS = {
 export type KeywordCommandCenterFilter =
   typeof KEYWORD_COMMAND_CENTER_FILTERS[keyof typeof KEYWORD_COMMAND_CENTER_FILTERS];
 
+// R5 action catalog: every verb in KEYWORD_COMMAND_CENTER_ACTIONS has a metadata
+// entry in the `keyword_command_center` context of shared/types/action-catalog.ts
+// (ACTION_CATALOG.keyword_command_center), verified by
+// tests/contract/action-catalog.test.ts. This const is the source of truth for
+// values — the catalog imports it and never redefines it. See
+// docs/rules/action-catalog.md.
 export const KEYWORD_COMMAND_CENTER_ACTIONS = {
   ADD_TO_STRATEGY: 'add_to_strategy',
   PROMOTE_EVIDENCE: 'promote_evidence',
@@ -142,6 +160,7 @@ export interface KeywordCommandCenterMetrics {
 export interface KeywordCommandCenterAssignment {
   pagePath?: string;
   pageTitle?: string;
+  topicCluster?: string;
   role?: 'site_keyword' | 'page_keyword' | 'content_gap' | 'raw_evidence';
 }
 
@@ -236,6 +255,7 @@ export interface KeywordCommandCenterRow {
   isProtected: boolean;
   protectionReason?: string;
   rawEvidenceOnly?: boolean;
+  lifecycleStage?: KeywordLifecycleStage;
   /** Number of GSC query variants aggregated onto this row. */
   variantCount?: number;
   /** Aggregated GSC query variants (populated when variantCount > 0). */
@@ -254,6 +274,8 @@ export interface KeywordCommandCenterRow {
    * Absent when the keyword has no value signal (signal gate fails).
    */
   valueReasons?: string[];
+  /** 0-100, server-computed; display-only. */
+  opportunityScore?: number;
   /**
    * Realized monthly dollar value of the keyword: clicks × cpc (Task 3.3).
    * Built in finalizeDraftRow via the single keywordDollarValue helper (one $
@@ -321,6 +343,16 @@ export interface KeywordCommandCenterSummaryResponse {
   generatedAt?: string | null;
   summarizedAt: string;
   geoLabel?: string;
+  /**
+   * Monthly organic traffic value from the ROI page-keyword read path.
+   * Display-only; null when no page-keyword or legacy page-map source exists.
+   */
+  trafficValueMonthly?: number | null;
+  /** Topic cluster rows from the normalized topic_clusters table for rebuilt grouping lenses. */
+  topicClusters?: TopicCluster[];
+  /** Cannibalization rows from the normalized cannibalization_issues table for rebuilt grouping flags. */
+  cannibalization?: CannibalizationItem[];
+  rankFreshness: KeywordRankFreshness;
 }
 
 export interface KeywordCommandCenterRowsQuery {
@@ -346,6 +378,23 @@ export interface KeywordCommandCenterRowsResponse {
   rows: KeywordCommandCenterRow[];
   pageInfo: KeywordCommandCenterPageInfo;
   generatedAt?: string | null;
+  rankFreshness: KeywordRankFreshness;
+}
+
+export const KEYWORD_RANK_FRESHNESS_STATUS = {
+  FRESH: 'fresh',
+  STALE: 'stale',
+  MISSING: 'missing',
+} as const;
+
+export type KeywordRankFreshnessStatus = typeof KEYWORD_RANK_FRESHNESS_STATUS[keyof typeof KEYWORD_RANK_FRESHNESS_STATUS];
+
+export interface KeywordRankFreshness {
+  /** ISO timestamp derived from the authoritative rank snapshot date, never request time. */
+  snapshotDate: string | null;
+  /** Whole UTC days since the authoritative snapshot; null when no snapshot exists. */
+  ageDays: number | null;
+  status: KeywordRankFreshnessStatus;
 }
 
 export interface KeywordCommandCenterInitialViewResponse {

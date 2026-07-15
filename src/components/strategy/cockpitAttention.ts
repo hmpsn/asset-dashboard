@@ -90,7 +90,7 @@ export function buildAttentionItems(recs: Recommendation[], now: number = Date.n
       recId: rec.id,
       title: rec.title,
       kind: 'new_reply' satisfies AttentionKind,
-      detail: 'The client replied — open the thread',
+      detail: 'Client discussion is active on this move',
     });
   }
 

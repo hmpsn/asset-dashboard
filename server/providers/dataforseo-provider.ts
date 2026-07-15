@@ -4,11 +4,12 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 
 import { getUploadRoot, getDataDir } from '../data-dir.js';
 import { createLogger } from '../logger.js';
 import { getCachedMetricsBatch, cacheMetricsBatch } from '../keyword-metrics-cache.js';
-import { keywordComparisonKey } from '../../shared/keyword-normalization.js';
+import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
 import { KEYWORD_GAP_COMPETITOR_KEYWORD_LIMIT, MAX_COMPETITORS } from '../constants.js';
 import { recordExternalApiTelemetry, recordOperationTrace } from '../platform-observability.js';
 import { KEYWORD_SOURCE_KIND, type KeywordSourceEvidence, type KeywordSourceKind } from '../../shared/types/keywords.js';
@@ -34,6 +35,7 @@ import type {
   DomainOverview,
   OrganicCompetitor,
   KeywordGapEntry,
+  DomainAuthorityMetric,
   BacklinksOverview,
   ReferringDomain,
   NationalSerpProviderRequest,
@@ -104,14 +106,19 @@ function normalizeLanguageCode(languageCode?: string): string {
  * file cache keys. Combines geo (location/database) + language so a non-US/non-en
  * workspace cannot read or write rows another geo/language workspace consumes.
  *
- * The `v2:` version prefix is a deliberate one-time invalidation of the legacy
- * language-blind cache rows (which were keyed on locationCode/database only and
- * could have been written by an 'en' caller). 'en' rows are versioned the same
- * way, so flag-OFF callers simply re-warm once after this ships — output is
- * unchanged; only the cache key changes.
+ * The `v2:` version prefix isolates language-aware cache regions from the
+ * original language-blind rows.
  */
 export function cacheRegionToken(geo: string, languageCode = DEFAULT_LANGUAGE_CODE): string {
   return `v2:${geo}:${normalizeLanguageCode(languageCode)}`;
+}
+
+/** Metrics-only generation token; older keyword identities stay rollback-only. */
+export function keywordMetricsCacheRegionToken(
+  geo: string,
+  languageCode = DEFAULT_LANGUAGE_CODE,
+): string {
+  return `v3:kid-v2:${geo}:${normalizeLanguageCode(languageCode)}`;
 }
 
 /**
@@ -176,7 +183,10 @@ export function flushCreditsToDisk(): void {
   const today = new Date().toISOString().slice(0, 10);
   const filePath = path.join(CREDIT_DIR, `${today}.json`);
   let existing: CreditEntry[] = [];
-  try { existing = JSON.parse(fs.readFileSync(filePath, 'utf-8')); } catch { /* new file — expected */ }
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    existing = Array.isArray(parsed) ? parsed as CreditEntry[] : [];
+  } catch { /* new file — expected */ }
   existing.push(...pendingCreditWrites);
   fs.writeFileSync(filePath, JSON.stringify(existing, null, 2));
   pendingCreditWrites = [];
@@ -285,6 +295,13 @@ function cleanUrlTarget(url: string): string {
 
 function cacheKeyPart(value: string): string {
   return value.toLowerCase().trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 180);
+}
+
+function keywordMetricsCacheKey(cacheRegion: string, keyword: string): string | null {
+  const identityKey = keywordIdentityKeyV2(keyword);
+  if (!identityKey) return null;
+  const identityDigest = createHash('sha256').update(identityKey, 'utf8').digest('hex');
+  return `kw_${cacheRegion}_${identityDigest}`;
 }
 
 function normalizeSeedKeywords(keywords: string[], limit = 10): string[] {
@@ -1118,25 +1135,19 @@ export class DataForSeoProvider implements SeoDataProvider {
     const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
     const lang = normalizeLanguageCode(languageCode);
     // Versioned + language-aware cache region (cross-workspace poisoning fix).
-    const cacheRegion = cacheRegionToken(String(resolvedLocationCode), lang);
-    // Pre-version, language-blind region a same-geo/'en' caller may have already
-    // warmed — read it forward only for the default language so US/en stays warm.
-    const useLegacyRegionFallback = lang === DEFAULT_LANGUAGE_CODE;
-    const legacyRegion = String(resolvedLocationCode);
+    const cacheRegion = keywordMetricsCacheRegionToken(String(resolvedLocationCode), lang);
     const results: KeywordMetrics[] = [];
     const uncached: string[] = [];
 
     // Check cache first
     for (const kw of keywords) {
-      const cacheKey = `kw_${cacheRegion}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
-      let cached = readCache<KeywordMetrics>(workspaceId, cacheKey, CACHE_TTL_KEYWORD);
-      if (!cached && useLegacyRegionFallback) {
-        const legacyCacheKey = `kw_${legacyRegion}_${kw.toLowerCase().replace(/\s+/g, '_')}`;
-        cached = readCache<KeywordMetrics>(workspaceId, legacyCacheKey, CACHE_TTL_KEYWORD);
-        if (cached) writeCache(workspaceId, cacheKey, cached);
-      }
+      if (!keywordIdentityKeyV2(kw)) continue;
+      const cacheKey = keywordMetricsCacheKey(cacheRegion, kw);
+      const cached = cacheKey
+        ? readCache<KeywordMetrics>(workspaceId, cacheKey, CACHE_TTL_KEYWORD)
+        : null;
       if (cached) {
-        results.push(cached);
+        results.push({ ...cached, keyword: kw });
         logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
       } else {
         uncached.push(kw);
@@ -1156,32 +1167,12 @@ export class DataForSeoProvider implements SeoDataProvider {
     }
     const stillUncached: string[] = [];
     for (const kw of uncached) {
-      const hit = globalHits.get(keywordComparisonKey(kw));
+      const hit = globalHits.get(keywordIdentityKeyV2(kw));
       if (hit) {
-        results.push(hit);
+        results.push({ ...hit, keyword: kw });
         logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
       } else {
         stillUncached.push(kw);
-      }
-    }
-
-    if (stillUncached.length > 0 && useLegacyRegionFallback) {
-      try {
-        const rawLegacyHits = getCachedMetricsBatch([...stillUncached], legacyRegion, CACHE_TTL_KEYWORD);
-        const legacyHits = rawLegacyHits as Map<string, KeywordMetrics>;
-        const legacyBackfill: KeywordMetrics[] = [];
-        for (let i = stillUncached.length - 1; i >= 0; i--) {
-          const kw = stillUncached[i];
-          const hit = legacyHits.get(keywordComparisonKey(kw));
-          if (!hit) continue;
-          results.push(hit);
-          legacyBackfill.push(hit);
-          stillUncached.splice(i, 1);
-          logCreditUsage({ credits: 0, endpoint: 'search_volume', query: kw, rowsReturned: 1, workspaceId, cached: true });
-        }
-        cacheMetricsBatch(legacyBackfill, cacheRegion);
-      } catch (err) {
-        log.warn({ err }, 'DataForSEO legacy L1 cache lookup failed — falling through to API');
       }
     }
 
@@ -1215,7 +1206,8 @@ export class DataForSeoProvider implements SeoDataProvider {
           for (const item of kdResults) {
             const kw = item.keyword as string;
             const kd = item.keyword_difficulty as number;
-            if (kw && typeof kd === 'number') kdMap.set(kw.toLowerCase(), kd);
+            const key = typeof kw === 'string' ? keywordIdentityKeyV2(kw) : '';
+            if (key && typeof kd === 'number') kdMap.set(key, kd);
           }
           const kdCost = getTaskCost(kdJson);
           if (kdCost > 0) {
@@ -1229,6 +1221,8 @@ export class DataForSeoProvider implements SeoDataProvider {
 
         for (const item of taskResults) {
           const keyword = item.keyword as string;
+          const keywordKey = typeof keyword === 'string' ? keywordIdentityKeyV2(keyword) : '';
+          if (!keywordKey) continue;
           const searchVolume = (item.search_volume as number) ?? 0;
           const competitionIndex = (item.competition_index as number) ?? 0;
           const cpc = (item.cpc as number) ?? 0;
@@ -1239,7 +1233,7 @@ export class DataForSeoProvider implements SeoDataProvider {
           const metrics: KeywordMetrics = {
             keyword,
             volume: searchVolume,
-            difficulty: kdMap.get(keyword.toLowerCase()) ?? competitionIndex,
+            difficulty: kdMap.get(keywordKey) ?? competitionIndex,
             cpc,
             competition: typeof competition === 'number' ? competition : 0,
             results: 0, // DataForSEO doesn't provide this in this endpoint
@@ -1248,8 +1242,8 @@ export class DataForSeoProvider implements SeoDataProvider {
 
           results.push(metrics);
           batchResults.push(metrics);
-          const cacheKey = `kw_${cacheRegion}_${keyword.toLowerCase().replace(/\s+/g, '_')}`;
-          writeCache(workspaceId, cacheKey, metrics);
+          const cacheKey = keywordMetricsCacheKey(cacheRegion, keyword);
+          if (cacheKey) writeCache(workspaceId, cacheKey, metrics);
         }
 
         cacheMetricsBatch(batchResults, cacheRegion);
@@ -1940,6 +1934,95 @@ export class DataForSeoProvider implements SeoDataProvider {
     return allGaps
       .filter(g => { if (seen.has(g.keyword.toLowerCase())) return false; seen.add(g.keyword.toLowerCase()); return true; })
       .sort((a, b) => b.volume - a.volume);
+  }
+
+  async getDomainAuthorityMetrics(
+    domains: string[],
+    workspaceId: string,
+    database = 'us',
+    locationCode?: number,
+    languageCode?: string,
+  ): Promise<DomainAuthorityMetric[]> {
+    const lang = normalizeLanguageCode(languageCode);
+    const resolvedLocationCode = locationCode ?? locationCodeFromDatabase(database);
+    const targets = [...new Set(domains.map(cleanDomain).filter(Boolean))].slice(0, MAX_COMPETITORS + 1);
+    if (targets.length === 0) return [];
+
+    const targetKey = targets.map(cacheKeyPart).sort().join('_');
+    const rankRows = await runDataForSeoOperation<Array<{ domain: string; authorityRank: number | null }>>({
+      workspaceId,
+      cacheKey: `domain_authority_bulk_rank_${targetKey}`,
+      cacheTtlHours: CACHE_TTL_BACKLINKS,
+      endpointLabel: 'backlinks_bulk_ranks',
+      query: targets.join(',').slice(0, 100),
+      emptyValue: [],
+      endpoint: 'backlinks/bulk_ranks/live',
+      body: [{
+        targets,
+        rank_scale: 'one_hundred',
+      }],
+      mapResult: (json) => {
+        const taskResults = getTaskResult(json);
+        const items = (taskResults[0]?.items as Array<Record<string, unknown>>) ?? [];
+        const results = items
+          .map((item) => {
+            const domain = cleanDomain(String(item.target ?? ''));
+            const rank = item.rank;
+            if (!domain) return null;
+            return {
+              domain,
+              authorityRank: typeof rank === 'number' ? rank : null,
+            };
+          })
+          .filter((item): item is { domain: string; authorityRank: number | null } => item !== null);
+        return { value: results, rowsReturned: results.length };
+      },
+      handleError: (err) => {
+        log.error({ err, domains: targets }, 'DataForSEO backlinks bulk rank error');
+        return [];
+      },
+    });
+
+    const top3Rows = await Promise.all(targets.map((target) =>
+      runDataForSeoOperation<{ domain: string; top3Keywords: number | null }>({
+        workspaceId,
+        cacheKey: `domain_rank_overview_${domainGeoToken(database, locationCode, lang)}_${cacheKeyPart(target)}`,
+        cacheTtlHours: CACHE_TTL_DOMAIN_OVERVIEW,
+        endpointLabel: 'domain_rank_overview',
+        query: target,
+        emptyValue: { domain: target, top3Keywords: null },
+        endpoint: 'dataforseo_labs/google/domain_rank_overview/live',
+        body: [{
+          target,
+          location_code: resolvedLocationCode,
+          language_code: lang,
+        }],
+        mapResult: (json) => {
+          const taskResults = getTaskResult(json);
+          const resultObj = taskResults[0] ?? {};
+          const metrics = resultObj.metrics as Record<string, Record<string, number>> | undefined;
+          const organic = metrics?.organic;
+          const pos1 = typeof organic?.pos_1 === 'number' ? organic.pos_1 : 0;
+          const pos2To3 = typeof organic?.pos_2_3 === 'number' ? organic.pos_2_3 : 0;
+          return {
+            value: { domain: target, top3Keywords: pos1 + pos2To3 },
+            rowsReturned: 1,
+          };
+        },
+        handleError: (err) => {
+          log.error({ err, domain: target }, 'DataForSEO domain rank overview error');
+          return { domain: target, top3Keywords: null };
+        },
+      })
+    ));
+
+    const rankByDomain = new Map(rankRows.map((row) => [row.domain, row.authorityRank]));
+    const top3ByDomain = new Map(top3Rows.map((row) => [row.domain, row.top3Keywords]));
+    return targets.map((domain) => ({
+      domain,
+      authorityRank: rankByDomain.get(domain) ?? null,
+      top3Keywords: top3ByDomain.get(domain) ?? null,
+    }));
   }
 
   // ── getBacklinksOverview → backlinks/summary ──

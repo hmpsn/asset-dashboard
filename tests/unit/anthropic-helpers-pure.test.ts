@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   throwIfSignalAborted: vi.fn(),
   isLocalFakeProviderModeEnabled: vi.fn(() => false),
   fetch: vi.fn(),
+  recordOperationTrace: vi.fn(),
 }));
 
 vi.mock('../../server/openai-helpers.js', () => ({ logTokenUsage: mocks.logTokenUsage }));
@@ -26,6 +27,9 @@ vi.mock('../../server/abort-helpers.js', () => ({
 }));
 vi.mock('../../server/local-provider-mode.js', () => ({
   isLocalFakeProviderModeEnabled: mocks.isLocalFakeProviderModeEnabled,
+}));
+vi.mock('../../server/platform-observability.js', () => ({
+  recordOperationTrace: mocks.recordOperationTrace,
 }));
 
 // Stub global fetch
@@ -63,9 +67,17 @@ describe('isAnthropicConfigured', () => {
 
 describe('callAnthropic (local fake provider mode)', () => {
   beforeEach(() => {
+    mocks.recordOperationTrace.mockClear();
     mocks.isLocalFakeProviderModeEnabled.mockReturnValue(true);
     mocks.logTokenUsage.mockReset();
     delete process.env.ANTHROPIC_API_KEY;
+  });
+
+  it('records provider execution metadata for the synthetic path', async () => {
+    await callAnthropic({ messages: [{ role: 'user', content: 'Hi' }], feature: 'test', runId: 'run-local', operation: 'op-local' });
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'success', runId: 'run-local', operation: 'op-local', provider: 'anthropic', attempts: 1,
+    }));
   });
 
   it('returns a synthetic text response without calling fetch', async () => {
@@ -102,6 +114,7 @@ describe('callAnthropic (local fake provider mode)', () => {
 
 describe('callAnthropic (real fetch path)', () => {
   beforeEach(() => {
+    mocks.recordOperationTrace.mockClear();
     mocks.isLocalFakeProviderModeEnabled.mockReturnValue(false);
     mocks.logTokenUsage.mockReset();
     mocks.fetch.mockReset();
@@ -121,6 +134,9 @@ describe('callAnthropic (real fetch path)', () => {
     await expect(
       callAnthropic({ messages: [{ role: 'user', content: 'Hi' }], feature: 'test' })
     ).rejects.toThrow('ANTHROPIC_API_KEY not configured');
+    expect(mocks.recordOperationTrace).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'error', provider: 'anthropic', attempts: 0,
+    }));
   });
 
   it('parses text content from Anthropic response shape', async () => {
@@ -323,6 +339,17 @@ describe('callAnthropicWithTools (real fetch path)', () => {
     expect(result.toolInput).toEqual({ label: 'positive' });
     expect(result.promptTokens).toBe(20);
     expect(result.completionTokens).toBe(8);
+  });
+
+  it('does not cache repeated tool calls on the legacy cache-none path', async () => {
+    mocks.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: [{ type: 'tool_use', input: { label: 'positive' } }], usage: { input_tokens: 2, output_tokens: 1 } }),
+    });
+    const opts = { userMessage: 'same', tools: [sampleTool], feature: 'legacy-tools' };
+    await callAnthropicWithTools(opts);
+    await callAnthropicWithTools(opts);
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('throws when response contains no tool_use block', async () => {

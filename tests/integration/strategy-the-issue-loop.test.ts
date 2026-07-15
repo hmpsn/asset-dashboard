@@ -242,6 +242,48 @@ describe('client act-on → durable content request (half-loop #2)', () => {
     const res = await postJson(`/api/public/recommendations/${workspaceId}/nope/act-on`, {});
     expect(res.status).toBe(404);
   });
+
+  // R4-PR1 authority split: act-on advances the rec-sourced deliverable MIRROR in lockstep, against
+  // the REAL deliverable store (not a mock). Send mints the mirror born awaiting_client; act-on must
+  // move it to approved so the two axes don't diverge by construction.
+  it('advances the rec-sourced deliverable mirror awaiting_client → approved (against the real store)', async () => {
+    seedRec('rec_mirror_sync', { clientStatus: 'curated' });
+    // /send mints the mirror born awaiting_client (half-loop #1).
+    const sendRes = await patchJson(`/api/recommendations/${workspaceId}/rec_mirror_sync/send`, {});
+    expect(sendRes.status).toBe(200);
+    const mirrorAfterSend = listDeliverables(workspaceId).find(
+      (d) => d.sourceRef === 'recommendation:rec_mirror_sync',
+    );
+    expect(mirrorAfterSend).toBeDefined();
+    expect(mirrorAfterSend!.status).toBe('awaiting_client');
+
+    // Client greenlight → the mirror advances to approved IN LOCKSTEP.
+    const actRes = await postJson(`/api/public/recommendations/${workspaceId}/rec_mirror_sync/act-on`, {});
+    expect(actRes.status).toBe(200);
+
+    const mirrorAfterActOn = listDeliverables(workspaceId).find(
+      (d) => d.sourceRef === 'recommendation:rec_mirror_sync',
+    );
+    expect(mirrorAfterActOn).toBeDefined();
+    expect(mirrorAfterActOn!.id).toBe(mirrorAfterSend!.id); // same row, advanced in place
+    expect(mirrorAfterActOn!.status).toBe('approved'); // no longer diverged
+    expect(mirrorAfterActOn!.decidedAt).toBeTruthy();
+  });
+
+  it('act-on with NO pre-existing mirror does not throw (best-effort; the greenlight still stands)', async () => {
+    // A rec sent before the dual-write shipped has no mirror. Act-on must still succeed (the mirror
+    // sync no-ops on a missing row; the divergence sweep surfaces it).
+    seedRec('rec_no_mirror', { clientStatus: 'sent', sentAt: now() });
+    // Ensure no mirror row exists for this rec.
+    db.prepare("DELETE FROM client_deliverable WHERE workspace_id = ? AND source_ref = ?").run(
+      workspaceId,
+      'recommendation:rec_no_mirror',
+    );
+    const actRes = await postJson(`/api/public/recommendations/${workspaceId}/rec_no_mirror/act-on`, {});
+    expect(actRes.status).toBe(200);
+    const body = (await actRes.json()) as { recommendation: { clientStatus?: string } };
+    expect(body.recommendation.clientStatus).toBe('approved');
+  });
 });
 
 describe('L8: cross-workspace act-on is tenant-scoped (404, mutates nothing)', () => {

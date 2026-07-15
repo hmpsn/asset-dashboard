@@ -22,7 +22,7 @@ describe('audit intelligence consistency contracts', () => {
     const src = readFileSync('src/hooks/useWsInvalidation.ts', 'utf-8'); // readFile-ok — source contract for suppression cache freshness
     const keys = getWorkspaceInvalidationKeys(WS_EVENTS.WORKSPACE_UPDATED, 'ws-audit', undefined, 'admin');
 
-    expect(src).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: () => invalidateRegistry(WS_EVENTS.WORKSPACE_UPDATED)');
+    expect(src).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: (data: unknown) => invalidateRegistry(WS_EVENTS.WORKSPACE_UPDATED, data)');
     expect(keys).toContainEqual(queryKeys.admin.workspaceHome('ws-audit'));
     expect(keys).toContainEqual(queryKeys.admin.workspaceDetail('ws-audit'));
     expect(keys).toContainEqual(queryKeys.admin.workspaceOverview());

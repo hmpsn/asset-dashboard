@@ -26,26 +26,39 @@ export interface KeywordTargetsLensProps {
    *  calls even if this panel is ever mounted outside the issueOverviewEl gate. Defaults to FALSE
    *  (opt-in) so an omitted prop never fires a flag-OFF fetch — the byte-identical-OFF safe default. */
   theIssueEnabled?: boolean;
+  /** Render only the lens body when a parent owns the shared section shell. */
+  embedded?: boolean;
+  /** Optional local curation set. When present, project only rows whose recommendation is staged. */
+  includedRecIds?: ReadonlySet<string>;
+  /** Opt-in compact composition for the Engine spine. */
+  presentation?: 'default' | 'engine-spine';
 }
 
 /** A single keyword/topic target row: label + sent/proposed badge + Keyword Hub deep-link. */
 function TargetRow({
   row,
   onOpen,
+  compact,
 }: {
   row: KeywordTargetRow;
   onOpen: (keyword: string) => void;
+  compact: boolean;
 }) {
   const canDeepLink = row.deepLinkKeyword != null;
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
+    <div
+      data-testid="keyword-target-row"
+      className={compact
+        ? 'flex flex-col items-stretch gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'
+        : 'flex items-center justify-between gap-4 py-3'}
+    >
       <div className="min-w-0">
         <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.label}</div>
         <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">
           {row.type === 'topic_cluster' ? 'Topic cluster' : 'Keyword gap'}
         </div>
       </div>
-      <div className="flex items-center gap-3 shrink-0">
+      <div className={compact ? 'flex flex-wrap items-center gap-2 sm:shrink-0' : 'flex items-center gap-3 shrink-0'}>
         <Badge
           tone={row.sent ? 'teal' : 'zinc'}
           variant="soft"
@@ -77,9 +90,19 @@ function TargetRow({
  * Renders one row per curated keyword_gap / topic_cluster rec. `theIssueEnabled` is threaded into the
  * hook's `enabled` arg, so flag-OFF makes zero network calls even if mounted outside the overview gate.
  */
-export function KeywordTargetsLens({ workspaceId, theIssueEnabled = false }: KeywordTargetsLensProps) {
+export function KeywordTargetsLens({
+  workspaceId,
+  theIssueEnabled = false,
+  embedded = false,
+  includedRecIds,
+  presentation = 'default',
+}: KeywordTargetsLensProps) {
   const navigate = useNavigate();
   const { keywordTargets, isLoading, isError } = useIssueLenses(workspaceId, theIssueEnabled);
+  const visibleTargets = includedRecIds
+    ? keywordTargets.filter((row) => includedRecIds.has(row.recId))
+    : keywordTargets;
+  const engineSpine = presentation === 'engine-spine';
 
   const openInHub = (keyword: string) => {
     navigate(adminPath(workspaceId, 'seo-keywords') + buildHubDeepLinkQuery({ keyword }));
@@ -87,33 +110,53 @@ export function KeywordTargetsLens({ workspaceId, theIssueEnabled = false }: Key
 
   const titleIcon = <Icon as={Target} size="md" className="text-accent-brand" />;
 
-  return (
-    <SectionCard title="Keyword targets" titleIcon={titleIcon}>
-      <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-        Curated keyword &amp; topic targets — open each in the Keyword Hub to act.
-      </p>
+  const content = (
+    <>
+      {!engineSpine && (
+        <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
+          Staged keyword &amp; topic targets — open each in the Keyword Hub to act.
+        </p>
+      )}
 
       {isLoading ? (
-        <p className="t-caption-sm text-[var(--brand-text-muted)] py-4 text-center">
+        <p className={`t-caption-sm text-[var(--brand-text-muted)] ${engineSpine ? 'py-3' : 'py-4'} text-center`}>
           Projecting curated targets…
         </p>
       ) : isError ? (
-        <p className="t-caption-sm text-red-400/80 py-4 text-center">
+        <p className={`t-caption-sm text-red-400/80 ${engineSpine ? 'py-3' : 'py-4'} text-center`}>
           Couldn't load keyword targets. It'll retry shortly.
         </p>
-      ) : keywordTargets.length === 0 ? (
+      ) : visibleTargets.length === 0 ? (
         <EmptyState
           icon={Search}
           title="No keyword targets yet"
-          description="Curate keyword-gap or topic-cluster moves in the queue above, then open each here to act in the Keyword Hub."
+          description="Stage a keyword-gap or topic-cluster move above, then open it here to act in the Keyword Hub."
+          className={engineSpine ? '!py-6 [&>div:first-child]:h-10 [&>div:first-child]:w-10' : undefined}
         />
       ) : (
         <div className="divide-y divide-[var(--brand-border)]">
-          {keywordTargets.map((row) => (
-            <TargetRow key={row.recId} row={row} onOpen={openInHub} />
+          {visibleTargets.map((row) => (
+            <TargetRow key={row.recId} row={row} onOpen={openInHub} compact={engineSpine} />
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div
+        data-testid="keyword-targets-embedded"
+        className={engineSpine ? 'px-2 py-1.5' : 'px-4 py-3'}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <SectionCard title="Keyword targets" titleIcon={titleIcon}>
+      {content}
     </SectionCard>
   );
 }

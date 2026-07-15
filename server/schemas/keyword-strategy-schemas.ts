@@ -24,6 +24,7 @@
  * for the retry-once repair turn. See docs/rules/ai-operation-contracts.md.
  */
 import { z } from 'zod';
+import { KEYWORD_SEARCH_INTENTS } from '../../shared/types/keywords.js';
 
 const contentGapIntentSchema = z.enum(['informational', 'commercial', 'transactional', 'navigational']).catch('informational');
 const contentGapPrioritySchema = z.enum(['high', 'medium', 'low']).catch('medium');
@@ -41,7 +42,7 @@ export const pageAssignmentItemSchema = z.object({
   /** The closed-set id the AI selected — the normalized keyword (source-row id). */
   primaryKeywordSourceId: z.string(),
   secondaryKeywords: z.array(z.string()).default([]),
-  searchIntent: z.string().optional(),
+  searchIntent: z.enum(KEYWORD_SEARCH_INTENTS).optional(),
   justification: z.string().optional(),
 });
 

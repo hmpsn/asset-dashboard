@@ -315,36 +315,41 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
   const sections = sectionsData?.sections ?? [];
 
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const refreshReviewQueries = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.client.copySections(workspaceId, entryId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
+  }, [entryId, queryClient, workspaceId]);
 
   // ── Approve mutation ──
   const approveMutation = useMutation({
-    mutationFn: (sectionId: string) => publicCopyReview.approveSection(workspaceId, sectionId),
+    mutationFn: (args: { sectionId: string; expectedUpdatedAt: string }) =>
+      publicCopyReview.approveSection(workspaceId, args.sectionId, args.expectedUpdatedAt),
     onSuccess: () => {
       setMutationError(null);
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copySections(workspaceId, entryId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
+      refreshReviewQueries();
     },
     onError: () => {
       setMutationError('Could not approve this section. Please try again.');
+      refreshReviewQueries();
     },
   });
 
   // ── Suggest mutation ──
   const suggestMutation = useMutation({
-    mutationFn: (args: { sectionId: string; originalText: string; suggestedText: string }) =>
+    mutationFn: (args: { sectionId: string; originalText: string; suggestedText: string; expectedUpdatedAt: string }) =>
       publicCopyReview.suggestEdit(workspaceId, args.sectionId, {
         originalText: args.originalText,
         suggestedText: args.suggestedText,
+        expectedUpdatedAt: args.expectedUpdatedAt,
       }),
     onSuccess: () => {
       setMutationError(null);
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copySections(workspaceId, entryId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntries(workspaceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.client.copyEntriesCount(workspaceId) });
+      refreshReviewQueries();
     },
     onError: () => {
       setMutationError('Could not submit your suggestion. Please try again.');
+      refreshReviewQueries();
     },
   });
 
@@ -398,11 +403,16 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
         <SectionReviewCard
           key={section.id}
           section={section}
-          onApprove={() => approveMutation.mutate(section.id)}
-          onSuggest={(originalText, suggestedText) =>
-            suggestMutation.mutate({ sectionId: section.id, originalText, suggestedText })
-          }
-          isApproving={approveMutation.isPending && approveMutation.variables === section.id}
+          onApprove={() => approveMutation.mutate({ sectionId: section.id, expectedUpdatedAt: section.updatedAt })}
+          onSuggest={async ({ originalText, suggestedText, expectedUpdatedAt }) => {
+            await suggestMutation.mutateAsync({
+              sectionId: section.id,
+              originalText,
+              suggestedText,
+              expectedUpdatedAt,
+            });
+          }}
+          isApproving={approveMutation.isPending && approveMutation.variables?.sectionId === section.id}
           isSuggesting={suggestMutation.isPending && suggestMutation.variables?.sectionId === section.id}
         />
       ))}
@@ -415,7 +425,11 @@ function EntrySections({ workspaceId, entryId }: { workspaceId: string; entryId:
 interface SectionReviewCardProps {
   section: PublicClientCopySection;
   onApprove: () => void;
-  onSuggest: (originalText: string, suggestedText: string) => void;
+  onSuggest: (submission: {
+    originalText: string;
+    suggestedText: string;
+    expectedUpdatedAt: string;
+  }) => Promise<void>;
   isApproving: boolean;
   isSuggesting: boolean;
 }
@@ -423,6 +437,10 @@ interface SectionReviewCardProps {
 function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSuggesting }: SectionReviewCardProps) {
   const [showSuggestForm, setShowSuggestForm] = useState(false);
   const [suggestedText, setSuggestedText] = useState('');
+  const [suggestionAuthority, setSuggestionAuthority] = useState<{
+    originalText: string;
+    expectedUpdatedAt: string;
+  } | null>(null);
   const isApproved = section.status === 'approved';
   const isReviewable = section.status === 'client_review';
 
@@ -431,13 +449,29 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
   const sectionLabel = SECTION_TYPE_LABELS[sectionTypeRaw] ?? sectionTypeRaw.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   const badgeConfig = COPY_STATUS_BADGE[section.status];
+  const suggestionAuthorityConflict = showSuggestForm
+    && suggestionAuthority !== null
+    && (section.updatedAt !== suggestionAuthority.expectedUpdatedAt
+      || section.generatedCopy !== suggestionAuthority.originalText);
 
-  const handleSubmitSuggestion = useCallback(() => {
-    if (!suggestedText.trim() || !section.generatedCopy) return;
-    onSuggest(section.generatedCopy, suggestedText.trim());
-    setSuggestedText('');
-    setShowSuggestForm(false);
-  }, [suggestedText, section.generatedCopy, onSuggest]);
+  const handleSubmitSuggestion = useCallback(async () => {
+    if (!suggestedText.trim()
+      || !suggestionAuthority
+      || section.updatedAt !== suggestionAuthority.expectedUpdatedAt
+      || section.generatedCopy !== suggestionAuthority.originalText) return;
+    try {
+      await onSuggest({
+        originalText: suggestionAuthority.originalText,
+        suggestedText: suggestedText.trim(),
+        expectedUpdatedAt: suggestionAuthority.expectedUpdatedAt,
+      });
+      setSuggestedText('');
+      setSuggestionAuthority(null);
+      setShowSuggestForm(false);
+    } catch { // catch-ok -- the parent mutation renders its own error and refreshes authority.
+      // Keep the client's suggestion visible and retryable after a conflict or transport failure.
+    }
+  }, [onSuggest, section.generatedCopy, section.updatedAt, suggestedText, suggestionAuthority]);
 
   return (
     <div className="border border-[var(--brand-border)] rounded-[var(--radius-lg)] p-4 space-y-3 bg-[var(--surface-2)]/50">
@@ -505,7 +539,21 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setShowSuggestForm(!showSuggestForm)}
+            onClick={() => {
+              if (showSuggestForm) {
+                setShowSuggestForm(false);
+                setSuggestedText('');
+                setSuggestionAuthority(null);
+                return;
+              }
+              if (!section.generatedCopy) return;
+              setSuggestionAuthority({
+                originalText: section.generatedCopy,
+                expectedUpdatedAt: section.updatedAt,
+              });
+              setShowSuggestForm(true);
+            }}
+            disabled={!section.generatedCopy}
             className="flex items-center gap-1.5 t-caption !px-3 !py-1.5 !rounded-[var(--radius-sm)] border border-[var(--brand-border)] text-[var(--brand-text)] hover:border-[var(--brand-border-hover)] hover:text-[var(--brand-text-bright)] transition-colors"
           >
             <MessageSquare className="w-3 h-3" />
@@ -535,11 +583,19 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
             rows={4}
             className="w-full t-body"
           />
+          {suggestionAuthorityConflict && (
+            <p role="alert" className="t-caption text-accent-danger">
+              This section changed while you were preparing your suggestion. Cancel and reopen it before submitting.
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <Button
               variant="primary"
-              onClick={handleSubmitSuggestion}
-              disabled={!suggestedText.trim() || isSuggesting}
+              onClick={() => { void handleSubmitSuggestion(); }}
+              disabled={!suggestedText.trim()
+                || isSuggesting
+                || suggestionAuthority === null
+                || suggestionAuthorityConflict}
               loading={isSuggesting}
               className="flex items-center gap-1.5 t-caption px-3 py-1.5"
             >
@@ -549,7 +605,11 @@ function SectionReviewCard({ section, onApprove, onSuggest, isApproving, isSugge
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setShowSuggestForm(false); setSuggestedText(''); }}
+              onClick={() => {
+                setShowSuggestForm(false);
+                setSuggestedText('');
+                setSuggestionAuthority(null);
+              }}
               className="!p-0 hover:!bg-transparent t-caption text-[var(--brand-text-muted)] hover:text-[var(--brand-text)] transition-colors"
             >
               Cancel

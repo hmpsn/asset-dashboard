@@ -33,6 +33,7 @@ export const DELIVERABLE_TYPES = [
   'content_request',
   'recommendation',
   'gbp_review_response',
+  'brand_generation',
 ] as const;
 export type DeliverableType = (typeof DELIVERABLE_TYPES)[number];
 

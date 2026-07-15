@@ -13,7 +13,7 @@
  */
 import { useNavigate } from 'react-router-dom';
 import { ClipboardList } from 'lucide-react';
-import { SectionCard, Badge, Button, Icon } from '../../ui';
+import { SectionCard, Badge, Button, EmptyState, Icon } from '../../ui';
 import type { BadgeTone } from '../../ui';
 import { useIssueLenses } from '../../../hooks/admin/useIssueLenses';
 import { adminPath } from '../../../routes';
@@ -28,6 +28,12 @@ export interface ContentWorkOrderLensProps {
    *  calls even if this panel is ever mounted outside the issueOverviewEl gate. Defaults to FALSE
    *  (opt-in) so an omitted prop never fires a flag-OFF fetch — the byte-identical-OFF safe default. */
   theIssueEnabled?: boolean;
+  /** Render only the lens body when a parent owns the shared section shell. */
+  embedded?: boolean;
+  /** Optional local curation set. When present, project only rows whose recommendation is staged. */
+  includedRecIds?: ReadonlySet<string>;
+  /** Opt-in compact composition for the Engine spine. */
+  presentation?: 'default' | 'engine-spine';
 }
 
 /** Production-stage → badge tone + operator-legible label. */
@@ -46,20 +52,27 @@ const STAGE_BADGE: Record<ContentWorkOrderStage, { tone: BadgeTone; label: strin
 function WorkOrderRow({
   row,
   onOpen,
+  compact,
 }: {
   row: ContentWorkOrderRow;
   onOpen: (row: ContentWorkOrderRow) => void;
+  compact: boolean;
 }) {
   const stage = STAGE_BADGE[row.stage];
   return (
-    <div className="flex items-center justify-between gap-4 py-3">
+    <div
+      data-testid="content-work-order-row"
+      className={compact
+        ? 'flex flex-col items-stretch gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'
+        : 'flex items-center justify-between gap-4 py-3'}
+    >
       <div className="min-w-0">
         <div className="t-ui font-medium text-[var(--brand-text-bright)] truncate">{row.title}</div>
         <div className="t-caption-sm mt-0.5 text-[var(--brand-text-muted)]">
           {row.type === 'content_refresh' ? 'Content refresh' : 'New content'}
         </div>
       </div>
-      <div className="flex items-center gap-3 shrink-0">
+      <div className={compact ? 'flex flex-wrap items-center gap-2 sm:shrink-0' : 'flex items-center gap-3 shrink-0'}>
         <Badge tone={stage.tone} variant="soft" size="sm" label={stage.label} />
         <Button
           variant="link"
@@ -81,14 +94,24 @@ function WorkOrderRow({
  * is threaded into the hook's `enabled` arg, so flag-OFF makes zero network calls even if mounted
  * outside the overview gate.
  */
-export function ContentWorkOrderLens({ workspaceId, theIssueEnabled = false }: ContentWorkOrderLensProps) {
+export function ContentWorkOrderLens({
+  workspaceId,
+  theIssueEnabled = false,
+  embedded = false,
+  includedRecIds,
+  presentation = 'default',
+}: ContentWorkOrderLensProps) {
   const navigate = useNavigate();
   const { contentWorkOrders, isLoading, isError } = useIssueLenses(workspaceId, theIssueEnabled);
+  const visibleWorkOrders = includedRecIds
+    ? contentWorkOrders.filter((row) => includedRecIds.has(row.recId))
+    : contentWorkOrders;
+  const engineSpine = presentation === 'engine-spine';
 
   // Empty → null (Blocker 4): when there are no curated content work-orders, render nothing rather
   // than an empty SectionCard, so a cold workspace shows zero placeholder chrome (mirrors
   // IssueAlsoOnPlanSection). Loading/error keep their inline states (transient, not "cold").
-  if (!isLoading && !isError && contentWorkOrders.length === 0) return null;
+  if (!embedded && !isLoading && !isError && visibleWorkOrders.length === 0) return null;
 
   const openInPipeline = (row: ContentWorkOrderRow) => {
     navigate(adminPath(workspaceId, 'content-pipeline') + (row.hasPost ? '?tab=posts' : '?tab=briefs'));
@@ -96,27 +119,53 @@ export function ContentWorkOrderLens({ workspaceId, theIssueEnabled = false }: C
 
   const titleIcon = <Icon as={ClipboardList} size="md" className="text-accent-brand" />;
 
-  return (
-    <SectionCard title="Content work-orders" titleIcon={titleIcon}>
-      <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
-        Curated content moves and where each stands in production.
-      </p>
+  const content = (
+    <>
+      {!engineSpine && (
+        <p className="t-caption-sm text-[var(--brand-text-muted)] mb-2">
+          Staged content moves and where each stands in production.
+        </p>
+      )}
 
       {isLoading ? (
-        <p className="t-caption-sm text-[var(--brand-text-muted)] py-4 text-center">
+        <p className={`t-caption-sm text-[var(--brand-text-muted)] ${engineSpine ? 'py-3' : 'py-4'} text-center`}>
           Projecting curated work-orders…
         </p>
       ) : isError ? (
-        <p className="t-caption-sm text-red-400/80 py-4 text-center">
+        <p className={`t-caption-sm text-red-400/80 ${engineSpine ? 'py-3' : 'py-4'} text-center`}>
           Couldn't load content work-orders. It'll retry shortly.
         </p>
+      ) : visibleWorkOrders.length === 0 ? (
+        <EmptyState
+          icon={ClipboardList}
+          title="No content work orders yet"
+          description="Stage a content or content-refresh move above to track it here and open it in Content Pipeline."
+          className={engineSpine ? '!py-6 [&>div:first-child]:h-10 [&>div:first-child]:w-10' : undefined}
+        />
       ) : (
         <div className="divide-y divide-[var(--brand-border)]">
-          {contentWorkOrders.map((row) => (
-            <WorkOrderRow key={row.recId} row={row} onOpen={openInPipeline} />
+          {visibleWorkOrders.map((row) => (
+            <WorkOrderRow key={row.recId} row={row} onOpen={openInPipeline} compact={engineSpine} />
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div
+        data-testid="content-work-orders-embedded"
+        className={engineSpine ? 'px-2 py-1.5' : 'px-4 py-3'}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <SectionCard title="Content work-orders" titleIcon={titleIcon}>
+      {content}
     </SectionCard>
   );
 }

@@ -18,7 +18,7 @@ const FALSE_POSITIVE_FILES = new Set([
 const INVENTORY: Array<{
   file: string;
   classification: ConsumerClass;
-  targetPath: 'low-level' | 'content-builder' | 'recommendation-builder' | 'chat-builder' | 'future-briefing-builder' | 'page-assist-builder';
+  targetPath: 'low-level' | 'content-builder' | 'recommendation-builder' | 'chat-builder' | 'current-period-reporting-builder' | 'page-assist-builder';
 }> = [
   { file: 'server/aeo-page-review.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/admin-chat-context.ts', classification: 'native', targetPath: 'chat-builder' },
@@ -35,9 +35,8 @@ const INVENTORY: Array<{
   { file: 'server/internal-links.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/keyword-recommendations.ts', classification: 'native', targetPath: 'recommendation-builder' },
   { file: 'server/keyword-strategy-synthesis/context.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/meeting-brief-generator.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/strategy-pov-generator.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/monthly-digest.ts', classification: 'native', targetPath: 'future-briefing-builder' },
+  { file: 'server/monthly-digest.ts', classification: 'documented-exception', targetPath: 'current-period-reporting-builder' },
   { file: 'server/page-analysis-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/google.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/public-analytics.ts', classification: 'native', targetPath: 'low-level' },
@@ -102,6 +101,17 @@ function parseAuditSummary(source: string): Record<ConsumerClass, number> {
   };
 }
 
+function parseAuditInventory(source: string): Array<{ file: string; classification: ConsumerClass }> {
+  return source
+    .split('\n')
+    .map(line => line.match(/^\| `([^`]+\.ts)` \| [^|]+ \| `(native|hybrid|legacy|documented-exception)` \|/))
+    .filter((match): match is RegExpMatchArray => match != null)
+    .map(match => ({
+      file: match[1],
+      classification: match[2] as ConsumerClass,
+    }));
+}
+
 describe('intelligence consumer inventory', () => {
   it('uses unique classifications for real server files', () => {
     const seen = new Set<string>();
@@ -129,16 +139,21 @@ describe('intelligence consumer inventory', () => {
   it('keeps the published audit summary in sync with the inventory counts', () => {
     const auditSource = readFileSync(AUDIT_DOC, 'utf-8'); // readFile-ok — audit guard: the published intelligence-consumer audit is declared source-of-truth, so this test keeps its native/hybrid/legacy counts synchronized with the inventory contract.
     expect(parseAuditSummary(auditSource)).toEqual(countByClassification());
+    const byFile = (left: { file: string }, right: { file: string }) => left.file.localeCompare(right.file);
+    expect(parseAuditInventory(auditSource).sort(byFile)).toEqual(
+      INVENTORY.map(({ file, classification }) => ({ file, classification })).sort(byFile),
+    );
   });
 
-  it('keeps PR5 consumers on canonical intelligence builders instead of one-off prompt assembly', () => {
-    const monthlyDigest = readFileSync(resolve(ROOT_DIR, 'server/monthly-digest.ts'), 'utf-8'); // readFile-ok — PR5 guard: monthly digest must stay on recommendation builder context.
-    expect(monthlyDigest).toContain('buildRecommendationGenerationContext');
-    // G3 documented exception: the digest's DETERMINISTIC wins/resolved rollups need the
-    // full insight set, which the slice no longer carries post-cap (byType capped at 25,
-    // `all` at 100) — so a direct getInsights() read is allowed for the rollups ONLY.
-    // The AI prompt path must still go through the builder (asserted above), and the
-    // direct read must carry its inline intel-builder-ok rationale (asserted here).
+  it('keeps audited PR5 consumers on their canonical builders or documented evidence boundary', () => {
+    const monthlyDigest = readFileSync(resolve(ROOT_DIR, 'server/monthly-digest.ts'), 'utf-8'); // readFile-ok — digest exception guard: current-month operational evidence must not be blended with lifetime recommendation learnings.
+    // The digest is intentionally a documented exception: full insight coverage is
+    // required for deterministic rollups after slice caps, and the AI summary must use
+    // that same bounded current-UTC-month evidence rather than lifetime learnings.
+    expect(monthlyDigest).not.toContain('buildRecommendationGenerationContext');
+    expect(monthlyDigest).toContain('getCurrentUtcReportingWindow');
+    expect(monthlyDigest).toContain('currentMonthInsights');
+    expect(monthlyDigest).toMatch(/lifetime\s+workspace learnings are intentionally excluded/);
     expect(monthlyDigest).not.toMatch(/getWorkspaceLearnings|formatLearningsForPrompt/);
     const getInsightsCalls = monthlyDigest.split('\n').filter(line => line.includes('getInsights('));
     expect(getInsightsCalls.length).toBeGreaterThan(0); // the documented exception exists...

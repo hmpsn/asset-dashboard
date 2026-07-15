@@ -32,17 +32,21 @@ describe('billing mutation lifecycle contracts', () => {
     const adminKeys = getWorkspaceInvalidationKeys(WS_EVENTS.WORKSPACE_UPDATED, 'ws-billing', undefined, 'admin');
     const clientKeys = getWorkspaceInvalidationKeys(WS_EVENTS.WORKSPACE_UPDATED, 'ws-billing', undefined, 'client-dashboard');
 
-    expect(adminInvalidation).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: () => invalidateRegistry(WS_EVENTS.WORKSPACE_UPDATED)');
+    expect(adminInvalidation).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: (data: unknown) => invalidateRegistry(WS_EVENTS.WORKSPACE_UPDATED, data)');
     expect(adminKeys).toContainEqual(queryKeys.admin.workspaceHome('ws-billing'));
     expect(adminKeys).toContainEqual(queryKeys.admin.workspaceDetail('ws-billing'));
     expect(adminKeys).toContainEqual(queryKeys.admin.workspaceOverview());
 
-    expect(clientDashboard).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: () => {');
+    expect(clientDashboard).toContain('[WS_EVENTS.WORKSPACE_UPDATED]: (data: unknown) => {');
     expect(clientDashboard).toContain(`/api/public/workspace/\${workspaceId}`);
-    expect(clientDashboard).toContain('invalidateClientEvent(WS_EVENTS.WORKSPACE_UPDATED)');
+    expect(clientDashboard).toContain('invalidateClientEvent(WS_EVENTS.WORKSPACE_UPDATED, data)');
     // client.roi joined the WORKSPACE_UPDATED set in The Issue (Client) P0: the ROI payload now
     // carries outcomeVerdict, which depends on the workspace's outcomeValue/segmentConfig.
-    expect(clientKeys).toEqual([queryKeys.client.pricing('ws-billing'), queryKeys.client.roi('ws-billing')]);
+    expect(clientKeys).toEqual([
+      queryKeys.client.pricing('ws-billing'),
+      queryKeys.client.roi('ws-billing'),
+      queryKeys.client.monthlyDigest('ws-billing'),
+    ]);
   });
 
   it('content subscription broadcasts invalidate the client subscription reader', () => {

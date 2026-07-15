@@ -89,6 +89,22 @@ describe('external-detection behavior', () => {
     );
   });
 
+  it('broadcasts only an opaque invalidation for a client-hidden detected action', async () => {
+    const { detectExternalExecutions } = await loadModule();
+
+    mocks.getNotActedOnActions.mockReturnValue([
+      action({ actionType: 'voice_calibrated', context: { detectionChecks: 1 } }),
+    ]);
+    mocks.fetchGscSnapshot.mockResolvedValue({ position: 8, clicks: 20 });
+
+    expect(await detectExternalExecutions()).toEqual({ detected: 1, checked: 1 });
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws_1',
+      'outcome:external_detected',
+      {},
+    );
+  });
+
   it('resets detectionChecks when improvement is no longer present', async () => {
     const { detectExternalExecutions } = await loadModule();
 

@@ -7,6 +7,7 @@ import { fetchGscSnapshot } from './outcome-measurement.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { TrackedAction, ActionContext } from '../shared/types/outcome-tracking.js';
+import { toClientSafeOutcomeEventPayload } from '../shared/types/action-catalog.js';
 
 const log = createLogger('external-detection');
 
@@ -22,7 +23,11 @@ export async function detectExternalExecutions(): Promise<{ detected: number; ch
         const checks = action.context.detectionChecks ?? 0;
         if (checks >= 1) {
           updateAttribution(action.id, action.workspaceId, 'externally_executed');
-          broadcastToWorkspace(action.workspaceId, WS_EVENTS.OUTCOME_EXTERNAL_DETECTED, { actionId: action.id });
+          broadcastToWorkspace(
+            action.workspaceId,
+            WS_EVENTS.OUTCOME_EXTERNAL_DETECTED,
+            toClientSafeOutcomeEventPayload(action.actionType, { actionId: action.id }),
+          );
           detected++;
           log.info({ actionId: action.id, actionType: action.actionType }, 'External execution detected');
         } else {

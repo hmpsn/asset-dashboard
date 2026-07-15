@@ -612,14 +612,9 @@ describe('src/api/misc — recommendations', () => {
 });
 
 describe('src/api/misc — redirects', () => {
-  it('redirects.list uses getSafe', async () => {
-    await redirects.list('site-1');
-    expect(mockedGetSafe).toHaveBeenCalledWith('/api/webflow/redirects/site-1', []);
-  });
-
-  it('redirects.save calls post with body', async () => {
-    await redirects.save('site-1', { from: '/old', to: '/new' });
-    expect(mockedPost).toHaveBeenCalledWith('/api/webflow/redirects/site-1', { from: '/old', to: '/new' });
+  it('does not expose list/save wrappers for nonexistent webflow redirect routes', () => {
+    expect('list' in redirects).toBe(false);
+    expect('save' in redirects).toBe(false);
   });
 
   it('redirects.scan appends workspaceId when provided', async () => {
@@ -933,30 +928,6 @@ describe('src/api/outcomes — clientOutcomesApi', () => {
     const [url, fallback] = mockedGetSafe.mock.calls[0];
     expect(url).toContain('/api/public/outcomes/ws-1/wins');
     expect(fallback).toEqual([]);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// src/api/meetingBrief.ts
-// ═══════════════════════════════════════════════════════════════════════════
-
-import { meetingBriefApi } from '../../src/api/meetingBrief';
-
-describe('src/api/meetingBrief', () => {
-  it('meetingBriefApi.get uses getSafe with null brief fallback', async () => {
-    await meetingBriefApi.get('ws-1');
-    const [url, fallback] = mockedGetSafe.mock.calls[0];
-    expect(url).toBe('/api/workspaces/ws-1/meeting-brief');
-    expect(fallback).toEqual({ brief: null });
-  });
-
-  it('meetingBriefApi.generate calls post with empty body', async () => {
-    mockedPost.mockResolvedValueOnce({ brief: null });
-    await meetingBriefApi.generate('ws-1');
-    expect(mockedPost).toHaveBeenCalledWith(
-      '/api/workspaces/ws-1/meeting-brief/generate',
-      {},
-    );
   });
 });
 

@@ -291,7 +291,14 @@ describe('GET /api/public/content-plan/:workspaceId/:matrixId — single', () =>
     const tpl = createTemplate(singleWs, {
       name: 'Single Test Template',
       pageType: 'service',
-      sections: [{ headingTemplate: 'About {service}', wordCountTarget: 400 }] as Parameters<typeof createTemplate>[1]['sections'],
+      sections: [{
+        id: 'single-about',
+        name: 'About service',
+        headingTemplate: 'About {service}',
+        guidance: 'Describe the service',
+        wordCountTarget: 400,
+        order: 0,
+      }],
     });
     const mx = createMatrix(singleWs, {
       name: 'Single Visible Matrix',
@@ -431,10 +438,27 @@ describe('POST /api/content-plan/:workspaceId/:matrixId/send-template-review', (
       urlPattern: '/services/{city}/{service}',
       keywordPattern: '{service} in {city}',
       sections: [
-        { headingTemplate: 'Why Choose Us for {service}', wordCountTarget: 500 },
-        { headingTemplate: '{service} Services in {city}', wordCountTarget: 300 },
-      ] as Parameters<typeof createTemplate>[1]['sections'],
-      variables: [{ name: 'city' }, { name: 'service' }] as Parameters<typeof createTemplate>[1]['variables'],
+        {
+          id: 'admin-why-choose',
+          name: 'Why choose us',
+          headingTemplate: 'Why Choose Us for {service}',
+          guidance: 'Explain the service differentiation',
+          wordCountTarget: 500,
+          order: 0,
+        },
+        {
+          id: 'admin-services',
+          name: 'Services',
+          headingTemplate: '{service} Services in {city}',
+          guidance: 'Describe the local service offering',
+          wordCountTarget: 300,
+          order: 1,
+        },
+      ],
+      variables: [
+        { name: 'city', label: 'City' },
+        { name: 'service', label: 'Service' },
+      ],
       toneAndStyle: 'Professional and friendly',
     });
     templateId = tpl.id;

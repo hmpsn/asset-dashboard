@@ -11,33 +11,12 @@ import {
 import { createPortal } from 'react-dom';
 import { cn } from '../../../lib/utils';
 import { prefersReducedMotion } from './reducedMotion';
-
-// ─── Body-scroll lock coordination across stacked modals ──────────────────
-// Simple reference counter: each open modal increments; each close
-// decrements. The lock is applied only when the counter transitions 0→1
-// and released only when it transitions 1→0. Prevents the "outer modal
-// closes → scroll re-enabled while inner modal still open" bug and the
-// inverse where the inner modal's cleanup leaves the body permanently
-// locked.
-let activeModalCount = 0;
-let originalBodyOverflow = '';
-
-function acquireScrollLock(): void {
-  if (typeof document === 'undefined') return;
-  if (activeModalCount === 0) {
-    originalBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-  }
-  activeModalCount++;
-}
-
-function releaseScrollLock(): void {
-  if (typeof document === 'undefined') return;
-  activeModalCount = Math.max(0, activeModalCount - 1);
-  if (activeModalCount === 0) {
-    document.body.style.overflow = originalBodyOverflow;
-  }
-}
+import {
+  getFocusable,
+  acquireScrollLock,
+  releaseScrollLock,
+  isTopmostOverlay,
+} from './overlayUtils';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * <Modal> — centered portal dialog with focus trap, escape, outside-click,
@@ -52,11 +31,13 @@ function releaseScrollLock(): void {
  * prefers reduced motion.
  * ────────────────────────────────────────────────────────────────────────── */
 
-type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
+type ModalSize = 'sm' | 'md' | 'workflow' | 'lg' | 'xl';
 
 const SIZE_MAX_WIDTH: Record<ModalSize, string> = {
   sm: 'max-w-[24rem]',
   md: 'max-w-[32rem]',
+  /** Compact editor/workflow shell approved for prototype-led Brand flows. */
+  workflow: 'max-w-[42.5rem]',
   lg: 'max-w-[48rem]',
   xl: 'max-w-[64rem]',
 };
@@ -68,6 +49,8 @@ interface ModalProps {
   children: ReactNode;
   /** Optional id override for the header title; defaults to auto-generated. */
   labelledById?: string;
+  /** Optional id of supporting copy that describes the dialog. */
+  describedById?: string;
 }
 
 interface ModalComponent {
@@ -77,33 +60,13 @@ interface ModalComponent {
   Footer: typeof ModalFooter;
 }
 
-/** Selector matching every element that can receive keyboard focus. */
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'area[href]',
-  'button:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  'iframe',
-  'object',
-  'embed',
-  '[tabindex]:not([tabindex="-1"])',
-  '[contenteditable="true"]',
-].join(',');
-
-function getFocusable(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1,
-  );
-}
-
 function ModalInner({
   open,
   onClose,
   size = 'md',
   children,
   labelledById,
+  describedById,
 }: ModalProps): React.ReactElement | null {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -127,14 +90,20 @@ function ModalInner({
     if (!open) return;
 
     const handleKey = (e: KeyboardEvent) => {
+      const root = containerRef.current;
+      if (!isTopmostOverlay(root)) return;
+
       if (e.key === 'Escape') {
+        // Native listeners for stacked overlays share the document target;
+        // stopImmediatePropagation ensures this key closes exactly one layer.
+        e.stopImmediatePropagation();
         e.stopPropagation();
         onClose();
         return;
       }
       if (e.key !== 'Tab') return;
-      const root = containerRef.current;
       if (!root) return;
+      e.stopImmediatePropagation();
       const focusables = getFocusable(root);
       if (focusables.length === 0) {
         e.preventDefault();
@@ -150,7 +119,7 @@ function ModalInner({
           last.focus();
         }
       } else {
-        if (active === last) {
+        if (active === last || !root.contains(active)) {
           e.preventDefault();
           first.focus();
         }
@@ -170,6 +139,7 @@ function ModalInner({
     if (!root) return;
     // Defer one frame so children mount.
     const raf = requestAnimationFrame(() => {
+      if (!isTopmostOverlay(root)) return;
       const focusables = getFocusable(root);
       if (focusables.length > 0) focusables[0].focus();
       else root.focus();
@@ -210,7 +180,11 @@ function ModalInner({
   };
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+    if (
+      e.target === e.currentTarget
+      && backdropMouseDownRef.current
+      && isTopmostOverlay(containerRef.current)
+    ) {
       onClose();
     }
     backdropMouseDownRef.current = false;
@@ -236,7 +210,9 @@ function ModalInner({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={describedById}
         tabIndex={-1}
+        data-overlay-panel="true"
         style={{ zIndex: 'var(--z-modal)' }}
         className={`relative bg-[var(--surface-2)] border border-[var(--brand-border)] rounded-[var(--radius-lg)] shadow-2xl w-full ${SIZE_MAX_WIDTH[size]} outline-none ${motionClass}`}
       >

@@ -19,11 +19,30 @@ import type {
 } from '../../../shared/types/analytics';
 import type { AnalyticsDateRange } from '../../../shared/types/analytics-contract.js';
 
+export const GA4_METRICS = [
+  'overview',
+  'trend',
+  'topPages',
+  'sources',
+  'devices',
+  'countries',
+  'comparison',
+  'newVsReturning',
+  'organic',
+  'landingPages',
+  'conversions',
+  'events',
+] as const;
+
+export type GA4Metric = typeof GA4_METRICS[number];
+
 export interface GA4BaseOptions {
   wsId: string;
   days: number;
   dateRange?: AnalyticsDateRange;
   enabled: boolean;
+  /** Optional query subset. Omit to preserve the historical all-metrics behavior. */
+  metrics?: readonly GA4Metric[];
   /** Cache namespace — determines the React Query key prefix. */
   keyPrefix: 'admin-ga4' | 'client-ga4';
   /** Whether to run the events query (client only). */
@@ -53,6 +72,7 @@ export function useGA4Base({
   days,
   dateRange: dr,
   enabled,
+  metrics,
   keyPrefix,
   includeEvents = false,
   landingOpts,
@@ -62,67 +82,68 @@ export function useGA4Base({
   // Build a consistent query key: [prefix, wsId, metric, days] or [..., dateRange]
   const mk = (metric: string): unknown[] =>
     dr ? [keyPrefix, wsId, metric, days, dr] : [keyPrefix, wsId, metric, days];
+  const metricEnabled = (metric: GA4Metric) => enabled && (!metrics || metrics.includes(metric));
 
   const overviewQ = useQuery({
     queryKey: mk('overview'),
     queryFn: () => api.overview(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('overview'),
     staleTime,
   });
 
   const trendQ = useQuery({
     queryKey: mk('trend'),
     queryFn: () => api.trend(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('trend'),
     staleTime,
   });
 
   const topPagesQ = useQuery({
     queryKey: mk('pages'),
     queryFn: () => api.topPages(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('topPages'),
     staleTime,
   });
 
   const sourcesQ = useQuery({
     queryKey: mk('sources'),
     queryFn: () => api.sources(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('sources'),
     staleTime,
   });
 
   const devicesQ = useQuery({
     queryKey: mk('devices'),
     queryFn: () => api.devices(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('devices'),
     staleTime,
   });
 
   const countriesQ = useQuery({
     queryKey: mk('countries'),
     queryFn: () => api.countries(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('countries'),
     staleTime,
   });
 
   const comparisonQ = useQuery({
     queryKey: mk('comparison'),
     queryFn: () => api.comparison(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('comparison'),
     staleTime,
   });
 
   const nvrQ = useQuery({
     queryKey: mk('nvr'),
     queryFn: () => api.newVsReturning(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('newVsReturning'),
     staleTime,
   });
 
   const organicQ = useQuery({
     queryKey: mk('organic'),
     queryFn: () => api.organic(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('organic'),
     staleTime,
   });
 
@@ -133,21 +154,21 @@ export function useGA4Base({
         ...(dr ? { dateRange: dr } : {}),
         ...landingOpts,
       }),
-    enabled,
+    enabled: metricEnabled('landingPages'),
     staleTime,
   });
 
   const conversionsQ = useQuery({
     queryKey: mk('conversions'),
     queryFn: () => api.conversions(wsId, days, dr),
-    enabled,
+    enabled: metricEnabled('conversions'),
     staleTime,
   });
 
   const eventsQ = useQuery({
     queryKey: mk('events'),
     queryFn: () => api.events ? api.events(wsId, days, dr) : Promise.resolve([]),
-    enabled: enabled && includeEvents,
+    enabled: metricEnabled('events') && includeEvents,
     staleTime,
   });
 

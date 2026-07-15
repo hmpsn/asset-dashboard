@@ -6,9 +6,17 @@ import { getVoiceProfile } from './voice-profile-read-model.js';
 import { buildSystemPrompt, guardrailsToPromptInstructions } from './prompt-assembly.js';
 import { renderVoiceDNAForPrompt } from './voice-dna-render.js';
 import { parseJsonFallback, parseJsonSafeArray } from './db/json-validation.js';
-import { variationFeedbackItemSchema } from './schemas/voice-calibration.js';
+import { parseVoiceCalibrationOutput, parseVoiceRefinementOutput } from './schemas/ai-brand-engine.js';
+import {
+  updateVoiceProfileSchema,
+  variationFeedbackItemSchema,
+  voiceSampleInputSchema,
+} from './schemas/voice-calibration.js';
+import { VOICE_PROFILE_TRANSITIONS, validateTransition, InvalidTransitionError } from './state-machines.js';
 import { createLogger } from './logger.js';
 import { randomUUID } from 'crypto';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 import type {
   VoiceProfile, VoiceSample, CalibrationSession, CalibrationVariation,
   VoiceDNA, VoiceGuardrails, ContextModifier, VoiceProfileStatus,
@@ -30,7 +38,27 @@ const stmts = createStmtCache(() => ({
   // UNIQUE(workspace_id) constraint — whichever inserts first wins, the loser
   // gets changes=0 and the caller throws/returns 409.
   insertProfile: db.prepare(`INSERT OR IGNORE INTO voice_profiles (id, workspace_id, status, voice_dna_json, guardrails_json, context_modifiers_json, created_at, updated_at) VALUES (@id, @workspace_id, @status, @voice_dna_json, @guardrails_json, @context_modifiers_json, @created_at, @updated_at)`),
-  updateProfile: db.prepare(`UPDATE voice_profiles SET status = @status, voice_dna_json = @voice_dna_json, guardrails_json = @guardrails_json, context_modifiers_json = @context_modifiers_json, updated_at = @updated_at WHERE id = @id AND workspace_id = @workspace_id`), // status-ok: voice profile status is not a platform state machine column
+  updateProfile: db.prepare(`
+    UPDATE voice_profiles
+    SET status = @status, -- status-ok: validated transition; generic mutation rejects calibrated
+        voice_dna_json = @voice_dna_json,
+        guardrails_json = @guardrails_json,
+        context_modifiers_json = @context_modifiers_json,
+        revision = revision + 1,
+        updated_at = @updated_at
+    WHERE id = @id
+      AND workspace_id = @workspace_id
+      AND revision = @expected_revision
+  `), // status-ok: generic mutations validate transitions and can never set calibrated
+  touchProfileAfterSampleMutation: db.prepare(`
+    UPDATE voice_profiles
+    SET status = CASE WHEN status = 'calibrated' THEN 'calibrating' ELSE status END, -- status-ok: sample mutation reopens finalized authority
+        revision = revision + 1,
+        updated_at = @updated_at
+    WHERE id = @id
+      AND workspace_id = @workspace_id
+      AND revision = @expected_revision
+  `), // status-ok: changing prompt evidence reopens finalized voice for review
   // Compute next sort_order atomically inside the transaction. Reading
   // profile.samples.length from an in-memory snapshot races: two concurrent
   // addVoiceSample() calls both see length=N and both assign sort_order=N.
@@ -105,66 +133,155 @@ export function createVoiceProfile(workspaceId: string): VoiceProfile & { sample
   doCreate.immediate();
 
   log.info({ workspaceId, profileId: id }, 'created voice profile');
-  return { id, workspaceId, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
+  return { id, workspaceId, revision: 1, status: 'draft', contextModifiers: defaultModifiers, samples: [], createdAt: now, updatedAt: now };
 }
 
-// Legal status transitions for the voice profile state machine. The critical
-// constraint is that `draft → calibrated` is FORBIDDEN — the only way to reach
-// `calibrated` is through `calibrating`, which runs the calibration pipeline
-// that populates voiceDNA + guardrails. Skipping it would let a caller flip
-// the status without any calibration data, breaking Layer 2 buildSystemPrompt
-// (which branches on `status === 'calibrated'` to inject DNA/guardrails and
-// would then inject `undefined`/`null` values). See PR #168 scaled-review
-// finding I5. Same-state "transitions" (e.g. draft → draft) are always legal
-// no-ops.
-const LEGAL_STATUS_TRANSITIONS: Record<VoiceProfileStatus, ReadonlySet<VoiceProfileStatus>> = {
-  draft: new Set<VoiceProfileStatus>(['draft', 'calibrating']),
-  calibrating: new Set<VoiceProfileStatus>(['calibrating', 'draft', 'calibrated']),
-  calibrated: new Set<VoiceProfileStatus>(['calibrated', 'draft', 'calibrating']),
-};
+// The legal voice-profile status transitions now live in server/state-machines.ts
+// (VOICE_PROFILE_TRANSITIONS) — this module no longer owns a parallel validator.
+// The critical constraint is unchanged: `draft → calibrated` is FORBIDDEN (the only
+// way to reach `calibrated` is through `calibrating`, which populates voiceDNA +
+// guardrails; skipping it would inject undefined DNA into Layer 2 buildSystemPrompt).
+// See PR #168 scaled-review finding I5. Same-state "transitions" (e.g. draft → draft)
+// are legal no-ops, filtered out at the write boundary before the guard runs.
 
 /**
  * Thrown when a caller attempts an illegal voice profile status transition.
  * Callers should catch this and return a 400 to the client rather than 500.
+ * Preserved as a distinct class (route handlers catch it by name) even though the
+ * transition TABLE is now shared — the guard translates the shared
+ * InvalidTransitionError into this domain error so the HTTP contract is unchanged.
  */
 export class VoiceProfileStateTransitionError extends Error {
   readonly from: VoiceProfileStatus;
   readonly to: VoiceProfileStatus;
   constructor(from: VoiceProfileStatus, to: VoiceProfileStatus) {
-    super(`Illegal voice profile transition: ${from} → ${to}. Legal transitions from ${from}: ${[...LEGAL_STATUS_TRANSITIONS[from]].filter(s => s !== from).join(', ') || '(none)'}`);
+    const legal = (VOICE_PROFILE_TRANSITIONS[from] ?? []).filter(s => s !== from);
+    super(`Illegal voice profile transition: ${from} → ${to}. Legal transitions from ${from}: ${legal.join(', ') || '(none)'}`);
     this.name = 'VoiceProfileStateTransitionError';
     this.from = from;
     this.to = to;
   }
 }
 
+/** Rejects samples that could never satisfy the finalized-anchor contract. */
+export class VoiceSampleValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VoiceSampleValidationError';
+  }
+}
+
+export class VoiceProfileValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VoiceProfileValidationError';
+  }
+}
+
+export interface UpdateVoiceProfileResult {
+  profile: VoiceProfile & { samples: VoiceSample[] };
+  changed: boolean;
+}
+
+export function updateVoiceProfileWithResult(
+  workspaceId: string,
+  updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
+): UpdateVoiceProfileResult {
+  const parsedUpdates = updateVoiceProfileSchema.safeParse(updates);
+  if (!parsedUpdates.success) {
+    throw new VoiceProfileValidationError(
+      parsedUpdates.error.issues[0]?.message ?? 'Voice profile update is invalid',
+    );
+  }
+  const normalizedUpdates = parsedUpdates.data;
+  const doUpdate = db.transaction((): {
+    profile: VoiceProfile & { samples: VoiceSample[] };
+    changed: boolean;
+  } => {
+    const profile = getVoiceProfile(workspaceId);
+    if (!profile) throw new Error('No voice profile exists for this workspace');
+
+    // Finalized authority is created only by finalizeBrandVoice(). The generic
+    // editor may reopen/revise a profile, but can never label a mutable draft as
+    // calibrated — including a same-status calibrated write.
+    if ((updates as { status?: VoiceProfileStatus }).status === 'calibrated') {
+      throw new VoiceProfileStateTransitionError(profile.status, 'calibrated');
+    }
+
+    const dnaChanged = normalizedUpdates.voiceDNA !== undefined
+      && JSON.stringify(normalizedUpdates.voiceDNA) !== JSON.stringify(profile.voiceDNA);
+    const guardrailsChanged = normalizedUpdates.guardrails !== undefined
+      && JSON.stringify(normalizedUpdates.guardrails) !== JSON.stringify(profile.guardrails);
+    const modifiersChanged = normalizedUpdates.contextModifiers !== undefined
+      && JSON.stringify(normalizedUpdates.contextModifiers) !== JSON.stringify(profile.contextModifiers);
+    const semanticEdit = dnaChanged || guardrailsChanged || modifiersChanged;
+    const targetStatus = normalizedUpdates.status
+      ?? (semanticEdit && profile.status === 'calibrated' ? 'calibrating' : profile.status);
+    const statusChanged = targetStatus !== profile.status;
+
+    if (statusChanged) {
+      try {
+        validateTransition('voice_profile', VOICE_PROFILE_TRANSITIONS, profile.status, targetStatus);
+      } catch (err) {
+        if (err instanceof InvalidTransitionError) {
+          log.warn(
+            { workspaceId, from: profile.status, to: targetStatus },
+            'rejected illegal voice profile state transition',
+          );
+          throw new VoiceProfileStateTransitionError(profile.status, targetStatus);
+        }
+        throw err;
+      }
+    }
+    if (!semanticEdit && !statusChanged) return { profile, changed: false };
+
+    const now = new Date().toISOString();
+    const result = stmts().updateProfile.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      status: targetStatus,
+      voice_dna_json: normalizedUpdates.voiceDNA !== undefined
+        ? JSON.stringify(normalizedUpdates.voiceDNA)
+        : (profile.voiceDNA ? JSON.stringify(profile.voiceDNA) : null),
+      guardrails_json: normalizedUpdates.guardrails !== undefined
+        ? JSON.stringify(normalizedUpdates.guardrails)
+        : (profile.guardrails ? JSON.stringify(profile.guardrails) : null),
+      context_modifiers_json: normalizedUpdates.contextModifiers !== undefined
+        ? JSON.stringify(normalizedUpdates.contextModifiers)
+        : (profile.contextModifiers ? JSON.stringify(profile.contextModifiers) : null),
+      updated_at: now,
+    });
+    if (result.changes !== 1) {
+      throw new Error(`Voice profile revision conflict at revision ${profile.revision}`);
+    }
+    return {
+      profile: {
+        ...profile,
+        status: targetStatus,
+        voiceDNA: normalizedUpdates.voiceDNA ?? profile.voiceDNA,
+        guardrails: normalizedUpdates.guardrails ?? profile.guardrails,
+        contextModifiers: normalizedUpdates.contextModifiers ?? profile.contextModifiers,
+        revision: profile.revision + 1,
+        updatedAt: now,
+      },
+      changed: true,
+    };
+  });
+
+  const result = doUpdate.immediate();
+  if (result.changed) {
+    invalidateMonthlyDigestCache(workspaceId);
+    clearIntelligenceCache(workspaceId);
+  }
+  return result;
+}
+
 export function updateVoiceProfile(
   workspaceId: string,
   updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
 ): VoiceProfile & { samples: VoiceSample[] } {
-  const profile = getVoiceProfile(workspaceId);
-  if (!profile) throw new Error('No voice profile exists for this workspace');
-  // Enforce state-machine at the write boundary. Any caller — route handler,
-  // internal flow, test harness — flows through here, so the guard catches
-  // every path without depending on Zod-schema discipline at the edge.
-  if (updates.status !== undefined && updates.status !== profile.status) {
-    const legal = LEGAL_STATUS_TRANSITIONS[profile.status];
-    if (!legal.has(updates.status)) {
-      log.warn({ workspaceId, from: profile.status, to: updates.status }, 'rejected illegal voice profile state transition');
-      throw new VoiceProfileStateTransitionError(profile.status, updates.status);
-    }
-  }
-  const now = new Date().toISOString();
-  stmts().updateProfile.run({
-    id: profile.id,
-    workspace_id: workspaceId,
-    status: updates.status ?? profile.status,
-    voice_dna_json: updates.voiceDNA !== undefined ? JSON.stringify(updates.voiceDNA) : (profile.voiceDNA ? JSON.stringify(profile.voiceDNA) : null),
-    guardrails_json: updates.guardrails !== undefined ? JSON.stringify(updates.guardrails) : (profile.guardrails ? JSON.stringify(profile.guardrails) : null),
-    context_modifiers_json: updates.contextModifiers !== undefined ? JSON.stringify(updates.contextModifiers) : (profile.contextModifiers ? JSON.stringify(profile.contextModifiers) : null),
-    updated_at: now,
-  });
-  return { ...profile, ...updates, updatedAt: now };
+  return updateVoiceProfileWithResult(workspaceId, updates).profile;
 }
 
 // Takes workspaceId (not profile.id) — resolves profile internally.
@@ -175,9 +292,16 @@ export function addVoiceSample(
   workspaceId: string, content: string,
   contextTag?: VoiceSampleContext, source?: VoiceSampleSource,
 ): VoiceSample {
+  const parsed = voiceSampleInputSchema.safeParse({ content, contextTag, source });
+  if (!parsed.success) {
+    throw new VoiceSampleValidationError(
+      parsed.error.issues[0]?.message ?? 'Voice sample is invalid',
+    );
+  }
+  const normalized = parsed.data;
   const id = `vs_${randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
-  const effectiveSource = source ?? 'manual';
+  const effectiveSource = normalized.source ?? 'manual';
 
   const doAdd = db.transaction((): { voiceProfileId: string; sortOrder: number } => {
     const profile = getVoiceProfile(workspaceId);
@@ -188,21 +312,63 @@ export function addVoiceSample(
     const { max } = stmts().maxSampleSortOrder.get(profile.id) as { max: number };
     const sortOrder = max + 1;
     stmts().insertSample.run({
-      id, voice_profile_id: profile.id, content,
-      context_tag: contextTag ?? null, source: effectiveSource,
+      id, voice_profile_id: profile.id, content: normalized.content,
+      context_tag: normalized.contextTag ?? null, source: effectiveSource,
       sort_order: sortOrder, created_at: now,
     });
+    const touched = stmts().touchProfileAfterSampleMutation.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      updated_at: now,
+    });
+    if (touched.changes !== 1) {
+      throw new Error(`Voice profile revision conflict at revision ${profile.revision}`);
+    }
     return { voiceProfileId: profile.id, sortOrder };
   });
 
   const { voiceProfileId, sortOrder } = doAdd.immediate();
-  return { id, voiceProfileId, content, contextTag, source: effectiveSource, sortOrder, createdAt: now };
+  invalidateMonthlyDigestCache(workspaceId);
+  clearIntelligenceCache(workspaceId);
+  return {
+    id,
+    voiceProfileId,
+    content: normalized.content,
+    contextTag: normalized.contextTag,
+    source: effectiveSource,
+    sortOrder,
+    createdAt: now,
+  };
 }
 
 export function deleteVoiceSample(workspaceId: string, sampleId: string): boolean {
-  const profile = getVoiceProfile(workspaceId);
-  if (!profile) return false;
-  return stmts().deleteSampleById.run(sampleId, profile.id).changes > 0;
+  const doDelete = db.transaction((): boolean => {
+    const profile = getVoiceProfile(workspaceId);
+    if (!profile) return false;
+    // Read before delete both proves workspace ownership and preserves context
+    // for future activity/effect callers without relying on a vanished row.
+    const sample = profile.samples.find(candidate => candidate.id === sampleId);
+    if (!sample) return false;
+    const deleted = stmts().deleteSampleById.run(sample.id, profile.id);
+    if (deleted.changes !== 1) return false;
+    const touched = stmts().touchProfileAfterSampleMutation.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      updated_at: new Date().toISOString(),
+    });
+    if (touched.changes !== 1) {
+      throw new Error(`Voice profile revision conflict at revision ${profile.revision}`);
+    }
+    return true;
+  });
+  const deleted = doDelete.immediate();
+  if (deleted) {
+    invalidateMonthlyDigestCache(workspaceId);
+    clearIntelligenceCache(workspaceId);
+  }
+  return deleted;
 }
 
 export function listCalibrationSessions(workspaceId: string): CalibrationSession[] {
@@ -284,17 +450,17 @@ Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "var
   log.info({ workspaceId, promptType }, 'generating calibration variations');
   // ai-race-ok: see rationale above — single-writer per request via randomUUID PK.
   const text = await callCreativeAI({
+    operation: 'voice-calibration',
     systemPrompt: system,
     userPrompt,
     maxTokens: 2000,
     temperature: 0.85,
-    feature: 'voice-calibration',
     workspaceId,
     json: true,
   });
 
-  const parsed = parseJsonFallback<{ variations: string[] }>(text, { variations: [] });
-  const variations: CalibrationVariation[] = (parsed.variations || []).map(variation => ({ text: variation }));
+  const parsed = parseVoiceCalibrationOutput(text);
+  const variations: CalibrationVariation[] = parsed.variations.map(variation => ({ text: variation }));
 
   const id = `cal_${randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
@@ -329,16 +495,16 @@ Return valid JSON: { "refined": "the refined text" }`;
   const system = buildSystemPrompt(workspaceId, 'You are a copywriter refining copy based on feedback. Adjust precisely as directed. Apply the style quality rules that follow, but if the original copy uses a pattern those rules discourage, preserve it — brand accuracy takes precedence over style guidelines.');
 
   const text = await callCreativeAI({
+    operation: 'voice-refinement',
     systemPrompt: system,
     userPrompt,
     maxTokens: 1000,
     temperature: 0.75,
-    feature: 'voice-refinement',
     workspaceId,
     json: true,
   });
 
-  const parsed = parseJsonFallback<{ refined: string }>(text, { refined: original.text });
+  const parsed = parseVoiceRefinementOutput(text);
 
   // Re-read the session INSIDE the transaction and mutate against the fresh
   // state — a concurrent refine on the same session during our AI call would

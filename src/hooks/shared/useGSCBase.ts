@@ -8,7 +8,16 @@ import type {
   PerformanceTrend,
 } from '../../../shared/types/analytics';
 
-type GSCMetric = 'overview' | 'trend' | 'comparison' | 'devices' | 'countries' | 'searchTypes';
+export const GSC_METRICS = [
+  'overview',
+  'trend',
+  'comparison',
+  'devices',
+  'countries',
+  'searchTypes',
+] as const;
+
+export type GSCMetric = typeof GSC_METRICS[number];
 
 export interface GSCBaseApi {
   overview: () => Promise<SearchOverview | null>;
@@ -21,51 +30,55 @@ export interface GSCBaseApi {
 
 export interface GSCBaseOptions {
   enabled: boolean;
+  /** Optional query subset. Omit to preserve the historical all-metrics behavior. */
+  metrics?: readonly GSCMetric[];
   makeKey: (metric: GSCMetric) => readonly unknown[];
   staleTime?: number;
   api: GSCBaseApi;
 }
 
-export function useGSCBase({ enabled, makeKey, staleTime, api }: GSCBaseOptions) {
+export function useGSCBase({ enabled, metrics, makeKey, staleTime, api }: GSCBaseOptions) {
+  const metricEnabled = (metric: GSCMetric) => enabled && (!metrics || metrics.includes(metric));
+
   const overviewQ = useQuery({
     queryKey: makeKey('overview'),
     queryFn: api.overview,
-    enabled,
+    enabled: metricEnabled('overview'),
     staleTime,
   });
 
   const trendQ = useQuery({
     queryKey: makeKey('trend'),
     queryFn: api.trend,
-    enabled,
+    enabled: metricEnabled('trend'),
     staleTime,
   });
 
   const comparisonQ = useQuery({
     queryKey: makeKey('comparison'),
     queryFn: api.comparison,
-    enabled,
+    enabled: metricEnabled('comparison'),
     staleTime,
   });
 
   const devicesQ = useQuery({
     queryKey: makeKey('devices'),
     queryFn: api.devices,
-    enabled,
+    enabled: metricEnabled('devices'),
     staleTime,
   });
 
   const countriesQ = useQuery({
     queryKey: makeKey('countries'),
     queryFn: () => api.countries ? api.countries() : Promise.resolve([]),
-    enabled: enabled && !!api.countries,
+    enabled: metricEnabled('countries') && !!api.countries,
     staleTime,
   });
 
   const searchTypesQ = useQuery({
     queryKey: makeKey('searchTypes'),
     queryFn: () => api.searchTypes ? api.searchTypes() : Promise.resolve([]),
-    enabled: enabled && !!api.searchTypes,
+    enabled: metricEnabled('searchTypes') && !!api.searchTypes,
     staleTime,
   });
 

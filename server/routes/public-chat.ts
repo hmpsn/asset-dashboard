@@ -63,7 +63,11 @@ router.post('/api/public/chat-sessions/:workspaceId/:sessionId/summarize', async
   try {
     const session = getClientSession(req.params.workspaceId, req.params.sessionId);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    const summary = await generateSessionSummary(req.params.workspaceId, req.params.sessionId);
+    const summary = await generateSessionSummary(
+      req.params.workspaceId,
+      req.params.sessionId,
+      { trigger: 'manual' },
+    );
     res.json({ summary });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });

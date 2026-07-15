@@ -6,15 +6,17 @@
  *  - a valid per-workspace key → scope = workspaceId + label attached, last_used_at touched
  *  - a revoked key → rejected (fail-closed)
  *  - an unknown key → rejected (fail-closed)
- *  - scope enforcement in handleMcpRequest:
+ *  - scope enforcement at the canonical registry execution boundary:
  *      • workspace-A key calling a tool with workspace_id=B → rejected
  *      • workspace-A key calling a tool with workspace_id=A → allowed
  *      • workspace-A key calling a no-workspace_id tool (list_workspaces) → rejected
+ *      • undeclared workspace aliases cannot bypass read/write/job scope checks
+ *      • conflicting workspaceId/workspace_id aliases → rejected
  *      • master key → allowed regardless of workspace_id
  *
- * The MCP SDK + tool-family modules are mocked (mirroring mcp-server-routing.test.ts)
- * so we can grab the CallToolRequestSchema handler and exercise the scope block
- * directly. The auth middleware + key store run against the real test DB.
+ * The MCP SDK + tool-family modules are mocked so we can grab the
+ * CallToolRequestSchema handler and exercise the real registry scope boundary.
+ * The auth middleware + key store run against the real test DB.
  */
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,6 +25,7 @@ const h = vi.hoisted(() => {
   const serverInstances: any[] = [];
 
   const workspaceHandler = vi.fn(async () => ({ content: [{ type: 'text', text: 'workspace' }] }));
+  const jobHandler = vi.fn(async () => ({ content: [{ type: 'text', text: 'job' }] }));
 
   class MockServer {
     handlers = new Map<unknown, (req: unknown) => Promise<unknown>>();
@@ -40,7 +43,7 @@ const h = vi.hoisted(() => {
     constructor(public options: unknown) {}
   }
 
-  return { serverInstances, workspaceHandler, MockServer, MockTransport };
+  return { serverInstances, workspaceHandler, jobHandler, MockServer, MockTransport };
 });
 
 vi.mock('@modelcontextprotocol/sdk/server', () => ({ Server: h.MockServer }));
@@ -52,13 +55,37 @@ vi.mock('@modelcontextprotocol/sdk/types', () => ({
   ListToolsRequestSchema: Symbol('ListToolsRequestSchema'),
 }));
 
-// Mock every tool family. Only the workspace family carries a spy; the others
-// just need a name + a no-op handler so handleMcpRequest's dispatch compiles.
+// Mock every tool family. Only workspace + job families carry spies; empty
+// families still exercise the production registration table without loading
+// unrelated domain implementations.
 vi.mock('../../server/mcp/tools/workspaces.js', () => ({
   workspaceTools: [
-    { name: 'list_workspaces' },
-    { name: 'get_workspace_overview' },
-    { name: 'update_workspace' },
+    {
+      name: 'list_workspaces',
+      description: 'List workspaces.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'create_workspace',
+      description: 'Create a workspace.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'get_workspace_overview',
+      description: 'Get a workspace overview.',
+      inputSchema: {
+        type: 'object',
+        properties: { workspaceId: { type: 'string', description: 'Workspace ID.' } },
+      },
+    },
+    {
+      name: 'update_workspace',
+      description: 'Update a workspace.',
+      inputSchema: {
+        type: 'object',
+        properties: { workspace_id: { type: 'string', description: 'Workspace ID.' } },
+      },
+    },
   ],
   handleWorkspaceTool: h.workspaceHandler,
 }));
@@ -71,7 +98,21 @@ vi.mock('../../server/mcp/tools/brand.js', () => ({ brandTools: [], handleBrandT
 vi.mock('../../server/mcp/tools/clients.js', () => ({ clientTools: [], handleClientTool: vi.fn() }));
 vi.mock('../../server/mcp/tools/keyword-actions.js', () => ({ keywordActionTools: [], handleKeywordActionTool: vi.fn() }));
 vi.mock('../../server/mcp/tools/content-actions.js', () => ({ contentActionTools: [], handleContentActionTool: vi.fn() }));
-vi.mock('../../server/mcp/tools/job-actions.js', () => ({ jobActionTools: [], handleJobActionTool: vi.fn() }));
+vi.mock('../../server/mcp/tools/recommendation-actions.js', () => ({ recommendationActionTools: [], handleRecommendationActionTool: vi.fn() }));
+vi.mock('../../server/mcp/tools/content-generation-actions.js', () => ({ contentGenerationActionTools: [], handleContentGenerationActionTool: vi.fn() }));
+vi.mock('../../server/mcp/tools/schema-actions.js', () => ({ schemaActionTools: [], handleSchemaActionTool: vi.fn() }));
+vi.mock('../../server/mcp/tools/analytics-read-actions.js', () => ({ analyticsReadActionTools: [], handleAnalyticsReadActionTool: vi.fn() }));
+vi.mock('../../server/mcp/tools/job-actions.js', () => ({
+  jobActionTools: [{
+    name: 'start_keyword_strategy_generation',
+    description: 'Start keyword strategy generation.',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace_id: { type: 'string', description: 'Workspace ID.' } },
+    },
+  }],
+  handleJobActionTool: h.jobHandler,
+}));
 
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types';
 import { mcpAuthMiddleware } from '../../server/mcp/auth.js';
@@ -86,6 +127,7 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 
 const MASTER = 'master-key-for-tests';
 const prevMaster = process.env.MCP_API_KEY;
+const WORKSPACE_KEY_A = { scope: 'ws-A', label: 'a', keyId: 'key-a' } as const;
 
 const cleanupWorkspaceIds: string[] = [];
 afterAll(() => {
@@ -103,7 +145,7 @@ function createRes() {
   };
 }
 
-// Drive a tool call through the real scope-enforcement block by grabbing the
+// Drive a tool call through the real registry scope boundary by grabbing the
 // CallToolRequestSchema handler from the per-request mock Server.
 async function callTool(
   mcpAuth: { scope: string; label?: string; keyId?: string },
@@ -228,37 +270,158 @@ describe('mcpAuthMiddleware — master + per-workspace keys', () => {
 describe('handleMcpRequest — workspace scope enforcement', () => {
   beforeEach(() => {
     h.workspaceHandler.mockClear();
+    h.jobHandler.mockClear();
   });
 
   it('master key (scope all) may call any tool with any workspace_id', async () => {
     const result = await callTool({ scope: 'all' }, 'get_workspace_overview', { workspaceId: 'ws-anything' });
     expect(result.isError).toBeUndefined();
-    expect(h.workspaceHandler).toHaveBeenCalledWith('get_workspace_overview', { workspaceId: 'ws-anything' });
+    expect(h.workspaceHandler).toHaveBeenCalledWith(
+      'get_workspace_overview',
+      { workspaceId: 'ws-anything' },
+      expect.objectContaining({
+        toolName: 'get_workspace_overview',
+        targetWorkspaceId: 'ws-anything',
+        caller: expect.objectContaining({ kind: 'master_key', scope: 'all' }),
+      }),
+    );
   });
 
   it('workspace-A key calling tool with workspace_id=A is allowed (camelCase)', async () => {
-    const result = await callTool({ scope: 'ws-A', label: 'a' }, 'get_workspace_overview', { workspaceId: 'ws-A' });
+    const result = await callTool(WORKSPACE_KEY_A, 'get_workspace_overview', { workspaceId: 'ws-A' });
     expect(result.isError).toBeUndefined();
-    expect(h.workspaceHandler).toHaveBeenCalledWith('get_workspace_overview', { workspaceId: 'ws-A' });
+    expect(h.workspaceHandler).toHaveBeenCalledWith(
+      'get_workspace_overview',
+      { workspaceId: 'ws-A' },
+      expect.objectContaining({
+        toolName: 'get_workspace_overview',
+        targetWorkspaceId: 'ws-A',
+        caller: expect.objectContaining({
+          kind: 'workspace_key',
+          scope: 'ws-A',
+          workspaceId: 'ws-A',
+          keyId: 'key-a',
+          keyLabel: 'a',
+        }),
+      }),
+    );
   });
 
   it('workspace-A key calling tool with workspace_id=A is allowed (snake_case)', async () => {
-    const result = await callTool({ scope: 'ws-A', label: 'a' }, 'update_workspace', { workspace_id: 'ws-A' });
+    const result = await callTool(WORKSPACE_KEY_A, 'update_workspace', { workspace_id: 'ws-A' });
     expect(result.isError).toBeUndefined();
-    expect(h.workspaceHandler).toHaveBeenCalledWith('update_workspace', { workspace_id: 'ws-A' });
+    expect(h.workspaceHandler).toHaveBeenCalledWith(
+      'update_workspace',
+      { workspace_id: 'ws-A' },
+      expect.objectContaining({ targetWorkspaceId: 'ws-A' }),
+    );
   });
 
   it('workspace-A key calling tool with workspace_id=B is rejected', async () => {
-    const result = await callTool({ scope: 'ws-A', label: 'a' }, 'get_workspace_overview', { workspaceId: 'ws-B' });
+    const result = await callTool(WORKSPACE_KEY_A, 'get_workspace_overview', { workspaceId: 'ws-B' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Forbidden');
+    expect(h.workspaceHandler).not.toHaveBeenCalled();
+  });
+
+  it('workspace-A key cannot authorize a snake_case write with a camelCase decoy', async () => {
+    const result = await callTool(
+      WORKSPACE_KEY_A,
+      'update_workspace',
+      { workspaceId: 'ws-A', workspace_id: 'ws-B' },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('must match');
+    expect(h.workspaceHandler).not.toHaveBeenCalled();
+  });
+
+  it('workspace-A key cannot authorize a camelCase read with a snake_case decoy', async () => {
+    const result = await callTool(
+      WORKSPACE_KEY_A,
+      'get_workspace_overview',
+      { workspaceId: 'ws-B', workspace_id: 'ws-A' },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('must match');
+    expect(h.workspaceHandler).not.toHaveBeenCalled();
+  });
+
+  it('workspace-A key cannot authorize a job start with a camelCase decoy', async () => {
+    const result = await callTool(
+      WORKSPACE_KEY_A,
+      'start_keyword_strategy_generation',
+      { workspaceId: 'ws-A', workspace_id: 'ws-B' },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('must match');
+    expect(h.jobHandler).not.toHaveBeenCalled();
+  });
+
+  it('workspace-A key calling a snake_case tool with workspace_id=B is rejected', async () => {
+    const result = await callTool(
+      WORKSPACE_KEY_A,
+      'update_workspace',
+      { workspace_id: 'ws-B' },
+    );
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Forbidden');
     expect(h.workspaceHandler).not.toHaveBeenCalled();
   });
 
   it('workspace-A key calling a no-workspace_id tool (list_workspaces) is rejected', async () => {
-    const result = await callTool({ scope: 'ws-A', label: 'a' }, 'list_workspaces', {});
+    const result = await callTool(WORKSPACE_KEY_A, 'list_workspaces', {});
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('not workspace-scoped');
+    expect(h.workspaceHandler).not.toHaveBeenCalled();
+  });
+
+  it('workspace-A key cannot make a global tool workspace-scoped with an undeclared argument', async () => {
+    const result = await callTool(
+      WORKSPACE_KEY_A,
+      'list_workspaces',
+      { workspaceId: 'ws-A' },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('not workspace-scoped');
+    expect(h.workspaceHandler).not.toHaveBeenCalled();
+  });
+
+  it('auth layer permits matching aliases when the declared workspace matches the key scope', async () => {
+    const result = await callTool(
+      WORKSPACE_KEY_A,
+      'update_workspace',
+      { workspaceId: 'ws-A', workspace_id: 'ws-A' },
+    );
+    expect(result.isError).toBeUndefined();
+    expect(h.workspaceHandler).toHaveBeenCalledWith(
+      'update_workspace',
+      {
+        workspaceId: 'ws-A',
+        workspace_id: 'ws-A',
+      },
+      expect.objectContaining({ targetWorkspaceId: 'ws-A' }),
+    );
+  });
+
+  it('rejects a workspace scope whose authenticated key identity is incomplete', async () => {
+    const result = await callTool(
+      { scope: 'ws-A', label: 'a' },
+      'get_workspace_overview',
+      { workspaceId: 'ws-A' },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('identity is incomplete');
+    expect(h.workspaceHandler).not.toHaveBeenCalled();
+  });
+
+  it('rejects conflicting aliases for the master key too', async () => {
+    const result = await callTool(
+      { scope: 'all' },
+      'update_workspace',
+      { workspaceId: 'ws-A', workspace_id: 'ws-B' },
+    );
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('must match');
     expect(h.workspaceHandler).not.toHaveBeenCalled();
   });
 });

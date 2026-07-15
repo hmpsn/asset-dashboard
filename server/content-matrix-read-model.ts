@@ -1,11 +1,77 @@
 import db from './db/index.js';
-import { parseJsonFallback } from './db/json-validation.js';
+import { parseJsonSafeArray } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
+import { z } from './middleware/validate.js';
 import type {
   ContentMatrix,
   MatrixCell,
   MatrixDimension,
 } from '../shared/types/content.ts';
+
+const matrixCellStatusSchema = z.enum([
+  'planned',
+  'keyword_validated',
+  'brief_generated',
+  'draft',
+  'review',
+  'flagged',
+  'approved',
+  'published',
+]);
+
+export const matrixDimensionSchema = z.object({
+  variableName: z.string().min(1),
+  values: z.array(z.string()),
+});
+
+const statusHistoryEntrySchema = z.object({
+  from: matrixCellStatusSchema,
+  to: matrixCellStatusSchema,
+  at: z.string().min(1),
+});
+
+const keywordCandidateSchema = z.object({
+  keyword: z.string(),
+  volume: z.number(),
+  difficulty: z.number(),
+  cpc: z.number(),
+  source: z.enum(['pattern', 'semrush_related', 'ai_suggested', 'gsc']),
+  isRecommended: z.boolean(),
+  authorityAssessment: z.object({
+    posture: z.enum([
+      'authority_unknown',
+      'within_current_authority_range',
+      'requires_authority_building',
+    ]),
+    note: z.string(),
+    referringDomains: z.number().optional(),
+  }).optional(),
+});
+
+/** Stored cell JSON schema. Legacy rows without a revision read as revision 0. */
+export const matrixCellSchema = z.object({
+  id: z.string().min(1),
+  revision: z.number().int().nonnegative().optional().default(0),
+  variableValues: z.record(z.string()),
+  targetKeyword: z.string(),
+  customKeyword: z.string().optional(),
+  plannedUrl: z.string(),
+  briefId: z.string().optional(),
+  postId: z.string().optional(),
+  status: matrixCellStatusSchema,
+  statusHistory: z.array(statusHistoryEntrySchema).optional(),
+  keywordValidation: z.object({
+    volume: z.number(),
+    difficulty: z.number(),
+    cpc: z.number(),
+    validatedAt: z.string().min(1),
+  }).optional(),
+  keywordCandidates: z.array(keywordCandidateSchema).optional(),
+  recommendedKeyword: z.string().optional(),
+  clientFlag: z.string().optional(),
+  clientFlaggedAt: z.string().optional(),
+  expectedSchemaTypes: z.array(z.string()).optional(),
+});
 
 interface MatrixRow {
   id: string;
@@ -16,13 +82,14 @@ interface MatrixRow {
   url_pattern: string;
   keyword_pattern: string;
   cells: string;
+  revision?: number | null;
   created_at: string;
   updated_at: string;
 }
 
 const stmts = createStmtCache(() => ({
   selectByWorkspace: db.prepare(
-    `SELECT * FROM content_matrices WHERE workspace_id = ? ORDER BY updated_at DESC`,
+    `SELECT * FROM content_matrices WHERE workspace_id = ? ORDER BY updated_at DESC, id ASC`,
   ),
   selectById: db.prepare(
     `SELECT * FROM content_matrices WHERE id = ? AND workspace_id = ?`,
@@ -56,14 +123,22 @@ export function computeStats(cells: MatrixCell[]): ContentMatrix['stats'] {
   return stats;
 }
 
-function rowToMatrix(row: MatrixRow): ContentMatrix {
-  const cells = parseJsonFallback<MatrixCell[]>(row.cells, []);
+export function rowToMatrix(row: MatrixRow): ContentMatrix {
+  const context = { workspaceId: row.workspace_id, table: 'content_matrices' };
+  const cells = parseJsonSafeArray(row.cells, matrixCellSchema, {
+    ...context,
+    field: 'cells',
+  }) as MatrixCell[];
   return {
     id: row.id,
     workspaceId: row.workspace_id,
+    revision: row.revision ?? 0,
     name: row.name,
     templateId: row.template_id,
-    dimensions: parseJsonFallback<MatrixDimension[]>(row.dimensions, []),
+    dimensions: parseJsonSafeArray(row.dimensions, matrixDimensionSchema, {
+      ...context,
+      field: 'dimensions',
+    }) as MatrixDimension[],
     urlPattern: row.url_pattern,
     keywordPattern: row.keyword_pattern,
     cells,

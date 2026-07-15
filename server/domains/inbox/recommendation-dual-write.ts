@@ -12,6 +12,12 @@
  * one mirror call. The mirror is best-effort and MUST NOT break the live send: any failure is
  * logged and swallowed (the rec's clientStatus is already 'sent' + the doorbell already queued).
  *
+ * Reconcile R4-PR1 — VERIFIABLE authority: the mirror no longer returns a bare
+ * `ClientDeliverable | null` (a shape that let ALL callers silently discard the failure). It returns
+ * a typed `MirrorResult` so every one of the three call seams (per-row /send, bulk send, autosend
+ * cron) OBSERVES the outcome and, on failure, writes a durable admin-only activity-log entry + a
+ * Pino error instead of swallowing the divergence. See docs/rules/strategy-recommendations.md.
+ *
  * Dedup: sourceRef = `recommendation:<id>`, so a re-send of the same rec collapses onto the one
  * existing deliverable row (upsertDeliverable keys on (ws, type, sourceRef)).
  *
@@ -20,7 +26,6 @@
  * deliverable is dark client-side until the strategy-the-issue surface reads it).
  */
 import type { Recommendation } from '../../../shared/types/recommendations.js';
-import type { ClientDeliverable } from '../../../shared/types/client-deliverable.js';
 import { upsertDeliverable } from '../../client-deliverables.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
 import { WS_EVENTS } from '../../ws-events.js';
@@ -31,26 +36,47 @@ import { createLogger } from '../../logger.js';
 const log = createLogger('recommendation-dual-write');
 
 /**
+ * The typed outcome of a dual-write mirror (Reconcile R4-PR1). Replaces the old
+ * `ClientDeliverable | null` return that let every caller silently discard the failure.
+ *
+ *   { ok: true, deliverableId }         — mirror row created/deduped successfully
+ *   { ok: true, skipped: true, reason } — the adapter benignly rejected a not-sendable input
+ *                                         (nothing to mirror; NOT a failure to alert on)
+ *   { ok: false, error }                — the store write threw; the caller MUST record a durable
+ *                                         activity entry so the divergence is observable
+ *
+ * Both dual-write mirrors (recommendation + client_action) return this same shape so the three rec
+ * callers and the client-action caller observe outcomes uniformly.
+ */
+export type MirrorResult =
+  | { ok: true; deliverableId?: string; skipped?: boolean; reason?: string }
+  | { ok: false; error: string };
+
+/**
  * Mirror a freshly-sent recommendation into `client_deliverable`.
- * Returns the mirrored deliverable, or null when the mirror was skipped/failed. Never throws —
- * the live send must not be affected.
+ * Returns a typed `MirrorResult`: `{ ok: true, deliverableId }` on success (or an adapter-rejected
+ * skip, which is a benign not-sendable outcome, `{ ok: true }` with no id), and `{ ok: false, error }`
+ * when the store write threw. NEVER throws — the live send must not be affected. Callers MUST observe
+ * `ok` and log an activity entry on `false` (R4-PR1 — no more silent swallow).
  */
 export function mirrorRecommendationToDeliverable(
   workspaceId: string,
   rec: Recommendation,
-): ClientDeliverable | null {
+): MirrorResult {
   try {
     const adapter = getAdapter('recommendation');
     const input: RecommendationInput = { rec };
 
     // Guarantee 0 — the adapter rejects not-ready recs (no id, or no title/insight to present).
+    // A rejection is a BENIGN skip (there was nothing sendable to mirror), NOT a failure the caller
+    // must alert on — return ok:true with no deliverableId so the caller doesn't log a false alarm.
     const sendable = adapter.validateSendable(input);
     if (!sendable.ok) {
       log.warn(
         { workspaceId, recId: rec.id, reason: sendable.reason },
         'recommendation mirror skipped: adapter rejected the rec',
       );
-      return null;
+      return { ok: true, skipped: true, reason: sendable.reason };
     }
 
     const built = adapter.buildPayload(input);
@@ -94,11 +120,14 @@ export function mirrorRecommendationToDeliverable(
         'DELIVERABLE_SENT broadcast failed (swallowed)',
       );
     }
-    return deliverable;
+    return { ok: true, deliverableId: deliverable.id };
   } catch (err) {
     // Best-effort: the rec is already sent + the doorbell queued. A mirror failure must not
-    // surface to the operator or roll back the live send.
-    log.error({ err, workspaceId, recId: rec.id }, 'recommendation mirror failed (swallowed)');
-    return null;
+    // surface to the operator or roll back the live send — but it is NO LONGER swallowed silently.
+    // The typed failure result flows back to the caller, which records a durable activity entry so
+    // the divergence is observable (R4-PR1). This module still logs the Pino error for the trace.
+    const error = err instanceof Error ? err.message : String(err);
+    log.error({ err, workspaceId, recId: rec.id }, 'recommendation mirror failed (surfaced to caller)');
+    return { ok: false, error };
   }
 }

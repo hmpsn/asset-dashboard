@@ -69,6 +69,18 @@ describe('CannibalizationTriage', () => {
     );
   });
 
+  it('stacks issue actions and page actions without widening a narrow parent', () => {
+    renderTriage([item()]);
+
+    const sendButton = screen.getByRole('button', { name: /send to client/i });
+    const actionCluster = sendButton.parentElement;
+    expect(actionCluster).toHaveClass('w-full', 'flex-wrap', 'sm:w-auto', 'sm:flex-shrink-0');
+    expect(actionCluster?.parentElement).toHaveClass('flex-col', 'items-stretch', 'sm:flex-row', 'sm:items-center');
+
+    const fixButton = screen.getByRole('button', { name: /fix in editor/i });
+    expect(fixButton.parentElement).toHaveClass('flex-col', 'items-stretch', 'sm:flex-row', 'sm:items-center');
+  });
+
   it('treats canonicalPath as the keeper regardless of position', () => {
     renderTriage([item({ canonicalPath: '/blog/crm-guide' })]);
     // canonicalPath /blog/crm-guide is the keeper → the OTHER page (/crm) is the only duplicate.

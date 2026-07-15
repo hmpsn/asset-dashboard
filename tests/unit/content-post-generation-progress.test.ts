@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
 import type { ContentBrief } from '../../shared/types/content.js';
+import { getPost } from '../../server/content-posts-db.js';
 
 vi.mock('../../server/content-posts-ai.js', () => ({
   buildVoiceContext: vi.fn(async () => 'Voice context'),
@@ -17,6 +18,14 @@ vi.mock('../../server/content-posts-ai.js', () => ({
     conclusion: post.conclusion,
   })),
   countHtmlWords: (html: string) => html.replace(/<[^>]+>/g, ' ').trim().split(/\s+/).filter(Boolean).length,
+}));
+
+vi.mock('../../server/feature-flags.js', () => ({
+  isFeatureEnabled: vi.fn(() => false),
+}));
+
+vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
+  buildContentGenerationContextV2: vi.fn(),
 }));
 
 const workspaceIds = new Set<string>();
@@ -73,7 +82,97 @@ describe('content post generation progress', () => {
     expect(progress).toContain('4/6:Unifying draft...');
     expect(progress).toContain('5/6:Generating SEO metadata...');
     expect(progress).toContain('6/6:Finalizing post draft...');
-  });
+  }, 15_000);
+
+  it('builds v2 context once and reuses its draft projection and authority through every post stage', async () => {
+    const { generatePost } = await import('../../server/content-posts.js');
+    const ai = await import('../../server/content-posts-ai.js');
+    const { isFeatureEnabled } = await import('../../server/feature-flags.js');
+    const { buildContentGenerationContextV2 } = await import('../../server/intelligence/generation-context-builders.js');
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
+    const authority = {
+      systemVoiceBlock: '[System voice]',
+      userVoiceBlock: '[User voice]',
+      identityPromptBlock: '[Identity]',
+      customNotes: null,
+      voice: { status: 'calibrated' as const, readiness: 'finalized' as const, profileRevision: 4, voiceVersion: 2 },
+    };
+    vi.mocked(buildContentGenerationContextV2).mockResolvedValue({
+      intelligence: { version: 1, workspaceId: 'ws', assembledAt: '2026-07-14T12:00:00.000Z' },
+      slices: ['seoContext', 'brand'],
+      authority,
+      projections: { brief: '[Brief context]', draft: '[Draft context]', voiceReview: '[Voice context]' },
+      tokenEstimates: { brief: 100, draft: 80, voiceReview: 50 },
+      evidence: {
+        capturedAt: '2026-07-14T12:00:00.000Z',
+        freshThrough: '2026-07-14T12:00:00.000Z',
+        observedAt: ['2026-07-14T12:00:00.000Z'],
+        missing: [],
+      },
+      learningsAvailability: 'degraded',
+      effectiveInputFingerprint: 'b'.repeat(64),
+    });
+    const workspaceId = `ws_post_context_v2_${Date.now()}`;
+    workspaceIds.add(workspaceId);
+
+    await generatePost(workspaceId, makeBrief(workspaceId), 'post_context_v2');
+
+    expect(buildContentGenerationContextV2).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ai.buildVoiceContext)).not.toHaveBeenCalled();
+    expect(vi.mocked(ai.generateIntroduction).mock.calls[0][1]).toBe('[Draft context]');
+    expect(vi.mocked(ai.generateIntroduction).mock.calls[0][4]).toEqual(expect.objectContaining({ promptAuthority: authority }));
+    expect(vi.mocked(ai.generateSection).mock.calls[0][4]).toBe('[Draft context]');
+    expect(vi.mocked(ai.generateSection).mock.calls[0][7]).toEqual(expect.objectContaining({ promptAuthority: authority }));
+    expect(vi.mocked(ai.generateConclusion).mock.calls[0][1]).toBe('[Draft context]');
+    expect(vi.mocked(ai.unifyPost).mock.calls[0][2]).toBe('[Draft context]');
+    expect(vi.mocked(ai.generateSeoMeta).mock.calls[0][3]).toEqual(expect.objectContaining({ promptAuthority: authority }));
+  }, 15_000);
+
+  it('returns a provenance-carrying candidate without writing a post row', async () => {
+    const { generatePost } = await import('../../server/content-posts.js');
+    const ai = await import('../../server/content-posts-ai.js');
+    const workspaceId = `ws_post_candidate_${Date.now()}`;
+    const postId = 'post_candidate_only';
+    workspaceIds.add(workspaceId);
+    const assertAuthority = vi.fn();
+    vi.mocked(ai.generateIntroduction).mockImplementationOnce(async (...args) => {
+      const options = args[4];
+      const timestamp = new Date().toISOString();
+      options?.onExecution?.({
+        execution: {
+          runId: 'candidate-introduction-run',
+          executionChainId: options.executionChainId,
+          operation: 'content-post-introduction',
+          provider: 'openai',
+          model: 'gpt-5.4-mini',
+          attempts: 1,
+          cacheOutcome: 'miss',
+          startedAt: timestamp,
+          completedAt: timestamp,
+          durationMs: 0,
+        },
+        inputFingerprint: 'a'.repeat(64),
+      });
+      return '<p>Intro words for the candidate post.</p>';
+    });
+
+    const candidate = await generatePost(workspaceId, makeBrief(workspaceId), postId, {
+      persist: false,
+      assertAuthority,
+    });
+
+    expect(candidate).toMatchObject({
+      id: postId,
+      status: 'draft',
+      generationRevision: 0,
+      generationProvenance: {
+        runId: 'candidate-introduction-run',
+      },
+    });
+    expect(candidate.generationProvenance?.inputFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(getPost(workspaceId, postId)).toBeUndefined();
+    expect(assertAuthority).toHaveBeenCalled();
+  }, 15_000);
 
   it('stops before the next generation step when the job signal is aborted', async () => {
     const { generatePost } = await import('../../server/content-posts.js');
@@ -90,7 +189,11 @@ describe('content post generation progress', () => {
       signal: controller.signal,
     })).rejects.toThrow(/cancelled/i);
 
-    expect(vi.mocked(ai.generateIntroduction).mock.calls[0][4]).toEqual({ signal: controller.signal });
+    expect(vi.mocked(ai.generateIntroduction).mock.calls[0][4]).toEqual(expect.objectContaining({
+      signal: controller.signal,
+      executionChainId: expect.any(String),
+      onExecution: expect.any(Function),
+    }));
     expect(vi.mocked(ai.generateSection)).not.toHaveBeenCalled();
   });
 });

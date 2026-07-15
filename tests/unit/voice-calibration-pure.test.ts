@@ -68,11 +68,37 @@ vi.mock('../../server/schemas/voice-calibration.js', () => ({
   variationFeedbackItemSchema: {},
 }));
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   buildVoiceCalibrationContext,
   VoiceProfileStateTransitionError,
 } from '../../server/voice-calibration.js';
 import type { VoiceProfile, VoiceSample, VoiceDNA, VoiceGuardrails } from '../../shared/types/brand-engine.js';
+
+// ── R3-PR2 fold: the parallel LEGAL_STATUS_TRANSITIONS map is deleted; the guard now
+// reads the shared VOICE_PROFILE_TRANSITIONS table from state-machines.ts ──────────
+describe('voice-calibration parallel-validator fold (R3-PR2)', () => {
+  const SRC = readFileSync(
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../server/voice-calibration.ts'),
+    'utf8',
+  );
+
+  it('no longer declares its own LEGAL_STATUS_TRANSITIONS map', () => {
+    expect(SRC).not.toContain('const LEGAL_STATUS_TRANSITIONS');
+  });
+
+  it('imports VOICE_PROFILE_TRANSITIONS + validateTransition from state-machines.ts', () => {
+    expect(SRC).toContain('VOICE_PROFILE_TRANSITIONS');
+    expect(SRC).toContain("from './state-machines.js'");
+    expect(SRC).toContain('validateTransition(');
+  });
+
+  it('still exports VoiceProfileStateTransitionError (route handlers catch it by class)', () => {
+    expect(SRC).toContain('export class VoiceProfileStateTransitionError');
+  });
+});
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -110,6 +136,7 @@ function makeProfile(
   return {
     id: 'vp_test',
     workspaceId: 'ws-test',
+    revision: 1,
     status,
     samples: [],
     createdAt: '2026-01-01T00:00:00.000Z',

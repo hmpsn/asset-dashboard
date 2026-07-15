@@ -5,12 +5,15 @@ import { enqueuePlaybook } from '../../playbooks.js';
 import { mutationError, runWorkspaceMutation } from '../../workspace-mutation-helper.js';
 import { getClientPortalUrl, getWorkspace } from '../../workspaces.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
+import { clearIntelligenceCache } from '../../intelligence/cache-clear.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { InvalidTransitionError } from '../../state-machines.js';
 import type { ClientAction, ClientActionPayload, ClientActionSourceType } from '../../../shared/types/client-actions.js';
 import { applyClientActionFeedbackLoop } from './client-action-feedback-loop.js';
 import { mirrorClientActionToDeliverable } from './client-action-dual-write.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('client-actions-mutations');
 
 type ClientActor = { id?: string; name?: string } | undefined;
 
@@ -39,8 +42,8 @@ export type RespondToClientActionRequest = {
 };
 
 function broadcastActionUpdate(workspaceId: string, actionId: string, action: string) {
+  clearIntelligenceCache(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.CLIENT_ACTION_UPDATE, { actionId, action });
-  invalidateIntelligenceCache(workspaceId);
 }
 
 export function createAdminClientAction(workspaceId: string, input: CreateClientActionRequest): ClientAction {
@@ -87,10 +90,28 @@ export function createAdminClientAction(workspaceId: string, input: CreateClient
   // client_deliverable model. Runs UNCONDITIONALLY (no feature flag) and broadcasts
   // DELIVERABLE_SENT for the live unified Inbox. This single seam covers all four producer
   // routes (redirect / internal_link / aeo_change / content_decay). Skipped for duplicates
-  // (the legacy create itself returned the existing row). Best-effort + self-swallowing —
-  // it can NEVER break the legacy create.
+  // (the legacy create itself returned the existing row). Best-effort — it can NEVER break the
+  // legacy create, but the failure is NO LONGER swallowed: R4-PR1 makes the outcome observable.
   if (!isDuplicate) {
-    mirrorClientActionToDeliverable(workspaceId, action);
+    const mirror = mirrorClientActionToDeliverable(workspaceId, action);
+    if (!mirror.ok) {
+      // Durable, observable failure record (R4-PR1) — the legacy action reached the client but its
+      // unified-deliverable mirror did not, so admin + client views can DIVERGE. Admin-only audit
+      // (rec_status_updated is deliberately NOT in CLIENT_VISIBLE_TYPES). The read-only divergence
+      // sweep will also surface it for repair. Guarded so a logging failure can't break the create.
+      try {
+        addActivity(
+          workspaceId,
+          'rec_status_updated',
+          `Client-deliverable mirror failed for "${action.title}"`,
+          `The action reached the client but its unified deliverable mirror did not write (${mirror.error}). Admin/client views may diverge until reconciled.`,
+          { actionId: action.id, sourceType: action.sourceType, mirrorError: mirror.error },
+        );
+      } catch (activityErr) {
+        log.error({ err: activityErr, workspaceId, actionId: action.id }, 'failed to record client-action mirror-failure activity');
+      }
+      log.error({ workspaceId, actionId: action.id, error: mirror.error }, 'client-action dual-write mirror failed (observed by caller)');
+    }
   }
   return action;
 }
@@ -100,7 +121,6 @@ export function updateAdminClientAction(
   actionId: string,
   updates: UpdateClientActionRequest,
 ): ClientAction {
-  let feedbackStatus: 'approved' | 'completed' | null = null;
   const updated = runWorkspaceMutation({
     workspaceId,
     defaultErrorMessage: 'Failed to update client action',
@@ -109,15 +129,20 @@ export function updateAdminClientAction(
       if (!existing) throw mutationError(404, 'Client action not found');
       const next = updateClientAction(currentWorkspaceId, actionId, updates);
       if (!next) throw mutationError(404, 'Client action not found');
+      const feedbackStatus =
+        updates.status === 'completed' && existing.status !== 'completed'
+          ? 'completed'
+          : updates.status === 'approved' && existing.status !== 'approved'
+            ? 'approved'
+            : null;
+      if (feedbackStatus) {
+        applyClientActionFeedbackLoop(currentWorkspaceId, next, feedbackStatus);
+      }
       return next;
     },
     onActivity: ({ workspaceId: currentWorkspaceId, existing, result }) => {
       if (!existing) return;
-      if (updates.status === 'approved' && existing.status !== 'approved') {
-        feedbackStatus = 'approved';
-      }
       if (updates.status === 'completed' && existing.status !== 'completed') {
-        feedbackStatus = 'completed';
         addActivity(
           currentWorkspaceId,
           'client_action_completed',
@@ -137,9 +162,6 @@ export function updateAdminClientAction(
       return null;
     },
   });
-  if (feedbackStatus) {
-    applyClientActionFeedbackLoop(workspaceId, updated, feedbackStatus);
-  }
   return updated;
 }
 
@@ -163,6 +185,9 @@ export function respondToPublicClientAction(
         clientNote: response.clientNote,
       });
       if (!next) throw mutationError(404, 'Client action not found');
+      if (response.status === 'approved') {
+        applyClientActionFeedbackLoop(currentWorkspaceId, next, 'approved');
+      }
       return next;
     },
     onActivity: ({ workspaceId: currentWorkspaceId, result }) => {
@@ -187,7 +212,6 @@ export function respondToPublicClientAction(
   });
 
   if (response.status === 'approved') {
-    applyClientActionFeedbackLoop(workspaceId, updated, 'approved');
     const ws = getWorkspace(workspaceId);
     notifyTeamActionApproved({
       workspaceId,

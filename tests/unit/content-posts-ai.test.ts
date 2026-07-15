@@ -2,16 +2,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentBrief } from '../../server/content-brief.js';
 import type { GeneratedPost } from '../../shared/types/content.ts';
 
-const { callAIMock } = vi.hoisted(() => ({
+const {
+  callAIMock,
+  isAnthropicConfiguredMock,
+  isFeatureEnabledMock,
+  buildContentGenerationContextV2Mock,
+} = vi.hoisted(() => ({
   callAIMock: vi.fn(),
+  isAnthropicConfiguredMock: vi.fn(() => false),
+  isFeatureEnabledMock: vi.fn(() => false),
+  buildContentGenerationContextV2Mock: vi.fn(),
 }));
 
-vi.mock('../../server/ai.js', () => ({
+vi.mock('../../server/ai.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../server/ai.js')>()),
   callAI: callAIMock,
 }));
 
 vi.mock('../../server/anthropic-helpers.js', () => ({
-  isAnthropicConfigured: vi.fn(() => false),
+  isAnthropicConfigured: isAnthropicConfiguredMock,
+}));
+
+vi.mock('../../server/feature-flags.js', () => ({
+  isFeatureEnabled: isFeatureEnabledMock,
+}));
+
+vi.mock('../../server/intelligence/generation-context-builders.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../server/intelligence/generation-context-builders.js')>()),
+  buildContentGenerationContextV2: buildContentGenerationContextV2Mock,
 }));
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
@@ -27,7 +45,16 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
   formatPageMapForPrompt: vi.fn(() => ''),
 }));
 
-import { generateSeoMeta, scoreVoiceMatch, unifyPost } from '../../server/content-posts-ai.js';
+import {
+  callCreativeAI,
+  callCreativeAIWithMetadata,
+  generateSeoMeta,
+  scoreVoiceMatch,
+  unifyPost,
+  renderCreativeProviderCallInput,
+} from '../../server/content-posts-ai.js';
+import { renderAIProviderInput } from '../../server/ai.js';
+import { fingerprintRenderedAIInput } from '../../server/generation-provenance.js';
 
 function makeBrief(): ContentBrief {
   return {
@@ -76,9 +103,221 @@ function makePost(): GeneratedPost {
 
 beforeEach(() => {
   callAIMock.mockReset();
+  isAnthropicConfiguredMock.mockReset();
+  isAnthropicConfiguredMock.mockReturnValue(false);
+  isFeatureEnabledMock.mockReset();
+  isFeatureEnabledMock.mockReturnValue(false);
+  buildContentGenerationContextV2Mock.mockReset();
+});
+
+describe('callCreativeAI fallback correlation', () => {
+  const opts = {
+    operation: 'copy-generation' as const,
+    systemPrompt: 'Write clearly.',
+    userPrompt: 'Draft a paragraph.',
+    maxTokens: 200,
+    workspaceId: 'ws_test',
+  };
+
+  it('links a successful GPT fallback to the failed Claude attempt', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    callAIMock
+      .mockRejectedValueOnce(new Error('Claude unavailable'))
+      .mockResolvedValueOnce({ text: 'GPT draft' });
+
+    await expect(callCreativeAI(opts)).resolves.toBe('GPT draft');
+    expect(callAIMock).toHaveBeenCalledTimes(2);
+    const claude = callAIMock.mock.calls[0][0];
+    const gpt = callAIMock.mock.calls[1][0];
+    expect(claude).toMatchObject({ provider: 'anthropic', executionChainId: expect.any(String) });
+    expect(claude).not.toHaveProperty('fallbackUsed');
+    expect(gpt).toMatchObject({
+      provider: 'openai',
+      executionChainId: claude.executionChainId,
+      fallbackUsed: true,
+    });
+  });
+
+  it('preserves the shared chain when the fallback also fails', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    callAIMock
+      .mockRejectedValueOnce(new Error('Claude unavailable'))
+      .mockRejectedValueOnce(new Error('GPT unavailable'));
+
+    await expect(callCreativeAI(opts)).rejects.toThrow('GPT unavailable');
+    expect(callAIMock.mock.calls[1][0]).toMatchObject({
+      provider: 'openai',
+      executionChainId: callAIMock.mock.calls[0][0].executionChainId,
+      fallbackUsed: true,
+    });
+  });
+
+  it('does not label GPT as fallback when Anthropic is unconfigured', async () => {
+    callAIMock.mockResolvedValueOnce({ text: 'Primary GPT draft' });
+    await expect(callCreativeAI(opts)).resolves.toBe('Primary GPT draft');
+    expect(callAIMock).toHaveBeenCalledOnce();
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'openai',
+      executionChainId: expect.any(String),
+    }));
+    expect(callAIMock.mock.calls[0][0]).not.toHaveProperty('fallbackUsed');
+  });
+
+  it('lets budgeted callers reserve every dispatcher invocation with retries disabled', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    const execution = {
+      runId: 'ai-run-fallback',
+      executionChainId: 'chain-fallback',
+      operation: 'copy-generation',
+      provider: 'openai' as const,
+      model: 'gpt-5.4-mini',
+      attempts: 1,
+      fallbackUsed: true,
+      cacheOutcome: 'bypass' as const,
+      startedAt: '2026-07-13T12:00:00.000Z',
+      completedAt: '2026-07-13T12:00:01.000Z',
+      durationMs: 1000,
+    };
+    callAIMock
+      .mockRejectedValueOnce(new Error('Claude unavailable'))
+      .mockResolvedValueOnce({
+        text: 'GPT draft',
+        tokens: { prompt: 20, completion: 5, total: 25 },
+        execution,
+      });
+    const beforeProviderDispatch = vi.fn();
+
+    await expect(callCreativeAIWithMetadata({
+      ...opts,
+      maxRetries: 0,
+      beforeProviderDispatch,
+    })).resolves.toEqual({
+      text: 'GPT draft',
+      tokens: { prompt: 20, completion: 5, total: 25 },
+      execution,
+    });
+    expect(beforeProviderDispatch.mock.calls).toEqual([
+      [{ provider: 'anthropic', fallback: false }],
+      [{ provider: 'openai', fallback: true }],
+    ]);
+    expect(callAIMock.mock.calls[0][0]).toMatchObject({ maxRetries: 0 });
+    expect(callAIMock.mock.calls[1][0]).toMatchObject({ maxRetries: 0 });
+  });
+
+  it('never dispatches a provider when its reservation is rejected', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    const budgetError = new Error('brand generation budget exhausted');
+
+    await expect(callCreativeAIWithMetadata({
+      ...opts,
+      maxRetries: 0,
+      beforeProviderDispatch: () => { throw budgetError; },
+    })).rejects.toThrow(budgetError);
+    expect(callAIMock).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch fallback when the bounded reservation is exhausted', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    callAIMock.mockRejectedValueOnce(new Error('Claude unavailable'));
+    const budgetError = new Error('matrix generation budget exhausted');
+    const beforeBoundedProviderDispatch = vi.fn()
+      .mockReturnValueOnce(undefined)
+      .mockImplementationOnce(() => { throw budgetError; });
+
+    await expect(callCreativeAIWithMetadata({
+      ...opts,
+      maxRetries: 0,
+      beforeBoundedProviderDispatch,
+    })).rejects.toThrow(budgetError);
+
+    expect(beforeBoundedProviderDispatch).toHaveBeenCalledTimes(2);
+    expect(callAIMock).toHaveBeenCalledOnce();
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'anthropic',
+      maxRetries: 0,
+    }));
+  });
+
+  it('does not buy a fallback when metadata observation rejects a successful Claude call', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    callAIMock.mockResolvedValueOnce({
+      text: 'Claude draft',
+      tokens: { prompt: 20, completion: 5, total: 25 },
+      execution: {
+        runId: 'run_claude',
+        executionChainId: 'chain_claude',
+        operation: 'copy-generation',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        attempts: 1,
+        cacheOutcome: 'miss',
+        startedAt: '2026-07-13T12:00:00.000Z',
+        completedAt: '2026-07-13T12:00:01.000Z',
+        durationMs: 1_000,
+      },
+    });
+
+    await expect(callCreativeAIWithMetadata({
+      ...opts,
+      onExecution: () => { throw new Error('provenance observer failed'); },
+    })).rejects.toThrow('provenance observer failed');
+    expect(callAIMock).toHaveBeenCalledOnce();
+  });
+
+  it('fingerprints registry-default research instructions exactly as dispatched', async () => {
+    const execution = {
+      runId: 'run_research',
+      executionChainId: 'chain_research',
+      operation: 'content-post-introduction',
+      provider: 'openai' as const,
+      model: 'gpt-5.4',
+      attempts: 1,
+      cacheOutcome: 'miss' as const,
+      startedAt: '2026-07-13T12:00:00.000Z',
+      completedAt: '2026-07-13T12:00:01.000Z',
+      durationMs: 1_000,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: 'Primary GPT draft',
+      tokens: { prompt: 20, completion: 5, total: 25 },
+      execution,
+    });
+    const onExecution = vi.fn();
+
+    await callCreativeAIWithMetadata({
+      ...opts,
+      operation: 'content-post-introduction',
+      onExecution,
+    });
+    const providerInput = renderCreativeProviderCallInput(opts, 'openai');
+    const expectedFingerprint = fingerprintRenderedAIInput(renderAIProviderInput({
+      provider: 'openai',
+      ...providerInput,
+      researchMode: true,
+    }));
+    expect(onExecution).toHaveBeenCalledWith({ execution, inputFingerprint: expectedFingerprint });
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({ researchMode: true }));
+  });
 });
 
 describe('generateSeoMeta', () => {
+  it('uses captured prompt authority exactly once when supplied by context v2', async () => {
+    callAIMock.mockResolvedValueOnce({
+      text: '{"seoTitle":"SEO Audit Checklist","seoMetaDescription":"A strong meta description."}',
+    });
+
+    await generateSeoMeta(makePost(), makeBrief(), 'ws_test', {
+      promptAuthority: {
+        systemVoiceBlock: '[Captured system voice]',
+        customNotes: 'Captured notes',
+      },
+    });
+
+    const system = callAIMock.mock.calls[0][0].system as string;
+    expect(system.match(/\[Captured system voice\]/g)).toHaveLength(1);
+    expect(system).toContain('Captured notes');
+  });
+
   it('parses fenced JSON through the structured-output boundary', async () => {
     callAIMock.mockResolvedValueOnce({
       text: '```json\n{"seoTitle":"SEO Audit Checklist","seoMetaDescription":"A strong meta description."}\n```',
@@ -199,9 +438,64 @@ describe('unifyPost', () => {
     const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
     expect(result).toBeNull();
   });
+
+  it('returns an explicit invalid candidate when the section census is wrong', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: '{"introduction":"<p>New intro</p>","sections":["<p>One</p>","<p>Extra</p>"],"conclusion":"<p>New conclusion</p>"}',
+    });
+
+    const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
+
+    expect(result).toEqual({
+      introduction: '<p>New intro</p>',
+      sections: ['<p>One</p>', '<p>Extra</p>'],
+      conclusion: '<p>New conclusion</p>',
+      invalidReason: 'section_census_mismatch',
+    });
+  });
 });
 
 describe('scoreVoiceMatch', () => {
+  it('uses one v2 voice-review projection with captured system authority', async () => {
+    isFeatureEnabledMock.mockReturnValue(true);
+    buildContentGenerationContextV2Mock.mockResolvedValue({
+      authority: {
+        systemVoiceBlock: '[Captured score voice]',
+        userVoiceBlock: '[Voice examples]',
+        identityPromptBlock: '',
+        customNotes: null,
+        voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 3, voiceVersion: 2 },
+      },
+      projections: {
+        brief: '[Brief context]',
+        draft: '[Draft context]',
+        voiceReview: '[V2 voice review context]',
+      },
+    });
+    callAIMock.mockResolvedValueOnce({
+      text: '{"voiceScore": 92, "voiceFeedback":"Strong match."}',
+    });
+
+    await scoreVoiceMatch(makePost(), makeBrief(), 'ws_test');
+
+    expect(buildContentGenerationContextV2Mock).toHaveBeenCalledTimes(1);
+    const call = callAIMock.mock.calls[0][0];
+    expect((call.system as string).match(/\[Captured score voice\]/g)).toHaveLength(1);
+    expect(call.messages[0].content).toContain('[V2 voice review context]');
+    expect(call.messages[0].content).not.toContain('[Captured score voice]');
+  });
+
   it('fails closed when AI returns a non-finite voiceScore', async () => {
     callAIMock.mockResolvedValueOnce({
       text: '{"voiceScore":"NaN","voiceFeedback":"Looks okay."}',

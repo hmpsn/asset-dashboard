@@ -8,6 +8,7 @@ import {
 } from '../../../shared/types/mcp-action-schemas.js';
 import { getInsights, getInsightsByDomain, getUnresolvedInsights, resolveInsight } from '../../analytics-insights-store.js';
 import { recordInsightResolutionOutcome } from '../../outcome-tracking.js';
+import { InvalidTransitionError } from '../../state-machines.js';
 import { getWorkspace } from '../../workspaces.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
@@ -51,10 +52,31 @@ export const insightTools: Tool[] = [
   },
 ];
 
+export const INSIGHT_HANDLED_TOOL_NAMES = Object.freeze([
+  'get_insights',
+  'get_anomalies',
+  'get_unresolved_insights',
+  'resolve_insight',
+  'bulk_resolve_insights',
+] as const);
+
+type InsightHandledToolName = (typeof INSIGHT_HANDLED_TOOL_NAMES)[number];
+
+function isInsightHandledToolName(name: string): name is InsightHandledToolName {
+  return INSIGHT_HANDLED_TOOL_NAMES.includes(name as InsightHandledToolName);
+}
+
 export async function handleInsightTool(
   name: string,
   args: Record<string, unknown>,
 ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
+  if (!isInsightHandledToolName(name)) {
+    return {
+      isError: true,
+      content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
+    };
+  }
+
   const workspaceId = args.workspaceId;
   try {
     if (typeof workspaceId !== 'string') {
@@ -132,7 +154,18 @@ export async function handleInsightTool(
         };
       }
       const { insightId, status, note } = parsed.data;
-      const updated = resolveInsight(insightId, workspaceId, status, note, 'mcp-chat');
+      let updated;
+      try {
+        updated = resolveInsight(insightId, workspaceId, status, note, 'mcp-chat');
+      } catch (err) {
+        if (err instanceof InvalidTransitionError) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `Illegal insight resolution transition: ${err.message}` }],
+          };
+        }
+        throw err;
+      }
       if (!updated) {
         return {
           isError: true,
@@ -164,8 +197,21 @@ export async function handleInsightTool(
       // ids, not strictly "resolved" ones.
       const updatedIds: string[] = [];
       const notFound: string[] = [];
+      // Skip-and-report: an illegal transition on ONE insight must never crash the
+      // whole batch. Guard rejections are collected per-item and returned alongside
+      // notFound so the agent can see which ids were skipped and why.
+      const rejected: Array<{ insightId: string; reason: string }> = [];
       for (const insightId of insightIds) {
-        const updated = resolveInsight(insightId, workspaceId, status, note, 'mcp-chat');
+        let updated;
+        try {
+          updated = resolveInsight(insightId, workspaceId, status, note, 'mcp-chat');
+        } catch (err) {
+          if (err instanceof InvalidTransitionError) {
+            rejected.push({ insightId, reason: err.message });
+            continue;
+          }
+          throw err;
+        }
         if (!updated) { notFound.push(insightId); continue; }
         if (status === 'resolved') recordInsightResolutionOutcome(workspaceId, updated);
         updatedIds.push(insightId);
@@ -182,13 +228,14 @@ export async function handleInsightTool(
         broadcastToWorkspace(workspaceId, WS_EVENTS.INSIGHT_RESOLVED, { insightIds: updatedIds, status });
       }
       return {
-        content: [{ type: 'text' as const, text: JSON.stringify({ updatedCount: updatedIds.length, updated: updatedIds, notFound }) }],
+        content: [{ type: 'text' as const, text: JSON.stringify({ updatedCount: updatedIds.length, updated: updatedIds, notFound, rejected }) }],
       };
     }
 
+    const unhandledName: never = name;
     return {
       isError: true,
-      content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
+      content: [{ type: 'text' as const, text: `Unknown tool: ${unhandledName}` }],
     };
   } catch (err) {
     log.error({ err, tool: name, workspaceId }, 'MCP tool error');

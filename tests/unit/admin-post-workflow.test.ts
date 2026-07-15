@@ -35,11 +35,13 @@ describe('admin post workflow helpers', () => {
       makePost('4', { status: 'error' }),
       makePost('5', { status: 'generating' }),
       makePost('6', { status: 'draft' }),
+      makePost('7', { status: 'needs_attention' }),
     ]);
 
     expect(counts).toEqual({
-      all: 6,
+      all: 7,
       generating: 1,
+      needs_attention: 1,
       error: 1,
       draft: 2,
       review: 1,

@@ -11,9 +11,10 @@ const log = createLogger('mcp-auth');
  * - `scope: 'all'` — the env MCP_API_KEY admin master key. Unchanged behavior:
  *   may operate on every workspace, carries no per-key label.
  * - `scope: <workspaceId>` — a per-workspace key from the `mcp_api_keys` table.
- *   May ONLY operate on that one workspace (enforced in handleMcpRequest, where
- *   the tool's workspace_id argument is available). `label` is the key's
- *   human-readable label, exposed for downstream activity attribution.
+ *   May ONLY operate on that one workspace (enforced by the canonical tool
+ *   registry executor, where the called tool's declared workspace field and
+ *   arguments are available). `label` is the key's human-readable label,
+ *   exposed for downstream activity attribution.
  */
 export interface McpAuthContext {
   scope: 'all' | (string & {});

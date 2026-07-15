@@ -1,0 +1,287 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "A1 Unified client insights feed (server narrative + local cards, merge/dedupe/sort)",
+        "resolution": "open-question",
+        "note": "D4 makes TheIssueClientPage the C1 baseline, which mounts no narrative feed (grep src/components/client/the-issue/ = 0 hook hits) — re-homing needs owner call (Open Q1/Q2); zero server work once decided."
+      },
+      {
+        "capability": "A2 Server narrative insight cards (outcome-language story, actionTaken, severity badges)",
+        "resolution": "open-question",
+        "note": "Same Q1/Q2 decision as A1; endpoint + contract verified live (server/routes/public-analytics.ts:179, shared/types/narrative.ts:4-15)."
+      },
+      {
+        "capability": "A3 21-type insight icon map",
+        "resolution": "ui-only",
+        "note": "Renders only if A1/A2 keeps the feed; map is lucide (InsightsDigest.tsx:378-400) — remap to FA ICON_NAMES per D5 in the rebuilt file."
+      },
+      {
+        "capability": "A4 Per-card deep-link action per insight type",
+        "resolution": "ui-only",
+        "note": "Retarget links to the ratified 4-tab IA via ?tab= two-halves contract; quick-win fallback is section anchors (DEF-* row)."
+      },
+      {
+        "capability": "A5 13 local data-card generators (traffic/search/CWV/key-events/content-plan/low-hanging etc.)",
+        "resolution": "ui-only",
+        "note": "All compute from existing client hooks; T1 carry-over-then-reskin default — 5 cards have no portal analogue so carry-over is the parity path."
+      },
+      {
+        "capability": "A6 Show-4/expand-to-10 progressive disclosure",
+        "resolution": "ui-only",
+        "note": "Pattern survives as bounded GroupBlock sections."
+      },
+      {
+        "capability": "A7 siteIntelligenceClientView per-workspace kill-switch",
+        "resolution": "ui-only",
+        "note": "Already serialized to the client (server/serializers/client-safe.ts:25,84); rebuilt feed must keep honoring it."
+      },
+      {
+        "capability": "A8 Client Overview empty/onboarding state",
+        "resolution": "ui-only",
+        "note": "OverviewTab.tsx:588-619 checklist re-composed with EmptyState/OnboardingChecklist; part of the mandatory states plan."
+      },
+      {
+        "capability": "A9 PerformancePulse dead export",
+        "resolution": "open-question",
+        "note": "0 imports repo-wide (verified); proposed default = delete in the C2 PR (Open Q7 retirement confirmation)."
+      },
+      {
+        "capability": "B1 InsightsEngine 'Prioritized Action Plan' (recommendations set)",
+        "resolution": "unknown",
+        "note": "Owned by the Recommendations surface audit; pickup there NOT verified from this seat — flagged as cross-surface dep."
+      },
+      {
+        "capability": "B2 MonthlyDigest (AI summary, wins, ROI highlights, 24h cache)",
+        "resolution": "open-question",
+        "note": "Endpoint + hook verified live (public-analytics.ts:192, useClientMonthlyDigestView) but it mounts only on the legacy body D4 retires; Open Q4 auto-render vs operator-composed."
+      },
+      {
+        "capability": "B3 IntelligenceSummaryCard (counts grid, win rate)",
+        "resolution": "open-question",
+        "note": "Open Q5 — fold into value band/Results or drop; endpoint verified live (server/routes/client-intelligence.ts:23)."
+      },
+      {
+        "capability": "B4 PredictionShowcaseCard ('we called it')",
+        "resolution": "open-question",
+        "note": "Open Q5 — no portal home; server field clientIntel.weCalledIt exists, so any answer is ui-only."
+      },
+      {
+        "capability": "B5 Tier gating + upsell teasers on client insight surfaces",
+        "resolution": "open-question",
+        "note": "Open Q3 — portal mockup shows zero gating; monetization semantics are a hard keep, proposed default = wrap with existing TierGate (DEF-* for theme clash)."
+      },
+      {
+        "capability": "C1 Insight compute + store (21 types, enrichment, TTL, bridge immunity)",
+        "resolution": "ui-only",
+        "note": "Backend preserved untouched; rebuild consumes, never re-computes."
+      },
+      {
+        "capability": "C2 Public insights read + admin ?force=true recompute",
+        "resolution": "ui-only",
+        "note": "Recompute-now button is a UI affordance over the existing param (public-analytics.ts:204-223); operator mount owned by engine.md."
+      },
+      {
+        "capability": "C3 Narrative filtering contract (impactScore>=20, excluded types, cap 15)",
+        "resolution": "ui-only",
+        "note": "Server contract survives as-is; client render must not re-filter."
+      },
+      {
+        "capability": "C4 Resolution machinery (PUT resolve + queue endpoint, no UI consumer)",
+        "resolution": "open-question",
+        "note": "Endpoints verified live with 0 frontend consumers (server/routes/insights.ts:15-51; grep src = 0); Open Q7 — proposed default = stay MCP-only this rebuild, zero server work either way."
+      },
+      {
+        "capability": "C5 MCP insight tools (get/resolve/bulk_resolve)",
+        "resolution": "ui-only",
+        "note": "Agent path is UI-independent; untouched."
+      },
+      {
+        "capability": "C6 WS live-refresh wiring (INSIGHT_RESOLVED/BRIDGE_UPDATED/SIGNALS_UPDATED)",
+        "resolution": "ui-only",
+        "note": "Rebuilt mounts must re-register every useWorkspaceEvents invalidation (wsInvalidation.ts:80-85,261-269)."
+      },
+      {
+        "capability": "C7 React Query cache contract (clientInsights/monthlyDigest/intelligence keys + getSafe fallbacks)",
+        "resolution": "ui-only",
+        "note": "useClientInsightViewModel hook family verified and survives as the data layer (queryKeys.ts:303-310)."
+      },
+      {
+        "capability": "C8 Deep-diagnostic path from anomaly insights",
+        "resolution": "ui-only",
+        "note": "Existing useDiagnostics hook; the conflicting ledger Gap-vs-improved Diagnostics rows must be reconciled by the diagnostics/search-traffic owner."
+      },
+      {
+        "capability": "D1 Operator send boundary (staged-only client render)",
+        "resolution": "defer-candidate",
+        "note": "D4 Q4 LOCKS this out of C1/C2 — per-idea C3 sign-off; server projection scoped as sn-insights-1 for that follow-up."
+      },
+      {
+        "capability": "D2 'Since your last visit' return hook + provenance value band",
+        "resolution": "ui-only",
+        "note": "HEAD seeds exist flag-gated (the-issue-client-return-hook, feature-flags.ts:110; outcomeProvenance.ts) — completing them is C2-compatible render work."
+      },
+      {
+        "capability": "D3 Client one-tap greenlight -> operator inbox graduation",
+        "resolution": "defer-candidate",
+        "note": "Product/workflow change, same D4 Q4 bucket as D1 — C3 with sign-off; would need sn-insights-2."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-insights-1",
+        "kind": "projection",
+        "description": "C3-CONTINGENT (D1 send boundary, locked out of C1/C2 by D4 Q4): a 'staged' marker on insight rows + a staged-only client read projection so the portal renders only operator-sent insights. Not needed for the C1/C2-scoped rebuild.",
+        "existsToday": "no",
+        "evidence": "rg -i 'staged|staging' server/analytics-insights-store.ts server/client-insight-narrative-view-model.ts shared/types/analytics.ts = 0 hits; narrative view filters only impactScore/type (client-insight-narrative-view-model.ts:12-53)",
+        "effort": "M",
+        "whereItLives": "server/analytics-insights-store.ts + server/client-insight-narrative-view-model.ts (+1 migration)",
+        "likelySharedWith": [
+          "engine (operator staging UI)",
+          "client-portal"
+        ]
+      },
+      {
+        "id": "sn-insights-2",
+        "kind": "derivation",
+        "description": "C3-CONTINGENT (D1's dark-loop guard + D3 greenlight loop): 'unstaged insights' nudge count for operators, and an insight->client-request graduation write path. Explicitly not scoped for C1/C2.",
+        "existsToday": "partial",
+        "evidence": "Unresolved-queue read exists (server/routes/insights.ts:15-23, MCP get_unresolved_insights); no staged/nudge or insight->request graduation path (grep above = 0)",
+        "effort": "M",
+        "whereItLives": "server/routes/insights.ts + server/client-actions domain",
+        "likelySharedWith": [
+          "engine",
+          "client-portal inbox"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1 Auto-surface vs staged send boundary for client insights (A1/A2/D1): retire, retain, or hybrid?",
+        "proposedDefault": "D4 Q4 already defers the send boundary to C3 — so C2 default is carry over auto-surfacing (feed re-mounted in the re-skinned Overview/Results), staged model revisited per-idea at C3.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2 Which client Overview is the parity baseline — D4 answers TheIssueClientPage, but it mounts none of InsightsDigest/MonthlyDigest/IntelligenceSummaryCard; where do those capabilities re-home after legacy retirement (hard floor: no deletion without a named home)?",
+        "proposedDefault": "Re-home the narrative feed + digest into C2 Overview ('Also detected' section) and Results tab; decide per-card at C2 dispatch.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3 Tier gating on the re-skinned client surfaces (B5) — which sections gated at which tier?",
+        "proposedDefault": "Preserve HEAD gating exactly (TierGate growth+ on digest + win rate); ungating is a monetization change requiring separate sign-off.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4 Automated monthly digest (B2): auto-render in the new client surface, or operator-composed with digest as draft?",
+        "proposedDefault": "Auto-render carry-over in C2 (zero behavior change per D4); operator-composed variant is a C3 idea.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5 IntelligenceSummaryCard counts + PredictionShowcaseCard 'we called it' (B3/B4): fold into value band/Results or drop?",
+        "proposedDefault": "Fold: counts into Results, we-called-it into the return-hook/value band (D2 work).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6 Will the operator Insights Engine host the full 21-type priority feed (covers search-traffic I1-I6 too)?",
+        "proposedDefault": "Yes — one DataTable/GroupBlock feed with severity pills + domain FilterChips; single decision shared with search-traffic + engine audits.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7 Intentional retirements: delete PerformancePulse dead export; keep resolve/queue endpoints MCP-only or add operator resolve UI?",
+        "proposedDefault": "Delete PerformancePulse in the C2 PR; keep resolution MCP-only (status quo, zero client risk), revisit with the Insights Engine build.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "NEW: does this client-facing surface rebuild ride the C-lane flags (strategy-the-issue/client-ia-v2 per D4 Q5 global flip) rather than ui-rebuild-shell — i.e., is Insights sequenced inside C1->C2->C3, not the A-lane fan-out?",
+        "proposedDefault": "Yes: client render work lands in C2 re-skin; only the operator Insights Engine half (owned by engine.md) rides the A-lane shell flag. Confirm lane assignment before dispatch.",
+        "needsOwner": true,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "D1 Operator send boundary (client sees only staged content)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "D4 Q4 explicitly rules it out of C1/C2 as a product/workflow change; needs sn-insights-1 plus an unstaged-nudge dark-loop guard."
+      },
+      {
+        "proposal": "D2 'Since your last visit' return hook + delta chips + provenance value band",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Completes existing flag-gated HEAD seeds (the-issue-client-return-hook, outcomeProvenance.ts) — render-only, fits C2 zero-behavior-change re-skin as flag completion."
+      },
+      {
+        "proposal": "D3 One-tap client greenlight on opportunities -> operator inbox as promotable request",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New two-way workflow (sn-insights-2); overlaps the recommendations respond loop — coordinate with that surface at C3."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Client Overview insight feed section (within ratified Overview tab — narrative cards + local data cards)",
+        "Client Results slots (monthly digest, intelligence counts, we-called-it)",
+        "Operator Insights Engine feed (cross-ref engine.md — 21-type priority feed + recompute + diagnostic CTA, pending Q6)"
+      ],
+      "primitives": [
+        "GroupBlock",
+        "MetricTile",
+        "Sparkline",
+        "Meter",
+        "FilterChip",
+        "Segmented",
+        "DataTable (operator feed)",
+        "Drawer (insight evidence detail)",
+        "KeyValueRow",
+        "Toolbar"
+      ],
+      "dataHooks": [
+        "useClientNarrativeInsightsView -> GET /api/public/insights/:id/narrative",
+        "useClientMonthlyDigestView -> GET /api/public/insights/:id/digest",
+        "useClientIntelligenceView -> GET /api/public/intelligence/:id",
+        "useClientInsightViewModel (facade)",
+        "GET /api/public/insights/:id (?force=true admin recompute)",
+        "useDiagnostics (deep-diagnostic reports)",
+        "useWorkspaceEvents + clientInsightKeys invalidation"
+      ],
+      "statesPlan": "getSafe fallbacks already guarantee never-hard-fail; add explicit empty (onboarding checklist per A8), Skeleton loading, ErrorState per section, TierGate locked states per Q3.",
+      "mountNote": "Client half mounts inside the C2 re-skinned 4-tab IA (C-lane flags, global flip per D4 Q5), NOT ui-rebuild-shell; operator half mounts in the Insights Engine under RebuiltAppChrome (engine.md owns). @ds-rebuilt marker + FA icon remap (D5) on all rebuilt files."
+    },
+    "crossSurfaceDeps": [
+      "D4/C-lane sequencing: this surface's client half is gated on C1 cutover -> C2 re-skin, not the A-lane fan-out",
+      "engine.md owns the operator Insights Engine (signals digest, recompute, staging composition) this surface's client render depends on",
+      "recommendations surface must confirm pickup of B1 (InsightsEngine.tsx renders the recommendations set)",
+      "search-traffic I1-I6 admin insight feed shares the Q6 decision (Insights Engine as the 21-type feed home)",
+      "cockpit/client-portal audits own OutcomeSummary/WinsSurface/TheIssueClientPage interlocks",
+      "diagnostics ledger conflict (Gap row :384 vs improved row :417-420) needs reconciliation by the diagnostics owner",
+      "D5 icon system: InsightsDigest 21-entry lucide map remaps to FA ICON_NAMES"
+    ],
+    "unknowns": [
+      "B1 pickup by the Recommendations audit not verifiable from this seat (reading recs surface doc was out of scope)",
+      "Whether the Handoff Brief's 'Insights Engine' operator zone and the C2 client re-skin are dispatched as one lane or two (lane assignment question, newly-found open question)",
+      "Final Diagnostics ledger status (conflicting Gap vs improved rows) — owned elsewhere"
+    ],
+    "effortEstimate": "M",
+    "surface": "insights"
+  },
+  "verify": {
+    "surface": "insights",
+    "verdicts": [
+      {
+        "needId": "sn-insights-1",
+        "verdict": "CONFIRMED",
+        "evidence": "No staged/staging concept on the insight path. analytics_insights schema (server/db/migrations/035-analytics-insights.sql:4-13 base; 040-insight-resolution-tracking.sql:3-5 adds resolution_status/note/resolved_at; 044 adds bridge_source) has no staged/client-visibility column. AnalyticsInsight interface has no such field (shared/types/analytics.ts:217-241). Client narrative projection filters only impactScore>=20 and isClientInsightExcluded (server/client-insight-narrative-view-model.ts:20-24) — no staged-only read path. Effort 'M' is correct: needs migration + row-interface/mapper/serialization lockstep + new projection."
+      },
+      {
+        "needId": "sn-insights-2",
+        "verdict": "CONFIRMED",
+        "evidence": "Unresolved-queue read exists and is a pure, workspace-scoped, side-effect-free SELECT: getUnresolvedInsights (server/analytics-insights-store.ts:324-326) over stmts().selectUnresolved (server/analytics-insights-store.ts:84-86, plain SELECT ... WHERE workspace_id=? AND resolution_status!='resolved'), backing GET /api/insights/:workspaceId/queue (server/routes/insights.ts:15-22) and MCP tool 'ln'/get_unresolved_insights (server/mcp/tools/insights.ts). No staged/nudge count and no insight->client-request graduation path exists: all 'nudge' hits are Strategy-v3 recommendation staleness (server/recommendation-staleness.ts), all 'graduate/promote' hits are outcome-provenance graduation (server/the-issue-outcome.ts:50, server/roi.ts:438, shared/types/outcome-tracking.ts:130), not insight lifecycle. 'partial' is accurate. Minor evidence-string imprecision (non-material): the queue handler is routes/insights.ts:15-22 and getUnresolvedInsights lives in analytics-insights-store.ts:324, not routes/insights.ts which only imports it."
+      }
+    ]
+  }
+}

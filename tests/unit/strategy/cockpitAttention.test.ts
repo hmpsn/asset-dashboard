@@ -80,7 +80,7 @@ describe('buildAttentionItems', () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       recId: 'a', kind: 'new_reply', title: 'Write the pricing post',
-      detail: 'The client replied — open the thread',
+      detail: 'Client discussion is active on this move',
     });
   });
 

@@ -33,6 +33,7 @@ import {
   stripBlockCommentsAndTemplateLiterals,
 } from './lexicon-registry.js';
 import { DUPLICATE_NAME_ALLOWLIST } from '../shared/types/lexicon.js';
+import { DELIVERABLE_TYPES } from '../shared/types/client-deliverable.js';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SCAN_ALL = process.argv.includes('--all');
@@ -46,7 +47,10 @@ function cleanGitEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-function getFiles(dir: string, pattern: string): string[] {
+// Exported only for the fail-loud regression fixture in tests/pr-check.test.ts.
+export function getFiles(dir: string, pattern: string): string[] {
+  if (!existsSync(dir)) return [];
+
   try {
     // maxBuffer: 50MB. The default 1MB is not enough for `find <repo-root>
     // -name '*.ts'` which on this codebase returns ~11k absolute paths
@@ -54,19 +58,29 @@ function getFiles(dir: string, pattern: string): string[] {
     // throw and the catch would return []. That is itself a Category A
     // silent-failure mode (rule reports ✓ because it received zero files).
     // 50MB is comfortably above any plausible repo-walk output.
-    return execSync(`find "${dir}" -name "${pattern}" -type f 2>/dev/null`, {
+    // Prune the gitignored UI-rebuild kit mirror: reference material whose token
+    // files/docs false-positive repo rules under --all (PR #1473). find has no
+    // gitignore awareness, so the exclusion must be explicit here.
+    return execFileSync('find', [
+      dir,
+      '-not',
+      '-path',
+      '*/hmpsn studio Design System/*',
+      '-name',
+      pattern,
+      '-type',
+      'f',
+    ], {
       cwd: ROOT,
       encoding: 'utf-8',
       maxBuffer: 50 * 1024 * 1024,
     }).trim().split('\n').filter(Boolean);
   } catch (err) {
-    // Surface the error to stderr so silent file-list collapses are visible.
-    // The previous bare `return []` made every getFiles failure look identical
-    // to "directory exists but contains no matches" — the exact silent-failure
-    // class the 2026-04-10 audit was built to catch.
+    // A failed repository walk is not equivalent to an empty directory. Throw
+    // so the CLI's customCheck boundary reports a hard failure instead of
+    // handing every affected rule an empty list and printing a false ✓.
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[pr-check] getFiles("${dir}", "${pattern}") failed: ${msg}`);
-    return [];
+    throw new Error(`getFiles("${dir}", "${pattern}") failed: ${msg}`);
   }
 }
 
@@ -304,6 +318,17 @@ const ROUTE_CONTRACT_REQUIRED_BASENAMES = new Set([
 // ─── Check definitions ────────────────────────────────────────────────────────
 
 export type CustomCheckMatch = { file: string; line: number; text: string };
+
+/** Canonical adapter census shared by the rule and its fail-loud regression test. */
+export function findMissingDeliverableAdapters(
+  adaptersDir: string,
+  deliverableTypes: readonly string[] = DELIVERABLE_TYPES,
+): string[] {
+  return deliverableTypes.filter(type => {
+    const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
+    return !existsSync(adapterPath);
+  });
+}
 
 export type Check = {
   name: string;
@@ -583,6 +608,14 @@ function hasHatch(lines: string[], i: number, hatch: string): boolean {
 }
 
 /**
+ * True when a file opts into the UI-rebuild strict gates (Phase D, D2). The
+ * `@ds-rebuilt` marker (any occurrence — comment, JSDoc) scopes the seven
+ * `ds-*` rules to rebuilt surfaces so pre-rebuild code is untouched. See
+ * docs/rules/ui-rebuild-consistency.md.
+ */
+const isDsRebuilt = (content: string): boolean => content.includes('@ds-rebuilt');
+
+/**
  * Find the end of a function's return-type annotation region given `tail`
  * — the substring starting immediately after the closing `)` of the
  * parameter list. Returns the index of the function-body opener (a `{`
@@ -785,6 +818,11 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // LearningsSlice
   // availability is control-plane metadata for callers; it intentionally does not render into prompt text
   'availability', 'forPage', 'winRateByActionType',
+  // clientProjection is a transport-only, fail-closed public boundary. The client
+  // view model and audience-aware generation-context builder select it before the
+  // normal formatter runs; rendering it from the admin slice would duplicate data
+  // and defeat that boundary. Covered by client-hidden-outcome-learning-boundary.
+  'clientProjection',
   // platformPriors (A6, audit #22): the anonymized cross-workspace fallback tier. It is NOT
   // rendered by the learnings slice formatter — it is surfaced as a clearly-labeled benchmark
   // through the default-path helpers (buildPlatformPriorPromptNote / buildOutcomeLearningStatusNote)
@@ -1112,6 +1150,69 @@ const RETIRED_FLAG_GROUPS: readonly RetiredFlagGroup[] = [
     migrationException: 'server/db/migrations/135-retire-keyword-hub-feature-flag.sql',
     scanTests: true,
   },
+  {
+    // Reconcile R12b flag burn-down: 'client-locations' had full FEATURE_FLAGS/
+    // FEATURE_FLAG_CATALOG/group entries but was NEVER read by isFeatureEnabled/
+    // useFeatureFlag/<FeatureFlag> anywhere in the repo — a genuinely phantom flag
+    // (do not confuse with the unrelated server/client-locations.ts CRUD module,
+    // which is real and unaffected). Zero behavior change on retirement.
+    label: 'client-locations phantom flag',
+    keys: [
+      'client-locations',
+    ],
+    envPattern: /\b(?:process\.env\.|import\.meta\.env\.)?(?:VITE_)?FEATURE_CLIENT_LOCATIONS\b/,
+    migrationException: 'server/db/migrations/170-retire-client-locations-flag-overrides.sql',
+  },
+  {
+    // Flag-sunset Wave 1: three reserved-but-never-wired phantom flags. Each had
+    // FEATURE_FLAGS / FEATURE_FLAG_CATALOG / group entries but ZERO isFeatureEnabled /
+    // useFeatureFlag / <FeatureFlag> readers — reserved for future features that were
+    // never built (Strategy paid-topic monetization; The Issue P3 named-record
+    // reconciliation; The Issue P1 segment-inserts — whose described behavior already
+    // ships unflagged under the-issue-client-spine). Delete-then-re-add-when-built;
+    // zero behavior change on retirement.
+    label: 'flag-sunset W1 phantoms',
+    keys: [
+      'strategy-paid-topics',
+      'the-issue-client-reconciliation',
+      'the-issue-client-segment-inserts',
+    ],
+    migrationException: 'server/db/migrations/173-retire-phantom-flags-overrides.sql',
+  },
+  {
+    // Flag-sunset Wave 2a: two pure-server-cron flags, both globally ON in prod already, so
+    // unconditional-izing their gates is a no-op for behavior. 'strategy-staleness-scan' gated
+    // the runSentRecStalenessScan nudge/supersession pass (server/recommendation-staleness.ts);
+    // 'signal-auto-recompute' gated the daily activity-gated insight-recompute cron
+    // (server/insight-recompute-cron.ts) and the shared enqueueIntelligenceRecompute helper
+    // (server/intelligence-recompute-job.ts). Both crons now run unconditionally.
+    label: 'flag-sunset W2a server crons',
+    keys: [
+      'strategy-staleness-scan',
+      'signal-auto-recompute',
+    ],
+    migrationException: 'server/db/migrations/174-retire-w2a-server-cron-flags-overrides.sql',
+  },
+  {
+    // Flag-sunset Wave 2b: four admin/data-shaping flags, all globally ON in prod already, so
+    // unconditional-izing their gates is a no-op for behavior. 'smart-placeholders' gated the
+    // admin AdminChat contextual placeholder + suggestion chips (src/hooks/useSmartPlaceholder.ts);
+    // 'keyword-universe-full' gated the uncapped keyword-universe coverage path in the Keyword
+    // Command Center (candidate-boundary.ts, read-model.ts, summary-service.ts) — the
+    // UNIVERSE_SAFETY_CEILING path is now the sole path; 'ai-visibility' gated the LLM-mentions
+    // admin KPI panel + seoContext slice field (seo-context-slice.ts, routes/rank-tracking.ts,
+    // AiVisibilityPanel.tsx); 'geo-targeting' gated workspaceProviderGeo resolving the real
+    // target-geo instead of `{}` (server/seo-target-geo.ts) + the admin TargetGeoEditor
+    // (BusinessFootprintTab.tsx). None have a client-facing surface.
+    label: 'flag-sunset W2b admin/data',
+    keys: [
+      'smart-placeholders',
+      'keyword-universe-full',
+      'ai-visibility',
+      'geo-targeting',
+    ],
+    migrationException: 'server/db/migrations/175-retire-w2b-admin-data-flags-overrides.sql',
+  },
 ];
 
 function escapedAlternation(values: readonly string[]): string {
@@ -1401,7 +1502,7 @@ const LEXICON_DUPLICATE_ALLOWLIST_NAMES = new Set(DUPLICATE_NAME_ALLOWLIST.map((
 /**
  * ActivityType minting guard baseline — the frozen snapshot of `ActivityType`
  * union members already registered against `shared/types/lexicon.ts`'s single
- * `historical`-class `ActivityType` entry as of R1-PR2 (150 members, matching
+ * `historical`-class `ActivityType` entry as of B2 (154 members, matching
  * `server/activity-log.ts` at this commit).
  *
  * The lexicon deliberately never re-declares a union (see docs/rules/lexicon.md
@@ -1445,7 +1546,10 @@ export const ACTIVITY_TYPE_LEXICON_BASELINE = new Set<string>([
   'brandscript_imported', 'brandscript_completed', 'brandscript_sections_updated', 'discovery_source_added',
   'discovery_source_deleted', 'discovery_processed', 'voice_sample_added', 'voice_sample_deleted',
   'voice_calibrated', 'voice_refined', 'voice_profile_created', 'voice_profile_updated',
+  'brand_generation_started', 'brand_generation_resumed',
+  'brand_generation_revision_started', 'brand_generation_completed',
   'brand_deliverable_generated', 'brand_deliverable_refined', 'brand_deliverable_approved', 'brand_deliverable_reverted',
+  'brand_intake_submitted', 'brand_intake_evidence_resolved',
   'blueprint_created', 'blueprint_updated', 'blueprint_deleted', 'blueprint_generated',
   'blueprint_entry_added', 'blueprint_entry_updated', 'blueprint_entry_deleted', 'copy_generated',
   'copy_approved', 'copy_batch_started', 'copy_batch_complete', 'copy_exported',
@@ -1458,16 +1562,19 @@ export const ACTIVITY_TYPE_LEXICON_BASELINE = new Set<string>([
   'suggested_brief_snoozed', 'post_voice_scored', 'strategy_keyword_kept', 'strategy_keyword_removed',
   'strategy_keyword_added', 'cannibalization_keeper_set', 'form_submission_captured', 'form_capture_configured',
   'client_return_hook_sent', 'autosend_policy_changed',
+  'workspace_archived', 'workspace_unarchived',
 ]);
 
 /** Same anchored member-line pattern the ActivityType parsers in this file
  *  already use (see loadClientVisibleTypes above): `| 'member_name'` at any
  *  indent, one member per line — matching server/activity-log.ts's actual
  *  formatting. Captures the member name only; trailing inline comments
- *  (`// admin-only: ...`) are not part of the match. Exported so the baseline
- *  parity meta-test in tests/pr-check.test.ts reuses the exact same extraction
- *  the rule does. */
-export const ACTIVITY_TYPE_MEMBER_LINE_RE = /^\s*\|\s*'([^']+)'/;
+ *  (`// admin-only: ...`) are not part of the match. GLOBAL so `matchAll`
+ *  finds every member on a line — a non-global `match()` only returns the
+ *  first hit, silently skipping any additional member sharing the same line
+ *  (e.g. `| 'a' | 'b'`). Exported so the baseline parity meta-test in
+ *  tests/pr-check.test.ts reuses the exact same extraction the rule does. */
+export const ACTIVITY_TYPE_MEMBER_LINE_RE = /\|\s*'([^']+)'/g;
 
 export const CHECKS: Check[] = [
   {
@@ -1636,7 +1743,6 @@ export const CHECKS: Check[] = [
       'server/performance-store.ts', 'server/rank-tracking.ts',
       'server/processor.ts', // file-based metadata JSON, not DB columns
       'server/websocket.ts', // WebSocket message parsing, not DB columns
-      'server/meeting-brief-generator.ts', // AI response text parser, not DB columns
       'server/openai-helpers.ts', // disk-based usage log files + AI response text parser, not DB columns
       'server/__tests__/openai-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
       'server/semrush.ts', // legacy disk files: SEMRush API usage log + credit log files (not DB columns)
@@ -2406,20 +2512,178 @@ export const CHECKS: Check[] = [
     },
   },
   {
+    // B10 (Reconcile R11-T7): tracked_actions and action_outcomes each have a
+    // hand-copied archive twin (tracked_actions_archive / action_outcomes_archive
+    // — see server/db/archive-twin.ts). ALTER TABLE always appends the new column
+    // at the end of a table, and the live table and its twin do NOT gain columns
+    // in the same relative physical order (the twin already has a trailing
+    // archived_at column the live table lacks), so a migration that ALTERs the
+    // live table without ALTERing the twin IN THE SAME FILE silently leaves the
+    // twin one column short — the exact drift assertArchiveTwinParity() (called
+    // at boot) is designed to catch, but catching it at boot is much later and
+    // more disruptive than catching it at PR time.
+    name: 'Live+twin ALTER lockstep (tracked_actions / action_outcomes archive twins)',
+    pattern: '',
+    fileGlobs: ['*.sql'],
+    pathFilter: 'server/db/migrations/',
+    message: 'A migration that ALTERs tracked_actions or action_outcomes must ALTER the matching archive twin (tracked_actions_archive / action_outcomes_archive) with an ADD COLUMN of the same name in the SAME migration file, or the twin silently drifts out of parity (see server/db/archive-twin.ts, docs/rules/destructive-migrations.md). Add an inline `-- twin-alter-ok: <reason>` comment on the live-table ALTER line if the twin genuinely does not need this column (e.g. a live-only operational column that must never be archived).',
+    severity: 'error',
+    rationale: 'An ALTER on tracked_actions/action_outcomes without a matching twin ALTER produces a twin that assertArchiveTwinParity() will reject at boot, and — worse, before that boot-time check existed — silently corrupts the archive sweep via positional column misalignment.',
+    claudeMdRef: '#code-conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Matches `ALTER TABLE tracked_actions ADD COLUMN <name>` but NOT
+      // `ALTER TABLE tracked_actions_archive ADD COLUMN ...` (the negative
+      // lookahead excludes the `_archive` suffix on the table identifier).
+      const liveAlterRe = /^\s*ALTER\s+TABLE\s+(tracked_actions|action_outcomes)(?!_archive)\b\s+ADD\s+COLUMN\s+(\S+)/i;
+      const twinAlterRe = /^\s*ALTER\s+TABLE\s+(tracked_actions_archive|action_outcomes_archive)\s+ADD\s+COLUMN\s+(\S+)/i;
+
+      for (const file of files) {
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+
+        // Collect every twin ALTER ADD COLUMN in this file, keyed by twin table.
+        const twinAlteredColumns: Record<string, Set<string>> = {
+          tracked_actions_archive: new Set(),
+          action_outcomes_archive: new Set(),
+        };
+        for (const line of lines) {
+          const twinMatch = line.match(twinAlterRe);
+          if (twinMatch) {
+            twinAlteredColumns[twinMatch[1].toLowerCase()].add(twinMatch[2].toLowerCase());
+          }
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const match = line.match(liveAlterRe);
+          if (!match) continue;
+          if (line.includes('twin-alter-ok')) continue;
+
+          const liveTable = match[1].toLowerCase();
+          const columnName = match[2].toLowerCase();
+          const twinTable = `${liveTable}_archive`;
+
+          if (twinAlteredColumns[twinTable]?.has(columnName)) continue;
+
+          hits.push({
+            file,
+            line: i + 1,
+            text: `ALTER TABLE ${liveTable} ADD COLUMN ${columnName} has no matching ALTER TABLE ${twinTable} ADD COLUMN ${columnName} in this file`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    // C1 (Reconcile R11-T5): server/db/snapshot-registry.ts is the machine-readable
+    // census of every `*_snapshots` table (see docs/rules/snapshot-envelope.md +
+    // tests/contract/snapshot-envelope-registry.test.ts). A new migration that creates
+    // a `_snapshots` table without also registering it in the same PR is the exact
+    // failure mode that let audit_snapshots / performance_snapshots / redirect_snapshots
+    // silently accumulate as site_id-only, unregistered, un-workspace-scoped tables for
+    // years before migration 167 retrofitted them. Catch it at PR time instead of
+    // relying on the runtime contract test to be run (or a future author to remember).
+    name: 'New migration creates a _snapshots table without a matching registry entry',
+    pattern: '',
+    fileGlobs: ['*.sql'],
+    pathFilter: 'server/db/migrations/',
+    message: 'A migration that CREATEs a `*_snapshots` table must add a matching entry to SNAPSHOT_TABLE_REGISTRY in server/db/snapshot-registry.ts in the same PR (name, workspaceScoped: true, hasForeignKeyCascade, captureColumn, writerModule, note). See docs/rules/snapshot-envelope.md. Add `-- snapshot-registry-ok: <reason>` on the CREATE TABLE line if this is a migration-bookkeeping table (an `_orphaned` quarantine copy or `_r11_old` rename-aside original) that is deliberately excluded from the registry.',
+    severity: 'warn',
+    rationale: 'An unregistered snapshot table is invisible to the workspace-scoping contract test and can silently ship without workspace_id / FK CASCADE, repeating the exact gap migration 167 closed for the three legacy tables.',
+    claudeMdRef: '#data-flow-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const createSnapshotTableRe = /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["'`]?(\w*_snapshots)["'`]?\s*\(/i;
+
+      // Read the registry's table names directly from source text (not via import —
+      // pr-check runs as a standalone script over changed files, not inside the
+      // TS module graph). Matches each `name: '<table>'` entry in
+      // SNAPSHOT_TABLE_REGISTRY.
+      const registryPath = path.join(ROOT, 'server/db/snapshot-registry.ts');
+      const registrySource = readFileOrEmpty(registryPath);
+      const registeredNames = new Set(
+        Array.from(registrySource.matchAll(/name:\s*'([a-z0-9_]+)'/g)).map(m => m[1]),
+      );
+
+      for (const file of files) {
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const match = line.match(createSnapshotTableRe);
+          if (!match) continue;
+          if (line.includes('snapshot-registry-ok')) continue;
+          // Bookkeeping tables (orphan quarantine copies, rename-aside originals) are
+          // deliberately excluded from the registry — see docs/rules/snapshot-envelope.md.
+          if (/_orphaned$/i.test(match[1]) || /_r11_old$/i.test(match[1])) continue;
+
+          const tableName = match[1].toLowerCase();
+          if (registeredNames.has(tableName)) continue;
+
+          hits.push({
+            file,
+            line: i + 1,
+            text: `CREATE TABLE "${tableName}" (matches *_snapshots) has no entry in SNAPSHOT_TABLE_REGISTRY (server/db/snapshot-registry.ts)`,
+          });
+        }
+      }
+      return hits;
+    },
+  },
+  {
     // FM-5: Direct SET status without a validation function.
     // State machine transitions should use validateTransition() to reject invalid transitions.
+    // FM-5: Direct SET <status-column> = <value> without a state-machine guard.
+    // State machine transitions should route through validateTransition() to reject
+    // illegal moves. Implemented as a customCheck (was a single-line regex) to close
+    // three verified structural escape classes the old `SET\s+(status|batch_status)\s*=\s*[?@]`
+    // pattern missed (R3-PR2 / Reconcile inventory):
+    //   (1) LITERAL writes — `SET status = 'applied'` (the `[?@]` char class missed literals)
+    //   (2) MID-CLAUSE writes — `..., status = @status` (only matched status as the FIRST
+    //       column after SET, so `SET name = @name, status = @status` escaped)
+    //   (3) OTHER lifecycle columns — `resolution_status = ?` (the column allow-list was
+    //       only `status|batch_status`)
+    // Hatches: inline OR preceding-line `// status-ok` / `-- status-ok` (both comment
+    // prefixes since these lines are usually inside backtick-SQL template literals where
+    // `//` breaks the SQL). `validateTransition` on the same line also suppresses. The
+    // hatch prefix is required so a bare `status-ok` substring can't false-suppress.
     name: 'Unguarded SET status = ? (state machine transition)',
-    pattern: "SET\\s+(status|batch_status)\\s*=\\s*[?@]",
     fileGlobs: ['*.ts'],
     pathFilter: 'server/',
-    // Accept both JS comment (`// status-ok`) and SQL comment (`-- status-ok`)
-    // forms since this rule fires on lines that are often inside backtick-SQL
-    // template literals where `//` would break the SQL. The comment prefix
-    // (`//` or `--`) is required so the hatch can't false-suppress via a bare
-    // `status-ok` substring inside an identifier, enum value, or string literal.
-    excludeLines: ['// status-ok', '-- status-ok', 'validateTransition'],
-    message: 'State machine transitions must use validateTransition(from, to). Direct SET status = ? skips guard. Add // status-ok (JS comment) or -- status-ok (SQL comment) if this is a non-state-machine column.',
+    message: 'State machine transitions must route through validateTransition(from, to). A direct SET status = ... (including literal writes, mid-clause `, status =`, and lifecycle columns like resolution_status) skips the guard. Add // status-ok (JS comment) or -- status-ok (SQL comment) — with a rationale — if this is a non-state-machine column or a documented exemption.',
     severity: 'error',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Lifecycle status columns this rule governs. `status`, `batch_status`, and the
+      // insight `resolution_status` column (the R3-PR2 gap). A `\b` word boundary keeps
+      // it from matching an unrelated `foo_status` column unless explicitly named here.
+      const STATUS_COLS = ['status', 'batch_status', 'resolution_status'];
+      // Match `SET <col> = <val>` OR mid-clause `, <col> = <val>` where <val> is a bound
+      // parameter (?, @name) or a string literal ('applied'). The `(?:SET|,)` prefix with
+      // required whitespace prevents matching a column NAMED e.g. `last_status` (the char
+      // before the col must be SET-keyword whitespace or a comma+whitespace).
+      const colAlt = STATUS_COLS.join('|');
+      const setStatusRe = new RegExp(
+        `(?:\\bSET\\b|,)\\s*(?:${colAlt})\\s*=\\s*(?:[?@]|')`,
+        'i',
+      );
+      for (const file of files) {
+        const lines = readFileOrEmpty(file).split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!setStatusRe.test(line)) continue;
+          if (line.includes('validateTransition')) continue;
+          if (hasHatch(lines, i, '// status-ok')) continue;
+          if (hasHatch(lines, i, '-- status-ok')) continue;
+          hits.push({ file, line: i + 1, text: line.trim() });
+        }
+      }
+      return hits;
+    },
   },
   {
     // FM-4: Untyped dynamic import results — as any suppresses field name checks.
@@ -5869,13 +6133,15 @@ export const CHECKS: Check[] = [
       'public/styleguide.html',
       'public/styleguide.css',
     ],
-    message: 'Use transition-duration-[120ms], transition-duration-[180ms], or transition-duration-[400ms]. Non-standard durations break motion consistency.',
+    message: 'Use var(--dur-fast|base|slow) (canonical motion tokens), or the legacy 120/180/400ms literals in pre-rebuild code. Non-standard durations break motion consistency.',
     // Promoted warn → error in Phase 5 Phase 3 (2026-04-25) after backlog reached zero.
+    // F2a (2026-07-03): var(--dur-*) motion tokens ratified canonical (alongside the
+    // legacy literals, which stay valid outside @ds-rebuilt scope — DEF-foundation-003).
     severity: 'error',
-    rationale: 'Enforces the three-speed motion system: 120ms (micro), 180ms (standard), 400ms (entrance).',
+    rationale: 'Enforces the three-speed motion system: canonical var(--dur-fast|base|slow) tokens, or the legacy 120/180/400ms literals in pre-rebuild code.',
     claudeMdRef: '#design-system--the-four-laws-of-color',
     customCheck: (files) => {
-      const ALLOWED = new Set(['120ms', '180ms', '400ms']);
+      const ALLOWED = new Set(['120ms', '180ms', '400ms', 'var(--dur-fast)', 'var(--dur-base)', 'var(--dur-slow)']);
       const violations: Array<{ file: string; line: number; text: string }> = [];
       // files are absolute paths from resolveCheckFileList — use directly
       files.forEach(filePath => {
@@ -6715,6 +6981,10 @@ export const CHECKS: Check[] = [
         if (!file.endsWith('.css')) continue;
         const normalized = file.replaceAll('\\', '/');
         if (normalized.endsWith('src/tokens.css') || normalized.endsWith('public/tokens.css')) continue;
+        // Vendored third-party CSS (Font Awesome Pro) legitimately declares its
+        // own namespaced --fa-* custom properties; it is not part of our token
+        // authority. Exempt the whole vendor dir.
+        if (normalized.includes('/public/vendor/')) continue;
 
         let css: string;
         try {
@@ -6772,6 +7042,209 @@ export const CHECKS: Check[] = [
         });
       }
 
+      return hits;
+    },
+  },
+  // ─── UI Rebuild (F2a) — @ds-rebuilt-scoped strict gates (Phase D, D2/D7) ──────
+  // All seven rules gate on isDsRebuilt(content): they fire ONLY on files carrying
+  // the `@ds-rebuilt` marker, at error severity. Dormant until the first rebuilt
+  // surface lands. Inline hatch only (above-line is silently ignored — house rule).
+  {
+    name: 'ds-raw-hex-anywhere',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts', '*.css'],
+    severity: 'error',
+    excludeLines: ['// raw-hex-ok', '/* raw-hex-ok'],
+    message: 'Raw hex color in a @ds-rebuilt file — use a --* token (src/tokens.css). Add // raw-hex-ok inline if unavoidable (e.g. third-party theme chrome).',
+    rationale: 'Rebuilt surfaces must consume tokens, never inline hex, so theme + brand changes propagate.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /#[0-9a-fA-F]{3,8}\b/;
+      // Comment starts: //, /*, block-comment continuation `*` — but NOT `://`
+      // (https:// URLs). Hex-shaped PR refs (#1472) live in comments; href="#…"
+      // anchors aren't colors. Review finding, PR #1473.
+      const commentStart = /(?<!:)\/\/|\/\*|^\s*\*/;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          const m = re.exec(line);
+          if (!m) return;
+          const c = commentStart.exec(line);
+          if (c && c.index < m.index) return;
+          if (/href=["']#/.test(line)) return;
+          hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-tailwind-palette-bypass',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    severity: 'error',
+    excludeLines: ['// palette-ok'],
+    message: 'Raw Tailwind palette class in a @ds-rebuilt file — use a token-backed class (text-[var(--...)], bg-[var(--surface-N)]). Add // palette-ok inline if unavoidable.',
+    rationale: 'Rebuilt surfaces route color through tokens; raw palette classes fork theme values.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /(?:text|bg|border|ring|from|to|via)-(?:zinc|slate|gray|neutral|stone|red|amber|emerald|teal|blue|purple|violet|indigo|rose|pink)-\d{2,3}/;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-per-view-css-block',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    severity: 'error',
+    excludeLines: ['// view-css-ok'],
+    message: 'Template-literal CSS block (const *css*/*styles* = `…`) or <style> tag in a @ds-rebuilt file — styling belongs in tokens + primitives, not ad hoc per-view CSS. Add // view-css-ok inline if unavoidable. (A `const xStyles = { … }` React style-map object is NOT flagged — inline style objects are the standard prop-driven pattern.)',
+    rationale: 'Rebuilt surfaces compose primitives; a template-literal CSS string / <style> tag re-forks the design system per screen. React style-map OBJECTS ({…}) are the normal prop pattern (kit props include style?: CSSProperties) and are intentionally excluded — the prior [`{] regex mis-flagged every one (review CP4).',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Template-literal CSS (`const fooStyles = ` … ``) or a <style> tag only.
+      // Deliberately NOT `const fooStyles = { … }` — that object-map form is the
+      // standard React inline-style pattern every ported primitive uses.
+      const re = /const\s+\w*(?:css|styles?)\w*\s*=\s*`|<style/i;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-token-theme-parity',
+    pattern: '',
+    fileGlobs: ['*.css'],
+    severity: 'error',
+    message: 'Token declared in :root without a .dashboard-light override (or vice versa) in a @ds-rebuilt file. Every themeable token needs both scopes; theme-neutral families (--font-/--type-/--space-/--shell-/--page-/--section-/--grid-/--bp-/--ease-/--dur-/--stagger/--radius/--icon/--z-) are exempt.',
+    rationale: 'A themeable token present in only one scope silently breaks the other theme.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const NEUTRAL = ['--font-', '--type-', '--space-', '--shell-', '--page-', '--section-', '--grid-', '--bp-', '--ease-', '--dur-', '--stagger', '--radius', '--icon', '--z-'];
+      const isNeutral = (name: string) => NEUTRAL.some(p => name.startsWith(p));
+      const declsIn = (block: string) => new Set((block.match(/--[\w-]+(?=\s*:)/g) ?? []));
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        const lines = content.split('\n');
+        const lineOf = (name: string) => (lines.findIndex(l => new RegExp(`${name}\\s*:`).test(l)) + 1) || 1;
+        // Union tokens across ALL :root / .dashboard-light blocks (a file may
+        // split declarations across several). matchAll(/g) — a single match()
+        // would see only the first block and mis-flag tokens in later ones
+        // (review finding, PR #1473). Assumes flat token blocks (no nested {}),
+        // which holds for :root token declarations.
+        const unionDecls = (re: RegExp) => {
+          const set = new Set<string>();
+          for (const m of content.matchAll(re)) for (const t of declsIn(m[1] ?? '')) set.add(t);
+          return set;
+        };
+        const root = unionDecls(/:root\s*\{([^}]*)\}/g);
+        const light = unionDecls(/\.dashboard-light[^{]*\{([^}]*)\}/g);
+        for (const name of root) {
+          if (!isNeutral(name) && !light.has(name)) hits.push({ file: filePath, line: lineOf(name), text: `themeable token ${name} in :root has no .dashboard-light override` });
+        }
+        for (const name of light) {
+          if (!isNeutral(name) && !root.has(name)) hits.push({ file: filePath, line: lineOf(name), text: `token ${name} in .dashboard-light is not declared in :root` });
+        }
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-icon-discipline',
+    pattern: '',
+    fileGlobs: ['*.tsx'],
+    severity: 'error',
+    excludeLines: ['// icon-ok'],
+    message: 'Emoji glyph used as an icon in a @ds-rebuilt file — go through the <Icon> component (Font Awesome Sharp Regular via `name`, or lucide via `as` during the migration). Add // icon-ok inline if the glyph is genuine content, not an icon.',
+    rationale: 'Font Awesome Sharp Regular is the icon system of record (D5, reversed 2026-07-03 from lucide-react); emoji-as-icon forks it. Font Awesome fa-* classes are now allowed (self-hosted Pro kit) — the prior fa-* prohibition was removed with the D5 reversal.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      // Only emoji-as-icon is flagged now (fa-* is the sanctioned icon system as
+      // of the D5 reversal). Emoji range deliberately excludes U+2600–27BF
+      // (dingbats: ✓ ⚠ ★ ✗ — legitimate string glyphs, not icons). Review finding, PR #1473.
+      const re = /[\u{1F300}-\u{1FAFF}]/u;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-deep-import',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.ts'],
+    severity: 'error',
+    excludeLines: ['// deep-import-ok'],
+    // Backstop for a future components/ui/internal/ layer. As of F3 no internal/
+    // dir exists — the F3 ports deliberately kept shared machinery PUBLIC
+    // (ui/overlay/overlayUtils.ts, ui/useRovingTabindex.ts) rather than under
+    // internal/, precisely so this rule never needs a carve-out. Refine the
+    // regex to the real internal layout only once such a dir is actually created.
+    message: 'Deep import into components/ui/internal/ from a @ds-rebuilt file — import the public primitive, not its internals. Add // deep-import-ok inline if intentional.',
+    rationale: 'Reaching into a primitive\'s internals couples rebuilt surfaces to private structure.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /from\s+['"].*components\/ui\/internal\//;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
+      return hits;
+    },
+  },
+  {
+    name: 'ds-motion-token',
+    pattern: '',
+    fileGlobs: ['*.tsx', '*.css'],
+    severity: 'error',
+    excludeLines: ['// motion-ok', '/* motion-ok'],
+    message: 'Literal transition/animation duration in a @ds-rebuilt file — use var(--dur-fast|base|slow). Add // motion-ok inline if unavoidable.',
+    rationale: 'Rebuilt surfaces must use the canonical motion tokens so timing stays consistent.',
+    claudeMdRef: 'UI Rebuild conventions',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const re = /transition[^;\n]*\b\d+m?s\b|duration-\[?\d+/;
+      files.forEach(filePath => {
+        let content: string;
+        try { content = readFileSync(filePath, 'utf-8'); } catch { return; }
+        if (!isDsRebuilt(content)) return;
+        content.split('\n').forEach((line, i) => {
+          if (re.test(line)) hits.push({ file: filePath, line: i + 1, text: line.trim() });
+        });
+      });
       return hits;
     },
   },
@@ -8330,7 +8803,6 @@ export const CHECKS: Check[] = [
     exclude: [
       'server/db/', 'server/schemas/', 'tests/', 'server/ai.ts',
       'server/openai-helpers.ts', 'server/anthropic-helpers.ts',
-      'server/meeting-brief-generator.ts', // comment-only exclusion, validated elsewhere
       'server/routes/content-publish.ts', // field-mapping suggestion, not critical schema
       'server/schema/extractors/', 'server/content-posts-ai.ts',
     ],
@@ -8580,44 +9052,20 @@ export const CHECKS: Check[] = [
       'A deliverable type has no adapter file under ' +
       'server/domains/inbox/deliverable-adapters/<type>.ts. Add the adapter (with registerAdapter) ' +
       'and its import line in deliverable-adapters/index.ts. Add // deliverable-adapter-ok if intentional.',
-    severity: 'warn',
+    severity: 'error',
     excludeLines: ['deliverable-adapter-ok'],
     rationale:
       'sendToClient() resolves an adapter per type; any deliverable type without one throws at send time.',
     claudeMdRef: '#code-conventions',
     customCheck: () => {
       const hits: CustomCheckMatch[] = [];
-      const deliverableTypes = [
-        'seo_edit',
-        'audit_issue',
-        'schema_item',
-        'schema_plan',
-        'redirect',
-        'internal_link',
-        'aeo_change',
-        'content_decay',
-        'cannibalization',
-        'content_plan_sample',
-        'content_plan_template',
-        'work_order',
-        'briefing',
-        'copy_section',
-        'content_request',
-        'recommendation',
-      ];
       const adaptersDir = path.join(ROOT, 'server/domains/inbox/deliverable-adapters');
-      for (const type of deliverableTypes) {
-        // Adapter files use the hyphenated convention (copy_section → copy-section.ts,
-        // schema_plan → schema-plan.ts, …), so normalize the underscore type id before
-        // resolving the file.
-        const adapterPath = path.join(adaptersDir, `${type.replace(/_/g, '-')}.ts`);
-        if (!existsSync(adapterPath)) {
-          hits.push({
-            file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
-            line: 1,
-            text: `deliverable type '${type}' has no adapter file`,
-          });
-        }
+      for (const type of findMissingDeliverableAdapters(adaptersDir)) {
+        hits.push({
+          file: path.join(ROOT, 'shared/types/client-deliverable.ts'),
+          line: 1,
+          text: `deliverable type '${type}' has no adapter file`,
+        });
       }
       return hits;
     },
@@ -9223,11 +9671,24 @@ export const CHECKS: Check[] = [
       const lines = content.split('\n');
 
       const unionStart = lines.findIndex((line) => line.trim() === 'export type ActivityType =');
-      if (unionStart === -1) return hits;
+      if (unionStart === -1) {
+        // "No match" must mean "unknown, skip" only when the file itself isn't
+        // in scope. Here server/activity-log.ts IS in the changed set (it's
+        // `target`), so a missing anchor means the union declaration format
+        // drifted (renamed, reformatted, moved) — the loop below would silently
+        // scan zero lines and pass every mint uninspected. Fail loudly instead
+        // of returning an empty hits array, per the "no-match-must-mean-unknown"
+        // rule (see docs/rules/pr-check-rule-authoring.md).
+        hits.push({
+          file: target,
+          line: 1,
+          text: 'export type ActivityType = anchor not found — ActivityType minting guard cannot scan this file. Update the guard in scripts/pr-check.ts if the declaration format changed.',
+        });
+        return hits;
+      }
 
       for (let i = unionStart + 1; i < lines.length; i++) {
         const line = lines[i];
-        const match = line.match(ACTIVITY_TYPE_MEMBER_LINE_RE);
         // The union's terminal line is the one whose CODE portion ends in the
         // closing `;` — stop scanning after it so declarations further down the
         // file (other unions, functions) are never mistaken for ActivityType
@@ -9238,7 +9699,12 @@ export const CHECKS: Check[] = [
         // — exactly the silent-false-negative class this rule exists to catch.
         const codePortion = line.replace(/\/\/.*$/, '');
         const terminal = /;\s*$/.test(codePortion);
-        if (match) {
+        // GLOBAL regex + matchAll so every member on the line is checked, not
+        // just the first — a non-global match() previously only inspected the
+        // first `| 'x'` on a line, silently passing a second member sharing
+        // that line (e.g. `| 'a' | 'b'`).
+        const lineMatches = [...line.matchAll(ACTIVITY_TYPE_MEMBER_LINE_RE)];
+        for (const match of lineMatches) {
           const member = match[1];
           // Inline-only hatch by design (Reconcile R1-PR2 task contract) —
           // deliberately not using hasHatch()'s line-above lookbehind here.
@@ -9273,14 +9739,18 @@ function globToExtension(glob: string): string {
 
 export function resolveRelevantChangedFilesForCheck(changedFiles: string[], check: Check): string[] {
   const exts = check.fileGlobs.map(globToExtension);
-  return changedFiles.filter(f =>
-    exts.some(ext => f.endsWith(ext)) &&
-    !isExcluded(f, check.exclude) &&
-    (!check.pathFilter || f.startsWith(check.pathFilter)) &&
-    (!EXCLUDED_DIRS.some(d => f.startsWith(d + '/') || f === d) ||
-     (!!check.pathFilter && f.startsWith(check.pathFilter))) &&
-    !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef))
-  );
+  const pathFilterDir = check.pathFilter?.replace(/\/$/, '').split('/').pop() ?? null;
+  return changedFiles.filter(f => {
+    const segments = f.replaceAll('\\', '/').split('/');
+    const isInExcludedDir = EXCLUDED_DIRS.some(
+      d => d !== pathFilterDir && segments.includes(d),
+    );
+    return exts.some(ext => f.endsWith(ext)) &&
+      !isExcluded(f, check.exclude) &&
+      (!check.pathFilter || f.startsWith(check.pathFilter)) &&
+      !isInExcludedDir &&
+      !EXCLUDED_FILES.some(ef => f === ef || f.endsWith('/' + ef));
+  });
 }
 
 export function checkFiles(files: string[], check: Check): string[] {
@@ -9313,8 +9783,11 @@ export function checkFile(file: string, check: Check): string[] {
   return checkFiles([file], check);
 }
 
-// Directories that should never be scanned (vendor code, test fixtures, build output)
-const EXCLUDED_DIRS = ['node_modules', 'dist', '.git', '.claude', '.worktrees', 'scripts', 'tests'];
+// Directories that should never be scanned (vendor code, test fixtures, build output).
+// 'hmpsn studio Design System' is the gitignored UI-rebuild kit mirror — reference
+// material, not product code; its token files legitimately declare --* tokens and
+// its docs name the studio, which false-positived 3 rules under --all (PR #1473).
+const EXCLUDED_DIRS = ['node_modules', 'dist', '.cache', '.git', '.claude', '.worktrees', 'scripts', 'tests', 'hmpsn studio Design System'];
 // Root-level files to skip (--exclude-dir doesn't work on files)
 const EXCLUDED_FILES: string[] = [];
 

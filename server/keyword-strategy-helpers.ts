@@ -1,5 +1,5 @@
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
-import type { KeywordSourceEvidence } from '../shared/types/keywords.js';
+import { isKeywordSearchIntent, type KeywordSearchIntent, type KeywordSourceEvidence } from '../shared/types/keywords.js';
 import type { Workspace } from '../shared/types/workspace.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 
@@ -7,6 +7,12 @@ export interface KeywordPoolCandidate {
   volume: number;
   difficulty: number;
   source: string;
+  /** Provider-grounded CPC. Zero means the provider returned no usable commercial value. */
+  cpc?: number;
+  cpcSource?: string;
+  /** Provider-grounded search intent; preserved independently from demand/source upgrades. */
+  intent?: KeywordSearchIntent;
+  intentSource?: string;
 }
 
 function keywordPoolSourcePriority(source: string): number {
@@ -27,6 +33,15 @@ export function upsertKeywordPoolCandidate(
 ): boolean {
   const normalized = keywordComparisonKey(keyword);
   if (!normalized) return false;
+  const usableCpc = candidate.cpc != null && Number.isFinite(candidate.cpc) && candidate.cpc > 0;
+  const usableIntent = isKeywordSearchIntent(candidate.intent);
+  candidate = {
+    ...candidate,
+    cpc: usableCpc ? candidate.cpc : undefined,
+    cpcSource: usableCpc ? (candidate.cpcSource ?? candidate.source) : undefined,
+    intent: usableIntent ? candidate.intent : undefined,
+    intentSource: usableIntent ? (candidate.intentSource ?? candidate.source) : undefined,
+  };
 
   const existing = pool.get(normalized);
   if (!existing) {
@@ -40,8 +55,36 @@ export function upsertKeywordPoolCandidate(
     || (candidatePriority === existingPriority && candidate.volume > existing.volume)
     || (existing.source === 'gsc' && candidate.volume > 0 && candidate.source !== 'gsc');
 
-  if (!shouldUpgrade) return false;
-  pool.set(normalized, candidate);
+  const candidateHasUsableCpc = candidate.cpc != null && candidate.cpc > 0;
+  const existingHasUsableCpc = existing.cpc != null && existing.cpc > 0;
+  const mergedCpc = candidateHasUsableCpc
+    && (!existingHasUsableCpc || candidatePriority > existingPriority)
+    ? candidate.cpc
+    : existing.cpc ?? candidate.cpc;
+  const mergedIntent = candidate.intent != null
+    && (existing.intent == null || candidatePriority > existingPriority)
+    ? candidate.intent
+    : existing.intent;
+
+  if (!shouldUpgrade) {
+    if (mergedCpc !== existing.cpc || mergedIntent !== existing.intent) {
+      pool.set(normalized, {
+        ...existing,
+        cpc: mergedCpc,
+        cpcSource: mergedCpc === candidate.cpc ? candidate.cpcSource : existing.cpcSource,
+        intent: mergedIntent,
+        intentSource: mergedIntent === candidate.intent ? candidate.intentSource : existing.intentSource,
+      });
+    }
+    return false;
+  }
+  pool.set(normalized, {
+    ...candidate,
+    cpc: mergedCpc,
+    cpcSource: mergedCpc === candidate.cpc ? candidate.cpcSource : existing.cpcSource,
+    intent: mergedIntent,
+    intentSource: mergedIntent === candidate.intent ? candidate.intentSource : existing.intentSource,
+  });
   return true;
 }
 

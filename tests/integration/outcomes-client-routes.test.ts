@@ -87,12 +87,16 @@ describe('Suite 1: Public client summary endpoint', () => {
   });
 
   it('with 0 scored actions: overallWinRate is 0, totalTracked reflects unscored count', async () => {
-    // Record 2 unscored actions
+    // Record 2 unscored EXECUTED actions. C4 attribution honesty: the client
+    // scorecard counts only executed work — not_acted_on proposals are excluded
+    // (pinned by the dedicated exclusion test below) — so these carry an explicit
+    // executed attribution to appear in totalTracked.
     for (let i = 0; i < 2; i++) {
       const r = await postJson(`/api/outcomes/${wsId}/actions`, {
         actionType: 'meta_updated',
         sourceType: 'summary-test',
         sourceId: `unscored-${RUN_ID}-${i}`,
+        attribution: 'platform_executed',
         baselineSnapshot: { position: 5, clicks: 10, impressions: 100 },
       });
       expect(r.status).toBe(200);
@@ -121,6 +125,9 @@ describe('Suite 1: Public client summary endpoint', () => {
           actionType: 'audit_fix_applied',
           sourceType: 'denom-test',
           sourceId: `denom-${RUN_ID}-${i}`,
+          // C4: executed actions so the honest public scorecard counts them (the
+          // denominator contract is orthogonal to the not_acted_on exclusion).
+          attribution: 'platform_executed',
           baselineSnapshot: { position: i + 1, clicks: i + 5 },
         });
         expect(r.status).toBe(200);
@@ -163,6 +170,91 @@ describe('Suite 1: Public client summary endpoint', () => {
       fresh.cleanup();
     }
   });
+
+  it('C4 attribution honesty: not_acted_on actions are excluded from the client scorecard', async () => {
+    // The public scorecard must count only executed work. A not_acted_on action is
+    // an unexecuted proposal the workspace never acted on — including it (or an
+    // outcome measured on it) in the client win-rate/tracked counts would claim a
+    // result for work nobody did. The admin overview route keeps them (admin parity);
+    // this pins the client-only exclusion.
+    const fresh = seedWorkspace({ clientPassword: '' });
+    const freshWsId = fresh.workspaceId;
+    try {
+      // One executed action, scored a win → should count.
+      const executed = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'audit_fix_applied',
+        sourceType: 'honesty-test',
+        sourceId: `exec-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: { position: 3, clicks: 8 },
+      });
+      expect(executed.status).toBe(200);
+      const executedId = (await executed.json()).action.id;
+      insertOutcomeRow({ actionId: executedId, score: 'win' });
+
+      // Two not_acted_on proposals, one of them scored a win → must NOT count.
+      const proposalIds: string[] = [];
+      for (let i = 0; i < 2; i++) {
+        const r = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+          actionType: 'meta_updated',
+          sourceType: 'honesty-test',
+          sourceId: `proposal-${RUN_ID}-${i}`,
+          attribution: 'not_acted_on',
+          baselineSnapshot: { position: 5, clicks: 10 },
+        });
+        expect(r.status).toBe(200);
+        proposalIds.push((await r.json()).action.id);
+      }
+      insertOutcomeRow({ actionId: proposalIds[0], score: 'win' });
+
+      const res = await api(`/api/public/outcomes/${freshWsId}/summary`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      // Only the executed action is counted; the two not_acted_on proposals (and
+      // the phantom win measured on one of them) are dropped entirely.
+      expect(body.totalTracked).toBe(1);
+      expect(body.totalScored).toBe(1);
+      expect(body.overallWinRate).toBeCloseTo(1.0, 5);
+    } finally {
+      fresh.cleanup();
+    }
+  });
+
+  it('excludes internal-only action-catalog entries from the client scorecard', async () => {
+    const fresh = seedWorkspace({ clientPassword: '' });
+    const freshWsId = fresh.workspaceId;
+    try {
+      const clientVisible = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'meta_updated',
+        sourceType: 'client-visibility-test',
+        sourceId: `visible-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: { clicks: 10 },
+      });
+      expect(clientVisible.status).toBe(200);
+
+      const internalOnly = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'voice_calibrated',
+        sourceType: 'client-visibility-test',
+        sourceId: `internal-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: {},
+      });
+      expect(internalOnly.status).toBe(200);
+
+      const res = await api(`/api/public/outcomes/${freshWsId}/summary`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.totalTracked).toBe(1);
+      expect(body.byCategory).toEqual([
+        expect.objectContaining({ actionType: 'meta_updated', count: 1 }),
+      ]);
+    } finally {
+      fresh.cleanup();
+    }
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -200,6 +292,9 @@ describe('Suite 2: Public client wins endpoint', () => {
       pageUrl: 'https://example.com/great-post',
       targetKeyword: 'test keyword',
       baselineSnapshot: { position: 8, clicks: 20, impressions: 400 },
+      // B14: a genuine platform-executed win — must be attributed so it surfaces in /wins
+      // (a missing attribution now stores the honest 'not_acted_on', which is excluded).
+      attribution: 'platform_executed',
     });
     expect(r.status).toBe(200);
     const actionId = (await r.json()).action.id;
@@ -237,6 +332,112 @@ describe('Suite 2: Public client wins endpoint', () => {
     expect(typeof win.recommendation).toBe('string');
   });
 
+  it('never surfaces an internal-only action as a client win', async () => {
+    const fresh = seedWorkspace({ clientPassword: '' });
+    const freshWsId = fresh.workspaceId;
+    try {
+      const internalOnly = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'voice_calibrated',
+        sourceType: 'client-visibility-win-test',
+        sourceId: `internal-win-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: {},
+      });
+      expect(internalOnly.status).toBe(200);
+      insertOutcomeRow({ actionId: (await internalOnly.json()).action.id, score: 'strong_win' });
+
+      const visible = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'meta_updated',
+        sourceType: 'client-visibility-win-test',
+        sourceId: `visible-win-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: { clicks: 10 },
+      });
+      expect(visible.status).toBe(200);
+      insertOutcomeRow({ actionId: (await visible.json()).action.id, score: 'win' });
+
+      const res = await api(`/api/public/outcomes/${freshWsId}/wins`);
+      expect(res.status).toBe(200);
+      const wins = await res.json();
+
+      expect(wins.map((win: { actionType: string }) => win.actionType)).toEqual(['meta_updated']);
+    } finally {
+      fresh.cleanup();
+    }
+  });
+
+  it('preserves an unknown historical action without crashing the client wins read', async () => {
+    const fresh = seedWorkspace({ clientPassword: '' });
+    const freshWsId = fresh.workspaceId;
+    try {
+      const created = await postJson(`/api/outcomes/${freshWsId}/actions`, {
+        actionType: 'meta_updated',
+        sourceType: 'historical-action-test',
+        sourceId: `historical-${RUN_ID}`,
+        attribution: 'platform_executed',
+        baselineSnapshot: { clicks: 10 },
+      });
+      expect(created.status).toBe(200);
+      const actionId = (await created.json()).action.id;
+
+      // Persisted rows predate the closed ActionType vocabulary in some workspaces;
+      // the mapper deliberately tolerates those historical strings.
+      db.prepare(`UPDATE tracked_actions SET action_type = ? WHERE id = ? AND workspace_id = ?`)
+        .run('legacy_imported_action', actionId, freshWsId);
+      insertOutcomeRow({ actionId, score: 'win' });
+
+      const res = await api(`/api/public/outcomes/${freshWsId}/wins`);
+      expect(res.status).toBe(200);
+      const wins = await res.json();
+
+      expect(wins).toEqual([
+        expect.objectContaining({ actionId, actionType: 'legacy_imported_action' }),
+      ]);
+    } finally {
+      fresh.cleanup();
+    }
+  });
+
+  it('P1 manual ingestion: a manually-recorded platform_executed post surfaces as a client win with its real title', async () => {
+    // The external/manual ingestion path (RecordPublishedWorkCard + the Rinse backfill) records a
+    // manual action with sourceType 'manual', an honest attribution, and a source snapshot. A
+    // platform_executed one that scores a win must (a) surface in the client wins and (b) carry its
+    // REAL title (the snapshot), not a generic fallback — the durable-title path (B11) end to end.
+    const title = `Manually Published ${RUN_ID}`;
+    const page = `https://example.com/manual/${RUN_ID}`;
+    const r = await postJson(`/api/outcomes/${wsId}/actions`, {
+      actionType: 'content_published',
+      sourceType: 'manual',
+      sourceId: `manual-p1-${RUN_ID}`,
+      pageUrl: page,
+      attribution: 'platform_executed',
+      baselineSnapshot: { position: 9, clicks: 5 },
+      source: { label: title, snapshot: { title, type: 'manual', page } },
+    });
+    expect(r.status).toBe(200);
+    const actionId = (await r.json()).action.id;
+    insertOutcomeRow({
+      actionId,
+      score: 'win',
+      deltaSummary: {
+        primary_metric: 'position',
+        baseline_value: 9,
+        current_value: 3,
+        delta_absolute: -6,
+        delta_percent: -66,
+        direction: 'improved',
+      },
+    });
+
+    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    expect(res.status).toBe(200);
+    const wins = await res.json();
+    const mine = wins.find((w: { pageUrl?: string }) => w.pageUrl === page);
+    expect(mine, 'the manually-recorded win should surface in the client wins').toBeTruthy();
+    // Durable title from the source snapshot — not a generic per-action-type fallback.
+    expect(mine.recommendation).toContain(title);
+  });
+
   it('only returns wins (not losses or no_change)', async () => {
     // Record an action with a loss
     const r = await postJson(`/api/outcomes/${wsId}/actions`, {
@@ -256,6 +457,34 @@ describe('Suite 2: Public client wins endpoint', () => {
     for (const w of wins) {
       expect(['win', 'strong_win']).toContain(w.score);
     }
+  });
+
+  // C2/R12a: the owner wording sign-off pass folded WIN_FALLBACK_LABELS into the single
+  // canonical shared/types/client-vocabulary.ts map. content_published's three drifted
+  // client-facing variants ("Published new content" here, "Published new post" in
+  // WinsSurface.tsx, "Content published" in OutcomeSummary.tsx) unified to WinsSurface's
+  // fuller sentence per the prefer-client-facing wording rule. This pin now proves the
+  // fallback title text matches the NEW canonical wording, not the pre-cutover string —
+  // still full-sentence client copy, NOT the catalog's short admin label ("Content Published").
+  it('the client-vocabulary fallback label is the canonical C2/R12a wording (client-visible)', async () => {
+    const r = await postJson(`/api/outcomes/${wsId}/actions`, {
+      actionType: 'content_published',
+      sourceType: 'wins-fallback-parity-test',
+      sourceId: `fallback-parity-${RUN_ID}`,
+      baselineSnapshot: { position: 8 },
+      // B14: platform-executed win so it appears in /wins (missing attribution → not_acted_on, excluded).
+      attribution: 'platform_executed',
+    });
+    expect(r.status).toBe(200);
+    const actionId = (await r.json()).action.id;
+    insertOutcomeRow({ actionId, score: 'strong_win' });
+
+    const res = await api(`/api/public/outcomes/${wsId}/wins`);
+    expect(res.status).toBe(200);
+    const wins = await res.json();
+    const win = wins.find((w: { actionId: string }) => w.actionId === actionId);
+    expect(win).toBeDefined();
+    expect(win.recommendation).toBe('Published new post');
   });
 });
 

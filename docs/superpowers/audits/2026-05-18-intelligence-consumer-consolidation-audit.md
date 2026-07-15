@@ -19,10 +19,14 @@ plans.
 
 ## Findings Summary
 
-- `native`: 34
+- `native`: 32
 - `hybrid`: 0
 - `legacy`: 0
-- `documented-exception`: 0
+- `documented-exception`: 1
+
+_(Count updated 2026-07-11: Monthly Digest was reclassified as a documented
+current-month reporting exception; lifetime recommendation learnings are
+intentionally excluded from its operational evidence window.)_
 
 Root pattern confirmed:
 
@@ -41,17 +45,16 @@ Root pattern confirmed:
 | `server/brandscript.ts` | `brand-engine` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if multi-slice context needed |
 | `server/content-brief.ts` | `content-pipeline` | `native` | shared `buildContentGenerationContext()` for seoContext, pageProfile, and formatted insights/learnings plus caller-owned evidence blocks | keep on content builder path | completed in wave 1 |
 | `server/content-decay.ts` | `seo-health` | `native` | shared `buildRecommendationGenerationContext()` for prompt context plus caller-owned GSC query breakdown block | keep on recommendation builder path | completed in wave 1 |
+| `server/content-posts-ai-jobs.ts` | `content-pipeline` | `native` | shared SEO prompt context inside the background content-generation job path | keep low-level for job-specific prompts | current canonical job consumer |
 | `server/content-posts-ai.ts` | `content-pipeline` | `native` | slice-backed voice context with aligned `slices` usage | `buildContentGenerationContext()` optional later | wave 4 |
 | `server/copy-generation.ts` | `brand-engine` | `native` | workspace-intelligence-backed SEO context | keep low-level for now | later only if builder consolidation crosses brand-engine |
 | `server/diagnostic-orchestrator.ts` | `analytics-intelligence` | `native` | diagnostic builder resolves anomaly insights, workspace intelligence, and page-scoped insight summaries | diagnostic builder | completed in follow-up builder PR |
 | `server/discovery-ingestion.ts` | `workspace-command-center` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if richer slices are added |
 | `server/internal-links.ts` | `seo-health` | `native` | slice-backed SEO context for AI internal-link suggestions | recommendation builder later if it broadens beyond seoContext | wave 4 |
 | `server/keyword-recommendations.ts` | `seo-health` | `native` | shared `buildRecommendationGenerationContext()` for ranking context plus deterministic strategic-fit scoring hooks (declines, cannibalization, client signals) | keep on recommendation builder path | completed in wave 2 |
-| `server/keyword-strategy-ai-synthesis.ts` | `analytics-intelligence` | `native` | rich slice-backed context with consistent `slices` usage | content/recommendation builder optional later | keep as reference implementation |
-| `server/meeting-brief-generator.ts` | `analytics-intelligence` | `native` | intelligence facade only | keep low-level | only revisit if a dedicated briefing builder is introduced |
-| `server/monthly-digest.ts` | `analytics-intelligence` | `native` | shared `buildRecommendationGenerationContext()` for insights/learnings-backed digest prompt enrichment | future digest/briefing builder | completed in PR5 |
+| `server/keyword-strategy-synthesis/context.ts` | `analytics-intelligence` | `native` | dedicated synthesis context module owns canonical intelligence assembly | keep low-level | current canonical synthesis consumer |
+| `server/monthly-digest.ts` | `analytics-intelligence` | `documented-exception` | full insight read for deterministic rollups and AI prompt evidence, bounded to one current UTC reporting window; lifetime workspace learnings are intentionally excluded | future current-period digest builder only if it preserves the same evidence boundary | documented current-month exception |
 | `server/page-analysis-job.ts` | `seo-health` | `native` | consistent slice-backed prompt assembly | recommendation builder later if it simplifies page job boilerplate | wave 4 |
-| `server/routes/content-posts.ts` | `content-pipeline` | `native` | `buildIntelPrompt(['seoContext', 'learnings'])` for review flows | keep low-level | later only if raw slice access becomes necessary |
 | `server/routes/google.ts` | `client-portal` | `native` | aligned slices + formatted block for client search chat | keep low-level | later only if shared client-story builder is added |
 | `server/routes/public-analytics.ts` | `client-portal` | `native` | slice-backed intelligence for client advisor context | keep low-level | later only if client-story builder is added |
 | `server/routes/rewrite-chat.ts` | `seo-health` | `native` | page-assist builder supplies canonical keyword/voice/page context; route owns conversation and page evidence | page-assist builder | completed in follow-up builder PR |
@@ -62,6 +65,7 @@ Root pattern confirmed:
 | `server/routes/webflow-alt-text.ts` | `seo-health` | `native` | `buildIntelPrompt(['seoContext'])` for compact alt-text context plus caller-owned page/image placement snippets | keep low-level | completed in PR5 |
 | `server/routes/workspaces.ts` | `workspace-command-center` | `native` | seoContext-backed AI helper path | keep low-level | revisit only if it needs multi-slice context |
 | `server/seo-audit-ai-recs.ts` | `seo-health` | `native` | slice-backed workspace + page prompt assembly | recommendation builder optional later | wave 2 |
+| `server/strategy-pov-generator.ts` | `analytics-intelligence` | `native` | shared intelligence prompt context for point-of-view generation | keep low-level | current canonical strategy consumer |
 | `server/voice-calibration.ts` | `brand-engine` | `native` | `buildIntelPrompt(['seoContext'])` | keep low-level | only revisit if richer slices are added |
 | `server/webflow-bulk-alt-background-job.ts` | `seo-health` | `native` | slice-backed SEO context inside extracted bulk alt background job | keep low-level for job-specific prompts | completed in simplification sprint phase 4 |
 | `server/webflow-bulk-seo-fix-background-job.ts` | `seo-health` | `native` | slice-backed SEO context inside extracted bulk SEO fix background job | keep low-level for job-specific prompts | completed in simplification sprint phase 6 |
@@ -70,11 +74,14 @@ Root pattern confirmed:
 
 ## Immediate Migration Queue
 
-No hybrid or legacy consumers remain in this audit inventory.
+No hybrid or legacy consumers remain in this audit inventory. Monthly Digest is
+the sole documented exception because its deterministic rollups require full
+pre-cap insight coverage and its narrative must remain bounded to current-month
+evidence rather than lifetime recommendation learnings.
 
 Optional future work:
 
-- reporting/briefing builder if monthly digest and meeting briefs start sharing more prompt context
+- current-period reporting builder only if another consumer shares Monthly Digest's bounded UTC-window evidence contract
 - low-level native caller consolidation only where a shared builder reduces meaningful duplication
 
 ## Notes

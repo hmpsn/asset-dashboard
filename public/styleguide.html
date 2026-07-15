@@ -264,7 +264,7 @@
       <div class="type-specimen">
         <div class="type-meta">
           <b>Mono</b>
-          Fira Code / JetBrains Mono · 400 · 12 / 1.5
+          JetBrains Mono · 400 · 12 / 1.5
           <span class="mono">.t-mono · IDs, URLs, tokens</span>
         </div>
         <div class="t-mono">/blog/seo-guide-2026 · ID 3f2a-91b</div>
@@ -282,7 +282,7 @@
       <div class="type-specimen">
         <div class="type-meta">
           <b>Micro</b>
-          Fira Code / JetBrains Mono · 400 · 10 / 1.4 · uppercase
+          JetBrains Mono · 400 · 10 / 1.4 · uppercase
           <span class="mono">.t-micro · tick labels, ISO dates, map keys</span>
         </div>
         <div class="t-micro">APR 12 — MON · 11:42 UTC</div>
@@ -410,7 +410,7 @@
           <div class="type-meta">
             <b>&lt;Mono&gt; / &lt;Mono size="micro"&gt;</b>
             <span class="mono">→ .t-mono / .t-micro</span>
-            Fira Code. IDs, slugs, tokens, tick labels.
+            JetBrains Mono. IDs, slugs, tokens, tick labels.
           </div>
           <span class="t-mono">/blog/seo-guide-2026 · ID 3f2a-91b</span><br>
           <span class="t-micro" style="color:var(--brand-text-muted);">APR 12 — MON · 11:42 UTC</span>
@@ -487,6 +487,17 @@
       </div>
     </div>
     <!-- Phase5:Typography END -->
+
+    <!-- F1:FoundationTokens-fonts START (relocated from §04 per F2a reconciliation) -->
+    <div class="sub-section">
+      <div class="col-label">Font families (F1) · <span class="t-mono">var(--font-display / --font-sans / --font-mono)</span></div>
+      <div style="display:grid;gap:6px;">
+        <div style="font-family:var(--font-display);font-size:20px;color:var(--brand-text-bright);">--font-display · The forward-leaning display face (DIN Pro → Inter)</div>
+        <div style="font-family:var(--font-sans);font-size:15.5px;color:var(--brand-text);">--font-sans · Inter body text, the workhorse for everything readable</div>
+        <div style="font-family:var(--font-mono);font-size:13px;color:var(--brand-text);">--font-mono · JetBrains Mono 0123456789 timestamps · IDs · code</div>
+      </div>
+    </div>
+    <!-- F1:FoundationTokens-fonts END -->
 
   </section>
 
@@ -1174,6 +1185,42 @@ SectionCard: var(--radius-signature-lg)</div>
       </div>
     </div>
     <!-- Phase5:Layout END -->
+
+    <!-- F1:FoundationTokens START (spacing + elevation here; fonts→§02 Type, motion→§07 Motion) -->
+    <div class="sub-section">
+      <div class="col-label">Foundation tokens (F1) · spacing · elevation — all referenced via <span class="t-mono">var(--…)</span></div>
+
+      <div style="display:grid;gap:24px;">
+        <!-- Spacing ladder via tokens -->
+        <div style="display:grid;gap:6px;">
+          <div class="t-label" style="color:var(--brand-text-muted);">Spacing scale · <span class="t-mono">var(--space-1 … --space-16)</span></div>
+          <div style="display:flex;align-items:flex-end;gap:var(--space-2);">
+            <div style="width:var(--space-1);height:var(--space-1);background:var(--teal);"></div>
+            <div style="width:var(--space-2);height:var(--space-2);background:var(--teal);"></div>
+            <div style="width:var(--space-3);height:var(--space-3);background:var(--teal);"></div>
+            <div style="width:var(--space-4);height:var(--space-4);background:var(--teal);"></div>
+            <div style="width:var(--space-5);height:var(--space-5);background:var(--teal);"></div>
+            <div style="width:var(--space-6);height:var(--space-6);background:var(--teal);"></div>
+            <div style="width:var(--space-8);height:var(--space-8);background:var(--teal);"></div>
+            <div style="width:var(--space-10);height:var(--space-10);background:var(--teal);"></div>
+            <div style="width:var(--space-12);height:var(--space-12);background:var(--teal);"></div>
+            <div style="width:var(--space-16);height:var(--space-16);background:var(--teal);"></div>
+          </div>
+        </div>
+
+        <!-- Elevation family via tokens -->
+        <div style="display:grid;gap:6px;">
+          <div class="t-label" style="color:var(--brand-text-muted);">Elevation · <span class="t-mono">--shadow-sm/md/lg/glow</span> (canonical; --brand-shadow-* deprecated)</div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div style="width:120px;height:64px;border-radius:var(--radius-lg);background:var(--surface-2);box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:center;"><span class="t-mono">sm</span></div>
+            <div style="width:120px;height:64px;border-radius:var(--radius-lg);background:var(--surface-2);box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center;"><span class="t-mono">md</span></div>
+            <div style="width:120px;height:64px;border-radius:var(--radius-lg);background:var(--surface-2);box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;"><span class="t-mono">lg</span></div>
+            <div style="width:120px;height:64px;border-radius:var(--radius-lg);background:var(--surface-2);box-shadow:var(--shadow-glow);display:flex;align-items:center;justify-content:center;"><span class="t-mono">glow</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- F1:FoundationTokens END -->
   </section>
 
   <!-- ══════ 05 · COMPONENTS ══════ -->
@@ -1661,6 +1708,9 @@ SectionCard: var(--radius-signature-lg)</div>
     <!-- Nav / sidebar -->
     <div class="sub-section">
       <div class="col-label">Sidebar navigation</div>
+      <div style="border:1px solid var(--brand-yellow);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin:var(--space-2) 0;color:var(--brand-yellow);font-size:13px;">
+        ⚠ SUPERSEDED — this demo documents the pre-rebuild sidebar. The ratified navigation is the two-zone rail (AppShell, lands in rebuild phase F4; spec: UI Rebuild Kit → nav model). Do not build new navigation to this demo.
+      </div>
       <div class="card" style="padding:16px;">
         <div style="display:grid; grid-template-columns:auto 1fr; gap:20px;">
           <div class="nav">
@@ -1685,6 +1735,516 @@ SectionCard: var(--radius-signature-lg)</div>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ══════ F3 PRIMITIVES ══════ -->
+    <div class="sec-head" style="margin-top:var(--space-10);">
+      <span class="sec-num">05f ·</span>
+      <h2>F3 primitives</h2>
+      <div class="rule"></div>
+      <p>18 new rebuild primitives across overlay/feedback, data, forms, and layout lanes. Static specimens only — each demo is a hand-styled box using existing styleguide classes and <span class="t-mono">var(--*)</span> tokens, not a live portal/interactive mount.</p>
+    </div>
+
+    <!-- F3: Drawer -->
+    <div class="sub-section">
+      <div class="col-label">Drawer · slide-in panel, shown OPEN (static)</div>
+      <div class="card" style="padding:0; max-width:380px; margin:0 auto; overflow:hidden;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--brand-border);">
+          <div>
+            <div class="t-caption" style="color:var(--brand-text-muted);">Content review</div>
+            <div style="font-weight:600; color:var(--brand-text-bright); font-size:15px; margin-top:2px;">Homepage hero rewrite</div>
+            <div class="t-caption-sm" style="color:var(--brand-text-muted); margin-top:2px;">Requested 2 days ago</div>
+          </div>
+          <button aria-label="Close drawer" class="btn btn-ghost" style="width:28px; height:28px; padding:0;"><svg class="i i-sm"><use href="#i-x"/></svg></button>
+        </div>
+        <div style="padding:var(--space-5); color:var(--brand-text); font-size:13px; line-height:1.6;">
+          <p>The drawer body scrolls independently of the header/footer. Use it for a focused, task-scoped detail view that shouldn't take over the whole screen the way a full <span class="t-mono">Modal</span> does.</p>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:var(--space-2); padding:var(--space-3) var(--space-5); border-top:1px solid var(--brand-border);">
+          <button class="btn btn-secondary">Dismiss</button>
+          <button class="btn btn-primary">Approve</button>
+        </div>
+      </div>
+      <div class="spec-note">Use for a side-anchored, task-scoped detail panel (record inspection, filter builder) that keeps the underlying list visible in context — not for destructive confirmations or full-attention flows, which belong to <span class="t-mono">Modal</span>.</div>
+    </div>
+
+    <!-- F3: Avatar -->
+    <div class="sub-section">
+      <div class="col-label">Avatar · initials / icon / image · tone + shape + size</div>
+      <div class="card" style="display:grid; gap:var(--space-5);">
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">Initials · tones</div>
+          <div class="row" style="gap:var(--space-3); align-items:center;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-pill); background:rgba(45,212,191,.16); color:var(--teal); font-weight:600; font-size:13px;">JH</span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-pill); background:rgba(96,165,250,.16); color:var(--blue); font-weight:600; font-size:13px;">AK</span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-pill); background:rgba(251,191,36,.16); color:var(--amber); font-weight:600; font-size:13px;">TM</span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-pill); background:rgba(52,211,153,.16); color:var(--emerald); font-weight:600; font-size:13px;">RS</span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-pill); background:var(--surface-3); color:var(--brand-text-muted); font-weight:600; font-size:13px;">?</span>
+          </div>
+        </div>
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">Icon variant · circle vs <span class="t-mono">--radius-md</span> shape</div>
+          <div class="row" style="gap:var(--space-3); align-items:center;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-pill); background:rgba(96,165,250,.16); color:var(--blue);"><svg class="i i-sm"><use href="#i-users"/></svg></span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-md); background:rgba(96,165,250,.16); color:var(--blue);"><svg class="i i-sm"><use href="#i-users"/></svg></span>
+          </div>
+        </div>
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">Image + sizes · sm / md / lg</div>
+          <div class="row" style="gap:var(--space-3); align-items:center;">
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:var(--radius-pill); background:var(--surface-3); overflow:hidden;"><svg class="i i-xs" style="color:var(--brand-text-muted);"><use href="#i-users"/></svg></span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:var(--radius-pill); background:var(--surface-3); overflow:hidden;"><svg class="i i-sm" style="color:var(--brand-text-muted);"><use href="#i-users"/></svg></span>
+            <span style="display:inline-flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:var(--radius-pill); background:var(--surface-3); overflow:hidden;"><svg class="i" style="color:var(--brand-text-muted);"><use href="#i-users"/></svg></span>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">Use wherever a person or entity needs a compact visual anchor — assignee chips, activity feed rows, comment threads. Fall back to initials when no image is available; never render a broken image icon.</div>
+    </div>
+
+    <!-- F3: IntentTag -->
+    <div class="sub-section">
+      <div class="col-label">IntentTag · search-intent classifier · full &amp; abbreviated</div>
+      <div class="card">
+        <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center;">
+          <span class="badge b-teal">Commercial</span>
+          <span class="badge b-blue">Informational</span>
+          <span class="badge b-emerald">Transactional</span>
+          <span class="badge b-amber">Local</span>
+        </div>
+        <div class="row" style="gap:var(--space-3); flex-wrap:wrap; align-items:center; margin-top:var(--space-4);">
+          <span class="badge b-teal">C</span>
+          <span class="badge b-blue">I</span>
+          <span class="badge b-emerald">T</span>
+          <span class="badge b-amber">L</span>
+        </div>
+      </div>
+      <div class="spec-note">Use in keyword tables and content rows where the intent axis needs to be scannable at a glance. The abbreviated single-letter form is for dense table cells; use the full word wherever there's room.</div>
+    </div>
+
+    <!-- F3: DataTable -->
+    <div class="sub-section">
+      <div class="col-label">DataTable · sortable header, 3-column</div>
+      <div class="sectioncard">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="cursor:pointer;">Page <svg class="i i-xs" style="vertical-align:-1px;"><use href="#i-chev"/></svg></th>
+              <th style="text-align:right; cursor:pointer;">Sessions <svg class="i i-xs" style="vertical-align:-1px;"><use href="#i-chev-up"/></svg></th>
+              <th style="text-align:right;">Bounce rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="name">/pricing</td><td class="num blue">4,210</td><td class="num emerald">28.4%</td></tr>
+            <tr><td class="name">/blog/seo-strategy-2026</td><td class="num blue">3,102</td><td class="num amber">41.2%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="spec-note">Use for compact record grids where one or two columns need sort affordance. Keep the header chevron on the currently-sorted column only; never show it on every column at once.</div>
+    </div>
+
+    <!-- F3: MetricTile -->
+    <div class="sub-section">
+      <div class="col-label">MetricTile · label / value / delta + accent icon</div>
+      <div class="grid2">
+        <div class="statcard">
+          <div class="row1"><svg class="i" style="color:var(--teal)"><use href="#i-zap"/></svg><span class="lab">Content velocity</span></div>
+          <div><span class="val">14</span><span class="deltaPos">+3</span></div>
+        </div>
+        <div class="statcard">
+          <div class="row1"><svg class="i" style="color:var(--amber)"><use href="#i-alert"/></svg><span class="lab">Stale pages</span></div>
+          <div><span class="val">9</span><span class="deltaNeg">-2</span></div>
+        </div>
+      </div>
+      <div class="spec-note">A single labeled number with an accent-colored icon and one directional delta — the atomic unit that <span class="t-mono">StatCard</span> grids are built from. Use it standalone in tighter spaces like sidebars or card headers.</div>
+    </div>
+
+    <!-- F3: Sparkline -->
+    <div class="sub-section">
+      <div class="col-label">Sparkline · inline trend, no axes</div>
+      <div class="card">
+        <div class="row" style="gap:var(--space-6); align-items:center;">
+          <div>
+            <div class="t-label" style="margin-bottom:6px;">Rising</div>
+            <svg width="120" height="32" viewBox="0 0 120 32"><polyline points="0,28 20,24 40,26 60,16 80,14 100,6 120,4" fill="none" stroke="var(--emerald)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>
+          </div>
+          <div>
+            <div class="t-label" style="margin-bottom:6px;">Falling</div>
+            <svg width="120" height="32" viewBox="0 0 120 32"><polyline points="0,4 20,8 40,10 60,18 80,20 100,26 120,28" fill="none" stroke="var(--red)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">Use inline next to a MetricTile or table cell to show shape-of-trend without the weight of a full <span class="t-mono">TrendChart</span>. No gridlines, no axis labels — the line is the entire message.</div>
+    </div>
+
+    <!-- F3: Meter -->
+    <div class="sub-section">
+      <div class="col-label">Meter · track + fill, solid &amp; gradient</div>
+      <div class="card" style="display:grid; gap:var(--space-5);">
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">Solid fill · 68%</div>
+          <div class="pbar teal"><div style="width:68%"></div></div>
+        </div>
+        <div>
+          <div class="t-label" style="margin-bottom:8px;">Gradient fill · 68%</div>
+          <div class="pbar" style="background:var(--surface-3);"><div style="width:68%; background:linear-gradient(90deg, var(--teal), var(--emerald));"></div></div>
+        </div>
+      </div>
+      <div class="spec-note">Use for a single bounded quantity (audit coverage, quota usage, completion) where the exact percentage matters more than a trend shape. Prefer the solid fill by default; reserve the gradient for a hero/celebratory context.</div>
+    </div>
+
+    <!-- F3: KeyValueRow + DefinitionList -->
+    <div class="sub-section">
+      <div class="col-label">KeyValueRow + DefinitionList</div>
+      <div class="sectioncard">
+        <ul class="datalist" style="padding:6px 0;">
+          <li><span class="label">Workspace</span><span class="value">hmpsn.studio</span></li>
+          <li><span class="label">Plan</span><span class="value" style="color:var(--teal);">Growth</span></li>
+          <li><span class="label">Last crawl</span><span class="value">3 hours ago</span></li>
+        </ul>
+      </div>
+      <div class="spec-note">Use for a compact label→value list — settings summaries, metadata panels, confirmation recaps. <span class="t-mono">DefinitionList</span> is the semantic wrapper; <span class="t-mono">KeyValueRow</span> is the single repeating row.</div>
+    </div>
+
+    <!-- F3: BoardColumn + BoardCard -->
+    <div class="sub-section">
+      <div class="col-label">BoardColumn + BoardCard · kanban-style grouping</div>
+      <div class="card" style="max-width:280px;">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:var(--space-3);">
+          <span class="t-label" style="margin:0;">In review</span>
+          <span class="badge b-zinc">2</span>
+        </div>
+        <div style="display:grid; gap:var(--space-2);">
+          <div class="sectioncard" style="padding:var(--space-3);">
+            <div style="color:var(--brand-text-bright); font-size:13px; font-weight:500;">Homepage hero rewrite</div>
+            <div class="t-caption-sm" style="color:var(--brand-text-muted); margin-top:4px;">Due Friday</div>
+          </div>
+          <div class="sectioncard" style="padding:var(--space-3);">
+            <div style="color:var(--brand-text-bright); font-size:13px; font-weight:500;">Schema for /pricing</div>
+            <div class="t-caption-sm" style="color:var(--brand-text-muted); margin-top:4px;">Due Monday</div>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">Use for grouped, status-driven work items — the count pill on the column header always matches the number of cards rendered beneath it, never a separately-fetched total.</div>
+    </div>
+
+    <!-- F3: Segmented -->
+    <div class="sub-section">
+      <div class="col-label">Segmented · single-select control</div>
+      <div class="card">
+        <div class="segmented">
+          <button class="on">Day</button>
+          <button>Week</button>
+          <button>Month</button>
+        </div>
+      </div>
+      <div class="spec-note">Use for a small, fixed set of mutually-exclusive views (date range, brief/full toggle) where all options should stay visible at once — never for more than four options.</div>
+    </div>
+
+    <!-- F3: LensSwitcher -->
+    <div class="sub-section">
+      <div class="col-label">LensSwitcher · perspective toggle with counts</div>
+      <div class="card">
+        <div class="row" style="gap:var(--space-2);">
+          <button style="display:inline-flex; align-items:center; gap:6px; padding:0.375rem 0.75rem; font-size:12px; font-weight:500; border-radius:var(--radius-md); background:var(--surface-active); color:var(--brand-text-bright); border:1px solid var(--brand-border-hover);"><svg class="i i-sm"><use href="#i-chart"/></svg> Overview <span class="badge b-teal">12</span></button>
+          <button style="display:inline-flex; align-items:center; gap:6px; padding:0.375rem 0.75rem; font-size:12px; font-weight:500; border-radius:var(--radius-md); background:transparent; color:var(--brand-text-muted); border:1px solid transparent;"><svg class="i i-sm"><use href="#i-zap"/></svg> Opportunities <span class="badge b-zinc">4</span></button>
+          <button style="display:inline-flex; align-items:center; gap:6px; padding:0.375rem 0.75rem; font-size:12px; font-weight:500; border-radius:var(--radius-md); background:transparent; color:var(--brand-text-muted); border:1px solid transparent;"><svg class="i i-sm"><use href="#i-alert"/></svg> Risks <span class="badge b-zinc">2</span></button>
+        </div>
+      </div>
+      <div class="spec-note">Use to switch a shared data set between a small number of curated perspectives, each carrying its own count badge — the active lens gets the elevated surface, not a color change, so it reads as "selected view" rather than "status."</div>
+    </div>
+
+    <!-- W6: CommandCenterVerdict -->
+    <div class="sub-section">
+      <div class="col-label">CommandCenterVerdict · server-authored daily headline</div>
+      <div class="card" style="position:relative; overflow:hidden; border:1px solid var(--brand-border); background:var(--surface-2);">
+        <div style="position:absolute; inset:0 0 0 auto; width:120px; background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--teal) 10%, transparent));"></div>
+        <div class="row" style="position:relative; align-items:flex-start; gap:var(--space-3);">
+          <span style="width:32px; height:32px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:var(--brand-mint-dim); color:var(--teal);"><svg class="i"><use href="#i-alert"/></svg></span>
+          <div>
+            <div class="t-label" style="color:var(--teal); margin-bottom:4px;">TODAY</div>
+            <div class="t-h1" style="color:var(--brand-text-bright);">Acme has three things ready for review.</div>
+            <div class="t-caption" style="margin-top:7px; max-width:58ch; color:var(--brand-text);">Two optimization fixes and one client-ready recommendation are waiting. The headline is supplied by the server, never composed in the component.</div>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">Ports the mockup <span class="t-mono">co-head</span> structure for cockpit/global ops verdict blocks. Use only with server-derived verdict copy.</div>
+    </div>
+
+    <!-- W6: WorkStreamSelector -->
+    <div class="sub-section">
+      <div class="col-label">WorkStreamSelector · opt / send / money selector</div>
+      <div class="grid3">
+        <button style="text-align:left; min-height:112px; border:1px solid var(--teal); border-radius:var(--radius-lg); background:linear-gradient(135deg, var(--surface-2), color-mix(in srgb, var(--teal) 7%, var(--surface-2))); padding:var(--space-4);">
+          <span style="width:32px; height:32px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:color-mix(in srgb, var(--blue) 12%, transparent); color:var(--blue);"><svg class="i"><use href="#i-gauge"/></svg></span>
+          <div class="t-stat" style="margin-top:10px; color:var(--brand-text-bright);">6</div>
+          <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright);">Optimizations</div>
+          <div class="t-caption-sm" style="color:var(--brand-text);">What needs fixing?</div>
+        </button>
+        <button style="text-align:left; min-height:112px; border:1px solid var(--brand-border); border-radius:var(--radius-lg); background:var(--surface-2); padding:var(--space-4);">
+          <span style="width:32px; height:32px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:var(--brand-mint-dim); color:var(--teal);"><svg class="i"><use href="#i-send"/></svg></span>
+          <div class="t-stat" style="margin-top:10px; color:var(--brand-text-bright);">2</div>
+          <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright);">To send</div>
+          <div class="t-caption-sm" style="color:var(--brand-text);">Ready for clients</div>
+        </button>
+        <button style="text-align:left; min-height:112px; border:1px solid var(--brand-border); border-radius:var(--radius-lg); background:var(--surface-2); padding:var(--space-4);">
+          <span style="width:32px; height:32px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:color-mix(in srgb, var(--amber) 12%, transparent); color:var(--amber);"><svg class="i"><use href="#i-target"/></svg></span>
+          <div class="t-stat" style="margin-top:10px; color:var(--brand-text-bright);">1</div>
+          <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright);">Monetization</div>
+          <div class="t-caption-sm" style="color:var(--brand-text);">Revenue plays</div>
+        </button>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">co-streams/co-stream</span> as a roving-tabindex single-select control. Use existing <span class="t-mono">MetricTile</span> when the tiles are read-only metrics.</div>
+    </div>
+
+    <!-- W6: ProvenanceChip -->
+    <div class="sub-section">
+      <div class="col-label">ProvenanceChip · estimate / measured / actual basis</div>
+      <div class="card">
+        <div class="row" style="gap:var(--space-2);">
+          <span class="t-micro" style="display:inline-flex; align-items:center; gap:4px; padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); color:var(--amber); background:color-mix(in srgb, var(--amber) 12%, transparent);"><span style="width:6px; height:6px; border-radius:var(--radius-pill); background:var(--amber);"></span>estimate</span>
+          <span class="t-micro" style="display:inline-flex; align-items:center; gap:4px; padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); color:var(--emerald); background:color-mix(in srgb, var(--emerald) 12%, transparent);"><span style="width:6px; height:6px; border-radius:var(--radius-pill); background:var(--emerald);"></span>measured</span>
+          <span class="t-micro" style="display:inline-flex; align-items:center; gap:4px; padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); color:var(--blue); background:color-mix(in srgb, var(--blue) 12%, transparent);"><span style="width:6px; height:6px; border-radius:var(--radius-pill); background:var(--blue);"></span>actual</span>
+        </div>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">prov</span>. Use beside admin-only value figures so the basis is never separated from the money number.</div>
+    </div>
+
+    <!-- W6: WorkQueueRow -->
+    <div class="sub-section">
+      <div class="col-label">WorkQueueRow · command-center queue item</div>
+      <div class="sectioncard" style="padding:0; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-top:1px solid var(--brand-border);">
+          <span style="width:24px; height:24px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--teal), var(--emerald)); color:var(--surface-1); font-weight:800;">B</span>
+          <div style="flex:1; min-width:0;">
+            <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Pitch implant landing page</div>
+            <div class="t-caption-sm" style="color:var(--brand-text-muted);">Bay Street Dental · high-intent demand</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="t-ui" style="font-weight:700; color:var(--emerald);">$2.4k/mo</div>
+            <span class="t-micro" style="display:inline-flex; align-items:center; gap:4px; padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); color:var(--amber); background:color-mix(in srgb, var(--amber) 12%, transparent);"><span style="width:6px; height:6px; border-radius:var(--radius-pill); background:var(--amber);"></span>estimate</span>
+          </div>
+          <button style="display:inline-flex; align-items:center; gap:6px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-3); color:var(--amber); padding:var(--space-2) var(--space-3); font-size:12px; font-weight:700;"><svg class="i i-sm"><use href="#i-target"/></svg>Propose</button>
+        </div>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">co-sig</span>. Compose inside <span class="t-mono">GroupBlock</span> for stream groups instead of wrapping it in another card.</div>
+    </div>
+
+    <!-- W6: ClientSwitcherRow -->
+    <div class="sub-section">
+      <div class="col-label">ClientSwitcherRow · cross-client rail item</div>
+      <div class="sectioncard" style="padding:0; overflow:hidden; max-width:360px;">
+        <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-top:1px solid var(--brand-border);">
+          <span style="width:28px; height:28px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--teal), var(--emerald)); color:var(--surface-1); font-weight:800;">A</span>
+          <div style="flex:1; min-width:0;">
+            <div class="t-ui" style="font-weight:700; color:var(--brand-text-bright); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Acme Interiors</div>
+            <div class="t-caption-sm" style="color:var(--brand-text-muted);">acme.example</div>
+          </div>
+          <span aria-hidden="true" style="width:8px; height:8px; border-radius:var(--radius-pill); background:var(--emerald);"></span>
+          <span class="badge b-amber">3</span>
+          <svg class="i i-sm" style="color:var(--brand-text-dim);"><use href="#i-chev"/></svg>
+        </div>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">co-crow</span>. Use for a compact selectable client rail; keep full workspace navigation in <span class="t-mono">NavItem</span>.</div>
+    </div>
+
+    <!-- W6: ClientThreadRow -->
+    <div class="sub-section">
+      <div class="col-label">ClientThreadRow · from-client rail message</div>
+      <div class="sectioncard" style="padding:0; overflow:hidden; max-width:460px;">
+        <div style="display:flex; align-items:flex-start; gap:var(--space-3); padding:var(--space-3) var(--space-4); border-top:1px solid var(--brand-border);">
+          <span style="width:24px; height:24px; border-radius:var(--radius-md); display:inline-flex; align-items:center; justify-content:center; background:var(--blue); color:var(--surface-1); font-weight:800;">J</span>
+          <div style="flex:1; min-width:0;">
+            <div class="row" style="gap:var(--space-2);">
+              <span class="t-ui" style="font-weight:700; color:var(--brand-text-bright);">Jordan</span>
+              <span class="badge b-amber">Request</span>
+              <span class="t-caption-sm" style="margin-left:auto; color:var(--brand-text-muted);">1h ago</span>
+            </div>
+            <div class="t-caption" style="margin-top:5px; color:var(--brand-text);">Can we prioritize the services page?</div>
+            <button style="margin-top:8px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:var(--radius-md); background:var(--teal); color:var(--button-primary-text); padding:var(--space-2) var(--space-3); font-size:12px; font-weight:700;"><svg class="i i-sm"><use href="#i-trend"/></svg>Promote to signal</button>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">Ports <span class="t-mono">co-trow/ck-frow</span>. Use for the from-client rail; approval decisions still use the inbox decision primitives.</div>
+    </div>
+
+    <!-- F3: FilterChip -->
+    <div class="sub-section">
+      <div class="col-label">FilterChip · active / inactive / removable</div>
+      <div class="card">
+        <div class="row" style="gap:var(--space-2);">
+          <span class="badge b-teal">Active filter</span>
+          <span class="badge b-zinc">Inactive filter</span>
+          <span class="badge b-teal" style="display:inline-flex; align-items:center; gap:4px;">Removable <svg class="i i-xs" style="cursor:pointer;"><use href="#i-x"/></svg></span>
+        </div>
+      </div>
+      <div class="spec-note">Use for user-applied filters above a table or list. Only a filter the user actively chose gets the remove affordance — a filter implied by page context (e.g. workspace scope) should never show an x.</div>
+    </div>
+
+    <!-- F3: SearchField -->
+    <div class="sub-section">
+      <div class="col-label">SearchField · leading icon + Cmd+K hint</div>
+      <div class="card">
+        <div class="input-group" style="max-width:320px;">
+          <svg class="i lead-icon"><use href="#i-search"/></svg>
+          <input class="input" type="text" placeholder="Search pages, keywords, briefs..." />
+          <kbd style="margin-left:auto; font-family:var(--font-mono); font-size:11px; color:var(--brand-text-muted); background:var(--surface-3); border:1px solid var(--brand-border); border-radius:var(--radius-sm); padding:var(--space-1);">⌘K</kbd>
+        </div>
+      </div>
+      <div class="spec-note">Use as the primary global or section search entry point. The <span class="t-mono">⌘K</span> hint only belongs on a search field that's actually wired to a keyboard shortcut — don't decorate a plain filter input with it.</div>
+    </div>
+
+    <!-- F3: RadioGroup -->
+    <div class="sub-section">
+      <div class="col-label">RadioGroup · single choice from a short list</div>
+      <div class="card" style="display:grid; gap:var(--space-2); max-width:280px;">
+        <label class="row" style="gap:var(--space-2); align-items:center; cursor:pointer;">
+          <span style="width:16px; height:16px; border-radius:var(--radius-pill); border:1px solid var(--teal); display:inline-flex; align-items:center; justify-content:center;"><span style="width:8px; height:8px; border-radius:var(--radius-pill); background:var(--teal); display:block;"></span></span>
+          <span style="font-size:13px; color:var(--brand-text-bright);">Weekly digest</span>
+        </label>
+        <label class="row" style="gap:var(--space-2); align-items:center; cursor:pointer;">
+          <span style="width:16px; height:16px; border-radius:var(--radius-pill); border:1px solid var(--brand-border-hover); display:inline-flex;"></span>
+          <span style="font-size:13px; color:var(--brand-text);">Monthly digest</span>
+        </label>
+        <label class="row" style="gap:var(--space-2); align-items:center; cursor:pointer;">
+          <span style="width:16px; height:16px; border-radius:var(--radius-pill); border:1px solid var(--brand-border-hover); display:inline-flex;"></span>
+          <span style="font-size:13px; color:var(--brand-text);">Off</span>
+        </label>
+      </div>
+      <div class="spec-note">Use when exactly one choice must be made from 2-5 mutually-exclusive options and all options should stay visible — swap to <span class="t-mono">Select</span> once the list grows past a handful.</div>
+    </div>
+
+    <!-- F3: AppShell -->
+    <div class="sub-section">
+      <div class="col-label">AppShell · miniature scaled mock (not a full-page shell)</div>
+      <div class="card" style="max-width:380px; margin:0 auto; padding:0; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:64px 1fr; height:180px;">
+          <div style="background:var(--surface-2); border-right:1px solid var(--brand-border); display:flex; flex-direction:column; align-items:center; gap:var(--space-3); padding:var(--space-3) 0;">
+            <span style="width:24px; height:24px; border-radius:var(--radius-md); background:var(--surface-active);"></span>
+            <span style="width:20px; height:20px; border-radius:var(--radius-sm); background:var(--teal); opacity:.7;"></span>
+            <span style="width:20px; height:20px; border-radius:var(--radius-sm); background:var(--surface-3);"></span>
+            <span style="width:20px; height:20px; border-radius:var(--radius-sm); background:var(--surface-3);"></span>
+          </div>
+          <div style="display:flex; flex-direction:column;">
+            <div style="height:32px; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; padding:0 var(--space-3); color:var(--brand-text-muted); font-size:11px;">Topbar</div>
+            <div style="flex:1; padding:var(--space-3); display:grid; gap:var(--space-2);">
+              <span style="height:14px; border-radius:var(--radius-sm); background:var(--surface-3); width:60%;"></span>
+              <span style="height:40px; border-radius:var(--radius-md); background:var(--surface-3);"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">Use as the outer two-zone rail + topbar + content region that every authenticated screen mounts into — this specimen is scaled down purely to fit the styleguide; the real shell fills the viewport.</div>
+    </div>
+
+    <!-- F4: Rebuilt admin shell -->
+    <div class="sub-section">
+      <div class="col-label">Rebuilt admin shell · NavItem + NavGroup + Breadcrumb + AppShell composition</div>
+      <div class="card" style="max-width:760px; margin:0 auto; padding:0; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:210px 1fr; height:300px; background:var(--surface-1); color:var(--brand-text);">
+          <div style="display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--brand-border);">
+            <div style="padding:var(--space-4) var(--space-4) var(--space-3); border-bottom:1px solid var(--brand-border);">
+              <div style="font-size:13px; font-weight:700; color:var(--brand-text-bright);">hmpsn.studio</div>
+              <div style="margin-top:var(--space-3); padding:var(--space-2) var(--space-3); border:1px solid var(--brand-border); border-radius:var(--radius-md); color:var(--brand-text-bright); font-size:12px;">Acme Dental</div>
+            </div>
+            <div style="flex:1; padding:var(--space-3) var(--space-2); overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-2) var(--space-1); font-family:var(--font-mono); font-size:10px; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--blue);">
+                MONITORING <span style="flex:1; height:1px; background:var(--blue); opacity:.35;"></span>
+              </div>
+              <div style="position:relative; display:flex; align-items:center; gap:var(--space-3); min-height:40px; padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); background:color-mix(in srgb, var(--blue) 12%, transparent); color:var(--blue); font-size:13px; font-weight:500;">
+                <span style="position:absolute; left:-8px; top:50%; transform:translateY(-50%); width:3px; height:18px; background:var(--blue); border-radius:0 var(--radius-sm) var(--radius-sm) 0;"></span>
+                <span style="width:12px; height:12px; border-radius:var(--radius-sm); background:var(--blue); opacity:.85;"></span>
+                <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Search &amp; Traffic</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--space-3); min-height:40px; padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); color:var(--brand-text); font-size:13px; font-weight:500;">
+                <span style="width:12px; height:12px; border-radius:var(--radius-sm); background:var(--brand-text-dim);"></span>
+                <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Action Results</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-2) var(--space-1); font-family:var(--font-mono); font-size:10px; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--teal);">
+                STRATEGY <span style="flex:1; height:1px; background:var(--teal); opacity:.35;"></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--space-3); min-height:40px; padding:var(--space-2) var(--space-3); border-radius:var(--radius-md); color:var(--brand-text); font-size:13px; font-weight:500;">
+                <span style="width:12px; height:12px; border-radius:var(--radius-sm); background:var(--brand-text-dim);"></span>
+                <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Keyword Hub</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; min-width:0;">
+            <div style="height:48px; border-bottom:1px solid var(--brand-border); display:flex; align-items:center; padding:0 18px;">
+              <div style="display:flex; align-items:center; gap:8px; min-width:0; font-size:12.5px; color:var(--brand-text-dim);">
+                <span>Command Center</span>
+                <span style="color:var(--brand-text-dim);">→</span>
+                <span>Acme Dental</span>
+                <span style="color:var(--brand-text-dim);">→</span>
+                <span style="color:var(--brand-text-bright); font-weight:600;">Keyword Hub</span>
+              </div>
+            </div>
+            <div style="flex:1; padding:22px; display:flex; flex-direction:column; gap:14px;">
+              <div>
+                <div style="height:18px; width:220px; border-radius:var(--radius-sm); background:var(--surface-3);"></div>
+                <div style="height:10px; width:320px; border-radius:var(--radius-sm); background:var(--surface-3); margin-top:8px;"></div>
+              </div>
+              <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+                <div style="height:58px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-2);"></div>
+                <div style="height:58px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-2);"></div>
+                <div style="height:58px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-2);"></div>
+              </div>
+              <div style="height:86px; border:1px solid var(--brand-border); border-radius:var(--radius-md); background:var(--surface-2);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spec-note">F4 adds the nav-chrome layer. Item identity stays single-sourced in <span class="t-mono">NAV_REGISTRY</span>; the new shell is gated by <span class="t-mono">ui-rebuild-shell</span> and is mounted by rebuilt pilot surfaces, not by the live admin app.</div>
+    </div>
+
+    <!-- F3: PageContainer -->
+    <div class="sub-section">
+      <div class="col-label">PageContainer · miniature max-width + padding concept</div>
+      <div class="card" style="max-width:380px; margin:0 auto;">
+        <div style="border:1px dashed var(--brand-border-hover); border-radius:var(--radius-md); padding:var(--space-4); background:var(--surface-3);">
+          <div style="border:1px solid var(--brand-border); border-radius:var(--radius-sm); padding:var(--space-3); background:var(--surface-2); color:var(--brand-text-muted); font-size:11px; text-align:center;">content column, capped and centered</div>
+        </div>
+      </div>
+      <div class="spec-note">Use to cap a page's content width and apply consistent horizontal padding (<span class="t-mono">--page-pad-x</span>) so text and cards never stretch edge-to-edge on wide viewports.</div>
+    </div>
+
+    <!-- F3: Toolbar -->
+    <div class="sub-section">
+      <div class="col-label">Toolbar · search + filters + spacer + action</div>
+      <div class="card">
+        <div class="row" style="gap:var(--space-2); align-items:center; flex-wrap:nowrap;">
+          <div class="input-group" style="max-width:220px;">
+            <svg class="i lead-icon"><use href="#i-search"/></svg>
+            <input class="input" type="text" placeholder="Filter rows..." />
+          </div>
+          <span class="badge b-teal">Status: Active</span>
+          <span class="badge b-zinc">Owner: Me</span>
+          <span style="flex:1;"></span>
+          <button class="btn btn-primary">New item</button>
+        </div>
+      </div>
+      <div class="spec-note">Use above a table or list where search, applied filters, and a primary action all need to share one row — the spacer always sits between the filter chips and the action button, never between individual chips.</div>
+    </div>
+
+    <!-- F3: GroupBlock -->
+    <div class="sub-section">
+      <div class="col-label">GroupBlock · icon tile + title + stats header, over body rows</div>
+      <div class="sectioncard">
+        <div class="sc-header">
+          <div class="sc-title" style="display:flex; align-items:center; gap:var(--space-2);">
+            <span style="width:28px; height:28px; border-radius:var(--radius-md); background:rgba(45,212,191,.14); display:inline-flex; align-items:center; justify-content:center; color:var(--teal);"><svg class="i i-sm"><use href="#i-target"/></svg></span>
+            Local visibility
+          </div>
+          <div class="row" style="gap:var(--space-4);">
+            <span class="t-caption" style="color:var(--brand-text-muted);">14 keywords</span>
+            <span class="t-caption" style="color:var(--emerald);">+3 this week</span>
+          </div>
+        </div>
+        <ul class="datalist" style="padding:6px 0;">
+          <li><span class="label">"seo agency near me"</span><span class="value">#3.1</span></li>
+          <li><span class="label">"local seo audit"</span><span class="value">#5.8</span></li>
+        </ul>
+      </div>
+      <div class="spec-note">Use to head a grouped section of related rows with an at-a-glance icon identity plus two right-aligned summary stats — reserve it for groupings that genuinely share one theme, not a generic catch-all list wrapper.</div>
     </div>
 
   </section>
@@ -3789,30 +4349,37 @@ SectionCard: var(--radius-signature-lg)</div>
       <span class="sec-num">07 ·</span>
       <h2>Motion</h2>
       <div class="rule"></div>
-      <p>Three durations. Every animation in the system picks one of the three — no in-between values. <span class="t-mono">Instant</span> for state response, <span class="t-mono">Standard</span> for UI changes, <span class="t-mono">Deliberate</span> for the rare moments that earn the spotlight. Ease is uniformly <span class="t-mono">ease-out</span> unless noted.</p>
+      <p>Three durations, exposed as tokens — every animation picks <span class="t-mono">var(--dur-fast)</span>, <span class="t-mono">var(--dur-base)</span>, or <span class="t-mono">var(--dur-slow)</span>; ease is <span class="t-mono">var(--ease-out)</span> unless noted (<span class="t-mono">var(--ease-draw)</span> for chart draws).</p>
     </div>
 
-    <!-- THE MOTION LAW — 3 durations, full stop -->
+    <!-- THE MOTION LAW — 3 duration tokens, full stop -->
     <div class="motion-law">
       <div class="motion-law-card">
-        <div class="motion-law-num">01 · Instant</div>
-        <div class="motion-law-dur">100<span class="ms">ms</span></div>
+        <div class="motion-law-num">01 · Instant · <span class="t-mono">--dur-fast</span></div>
+        <div class="motion-law-dur">150<span class="ms">ms</span></div>
         <div class="motion-law-use">Hover, focus, toggle, press. The UI should feel like it's responding <em>to</em> you, not performing <em>for</em> you.</div>
         <div class="motion-law-bar"></div>
       </div>
       <div class="motion-law-card">
-        <div class="motion-law-num">02 · Standard</div>
-        <div class="motion-law-dur">240<span class="ms">ms</span></div>
-        <div class="motion-law-use">Card entries, modal open/close, tab switch, toast, number fade-in, stagger step. The workhorse — 90% of animations land here.</div>
+        <div class="motion-law-num">02 · Standard · <span class="t-mono">--dur-base</span></div>
+        <div class="motion-law-dur">250<span class="ms">ms</span></div>
+        <div class="motion-law-use">Card entries, modal open/close, tab switch, toast, stagger step (via <span class="t-mono">--stagger-step</span> 60ms). The workhorse — 90% of animations land here.</div>
         <div class="motion-law-bar"></div>
       </div>
       <div class="motion-law-card">
-        <div class="motion-law-num">03 · Deliberate</div>
-        <div class="motion-law-dur">600<span class="ms">ms</span></div>
+        <div class="motion-law-num">03 · Deliberate · <span class="t-mono">--dur-slow</span></div>
+        <div class="motion-law-dur">500<span class="ms">ms</span></div>
         <div class="motion-law-use">Moments of consequence: ring charge-up, scanner reveal, celebration glow. Use sparingly — once per screen, at most.</div>
         <div class="motion-law-bar"></div>
       </div>
     </div>
+
+    <!-- F1:FoundationTokens-motion START (relocated from §04 per F2a reconciliation) -->
+    <div class="sub-section">
+      <div class="col-label">Motion tokens (F1) · hover the tile — <span class="t-mono">transition: transform var(--dur-base) var(--ease-out)</span></div>
+      <div style="width:120px;height:48px;border-radius:var(--radius-md);background:var(--teal);color:var(--button-primary-text);display:flex;align-items:center;justify-content:center;transition:transform var(--dur-base) var(--ease-out);cursor:default;" onmouseover="this.style.transform='translateX(24px)'" onmouseout="this.style.transform='translateX(0)'"><span class="t-mono">--dur-base</span></div>
+    </div>
+    <!-- F1:FoundationTokens-motion END -->
 
     <div class="motion-grid">
 
@@ -3820,7 +4387,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-hover">
         <div class="motion-head">
           <span class="motion-title">Hover / focus / state</span>
-          <span class="motion-tier">Instant · 100ms</span>
+          <span class="motion-tier">Instant · 150ms</span>
           <span class="motion-spec">background, color, border, translateY(-1px)</span>
         </div>
         <div class="motion-stage">
@@ -3833,7 +4400,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-stagger">
         <div class="motion-head">
           <span class="motion-title">Stagger entrance</span>
-          <span class="motion-tier std">Standard · 240ms</span>
+          <span class="motion-tier std">Standard · 250ms</span>
           <span class="motion-spec">opacity + translateY · step 60ms</span>
         </div>
         <div class="motion-stage">
@@ -3850,7 +4417,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-charge">
         <div class="motion-head">
           <span class="motion-title">MetricRing charge-up</span>
-          <span class="motion-tier del">Deliberate · 600ms</span>
+          <span class="motion-tier del">Deliberate · 500ms</span>
           <span class="motion-spec">stroke-dashoffset 0 → target</span>
         </div>
         <div class="motion-stage">
@@ -3866,7 +4433,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-numfade">
         <div class="motion-head">
           <span class="motion-title">Number fade-in</span>
-          <span class="motion-tier std">Standard · 240ms</span>
+          <span class="motion-tier std">Standard · 250ms</span>
           <span class="motion-spec">opacity 0 → 1 · delay 320ms</span>
         </div>
         <div class="motion-stage">
@@ -3879,7 +4446,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-glow">
         <div class="motion-head">
           <span class="motion-title">Outward glow</span>
-          <span class="motion-tier del">Deliberate · 600ms</span>
+          <span class="motion-tier del">Deliberate · 500ms</span>
           <span class="motion-spec">bloom + soft shadow</span>
         </div>
         <div class="motion-stage">
@@ -3892,7 +4459,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-scan">
         <div class="motion-head">
           <span class="motion-title">ScannerReveal · route change</span>
-          <span class="motion-tier del">Deliberate · 600ms</span>
+          <span class="motion-tier del">Deliberate · 500ms</span>
           <span class="motion-spec">mint beam sweep</span>
         </div>
         <div class="motion-stage">
@@ -3912,7 +4479,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-icard">
         <div class="motion-head">
           <span class="motion-title">Interactive card hover</span>
-          <span class="motion-tier">Instant · 100ms</span>
+          <span class="motion-tier">Instant · 150ms</span>
           <span class="motion-spec">2px left accent · rgba(45,212,191,.4)</span>
         </div>
         <div class="motion-stage">
@@ -3941,7 +4508,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-modal">
         <div class="motion-head">
           <span class="motion-title">Modal scale-in</span>
-          <span class="motion-tier std">Standard · 240ms</span>
+          <span class="motion-tier std">Standard · 250ms</span>
           <span class="motion-spec">scale 0.96 → 1 + opacity</span>
         </div>
         <div class="motion-stage">
@@ -3957,7 +4524,7 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="motion-card" data-screen-label="motion-toast">
         <div class="motion-head">
           <span class="motion-title">Toast slide-up</span>
-          <span class="motion-tier std">Standard · 240ms</span>
+          <span class="motion-tier std">Standard · 250ms</span>
           <span class="motion-spec">translateY 12 → 0 + opacity</span>
         </div>
         <div class="motion-stage">

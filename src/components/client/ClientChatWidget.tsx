@@ -8,7 +8,7 @@ import { Button, ClickableRow, FormInput, Icon, IconButton, cn } from '../ui';
 import { getOptional, getSafe } from '../../api/client';
 import { clientPath } from '../../routes';
 import { STUDIO_NAME } from '../../constants';
-import { RenderMarkdown } from './helpers';
+import { RenderMarkdown } from './RenderMarkdown';
 import { ServiceInterestCTA } from './ServiceInterestCTA';
 import { useChat, type ChatDeps } from '../../hooks/useChat';
 import { type WorkspaceInfo, QUICK_QUESTIONS, LEARN_SEO_QUESTIONS } from './types';

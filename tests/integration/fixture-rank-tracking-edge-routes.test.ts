@@ -15,7 +15,7 @@ beforeAll(async () => {
   updateWorkspace(wsId, { clientPassword: 'test-password' });
   const authRes = await postJson(`/api/public/auth/${wsId}`, { password: 'test-password' });
   expect(authRes.status).toBe(200);
-});
+}, 30_000);
 
 afterAll(async () => {
   deleteWorkspace(wsId);

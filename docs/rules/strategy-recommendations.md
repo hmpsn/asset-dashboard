@@ -64,7 +64,8 @@ export function throttleRecommendation(
 export function fixRecommendation(workspaceId: string, recId: string): Recommendation | null;
 ```
 
-All five functions return `null` when the rec id is not found in the workspace blob.
+All five functions return `null` when the rec id is not found in the workspace's
+`recommendation_items` rows (the sole store after the R7 blob→rows cutover).
 
 ## `isActiveRec` — the ONE active-set predicate
 
@@ -199,6 +200,68 @@ Current registry (Phase 1, + `competitor` added in P4 / PR #1286):
 `competitor` recs are minted on demand from a competitive gap by `POST /:ws/competitor-rec`
 (`CompetitiveIntel` "Send to client", flag `strategy-competitor-send`); the generation engine emits
 none, and `signalToRecType` never maps to `competitor`.
+
+## Verifiable dual-write + client-delivery authority (Reconcile R4-PR1)
+
+The owner KEPT the two-axis model (R4 does NOT collapse the axes). What R4-PR1 hardens is the
+`recommendation → client_deliverable` mirror: it was fire-and-forget and could silently diverge (a
+named audit blind spot). Three contracts close that:
+
+### 1. The dual-write returns a typed `MirrorResult` — every caller OBSERVES it
+
+`mirrorRecommendationToDeliverable` / `mirrorClientActionToDeliverable` no longer return a bare
+`ClientDeliverable | null` (a shape every caller silently discarded). They return `MirrorResult`
+(exported from `server/domains/inbox/recommendation-dual-write.ts`):
+
+```ts
+type MirrorResult =
+  | { ok: true; deliverableId?: string; skipped?: boolean; reason?: string }
+  | { ok: false; error: string };
+```
+
+- `ok:true, deliverableId` — mirror row created/deduped
+- `ok:true, skipped:true` — the adapter benignly rejected a not-sendable input (NOT a failure)
+- `ok:false, error` — the store write threw
+
+**All three rec callers MUST observe `ok` and, on `false`, write an admin-only `addActivity` +
+a Pino error — NEVER swallow it** (that was the bug). The three seams:
+`server/routes/recommendations.ts` per-row `/send` + bulk `/bulk` (via `observeRecMirror`), and
+`server/strategy-issue-cron.ts` `runAutoSendForWorkspace` (the autosend cron). The client-action
+caller (`createAdminClientAction` in `server/domains/inbox/client-actions-mutations.ts`) observes the
+same shape. The failure activity uses the admin-only `rec_status_updated` type (deliberately NOT in
+`CLIENT_VISIBLE_TYPES`).
+
+### 2. Act-on advances the mirror in lockstep (`recommendation-mirror-sync.ts`)
+
+The client "Act on this" greenlight flips `clientStatus → approved` via the single-writer AND advances
+the rec-sourced deliverable mirror `awaiting_client → approved` THROUGH THE DELIVERABLE STORE
+(`syncRecommendationDeliverableStatus` in `server/domains/inbox/recommendation-mirror-sync.ts`, modeled
+exactly on `approval-batch-mirror-sync.ts`). Rules: status changes go through `upsertDeliverable`
+(pr-check forbids a direct table insert) guarded by `getDeliverableTransitions`, and it fires
+`DELIVERABLE_UPDATED` (reused — already has full frontend invalidation coverage). Called POST-commit +
+best-effort from the act-on route: the greenlight has already committed and must not roll back on a
+mirror hiccup. This closes the "act-on never advances the mirror" divergence-by-construction path.
+
+### 3. Read-only divergence sweep (`deliverable-divergence-sweep.ts`)
+
+`runDeliverableDivergenceSweep` (flag-gated per workspace behind `strategy-divergence-sweep`,
+registered in `server/outcome-crons.ts`) compares each sent/decided rec's `clientStatus` against its
+`recommendation:<id>` deliverable mirror and REPORTS the pairs that disagree
+(`missing_mirror` / `mirror_behind` / `rec_behind` / `decision_conflict`). It **MUTATES NOTHING** — no
+upsert, no broadcast, no activity, no repair. Repair is the separate R4-PR2 ticket (a DB trigger pair
+on `recommendation_items`) plus a backfill/verify PR. Making the sweep write would recreate exactly the
+silent reconciliation the two-axis split eliminates.
+
+### The app-level struck≠completed guard
+
+`updateRecommendationStatus` (status-service) throws `StruckRecCompletionError` when asked to complete a
+rec that `isExemptFromAutoResolve` (struck / sent / discussing / approved) — the SAME predicate the
+finalization auto-resolve uses, so the direct-completion path (`fixRecommendation`, PATCH `/:recId`
+status, the `/fix` route) can no longer silently sweep a struck rec to `completed`. The two write-driven
+auto-resolve loops in `resolution-service.ts` (`resolveRecommendationsForChange`,
+`resolveContentRecommendationsForPublishedPost`) skip exempt recs for the same reason. The
+UNbypassable DB-level constraint is R4-PR2 (guards ship BEFORE the trigger so regen rollbacks aren't
+opaque 500s).
 
 ## Deferred items (do not implement early)
 

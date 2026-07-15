@@ -14,6 +14,18 @@ interface SectionCardProps {
    */
   titleExtra?: ReactNode;
   /**
+   * Optional secondary line rendered stacked BELOW the title (co-sh "header" style).
+   * When set, the title cluster switches from inline (title + titleExtra side by side)
+   * to stacked (title over subtitle), matching the prototype's `.co-sh` card header.
+   * Pair with `iconChip` to also wrap `titleIcon` in a 30px chip.
+   */
+  subtitle?: ReactNode;
+  /**
+   * When true, wraps `titleIcon` in a 30×30 `bg-[var(--surface-3)]` rounded chip
+   * (the prototype `.co-sh .si` treatment). The caller's icon keeps its own color.
+   */
+  iconChip?: boolean;
+  /**
    * Right-aligned slot in the header row. The outer flex uses `justify-between`, so
    * `action` naturally hugs the right edge. Use this for buttons, toggles, date range
    * selectors, small muted counts/metadata, or anything that was previously marked with
@@ -39,8 +51,8 @@ interface SectionCardProps {
   variant?: 'default' | 'subtle';
 }
 
-export function SectionCard({ id, title, titleIcon, titleExtra, action, children, className, noPadding, interactive, staggerIndex, variant = 'default' }: SectionCardProps) {
-  const hasHeader = title || action || titleExtra;
+export function SectionCard({ id, title, titleIcon, titleExtra, subtitle, iconChip, action, children, className, noPadding, interactive, staggerIndex, variant = 'default' }: SectionCardProps) {
+  const hasHeader = title || action || titleExtra || subtitle;
 
   const staggerStyle = staggerIndex !== undefined
     ? { animation: 'staggerFadeIn 0.4s cubic-bezier(0.22,0.61,0.36,1) both', animationDelay: `${staggerIndex * 60}ms` }
@@ -63,10 +75,24 @@ export function SectionCard({ id, title, titleIcon, titleExtra, action, children
     >
       {hasHeader && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--brand-border)]">
-          <div className="flex items-center gap-2 min-w-0">
-            {titleIcon}
-            <span className="t-body font-semibold text-[var(--brand-text-bright)]">{title}</span>
-            {titleExtra}
+          <div className="flex items-center gap-[11px] min-w-0">
+            {titleIcon && (iconChip
+              ? <span className="inline-flex h-[30px] w-[30px] flex-none items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-3)]">{titleIcon}</span>
+              : titleIcon)}
+            {subtitle ? (
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="t-body font-semibold text-[var(--brand-text-bright)] truncate">{title}</span>
+                  {titleExtra}
+                </div>
+                <div className="t-caption-sm text-[var(--brand-text-muted)]">{subtitle}</div>
+              </div>
+            ) : (
+              <>
+                <span className="t-body font-semibold text-[var(--brand-text-bright)]">{title}</span>
+                {titleExtra}
+              </>
+            )}
           </div>
           {action}
         </div>

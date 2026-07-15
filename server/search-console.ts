@@ -10,10 +10,20 @@ import { googleJson, isGoogleProviderError } from './google-provider-client.js';
 import { createLogger } from './logger.js';
 import { GSC_METRIC_WINDOW_DAYS } from '../shared/keyword-window.js';
 import { normalizePageUrl } from '../shared/page-address-utils.js';
+import {
+  buildLocalGscFixtureResponse,
+  isLocalProviderFixtureSite,
+  LOCAL_PROVIDER_FIXTURE_TOKEN,
+} from './providers/local-provider-fixtures.js';
 
 
 const log = createLogger('search-console');
 const GSC_API = 'https://www.googleapis.com/webmasters/v3';
+
+async function getGscAccessToken(siteId: string): Promise<string | null> {
+  if (isLocalProviderFixtureSite(siteId)) return LOCAL_PROVIDER_FIXTURE_TOKEN;
+  return getValidToken(siteId);
+}
 
 /** Convert GSC decimal CTR to percentage, rounded to 1 decimal place. E.g. 0.063 → 6.3 */
 export function formatGscCtr(ctr: number): number {
@@ -171,6 +181,10 @@ export interface PerformanceTrend {
 }
 
 async function gscFetch(endpoint: string, token: string, body?: unknown): Promise<unknown> {
+  if (token === LOCAL_PROVIDER_FIXTURE_TOKEN) {
+    const fixtureBody = body && typeof body === 'object' ? body as Record<string, unknown> : undefined;
+    return buildLocalGscFixtureResponse(endpoint, fixtureBody);
+  }
   try {
     return await googleJson({
       endpoint,
@@ -187,7 +201,7 @@ async function gscFetch(endpoint: string, token: string, body?: unknown): Promis
 }
 
 export async function listGscSites(siteId: string): Promise<Array<{ siteUrl: string; permissionLevel: string }>> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const data = await gscFetch(`${GSC_API}/sites`, token) as {
@@ -203,7 +217,7 @@ export async function getSearchOverview(
   options: { queryLimit?: number; pageLimit?: number; startRow?: number; searchType?: string } = {},
   dateRange?: CustomDateRange,
 ): Promise<SearchOverview> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate, endDate } = gscDateRange(days, dateRange);
@@ -298,7 +312,7 @@ export async function getSearchQueryObservations(
   options: { maxRows?: number; searchType?: string } = {},
   dateRange?: CustomDateRange,
 ): Promise<SearchQueryObservation[]> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate, endDate } = gscDateRange(days, dateRange);
@@ -350,7 +364,7 @@ export async function getQueryPageData(
   days: number = 90,
   opts?: { maxRows?: number; dateRange?: CustomDateRange },
 ): Promise<QueryPageRow[]> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate, endDate } = gscDateRange(days, opts?.dateRange);
@@ -421,7 +435,7 @@ export async function getAllGscPages(
   dateRange?: CustomDateRange,
   opts?: { maxRows?: number },
 ): Promise<SearchPage[]> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate: start, endDate: end } = gscDateRange(days, dateRange);
@@ -469,7 +483,7 @@ export async function getTopDroppedGscPage(
   gscSiteUrl: string,
   days: number = 28,
 ): Promise<string | null> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) return null;
 
   const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
@@ -528,7 +542,7 @@ export async function getTopSpikedGscPage(
   gscSiteUrl: string,
   days: number = 28,
 ): Promise<string | null> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) return null;
 
   const { startDate: curStart, endDate: curEnd } = gscDateRange(days);
@@ -611,8 +625,15 @@ export async function inspectUrlForRichResults(
   pageUrl: string,
   siteUrl: string,
 ): Promise<UrlInspectionResult | null> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) return null;
+  if (token === LOCAL_PROVIDER_FIXTURE_TOKEN) {
+    return {
+      hasErrors: false,
+      issues: [{ severity: 'SUGGESTION', issueMessage: 'Add an image to the service rich result.', type: 'image' }],
+      richResultsDetected: ['Organization', 'Service', 'BreadcrumbList'],
+    };
+  }
 
   let data: {
     inspectionResult?: {
@@ -733,7 +754,7 @@ export async function getPerformanceTrend(
   days: number = 28,
   dateRange?: CustomDateRange,
 ): Promise<PerformanceTrend[]> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate, endDate } = gscDateRange(days, dateRange);
@@ -770,7 +791,7 @@ export async function getPageTrend(
   days: number = 90,
   dateRange?: CustomDateRange,
 ): Promise<PerformanceTrend[]> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate, endDate } = gscDateRange(days, dateRange);
@@ -863,7 +884,7 @@ export async function getSearchDeviceBreakdown(
   days: number = 28,
   dateRange?: CustomDateRange,
 ): Promise<DeviceBreakdown[]> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate, endDate } = gscDateRange(days, dateRange);
@@ -899,7 +920,7 @@ export async function getSearchCountryBreakdown(
   limit: number = 20,
   dateRange?: CustomDateRange,
 ): Promise<CountryBreakdown[]> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate, endDate } = gscDateRange(days, dateRange);
@@ -939,7 +960,7 @@ export async function getSearchTypeBreakdown(
   days: number = 28,
   dateRange?: CustomDateRange,
 ): Promise<SearchTypeBreakdown[]> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const { startDate, endDate } = gscDateRange(days, dateRange);
@@ -991,7 +1012,7 @@ export async function getSearchPeriodComparison(
   days: number = 28,
   dateRange?: CustomDateRange,
 ): Promise<PeriodComparison> {
-  const token = await getValidToken(siteId);
+  const token = await getGscAccessToken(siteId);
   if (!token) throw new Error('Not connected to Google');
 
   const encodedSiteUrl = encodeURIComponent(gscSiteUrl);

@@ -53,23 +53,22 @@ vi.mock('../../server/content-posts-ai.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../server/content-posts-ai.js')>();
   return {
     ...original,
-    callCreativeAI: vi.fn(async (opts: { json?: boolean }) => {
+    callCreativeAI: vi.fn(async (opts: { json?: boolean; operation?: string }) => {
       if (aiState.shouldFail) {
         throw new Error('Simulated AI failure');
       }
-      // The route passes json:true — return an appropriate response based on
-      // whether this is a generate or refine call (distinguished by a best-effort
-      // heuristic: refine calls include a "DIRECTION:" in the user prompt but we
-      // cannot inspect opts here, so we return a shape that covers both).
-      const payload = {
+      // Named operations make the structured response contract explicit; each
+      // strict schema receives only the fields it owns.
+      if (opts.operation === 'voice-refinement') {
+        return JSON.stringify({ refined: aiState.refineText });
+      }
+      return JSON.stringify({
         variations: [
           'Bold brands don\'t blend in — they ignite.',
           'Your audience is already searching. Be impossible to miss.',
           'Three words: clarity, confidence, conviction.',
         ],
-        refined: aiState.refineText,
-      };
-      return JSON.stringify(payload);
+      });
     }),
   };
 });
@@ -291,6 +290,13 @@ describe('POST /api/voice/:workspaceId/calibrate — AI-backed variation generat
   });
 
   it('returns 200 with a CalibrationSession shape when AI succeeds', async () => {
+    const count = (type: string): number => (db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM activity_log
+      WHERE workspace_id = ? AND type = ?
+    `).get(calWsId, type) as { count: number }).count;
+    const draftUpdatesBefore = count('voice_profile_updated');
+    const calibratedBefore = count('voice_calibrated');
     const res = await postJson(`/api/voice/${calWsId}/calibrate`, {
       promptType: 'headline',
     });
@@ -301,6 +307,8 @@ describe('POST /api/voice/:workspaceId/calibrate — AI-backed variation generat
     expect(body.promptType).toBe('headline');
     expect(Array.isArray(body.variations)).toBe(true);
     expect((body.variations as unknown[]).length).toBeGreaterThan(0);
+    expect(count('voice_profile_updated')).toBe(draftUpdatesBefore + 1);
+    expect(count('voice_calibrated')).toBe(calibratedBefore);
   });
 
   it('fires VOICE_PROFILE_UPDATED broadcast with sessionId after calibration', async () => {
@@ -538,10 +546,10 @@ describe('Variation feedback loop — POST /calibration-feedback', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. Reset to draft (status machine round-trip)
+// 6. Generic status edits cannot finalize the profile
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Status machine — reset to draft after calibration cycle', () => {
+describe('Status machine — finalization authority stays on POST /finalize', () => {
   let cycleWsId = '';
 
   beforeAll(async () => {
@@ -554,20 +562,20 @@ describe('Status machine — reset to draft after calibration cycle', () => {
     deleteWorkspace(cycleWsId);
   });
 
-  it('draft → calibrating → calibrated → draft round-trip succeeds', async () => {
+  it('draft → calibrating succeeds, calibrated is rejected, then draft reset succeeds', async () => {
     // draft → calibrating
     let res = await patchJson(`/api/voice/${cycleWsId}`, { status: 'calibrating' });
     expect(res.status).toBe(200);
     let body = await res.json() as Record<string, unknown>;
     expect(body.status).toBe('calibrating');
 
-    // calibrating → calibrated
+    // Generic PATCH cannot claim calibrating → calibrated.
     res = await patchJson(`/api/voice/${cycleWsId}`, { status: 'calibrated' });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     body = await res.json() as Record<string, unknown>;
-    expect(body.status).toBe('calibrated');
+    expect(body).toHaveProperty('error');
 
-    // calibrated → draft (reset)
+    // calibrating → draft (reset)
     res = await patchJson(`/api/voice/${cycleWsId}`, { status: 'draft' });
     expect(res.status).toBe(200);
     body = await res.json() as Record<string, unknown>;
@@ -582,14 +590,16 @@ describe('Status machine — reset to draft after calibration cycle', () => {
     expect(body.status).toBe('draft');
   });
 
-  it('illegal transition draft → calibrated returns 400 with from/to fields', async () => {
-    // cycleWsId is now draft; direct jump to calibrated is illegal
+  it('draft → calibrated is rejected by the domain transition boundary', async () => {
+    // The edge schema accepts the complete status vocabulary, but only explicit
+    // finalization may claim calibrated authority; generic domain updates reject it.
     const res = await patchJson(`/api/voice/${cycleWsId}`, { status: 'calibrated' });
     expect(res.status).toBe(400);
     const body = await res.json() as Record<string, unknown>;
     expect(body).toHaveProperty('error');
-    expect(body).toHaveProperty('from', 'draft');
-    expect(body).toHaveProperty('to', 'calibrated');
+    const getRes = await api(`/api/voice/${cycleWsId}`);
+    const profile = await getRes.json() as Record<string, unknown>;
+    expect(profile.status).toBe('draft');
   });
 });
 

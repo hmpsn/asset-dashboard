@@ -276,10 +276,11 @@ function LocalSeoPageAnnotationPanel({
   return (
     <SectionCard
       title="Local visibility annotation"
-      titleExtra={<Badge label="Page context" tone="blue" variant="soft" shape="pill" />}
+      titleExtra={<span className="hidden sm:inline-flex"><Badge label="Page context" tone="blue" variant="soft" shape="pill" /></span>}
       action={onOpenKeywords ? (
-        <Button variant="secondary" size="sm" icon={Search} onClick={onOpenKeywords}>
-          Open Keywords
+        <Button variant="secondary" size="sm" className="px-2 sm:px-2.5" aria-label="Open Keywords" onClick={onOpenKeywords}>
+          <Icon name="search" size="sm" />
+          <span className="sr-only sm:not-sr-only">Open Keywords</span>
         </Button>
       ) : undefined}
       variant="subtle"

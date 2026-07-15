@@ -4,14 +4,26 @@
 import { randomUUID } from 'crypto';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import { parseJsonSafeArray } from './db/json-validation.js';
-import { steeringEntrySchema, clientSuggestionSchema, qualityFlagSchema } from './schemas/copy-pipeline.js';
+import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
+import {
+  steeringEntrySchema,
+  clientSuggestionSchema,
+  qualityFlagSchema,
+  copySectionPlanIdentitySchema,
+} from './schemas/copy-pipeline.js';
+import {
+  canonicalGenerationProvenanceSchema,
+  generationProvenanceSchema,
+} from './schemas/generation-provenance.js';
+import { GenerationRevisionConflictError } from './generation-provenance.js';
 import { createLogger } from './logger.js';
 import { addVoiceSample, getVoiceProfile, deleteVoiceSample } from './voice-calibration.js';
 import { getEntry } from './page-strategy.js';
 import { addActivity } from './activity-log.js';
+import { COPY_SECTION_TRANSITIONS, validateTransition, InvalidTransitionError } from './state-machines.js';
 import type {
   CopySection,
+  PersistedCopySection,
   CopyMetadata,
   CopySectionStatus,
   SteeringEntry,
@@ -19,10 +31,31 @@ import type {
   QualityFlag,
   EntryCopyStatus,
 } from '../shared/types/copy-pipeline.js';
+import type { GenerationProvenance } from '../shared/types/ai-execution.js';
 import type { SectionPlanItem } from '../shared/types/page-strategy.js';
 import type { VoiceSampleContext } from '../shared/types/brand-engine.js';
 
 const log = createLogger('copy-review');
+
+export class CopySuggestionOriginalMismatchError extends Error {
+  readonly code = 'copy_suggestion_original_mismatch';
+
+  constructor(sectionId: string) {
+    super(`Copy section ${sectionId} no longer matches the suggestion source text`);
+    this.name = 'CopySuggestionOriginalMismatchError';
+  }
+}
+
+/**
+ * Public copy review uses `updatedAt` as its privacy-safe optimistic-lock token.
+ * SQLite timestamps only have millisecond precision, so two mutations in the same
+ * tick must still produce distinct tokens.
+ */
+function nextMutationTimestamp(previous: string): string {
+  const previousMs = Date.parse(previous);
+  const nowMs = Date.now();
+  return new Date(Number.isFinite(previousMs) ? Math.max(nowMs, previousMs + 1) : nowMs).toISOString();
+}
 
 // ── Voice sample auto-add on approve ──
 
@@ -77,6 +110,8 @@ interface CopySectionRow {
   client_suggestions: string | null;
   quality_flags: string | null;
   version: number;
+  generation_revision: number;
+  generation_provenance: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -100,8 +135,8 @@ interface CopyMetadataRow {
 const stmts = createStmtCache(() => ({
   // copy_sections
   insertSection: db.prepare(
-    `INSERT INTO copy_sections (id, workspace_id, entry_id, section_plan_item_id, generated_copy, status, ai_annotation, ai_reasoning, steering_history, client_suggestions, quality_flags, version, created_at, updated_at)
-     VALUES (@id, @workspace_id, @entry_id, @section_plan_item_id, @generated_copy, @status, @ai_annotation, @ai_reasoning, @steering_history, @client_suggestions, @quality_flags, @version, @created_at, @updated_at)`,
+    `INSERT INTO copy_sections (id, workspace_id, entry_id, section_plan_item_id, generated_copy, status, ai_annotation, ai_reasoning, steering_history, client_suggestions, quality_flags, version, generation_revision, generation_provenance, created_at, updated_at)
+     VALUES (@id, @workspace_id, @entry_id, @section_plan_item_id, @generated_copy, @status, @ai_annotation, @ai_reasoning, @steering_history, @client_suggestions, @quality_flags, @version, @generation_revision, @generation_provenance, @created_at, @updated_at)`,
   ),
   selectSectionsByEntry: db.prepare(
     `SELECT * FROM copy_sections WHERE entry_id = ? AND workspace_id = ? ORDER BY rowid ASC`,
@@ -109,33 +144,57 @@ const stmts = createStmtCache(() => ({
   selectSectionById: db.prepare(
     `SELECT * FROM copy_sections WHERE id = ? AND workspace_id = ?`,
   ),
-  deleteSectionsByEntry: db.prepare(
-    `DELETE FROM copy_sections WHERE entry_id = ? AND workspace_id = ?`,
+  deleteSectionCas: db.prepare(
+    `DELETE FROM copy_sections
+     WHERE id = @id AND workspace_id = @workspace_id
+       AND generation_revision = @expected_revision
+       AND status NOT IN ('client_review', 'approved')`,
   ),
   updateSectionCopy: db.prepare(
     `UPDATE copy_sections
-     SET generated_copy = @generated_copy, ai_annotation = @ai_annotation, ai_reasoning = @ai_reasoning, quality_flags = @quality_flags, status = @status, version = @version, updated_at = @updated_at
-     WHERE id = @id AND workspace_id = @workspace_id`,
+     SET generated_copy = @generated_copy, ai_annotation = @ai_annotation, ai_reasoning = @ai_reasoning,
+       quality_flags = @quality_flags, status = @status, version = @version, -- status-ok: COPY_SECTION_TRANSITIONS guard runs in saveGeneratedCopy() before this write (pending→draft)
+       generation_revision = generation_revision + 1,
+       generation_provenance = @generation_provenance,
+       updated_at = @updated_at
+     WHERE id = @id AND workspace_id = @workspace_id
+       AND generation_revision = @expected_revision
+       AND status NOT IN ('client_review', 'approved')`,
   ),
   updateSectionStatus: db.prepare(
     `UPDATE copy_sections
-     SET status = @status, updated_at = @updated_at -- status-ok: validated by isValidTransition() before run()
-     WHERE id = @id AND workspace_id = @workspace_id`,
+     SET status = @status, generation_revision = generation_revision + 1, -- status-ok: COPY_SECTION_TRANSITIONS guard runs in updateSectionStatus() before this write
+       updated_at = @updated_at
+     WHERE id = @id AND workspace_id = @workspace_id
+       AND generation_revision = @expected_revision`,
   ),
   updateSectionSteering: db.prepare(
     `UPDATE copy_sections
-     SET steering_history = @steering_history, updated_at = @updated_at
-     WHERE id = @id AND workspace_id = @workspace_id`,
+     SET steering_history = @steering_history,
+       generation_revision = generation_revision + 1, updated_at = @updated_at
+     WHERE id = @id AND workspace_id = @workspace_id
+       AND generation_revision = @expected_revision`,
   ),
   updateSectionClientSuggestions: db.prepare(
     `UPDATE copy_sections
-     SET client_suggestions = @client_suggestions, status = @status, updated_at = @updated_at
-     WHERE id = @id AND workspace_id = @workspace_id`,
+     SET client_suggestions = @client_suggestions, status = @status, -- status-ok: addClientSuggestion() only advances client_review→revision_requested; otherwise status is carried through unchanged
+       generation_revision = generation_revision + 1, updated_at = @updated_at
+     WHERE id = @id AND workspace_id = @workspace_id
+       AND generation_revision = @expected_revision`,
   ),
   updateSectionText: db.prepare(
     `UPDATE copy_sections
-     SET generated_copy = @generated_copy, status = @status, version = @version, updated_at = @updated_at
-     WHERE id = @id AND workspace_id = @workspace_id`,
+     SET generated_copy = @generated_copy, status = @status, version = @version, -- status-ok: updateCopyText() is a manual content edit that resets to draft; approved sections are blocked
+       generation_revision = generation_revision + 1, updated_at = @updated_at
+     WHERE id = @id AND workspace_id = @workspace_id
+       AND generation_revision = @expected_revision`,
+  ),
+
+  selectEntryGenerationAuthority: db.prepare(
+    `SELECT be.section_plan_json, be.updated_at
+     FROM blueprint_entries be
+     JOIN site_blueprints sb ON sb.id = be.blueprint_id
+     WHERE be.id = @entry_id AND sb.workspace_id = @workspace_id`,
   ),
 
   // blueprint entry lookup (for voice sample context tag resolution)
@@ -164,7 +223,7 @@ const stmts = createStmtCache(() => ({
 
 // ── Row mappers ──
 
-function rowToSection(row: CopySectionRow): CopySection {
+function rowToSection(row: CopySectionRow): PersistedCopySection {
   const r = row;
   return {
     id: r.id,
@@ -183,6 +242,13 @@ function rowToSection(row: CopySectionRow): CopySection {
       ? parseJsonSafeArray(r.quality_flags, qualityFlagSchema, { table: 'copy_sections', field: 'quality_flags' })
       : null,
     version: r.version,
+    generationRevision: r.generation_revision,
+    generationProvenance: parseJsonSafe(
+      r.generation_provenance,
+      generationProvenanceSchema,
+      null,
+      { workspaceId: r.workspace_id, table: 'copy_sections', field: 'generation_provenance' },
+    ),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -206,17 +272,13 @@ function rowToMetadata(row: CopyMetadataRow): CopyMetadata {
 }
 
 // ── Status transition validation ──
-
-const VALID_TRANSITIONS: Record<CopySectionStatus, CopySectionStatus[]> = {
-  pending: ['draft'],
-  draft: ['client_review', 'approved'],
-  client_review: ['approved', 'revision_requested'],
-  revision_requested: ['draft'],
-  approved: [],
-};
+// The copy-section transition table lives in server/state-machines.ts
+// (COPY_SECTION_TRANSITIONS) — this module no longer owns a parallel map.
+// isValidTransition is a boolean convenience wrapper over the shared table for the
+// internal callers below; the write-boundary guard uses validateTransition() (throws).
 
 export function isValidTransition(from: CopySectionStatus, to: CopySectionStatus): boolean {
-  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+  return COPY_SECTION_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 // ── Approve side-effects ──
@@ -339,44 +401,49 @@ function handleAllSectionsApproved(entryId: string, workspaceId: string): void {
 
 // ── Section CRUD ──
 
-export function getSectionsForEntry(entryId: string, workspaceId: string): CopySection[] {
+function getPersistedSectionsForEntry(entryId: string, workspaceId: string): PersistedCopySection[] {
   const rows = stmts().selectSectionsByEntry.all(entryId, workspaceId) as CopySectionRow[];
   return rows.map(r => rowToSection(r));
 }
 
-export function getSection(sectionId: string, workspaceId: string): CopySection | null {
+export function getSectionsForEntry(entryId: string, workspaceId: string): CopySection[] {
+  return getPersistedSectionsForEntry(entryId, workspaceId);
+}
+
+function getPersistedSection(sectionId: string, workspaceId: string): PersistedCopySection | null {
   const row = stmts().selectSectionById.get(sectionId, workspaceId) as CopySectionRow | undefined;
   if (!row) return null;
   return rowToSection(row);
 }
 
-// Initialize sections from section plan (delete-then-insert in transaction).
-// Preserves steering_history, client_suggestions, and created_at from any
-// existing sections so that re-generation doesn't wipe accumulated review data.
+export function getSection(sectionId: string, workspaceId: string): CopySection | null {
+  return getPersistedSection(sectionId, workspaceId);
+}
+
+// Initialize missing sections from the section plan without replacing stable rows.
+// Existing IDs, copy, review state, feedback, provenance, and timestamps remain authoritative.
 export function initializeSections(
   workspaceId: string,
   entryId: string,
   sectionPlan: SectionPlanItem[],
-): CopySection[] {
+): PersistedCopySection[] {
   const now = new Date().toISOString();
 
   const run = db.transaction(() => {
-    // Read before delete so steering history / client feedback survive re-generation
-    const existing = getSectionsForEntry(entryId, workspaceId);
-    const prevByPlanItem = new Map(
-      existing.map(s => [s.sectionPlanItemId, {
-        steeringHistory: s.steeringHistory,
-        clientSuggestions: s.clientSuggestions,
-        createdAt: s.createdAt,
-      }]),
-    );
+    const existing = getPersistedSectionsForEntry(entryId, workspaceId);
+    const existingByPlanItem = new Map(existing.map(section => [section.sectionPlanItemId, section]));
+    if (new Set(sectionPlan.map(item => item.id)).size !== sectionPlan.length) {
+      throw new Error('Cannot initialize copy sections from a plan with duplicate section ids');
+    }
 
-    stmts().deleteSectionsByEntry.run(entryId, workspaceId);
-
-    const sections: CopySection[] = [];
+    const sections: PersistedCopySection[] = [];
     for (const item of sectionPlan) {
+      const retained = existingByPlanItem.get(item.id);
+      if (retained) {
+        sections.push(retained);
+        continue;
+      }
       const id = `cs_${randomUUID().slice(0, 8)}`;
-      const prev = prevByPlanItem.get(item.id);
       stmts().insertSection.run({
         id,
         workspace_id: workspaceId,
@@ -386,29 +453,18 @@ export function initializeSections(
         status: 'pending',
         ai_annotation: null,
         ai_reasoning: null,
-        steering_history: prev ? JSON.stringify(prev.steeringHistory) : '[]',
-        client_suggestions: prev?.clientSuggestions ? JSON.stringify(prev.clientSuggestions) : null,
-        quality_flags: null,  // reset — AI re-scores on generation
+        steering_history: '[]',
+        client_suggestions: null,
+        quality_flags: null,
         version: 0,
-        created_at: prev?.createdAt ?? now,
+        generation_revision: 0,
+        generation_provenance: null,
+        created_at: now,
         updated_at: now,
       });
-      sections.push({
-        id,
-        workspaceId,
-        entryId,
-        sectionPlanItemId: item.id,
-        generatedCopy: null,
-        status: 'pending',
-        aiAnnotation: null,
-        aiReasoning: null,
-        steeringHistory: prev?.steeringHistory ?? [],
-        clientSuggestions: prev?.clientSuggestions ?? null,
-        qualityFlags: null,
-        version: 0,
-        createdAt: prev?.createdAt ?? now,
-        updatedAt: now,
-      });
+      const inserted = getPersistedSection(id, workspaceId);
+      if (!inserted) throw new Error(`Failed to initialize copy section: ${id}`);
+      sections.push(inserted);
     }
     return sections;
   });
@@ -416,29 +472,268 @@ export function initializeSections(
   return run();
 }
 
+interface CopyEntryAuthorityRow {
+  section_plan_json: string;
+  updated_at: string;
+}
+
+export interface CopyGenerationCensusSection {
+  id: string;
+  sectionPlanItemId: string;
+  generationRevision: number;
+  status: CopySectionStatus;
+}
+
+/** Durable identity/revision boundary captured before paid full-entry generation begins. */
+export interface CopyEntryGenerationSnapshot {
+  workspaceId: string;
+  entryId: string;
+  sectionPlanJson: string;
+  entryUpdatedAt: string;
+  plannedSections: Array<{ id: string; order: number }>;
+  sections: CopyGenerationCensusSection[];
+}
+
+export interface GeneratedCopySectionCommit {
+  sectionPlanItemId: string;
+  generatedCopy: string;
+  aiAnnotation: string;
+  aiReasoning: string;
+  qualityFlags?: QualityFlag[];
+}
+
+export interface GeneratedCopyMetadataCommit {
+  seoTitle: string;
+  metaDescription: string;
+  ogTitle: string;
+  ogDescription: string;
+}
+
+function generationConflict(snapshot: CopyEntryGenerationSnapshot): GenerationRevisionConflictError {
+  const first = snapshot.sections[0];
+  return new GenerationRevisionConflictError(
+    'copy_section',
+    first?.id ?? snapshot.entryId,
+    first?.generationRevision ?? 0,
+  );
+}
+
+function censusOf(sections: PersistedCopySection[]): CopyGenerationCensusSection[] {
+  return sections.map(section => ({
+    id: section.id,
+    sectionPlanItemId: section.sectionPlanItemId,
+    generationRevision: section.generationRevision,
+    status: section.status,
+  }));
+}
+
+function sameCensus(
+  expected: CopyGenerationCensusSection[],
+  actual: CopyGenerationCensusSection[],
+): boolean {
+  return expected.length === actual.length && expected.every((section, index) => {
+    const candidate = actual[index];
+    return candidate?.id === section.id
+      && candidate.sectionPlanItemId === section.sectionPlanItemId
+      && candidate.generationRevision === section.generationRevision
+      && candidate.status === section.status;
+  });
+}
+
+/**
+ * Captures the exact section census and blueprint plan authority before AI work.
+ * Client-review and approved copy are authoritative and cannot be auto-replaced.
+ */
+export function snapshotCopyEntryGeneration(
+  workspaceId: string,
+  entryId: string,
+  expectedSectionPlan: SectionPlanItem[],
+): CopyEntryGenerationSnapshot {
+  const authority = stmts().selectEntryGenerationAuthority.get({
+    workspace_id: workspaceId,
+    entry_id: entryId,
+  }) as CopyEntryAuthorityRow | undefined;
+  if (!authority) throw new Error(`Blueprint entry not found: ${entryId}`);
+
+  const plannedSections = parseJsonSafeArray(
+    authority.section_plan_json,
+    copySectionPlanIdentitySchema,
+    { workspaceId, table: 'blueprint_entries', field: 'section_plan_json' },
+  ).map(section => ({ id: section.id, order: section.order }));
+  const expected = expectedSectionPlan.map(section => ({ id: section.id, order: section.order }));
+  if (JSON.stringify(plannedSections) !== JSON.stringify(expected)) {
+    throw new GenerationRevisionConflictError('copy_section', entryId, 0);
+  }
+  if (new Set(plannedSections.map(section => section.id)).size !== plannedSections.length) {
+    throw new Error('Cannot generate copy from a plan with duplicate section ids');
+  }
+
+  const sections = getPersistedSectionsForEntry(entryId, workspaceId);
+  const protectedSection = sections.find(section => (
+    section.status === 'client_review' || section.status === 'approved'
+  ));
+  if (protectedSection) {
+    throw new GenerationRevisionConflictError(
+      'copy_section',
+      protectedSection.id,
+      protectedSection.generationRevision,
+    );
+  }
+
+  return {
+    workspaceId,
+    entryId,
+    sectionPlanJson: authority.section_plan_json,
+    entryUpdatedAt: authority.updated_at,
+    plannedSections,
+    sections: censusOf(sections),
+  };
+}
+
+/** Atomically adopts a full generated page only if the plan and section census are unchanged. */
+export function commitGeneratedEntryCopy(
+  snapshot: CopyEntryGenerationSnapshot,
+  generatedSections: GeneratedCopySectionCommit[],
+  metadata: GeneratedCopyMetadataCommit,
+  provenance: GenerationProvenance,
+): { sections: PersistedCopySection[]; metadata: CopyMetadata } {
+  const validatedProvenance = canonicalGenerationProvenanceSchema.parse(provenance);
+  const generatedByPlan = new Map(generatedSections.map(section => [section.sectionPlanItemId, section]));
+  const plannedIds = snapshot.plannedSections.map(section => section.id);
+  if (generatedByPlan.size !== generatedSections.length
+    || generatedSections.length !== plannedIds.length
+    || plannedIds.some(id => !generatedByPlan.has(id))) {
+    throw new Error('Generated copy does not match the authoritative section plan');
+  }
+
+  return db.transaction(() => {
+    const authority = stmts().selectEntryGenerationAuthority.get({
+      workspace_id: snapshot.workspaceId,
+      entry_id: snapshot.entryId,
+    }) as CopyEntryAuthorityRow | undefined;
+    const current = getPersistedSectionsForEntry(snapshot.entryId, snapshot.workspaceId);
+    if (!authority
+      || authority.section_plan_json !== snapshot.sectionPlanJson
+      || authority.updated_at !== snapshot.entryUpdatedAt
+      || !sameCensus(snapshot.sections, censusOf(current))
+      || current.some(section => section.status === 'client_review' || section.status === 'approved')) {
+      throw generationConflict(snapshot);
+    }
+
+    const planned = new Set(plannedIds);
+    for (const existing of current) {
+      if (planned.has(existing.sectionPlanItemId)) continue;
+      const deleted = stmts().deleteSectionCas.run({
+        id: existing.id,
+        workspace_id: snapshot.workspaceId,
+        expected_revision: existing.generationRevision,
+      }).changes;
+      if (deleted !== 1) throw generationConflict(snapshot);
+    }
+
+    const now = new Date().toISOString();
+    const provenanceJson = JSON.stringify(validatedProvenance);
+    const existingByPlan = new Map(current.map(section => [section.sectionPlanItemId, section]));
+    for (const planId of plannedIds) {
+      const generated = generatedByPlan.get(planId)!;
+      const existing = existingByPlan.get(planId);
+      if (existing) {
+        const updated = stmts().updateSectionCopy.run({
+          id: existing.id,
+          workspace_id: snapshot.workspaceId,
+          generated_copy: generated.generatedCopy,
+          ai_annotation: generated.aiAnnotation,
+          ai_reasoning: generated.aiReasoning,
+          quality_flags: generated.qualityFlags?.length ? JSON.stringify(generated.qualityFlags) : null,
+          status: 'draft',
+          version: existing.version + 1,
+          generation_provenance: provenanceJson,
+          expected_revision: existing.generationRevision,
+          updated_at: nextMutationTimestamp(existing.updatedAt),
+        }).changes;
+        if (updated !== 1) throw generationConflict(snapshot);
+        continue;
+      }
+
+      stmts().insertSection.run({
+        id: `cs_${randomUUID().slice(0, 8)}`,
+        workspace_id: snapshot.workspaceId,
+        entry_id: snapshot.entryId,
+        section_plan_item_id: planId,
+        generated_copy: generated.generatedCopy,
+        status: 'draft',
+        ai_annotation: generated.aiAnnotation,
+        ai_reasoning: generated.aiReasoning,
+        steering_history: '[]',
+        client_suggestions: null,
+        quality_flags: generated.qualityFlags?.length ? JSON.stringify(generated.qualityFlags) : null,
+        version: 1,
+        generation_revision: 1,
+        generation_provenance: provenanceJson,
+        created_at: now,
+        updated_at: now,
+      });
+    }
+
+    const savedMetadata = saveMetadata(snapshot.entryId, snapshot.workspaceId, metadata);
+    const savedByPlan = new Map(
+      getPersistedSectionsForEntry(snapshot.entryId, snapshot.workspaceId)
+        .map(section => [section.sectionPlanItemId, section]),
+    );
+    return {
+      sections: plannedIds.map(id => savedByPlan.get(id)!),
+      metadata: savedMetadata,
+    };
+  }).immediate();
+}
+
 // Save AI-generated copy (sets status to 'draft', increments version)
 export function saveGeneratedCopy(
   sectionId: string,
   workspaceId: string,
-  data: { generatedCopy: string; aiAnnotation: string; aiReasoning: string; qualityFlags?: QualityFlag[] },
-): CopySection | null {
-  const existing = getSection(sectionId, workspaceId);
+  data: {
+    generatedCopy: string;
+    aiAnnotation: string;
+    aiReasoning: string;
+    qualityFlags?: QualityFlag[];
+    expectedRevision?: number;
+    generationProvenance?: GenerationProvenance | null;
+  },
+): PersistedCopySection | null {
+  const existing = getPersistedSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'saveGeneratedCopy: section not found');
     return null;
   }
 
-  // pending → draft (or re-generation: draft/revision_requested → draft)
+  // pending → draft (or re-generation: draft/revision_requested → draft, both no-op
+  // self-edges handled here since generation legitimately re-writes an existing draft).
   const targetStatus: CopySectionStatus = 'draft';
-  if (!isValidTransition(existing.status, targetStatus) && existing.status !== 'draft' && existing.status !== 'revision_requested') {
-    log.warn({ sectionId, currentStatus: existing.status }, 'saveGeneratedCopy: invalid status transition');
+  if (existing.status === 'client_review' || existing.status === 'approved') {
+    log.warn({ sectionId, currentStatus: existing.status }, 'saveGeneratedCopy: protected review state');
     return null;
   }
+  if (existing.status !== 'draft' && existing.status !== 'revision_requested') {
+    try {
+      validateTransition('copy_section', COPY_SECTION_TRANSITIONS, existing.status, targetStatus);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) {
+        log.warn({ sectionId, currentStatus: existing.status }, 'saveGeneratedCopy: invalid status transition');
+        return null;
+      }
+      throw err;
+    }
+  }
 
-  const now = new Date().toISOString();
+  const now = nextMutationTimestamp(existing.updatedAt);
   const newVersion = existing.version + 1;
 
-  stmts().updateSectionCopy.run({
+  const expectedRevision = data.expectedRevision ?? existing.generationRevision;
+  const provenance = data.generationProvenance === undefined
+    ? existing.generationProvenance
+    : data.generationProvenance;
+  if (provenance) canonicalGenerationProvenanceSchema.parse(provenance);
+  const changed = stmts().updateSectionCopy.run({
     id: sectionId,
     workspace_id: workspaceId,
     generated_copy: data.generatedCopy,
@@ -447,10 +742,15 @@ export function saveGeneratedCopy(
     quality_flags: data.qualityFlags ? JSON.stringify(data.qualityFlags) : null,
     status: 'draft',
     version: newVersion,
+    generation_provenance: provenance ? JSON.stringify(provenance) : null,
+    expected_revision: expectedRevision,
     updated_at: now,
-  });
+  }).changes;
+  if (changed !== 1) {
+    throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
+  }
 
-  return getSection(sectionId, workspaceId);
+  return getPersistedSection(sectionId, workspaceId);
 }
 
 // Status management
@@ -458,26 +758,49 @@ export function updateSectionStatus(
   sectionId: string,
   workspaceId: string,
   status: CopySectionStatus,
-): CopySection | null {
-  const existing = getSection(sectionId, workspaceId);
+  expectedRevision?: number,
+): PersistedCopySection | null {
+  const existing = getPersistedSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'updateSectionStatus: section not found');
     return null;
   }
-  if (!isValidTransition(existing.status, status)) {
-    log.warn({ sectionId, from: existing.status, to: status }, 'updateSectionStatus: invalid status transition');
-    return null;
+  // Conflict classification is part of the public mutation contract. A caller
+  // that observed an older revision gets a deterministic 409 even when the
+  // newer state would also make the requested lifecycle transition invalid.
+  if (expectedRevision !== undefined && expectedRevision !== existing.generationRevision) {
+    throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
+  }
+  // Route through the shared state machine. Preserve the historical return-null-on-
+  // invalid contract (the route maps null → 404) by catching InvalidTransitionError
+  // rather than propagating it — a bulk send-to-client transaction must not abort on
+  // one illegal section.
+  try {
+    validateTransition('copy_section', COPY_SECTION_TRANSITIONS, existing.status, status);
+  } catch (err) {
+    if (err instanceof InvalidTransitionError) {
+      log.warn({ sectionId, from: existing.status, to: status }, 'updateSectionStatus: invalid status transition');
+      return null;
+    }
+    throw err;
   }
 
-  const now = new Date().toISOString();
-  stmts().updateSectionStatus.run({
+  const now = nextMutationTimestamp(existing.updatedAt);
+  const changed = stmts().updateSectionStatus.run({
     id: sectionId,
     workspace_id: workspaceId,
     status,
+    expected_revision: expectedRevision ?? existing.generationRevision,
     updated_at: now,
-  });
+  }).changes;
+  if (changed !== 1) {
+    if (expectedRevision !== undefined) {
+      throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
+    }
+    return null;
+  }
 
-  const updated = getSection(sectionId, workspaceId);
+  const updated = getPersistedSection(sectionId, workspaceId);
 
   // ── Side effects on transition to 'approved' ──
   if (status === 'approved' && updated) {
@@ -496,29 +819,37 @@ export function addSteeringEntry(
   sectionId: string,
   workspaceId: string,
   entry: Omit<SteeringEntry, 'timestamp'>,
-): CopySection | null {
-  const existing = getSection(sectionId, workspaceId);
+  expectedRevision?: number,
+): PersistedCopySection | null {
+  const existing = getPersistedSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'addSteeringEntry: section not found');
     return null;
   }
 
+  const now = nextMutationTimestamp(existing.updatedAt);
   const newEntry: SteeringEntry = {
     ...entry,
-    timestamp: new Date().toISOString(),
+    timestamp: now,
   };
 
   const updated = [...existing.steeringHistory, newEntry];
-  const now = new Date().toISOString();
 
-  stmts().updateSectionSteering.run({
+  const changed = stmts().updateSectionSteering.run({
     id: sectionId,
     workspace_id: workspaceId,
     steering_history: JSON.stringify(updated),
+    expected_revision: expectedRevision ?? existing.generationRevision,
     updated_at: now,
-  });
+  }).changes;
+  if (changed !== 1) {
+    if (expectedRevision !== undefined) {
+      throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
+    }
+    return null;
+  }
 
-  return getSection(sectionId, workspaceId);
+  return getPersistedSection(sectionId, workspaceId);
 }
 
 // Client suggestions (appends, sets status to 'revision_requested')
@@ -526,17 +857,25 @@ export function addClientSuggestion(
   sectionId: string,
   workspaceId: string,
   suggestion: Omit<ClientSuggestion, 'timestamp' | 'status'>,
-): CopySection | null {
-  const existing = getSection(sectionId, workspaceId);
+  expectedRevision?: number,
+): PersistedCopySection | null {
+  const existing = getPersistedSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'addClientSuggestion: section not found');
     return null;
   }
+  if (expectedRevision !== undefined && expectedRevision !== existing.generationRevision) {
+    throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
+  }
+  if (existing.generatedCopy === null || suggestion.originalText !== existing.generatedCopy) {
+    throw new CopySuggestionOriginalMismatchError(sectionId);
+  }
 
+  const now = nextMutationTimestamp(existing.updatedAt);
   const newSuggestion: ClientSuggestion = {
     ...suggestion,
     status: 'pending',
-    timestamp: new Date().toISOString(),
+    timestamp: now,
   };
 
   const currentSuggestions = existing.clientSuggestions ?? [];
@@ -549,17 +888,22 @@ export function addClientSuggestion(
     newStatus = 'revision_requested';
   }
 
-  const now = new Date().toISOString();
-
-  stmts().updateSectionClientSuggestions.run({
+  const changed = stmts().updateSectionClientSuggestions.run({
     id: sectionId,
     workspace_id: workspaceId,
     client_suggestions: JSON.stringify(updatedSuggestions),
     status: newStatus,
+    expected_revision: expectedRevision ?? existing.generationRevision,
     updated_at: now,
-  });
+  }).changes;
+  if (changed !== 1) {
+    if (expectedRevision !== undefined) {
+      throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
+    }
+    return null;
+  }
 
-  return getSection(sectionId, workspaceId);
+  return getPersistedSection(sectionId, workspaceId);
 }
 
 // Manual edit (status → 'draft', version++)
@@ -567,30 +911,44 @@ export function updateCopyText(
   sectionId: string,
   workspaceId: string,
   newCopy: string,
-): CopySection | null {
-  const existing = getSection(sectionId, workspaceId);
+  expectedRevision?: number,
+): PersistedCopySection | null {
+  const existing = getPersistedSection(sectionId, workspaceId);
   if (!existing) {
     log.warn({ sectionId, workspaceId }, 'updateCopyText: section not found');
     return null;
+  }
+  if (expectedRevision !== undefined && expectedRevision !== existing.generationRevision) {
+    throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
   }
   if (existing.status === 'approved') {
     log.warn({ sectionId, workspaceId }, 'updateCopyText: cannot edit approved section');
     return null;
   }
+  if (existing.status === 'draft' && existing.generatedCopy === newCopy) {
+    return existing;
+  }
 
-  const now = new Date().toISOString();
+  const now = nextMutationTimestamp(existing.updatedAt);
   const newVersion = existing.version + 1;
 
-  stmts().updateSectionText.run({
+  const changed = stmts().updateSectionText.run({
     id: sectionId,
     workspace_id: workspaceId,
     generated_copy: newCopy,
     status: 'draft',
     version: newVersion,
+    expected_revision: expectedRevision ?? existing.generationRevision,
     updated_at: now,
-  });
+  }).changes;
+  if (changed !== 1) {
+    if (expectedRevision !== undefined) {
+      throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
+    }
+    return null;
+  }
 
-  return getSection(sectionId, workspaceId);
+  return getPersistedSection(sectionId, workspaceId);
 }
 
 // ── Metadata ──

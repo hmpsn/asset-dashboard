@@ -26,9 +26,9 @@ import { getLinkCheck, getPageSpeedSummary, getPageWeight } from './performance-
 import type { DeadLink } from './link-checker.js';
 import { getSearchOverview, getSearchDeviceBreakdown, getSearchCountryBreakdown, getSearchPeriodComparison } from './search-console.js';
 import { getGA4Overview, getGA4TopPages, getGA4TopSources, getGA4OrganicOverview, getGA4NewVsReturning, getGA4Conversions, getGA4LandingPages, getGA4PeriodComparison } from './google-analytics.js';
-import { isGlobalConnected } from './google-auth.js';
 import { applySuppressionsToAudit } from './seo-audit-suppressions.js';
 import { findPageMapEntryByIdentity, resolvePagePath, normalizePageUrl } from './utils/page-address.js';
+import { sanitizeInlinePromptText } from './utils/text.js';
 import { getAuditTrafficForWorkspace } from './audit-traffic.js';
 import { RICH_BLOCKS_PROMPT } from './prompt-rich-blocks.js';
 import { scrapeUrl } from './web-scraper.js';
@@ -36,7 +36,7 @@ import { createLogger } from './logger.js';
 import { listBlueprints } from './page-strategy.js';
 import { getEntryCopyStatus } from './copy-review.js';
 import { getAllPatterns } from './copy-intelligence.js';
-import type { AnalyticsInsight } from '../shared/types/analytics.js';
+import type { AnalyticsInsight, InsightType } from '../shared/types/analytics.js';
 import { STUDIO_NAME } from './constants.js';
 import { isProgrammingError } from './errors.js';
 import { buildSystemPrompt as buildLayeredSystemPrompt } from './prompt-assembly.js';
@@ -149,6 +149,59 @@ export function extractUrl(question: string): string | null {
 }
 
 // ── Analytics Intelligence Context ──
+
+const RICH_INSIGHT_CONTEXT_TYPES = new Set<InsightType>([
+  'page_health',
+  'ranking_opportunity',
+  'content_decay',
+  'cannibalization',
+  'keyword_cluster',
+  'competitor_gap',
+  'conversion_attribution',
+  'anomaly_digest',
+  'emerging_keyword',
+  'competitor_alert',
+  'freshness_alert',
+]);
+
+const RESIDUAL_INSIGHT_FIELD_ORDER = [
+  'query', 'keyword', 'pageUrl', 'scope', 'issueCount', 'issueMessages',
+  'siteScore', 'previousScore', 'scoreDelta', 'errors', 'warnings',
+  'alignedCount', 'misalignedCount', 'untrackedCount', 'summary',
+  'currentPosition', 'previousPosition', 'positionChange',
+  'actualCtr', 'expectedCtr', 'impressions', 'estimatedClickGap',
+  'schemaStatus', 'thresholdCrossed', 'briefTitle', 'currentClicks',
+  'daysSinceDelivery', 'trafficValue', 'lostCount', 'direction',
+  'marketLabel', 'previousRank', 'currentRank', 'competitorName',
+  'competitorAppearances', 'presentFeatures', 'aiOverviewPresent',
+  'aiOverviewCited', 'estimatedMonthlyCitations',
+] as const;
+
+function formatResidualInsightValue(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const compact = sanitizeInlinePromptText(value, 180);
+    return compact || null;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (Array.isArray(value) && value.every(item => typeof item === 'string')) {
+    const compact = sanitizeInlinePromptText(value.slice(0, 4).join(', '), 180);
+    return compact || null;
+  }
+  return null;
+}
+
+function formatResidualInsight(insight: AnalyticsInsight): string {
+  const data = insight.data as Record<string, unknown>;
+  const details = RESIDUAL_INSIGHT_FIELD_ORDER.flatMap((key) => {
+    const formatted = formatResidualInsightValue(data[key]);
+    return formatted == null ? [] : [`${key.replace(/([A-Z])/g, ' $1')}: ${formatted}`];
+  }).slice(0, 6);
+  const location = sanitizeInlinePromptText(insight.pageTitle ?? insight.pageId, 180);
+  if (location) details.push(`page: ${location}`);
+  const detailText = details.length > 0 ? ` — ${details.join('; ')}` : '';
+  return `  [${insight.severity}] ${insight.insightType.replace(/_/g, ' ')} (impact ${insight.impactScore ?? 'n/a'})${detailText}`;
+}
 
 /**
  * Build a formatted context block from analytics intelligence insights.
@@ -313,6 +366,24 @@ export function buildInsightsContext(insights: AnalyticsInsight[]): string {
     sections.push(`STALE CONTENT (pages with outdated keyword analysis — at risk of ranking decline):\n${lines.join('\n')}`);
   }
 
+  // Preserve typed signals that do not yet have a bespoke narrative section.
+  // The generic workspace formatter previously repeated every insight; removing
+  // that duplicate block must not make newer insight types invisible to chat.
+  const residualInsights = insights
+    .filter(insight => !RICH_INSIGHT_CONTEXT_TYPES.has(insight.insightType))
+    .sort((a, b) => {
+      const severityOrder = { critical: 0, warning: 1, opportunity: 2, positive: 3 } as const;
+      return severityOrder[a.severity] - severityOrder[b.severity]
+        || (b.impactScore ?? 0) - (a.impactScore ?? 0);
+    });
+  if (residualInsights.length > 0) {
+    const shown = residualInsights.slice(0, 12).map(formatResidualInsight);
+    if (residualInsights.length > shown.length) {
+      shown.push(`  +${residualInsights.length - shown.length} more additional insight(s)`);
+    }
+    sections.push(`ADDITIONAL ACTIVE INSIGHTS (typed signals not expanded above):\n${shown.join('\n')}`);
+  }
+
   // Proactive critical insight summary
   const criticalInsights = insights.filter(i => i.severity === 'critical');
   if (criticalInsights.length > 0) {
@@ -379,33 +450,43 @@ export async function assembleAdminContext(
 
   // ── Parallel fetch based on categories ──
   const fetches: Array<{ key: string; promise: Promise<unknown> }> = [];
-
-  // Google connections check
-  const googleConnected = isGlobalConnected();
+  const addOptionalFetch = (key: string, promise: Promise<unknown>): void => {
+    fetches.push({
+      key,
+      promise: promise.catch((err) => {
+        log.debug({ err, workspaceId, source: key }, 'Optional admin chat context source unavailable');
+        return null;
+      }),
+    });
+  };
 
   // GSC data
   if (categories.has('search') || categories.has('general') || categories.has('ranks')) {
-    if (ws.gscPropertyUrl && ws.webflowSiteId && googleConnected) {
-      fetches.push({ key: 'gscOverview', promise: getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days).catch(() => null) });
-      fetches.push({ key: 'gscComparison', promise: getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, days).catch(() => null) });
+    // Do not pre-gate these canonical wrappers on the global Google token. GSC can
+    // authenticate with a site-scoped token and both wrappers own deterministic
+    // local-fixture fallback. A missing credential degrades through the existing
+    // rejected-read handling below without hiding valid site-scoped data.
+    if (ws.gscPropertyUrl && ws.webflowSiteId) {
+      addOptionalFetch('gscOverview', getSearchOverview(ws.webflowSiteId, ws.gscPropertyUrl, days));
+      addOptionalFetch('gscComparison', getSearchPeriodComparison(ws.webflowSiteId, ws.gscPropertyUrl, days));
       if (categories.has('search') || categories.has('general')) {
-        fetches.push({ key: 'gscDevices', promise: getSearchDeviceBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days).catch(() => null) });
-        fetches.push({ key: 'gscCountries', promise: getSearchCountryBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days).catch(() => null) });
+        addOptionalFetch('gscDevices', getSearchDeviceBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days));
+        addOptionalFetch('gscCountries', getSearchCountryBreakdown(ws.webflowSiteId, ws.gscPropertyUrl, days));
       }
     }
   }
 
   // GA4 data
   if (categories.has('analytics') || categories.has('general')) {
-    if (ws.ga4PropertyId && googleConnected) {
-      fetches.push({ key: 'ga4Overview', promise: getGA4Overview(ws.ga4PropertyId, days).catch(() => null) });
-      fetches.push({ key: 'ga4Comparison', promise: getGA4PeriodComparison(ws.ga4PropertyId, days).catch(() => null) });
-      fetches.push({ key: 'ga4TopPages', promise: getGA4TopPages(ws.ga4PropertyId, days).catch(() => null) });
-      fetches.push({ key: 'ga4Sources', promise: getGA4TopSources(ws.ga4PropertyId, days).catch(() => null) });
-      fetches.push({ key: 'ga4Organic', promise: getGA4OrganicOverview(ws.ga4PropertyId, days).catch(() => null) });
-      fetches.push({ key: 'ga4NewVsReturning', promise: getGA4NewVsReturning(ws.ga4PropertyId, days).catch(() => null) });
-      fetches.push({ key: 'ga4Conversions', promise: getGA4Conversions(ws.ga4PropertyId, days).catch(() => null) });
-      fetches.push({ key: 'ga4LandingPages', promise: getGA4LandingPages(ws.ga4PropertyId, days).catch(() => null) });
+    if (ws.ga4PropertyId) {
+      addOptionalFetch('ga4Overview', getGA4Overview(ws.ga4PropertyId, days));
+      addOptionalFetch('ga4Comparison', getGA4PeriodComparison(ws.ga4PropertyId, days));
+      addOptionalFetch('ga4TopPages', getGA4TopPages(ws.ga4PropertyId, days));
+      addOptionalFetch('ga4Sources', getGA4TopSources(ws.ga4PropertyId, days));
+      addOptionalFetch('ga4Organic', getGA4OrganicOverview(ws.ga4PropertyId, days));
+      addOptionalFetch('ga4NewVsReturning', getGA4NewVsReturning(ws.ga4PropertyId, days));
+      addOptionalFetch('ga4Conversions', getGA4Conversions(ws.ga4PropertyId, days));
+      addOptionalFetch('ga4LandingPages', getGA4LandingPages(ws.ga4PropertyId, days));
     }
   }
 
@@ -416,7 +497,7 @@ export async function assembleAdminContext(
       mode = 'page_reviewer';
       const fullUrl = targetUrl.startsWith('http') ? targetUrl : (ws.liveDomain ? `https://${ws.liveDomain}${targetUrl}` : targetUrl);
       if (fullUrl.startsWith('http')) {
-        fetches.push({ key: 'pageScrape', promise: scrapeUrl(fullUrl).catch(() => null) });
+        addOptionalFetch('pageScrape', scrapeUrl(fullUrl));
       }
       pageContext = { url: targetUrl };
 

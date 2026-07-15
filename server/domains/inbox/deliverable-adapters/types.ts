@@ -14,6 +14,7 @@
 import type {
   ClientDeliverable,
   DeliverableKind,
+  DeliverableStatus,
   DeliverableType,
 } from '../../../../shared/types/client-deliverable.js';
 import type { UpsertDeliverableItemInput } from '../../../client-deliverables.js';
@@ -86,6 +87,15 @@ export interface DeliverableAdapter<TInput = unknown, TSourceRow = unknown> {
   buildPayload(input: TInput): BuiltDeliverablePayload;
   /** Stable natural key for dedup-on-resend (per-type, design §4.5). null = no dedup. */
   sourceRef(input: TInput): string | null;
+  /**
+   * Optional honest resend state. Most artifacts supersede back to awaiting_client;
+   * grouped per-item reviews may need to remain partial when approved children are
+   * retained. Returning approved/terminal states is deliberately not supported.
+   */
+  resolveSendStatus?(
+    input: TInput,
+    existing: ClientDeliverable | null,
+  ): Extract<DeliverableStatus, 'awaiting_client' | 'partial'>;
   /**
    * Opt-in: when appliesOnApprove is true, the response handler runs this on approve
    * (Webflow write outside the DB txn). Default no-op — apply is a separate transition

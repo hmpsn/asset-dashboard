@@ -55,6 +55,31 @@ export { TrendBadge, type TrendBadgeProps } from './TrendBadge';
 export { OutcomeReadbackChip, type OutcomeReadbackChipProps } from './OutcomeReadbackChip';
 export { ChartCard, type ChartCardProps } from './ChartCard';
 
+// ─── F3 — net-new design-system primitives ───────────────────────────────────
+export { Avatar } from './Avatar';
+export type { AvatarProps } from './Avatar';
+export { IntentTag, INTENT_TONE, INTENT_ABBREV, type KeywordIntent } from './IntentTag';
+export type { IntentTagProps } from './IntentTag';
+export { DataTable } from './DataTable';
+export type { DataTableProps, DataColumn } from './DataTable';
+export { MetricTile } from './MetricTile';
+export type { MetricTileProps } from './MetricTile';
+export { Sparkline } from './Sparkline';
+export type { SparklineProps } from './Sparkline';
+export { Meter } from './Meter';
+export type { MeterProps } from './Meter';
+export { KeyValueRow, DefinitionList } from './KeyValueRow';
+export type { KeyValueRowProps, DefinitionListProps, DefinitionItem } from './KeyValueRow';
+export { BoardColumn, BoardCard } from './BoardColumn';
+export type { BoardColumnProps, BoardCardProps } from './BoardColumn';
+export { useRovingTabindex } from './useRovingTabindex';
+export type {
+  RovingTabindex,
+  RovingTabindexOptions,
+  RovingItemProps,
+  RovingOrientation,
+} from './useRovingTabindex';
+
 // ─── Phase 1 primitives (pre-committed stubs; Phase 1 agents fill implementations) ───
 
 // Typography
@@ -63,6 +88,7 @@ export { Heading, Stat, BodyText, Caption, Label, Mono } from './typography';
 // Icon
 export { Icon } from './Icon';
 export type { IconSize, IconProps } from './Icon';
+export { ICON_NAMES, type IconName } from './iconNames';
 
 // Actions
 export { Button } from './Button';
@@ -77,6 +103,15 @@ export type { FormSelectProps, SelectOption } from './forms/FormSelect';
 export type { FormTextareaProps } from './forms/FormTextarea';
 export type { CheckboxProps } from './forms/Checkbox';
 export type { ToggleProps } from './forms/Toggle';
+// F3 net-new forms
+export { Segmented, LensSwitcher, FilterChip, SearchField, RadioGroup } from './forms';
+export type {
+  SegmentedProps,
+  LensSwitcherProps, LensOption,
+  FilterChipProps,
+  SearchFieldProps,
+  RadioGroupProps, RadioOption,
+} from './forms';
 
 // Layout
 export { Row, Stack, Column, Grid, Divider } from './layout';
@@ -87,9 +122,23 @@ export type {
   GridProps, GridCols, GridColCount,
   DividerProps, DividerOrientation,
 } from './layout';
+// F3 net-new layout
+export { AppShell, PageContainer, Toolbar, ToolbarSpacer, GroupBlock, NavItem, NavGroup } from './layout';
+export type {
+  AppShellProps,
+  PageContainerProps,
+  ToolbarProps,
+  GroupBlockProps, GroupStat, GroupFlag,
+  NavItemProps,
+  NavGroupProps,
+} from './layout';
 
 // Overlays
 export { Modal, Popover, Tooltip } from './overlay';
+// F3 net-new overlay + shared machinery
+export { Drawer } from './overlay';
+export type { DrawerProps } from './overlay';
+export { getFocusable, acquireScrollLock, releaseScrollLock, FOCUSABLE_SELECTOR } from './overlay';
 export { Menu } from './Menu';
 export type { MenuItem, MenuProps } from './Menu';
 
@@ -99,6 +148,27 @@ export type { NeedsAttentionProps, AttentionItem, AttentionSeverity } from './Ne
 export { Disclosure } from './Disclosure';
 export type { DisclosureProps } from './Disclosure';
 export { SectionLabel } from './SectionLabel';
+export {
+  CommandCenterVerdict,
+  WorkStreamSelector,
+  ProvenanceChip,
+  WorkQueueRow,
+  ClientSwitcherRow,
+  ClientThreadRow,
+} from './co';
+export type {
+  CommandCenterVerdictProps,
+  WorkStreamOption,
+  WorkStreamSelectorProps,
+  SelectableWorkStream,
+  ProvenanceBasis,
+  ProvenanceChipProps,
+  WorkQueueRowProps,
+  ClientHealthTone,
+  ClientSwitcherRowProps,
+  ClientThreadKind,
+  ClientThreadRowProps,
+} from './co';
 
 // className merge helper — re-exported so Phase 2 consumers can write
 // `import { cn } from '../ui'` alongside the primitives they're using

@@ -37,6 +37,8 @@ import {
 import { capWithDiversity } from './feed.js';
 import { deduplicatePages, deduplicateQueryPages } from './normalization.js';
 import { validateInsightBatch } from './validation.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { WS_EVENTS } from '../../ws-events.js';
 
 const log = createLogger('analytics-intelligence');
 
@@ -47,7 +49,7 @@ const log = createLogger('analytics-intelligence');
 export async function getOrComputeInsights(
   workspaceId: string,
   insightType?: InsightType,
-  opts?: { force?: boolean },
+  opts?: { force?: boolean; broadcastOnCompute?: boolean },
 ): Promise<AnalyticsInsight[]> {
   // Always check staleness against ALL workspace insights (not filtered),
   // so a computation cycle that legitimately produced zero results for a
@@ -66,14 +68,22 @@ export async function getOrComputeInsights(
   }
 
   // Attempt to compute fresh insights
+  let recomputed = false;
   try {
     await computeAndPersistInsights(workspaceId);
+    recomputed = true;
   } catch (err) {
     log.warn({ err, workspaceId }, 'Failed to compute fresh insights, returning stale data');
     if (allExisting.length > 0) {
       const stale = insightType ? allExisting.filter(i => i.insightType === insightType) : allExisting;
       return capWithDiversity(stale, insightType);
     }
+  }
+
+  if (recomputed && opts?.broadcastOnCompute) {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.INTELLIGENCE_SIGNALS_UPDATED, {
+      source: 'lazy_insight_recompute',
+    });
   }
 
   return capWithDiversity(getInsights(workspaceId, insightType), insightType);

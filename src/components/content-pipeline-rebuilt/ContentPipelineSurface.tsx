@@ -1,0 +1,576 @@
+// @ds-rebuilt
+import { Suspense, useCallback, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useWorkspaceEvents } from '../../hooks/useWorkspaceEvents';
+import {
+  useAdminBriefsList,
+  useAdminPostsList,
+  useAdminRequestsList,
+  useAiSuggestedBriefs,
+  useContentPipeline,
+  useWorkspaces,
+  useWorkspaceIntelligence,
+} from '../../hooks/admin';
+import { useAdminWorkOrders } from '../../hooks/admin/useWorkOrders';
+import { lazyWithRetry } from '../../lib/lazyWithRetry';
+import { queryKeys } from '../../lib/queryKeys';
+import { awaitSuccessfulRefetches } from '../../lib/reactQueryRefresh';
+import { WS_EVENTS } from '../../lib/wsEvents';
+import type { FixContext } from '../../types/fix-context';
+import { ErrorBoundary } from '../ErrorBoundary';
+import { RebuiltTopbarActions } from '../layout/RebuiltAppChrome';
+import { useToast } from '../Toast';
+import {
+  Button,
+  Drawer,
+  ErrorState,
+  Icon,
+  InlineBanner,
+  LensSwitcher,
+  Menu,
+  PageHeader,
+  ToolbarSpacer,
+  type MenuItem,
+  type Tier,
+} from '../ui';
+import { ContentLifecycleBoard, deriveLifecycleBoardItems } from './ContentLifecycleBoard';
+import { ContentPipelineIntake, deriveContentIntake } from './ContentPipelineIntake';
+import {
+  ContentPipelineLenses,
+  isContentPipelineStandaloneTab,
+} from './ContentPipelineLenses';
+import type { ContentPipelineData } from './ContentPipelineLenses';
+import { ContentPipelineInteriorLoading } from './ContentPipelineInteriorLoading';
+import { ContentPipelineWorkspaces } from './ContentPipelineWorkspaces';
+import {
+  type ContentPipelineTab,
+  useContentPipelineSurfaceState,
+} from './useContentPipelineSurfaceState';
+import { mutationErrorMessage } from './contentPipelineMutationFeedback';
+import { resolveLiveSiteBase } from './contentPipelineFormatters';
+
+const LazyContentPipelineGuide = lazyWithRetry(() => import('../ContentPipelineGuide').then((module) => ({
+  default: module.ContentPipelineGuide,
+})));
+const LazyPublishedContentLens = lazyWithRetry(() => import('./PublishedContentLens').then((module) => ({
+  default: module.PublishedContentLens,
+})));
+
+interface ContentPipelineSurfaceProps {
+  workspaceId: string;
+}
+
+const EXPORTS = [
+  { key: 'briefs', label: 'Content Briefs' },
+  { key: 'requests', label: 'Content Requests' },
+  { key: 'matrices', label: 'Content Matrices' },
+  { key: 'templates', label: 'Content Templates' },
+  { key: 'strategy', label: 'Keyword Strategy' },
+] as const;
+
+function buildSignalPrefill(keyword: string, pageUrl?: string): FixContext {
+  return {
+    targetRoute: 'content-pipeline',
+    primaryKeyword: keyword || undefined,
+    pageSlug: pageUrl || undefined,
+  };
+}
+
+function readBriefFixContext(routerState: unknown): FixContext | null {
+  const fixContext = (routerState as { fixContext?: FixContext } | null)?.fixContext;
+  return fixContext?.targetRoute === 'content-pipeline' ? fixContext : null;
+}
+
+type ContentPipelineMode = 'board' | 'calendar' | 'published' | 'content-health' | 'planner';
+
+const MODE_OPTIONS: Array<{ value: ContentPipelineMode; label: string; count?: (data: ContentPipelineData | undefined) => number | undefined }> = [
+  { value: 'board', label: 'Board' },
+  { value: 'calendar', label: 'Calendar' },
+  { value: 'published', label: 'Published', count: (data) => data?.summary?.published },
+  { value: 'content-health', label: 'Content Health', count: (data) => data?.decay?.totalDecaying },
+  { value: 'planner', label: 'Matrix', count: (data) => data?.summary?.matrices },
+];
+
+function modeForTab(tab: ContentPipelineTab): ContentPipelineMode | undefined {
+  if (tab === 'briefs' || tab === 'intake' || tab === 'posts') return 'board';
+  if (tab === 'publish') return undefined;
+  return tab;
+}
+
+export function ContentPipelineSurface({ workspaceId }: ContentPipelineSurfaceProps) {
+  const location = useLocation();
+  const state = useContentPipelineSurfaceState();
+  const shellFlagEnabled = useFeatureFlag('ui-rebuild-shell');
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const lifecycleBoardVisible = state.tab === 'briefs'
+    || state.tab === 'intake'
+    || state.tab === 'publish'
+    || Boolean(state.postId);
+  const pipelineQuery = useContentPipeline(workspaceId, { includeContentLists: false });
+  const workspaces = useWorkspaces();
+  const intelligence = useWorkspaceIntelligence(workspaceId, ['contentPipeline']);
+  // Briefs/posts stay mounted because their authoritative counts are visible in
+  // the lens switcher on every tab. React Query shares these observers with
+  // active interiors, so this does not duplicate the underlying request.
+  const briefsQuery = useAdminBriefsList(workspaceId);
+  const requestsQuery = useAdminRequestsList(workspaceId, lifecycleBoardVisible);
+  const postsQuery = useAdminPostsList(workspaceId);
+  const suggestionsQuery = useAiSuggestedBriefs(workspaceId, lifecycleBoardVisible);
+  const workOrdersQuery = useAdminWorkOrders(workspaceId, lifecycleBoardVisible);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [capacityDrawerOpen, setCapacityDrawerOpen] = useState(false);
+  const [focusedBriefId, setFocusedBriefId] = useState<string | null>(null);
+  const [briefFixContext, setBriefFixContext] = useState<FixContext | null>(() => readBriefFixContext(location.state));
+  const [blankBriefOpen, setBlankBriefOpen] = useState(() => readBriefFixContext(location.state) !== null);
+
+  const workspace = useMemo(
+    () => workspaces.data?.find((item) => item.id === workspaceId),
+    [workspaceId, workspaces.data],
+  );
+  const workspaceTier = workspace?.tier as Tier | undefined;
+  const siteLabel = resolveLiveSiteBase(workspace?.liveDomain, workspace?.gscPropertyUrl);
+  const contentPipeline = intelligence.data?.contentPipeline;
+  const pipelineData = useMemo<ContentPipelineData | undefined>(() => {
+    if (!pipelineQuery.data) return undefined;
+    return {
+      ...pipelineQuery.data,
+      summary: pipelineQuery.data.summary
+        ? {
+            ...pipelineQuery.data.summary,
+            briefs: briefsQuery.data?.length ?? 0,
+            posts: postsQuery.data?.length ?? 0,
+          }
+        : null,
+    };
+  }, [briefsQuery.data, pipelineQuery.data, postsQuery.data]);
+  const mode = modeForTab(state.tab);
+  const boardFocus = state.tab === 'intake' ? 'intake' : 'brief';
+  const lifecycleItems = useMemo(() => deriveLifecycleBoardItems({
+    briefs: briefsQuery.data,
+    requests: requestsQuery.data,
+    posts: postsQuery.data,
+  }), [briefsQuery.data, postsQuery.data, requestsQuery.data]);
+  const intakeSnapshot = useMemo(() => deriveContentIntake({
+    briefs: briefsQuery.data,
+    requests: requestsQuery.data,
+    posts: postsQuery.data,
+    suggestions: suggestionsQuery.data,
+    workOrders: workOrdersQuery.data,
+  }), [briefsQuery.data, postsQuery.data, requestsQuery.data, suggestionsQuery.data, workOrdersQuery.data]);
+  const focusedBrief = useMemo(
+    () => briefsQuery.data?.find((brief) => brief.id === focusedBriefId) ?? null,
+    [briefsQuery.data, focusedBriefId],
+  );
+  const focusedPost = useMemo(
+    () => postsQuery.data?.find((post) => post.id === state.postId) ?? null,
+    [postsQuery.data, state.postId],
+  );
+  const subscriptionSummary = contentPipeline?.subscriptions;
+  const intelligenceResponseAvailable = intelligence.data !== undefined;
+  const intelligenceSnapshotAvailable = contentPipeline !== undefined;
+  const intelligenceSnapshotPending = !intelligenceResponseAvailable && !intelligence.isError;
+  const intelligenceSnapshotUnavailable = !intelligenceSnapshotAvailable
+    && (intelligence.isError || intelligenceResponseAvailable);
+  const intelligenceSnapshotStale = intelligence.isError && intelligenceSnapshotAvailable;
+  const subscriptionSnapshotAvailable = subscriptionSummary !== undefined;
+  const capacityUnavailable = intelligenceSnapshotUnavailable
+    || (intelligenceSnapshotAvailable && !subscriptionSnapshotAvailable);
+  const activePlanCount = subscriptionSummary?.active ?? 0;
+  const capacityOpen = capacityDrawerOpen || state.tab === 'publish';
+  const capacityHeadline = intelligenceSnapshotPending
+    ? 'Loading capacity'
+    : capacityUnavailable
+      ? 'Capacity unavailable'
+      : activePlanCount > 0
+        ? `${activePlanCount} active plan${activePlanCount === 1 ? '' : 's'}`
+        : 'No content plan';
+  const capacityDetailBase = activePlanCount > 0
+    ? `${subscriptionSummary?.totalPages ?? 0} pages covered`
+    : 'Set up plan';
+  const capacityDetail = intelligenceSnapshotPending
+    ? 'Checking content plan'
+    : capacityUnavailable
+      ? 'Retry data'
+      : intelligenceSnapshotStale
+        ? `${capacityDetailBase} · May be stale`
+        : capacityDetailBase;
+  const lifecycleQueries = [
+    briefsQuery,
+    requestsQuery,
+    postsQuery,
+    suggestionsQuery,
+    workOrdersQuery,
+  ] as const;
+  const lifecycleUnavailable = lifecycleBoardVisible
+    && lifecycleQueries.some((query) => query.isError && query.data === undefined);
+  const lifecycleLoading = lifecycleBoardVisible
+    && !lifecycleUnavailable
+    && lifecycleQueries.some((query) => query.data === undefined && !query.isError);
+  const lifecycleStale = lifecycleBoardVisible
+    && lifecycleQueries.some((query) => query.isError && query.data !== undefined);
+  const pipelineSnapshotAvailable = pipelineQuery.data !== undefined;
+  const pipelineSnapshotPending = !pipelineSnapshotAvailable && !pipelineQuery.isError;
+  const healthUnavailable = (pipelineQuery.isError && !pipelineSnapshotAvailable)
+    || intelligenceSnapshotUnavailable;
+  const healthLoading = !healthUnavailable && (
+    pipelineSnapshotPending
+    || intelligenceSnapshotPending
+  );
+  const healthStale = (pipelineQuery.isError && pipelineSnapshotAvailable)
+    || intelligenceSnapshotStale;
+
+  const retryLifecycleQueries = () => {
+    void Promise.all(
+      lifecycleQueries
+        .filter((query) => query.isError)
+        .map((query) => query.refetch()),
+    );
+  };
+
+  const retryHealthQueries = () => {
+    const refetches: Array<Promise<unknown>> = [];
+    if (pipelineQuery.isError) refetches.push(pipelineQuery.refetch());
+    if (intelligence.isError || intelligenceSnapshotUnavailable) refetches.push(intelligence.refetch());
+    void Promise.all(refetches);
+  };
+
+  const invalidateContentPipeline = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentPipeline(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.intelligence(workspaceId, ['contentPipeline']) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.briefs(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.aiSuggestedBriefs(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.workOrders(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentPerformanceAll(workspaceId) });
+  }, [queryClient, workspaceId]);
+
+  useWorkspaceEvents(workspaceId, {
+    // ws-invalidation-ok — the rebuilt Content Pipeline summary and Published lens share content writes across briefs, posts, requests, and performance readbacks.
+    [WS_EVENTS.CONTENT_UPDATED]: invalidateContentPipeline,
+    // ws-invalidation-ok — brief edits and generation affect the cockpit counts and Briefs lens.
+    [WS_EVENTS.BRIEF_UPDATED]: invalidateContentPipeline,
+    // ws-invalidation-ok — request lifecycle changes affect Briefs/Requests and Published readback eligibility.
+    [WS_EVENTS.CONTENT_REQUEST_UPDATE]: invalidateContentPipeline,
+    // ws-invalidation-ok — post updates affect Drafts, Calendar, Publish status, and Published metrics.
+    [WS_EVENTS.POST_UPDATED]: invalidateContentPipeline,
+    // ws-invalidation-ok — publication changes can move rows into the Published readback lens.
+    [WS_EVENTS.CONTENT_PUBLISHED]: invalidateContentPipeline,
+    // ws-invalidation-ok — AI suggested brief queue is surfaced as the Intake lens.
+    [WS_EVENTS.SUGGESTED_BRIEF_UPDATED]: invalidateContentPipeline,
+    // ws-invalidation-ok — subscriptions are mounted under Publish and update cockpit capacity.
+    [WS_EVENTS.CONTENT_SUBSCRIPTION_UPDATED]: invalidateContentPipeline,
+    // ws-invalidation-ok — outcome readbacks drive Published verdict badges.
+    [WS_EVENTS.OUTCOME_SCORED]: invalidateContentPipeline,
+  });
+
+  const exportMenuItems: MenuItem[] = EXPORTS.flatMap((exp) => [
+    { label: `${exp.label} - CSV`, onSelect: () => window.open(`/api/export/${workspaceId}/${exp.key}?format=csv`, '_blank', 'noopener,noreferrer') },
+    { label: `${exp.label} - JSON`, onSelect: () => window.open(`/api/export/${workspaceId}/${exp.key}?format=json`, '_blank', 'noopener,noreferrer') },
+  ]);
+
+  const handleRefresh = async () => {
+    try {
+      const contentPerformanceKey = queryKeys.admin.contentPerformanceAll(workspaceId);
+      await queryClient.invalidateQueries({ queryKey: contentPerformanceKey, refetchType: 'none' });
+      const lifecycleDetailRefetches = lifecycleBoardVisible
+        ? [
+            requestsQuery.refetch(),
+            suggestionsQuery.refetch(),
+            workOrdersQuery.refetch(),
+          ]
+        : [];
+      await Promise.all([
+        queryClient.refetchQueries(
+          { queryKey: contentPerformanceKey, type: 'active' },
+          { throwOnError: true },
+        ),
+        awaitSuccessfulRefetches([
+          pipelineQuery.refetch(),
+          intelligence.refetch(),
+          briefsQuery.refetch(),
+          postsQuery.refetch(),
+          ...lifecycleDetailRefetches,
+        ]),
+      ]);
+      toast('Content Pipeline data refreshed', 'success');
+    } catch (error) {
+      toast(mutationErrorMessage(error, 'Content Pipeline refresh failed'), 'error');
+    }
+  };
+
+  const clearBriefFixContext = () => setBriefFixContext(null);
+  const lifecycleCountsReady = briefsQuery.data !== undefined && postsQuery.data !== undefined;
+  const lensOptions = MODE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: option.label,
+    count: option.value === 'board'
+      ? (lifecycleCountsReady ? lifecycleItems.length : undefined)
+      : option.count?.(pipelineData),
+  }));
+
+  const openMode = (nextMode: ContentPipelineMode) => {
+    setCapacityDrawerOpen(false);
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    clearBriefFixContext();
+    state.setTab(nextMode === 'board' ? 'briefs' : nextMode);
+  };
+
+  const openBriefs = () => {
+    setFocusedBriefId(null);
+    setBlankBriefOpen(true);
+    state.setTab('briefs');
+  };
+
+  const openNewPiece = () => {
+    clearBriefFixContext();
+    openBriefs();
+  };
+
+  const openIntake = () => {
+    setBlankBriefOpen(false);
+    state.setTab('intake');
+  };
+
+  const openDrafts = () => {
+    setBlankBriefOpen(false);
+    state.setTab('posts');
+  };
+
+  const openBrief = (briefId: string) => {
+    setBlankBriefOpen(false);
+    setFocusedBriefId(briefId);
+  };
+
+  const openPost = (postId: string) => {
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    state.openPost(postId);
+  };
+
+  const openWorkflowTab = (tab: ContentPipelineTab) => {
+    if (tab === 'briefs') {
+      openBriefs();
+      return;
+    }
+    if (tab === 'intake') {
+      openIntake();
+      return;
+    }
+    if (tab === 'posts') {
+      openDrafts();
+      return;
+    }
+    setBlankBriefOpen(false);
+    state.setTab(tab);
+  };
+
+  const handleCreateBrief = (keyword: string, pageUrl?: string, _suggestedBriefId?: string) => {
+    setBriefFixContext(buildSignalPrefill(keyword, pageUrl));
+    openBriefs();
+  };
+
+  const closeCapacity = () => {
+    setCapacityDrawerOpen(false);
+    if (state.tab === 'publish') state.setTab('briefs');
+  };
+
+  const openCapacity = () => {
+    if (intelligenceSnapshotPending) return;
+    if (capacityUnavailable) {
+      void intelligence.refetch();
+      return;
+    }
+    setCapacityDrawerOpen(true);
+  };
+
+  const closeBriefWorkspace = () => {
+    setFocusedBriefId(null);
+    setBlankBriefOpen(false);
+    clearBriefFixContext();
+  };
+
+  const topbarActions = (
+    <div data-testid="content-pipeline-header-actions" className="flex max-w-full items-center justify-end gap-2 overflow-x-auto">
+      <Button size="sm" onClick={openNewPiece}>
+        <Icon name="plus" size="sm" />
+        New piece
+      </Button>
+      <Menu
+        align="end"
+        trigger={(
+          <Button size="sm" variant="secondary">
+            <Icon name="download" size="sm" />
+            Export
+          </Button>
+        )}
+        items={exportMenuItems}
+      />
+      <Button size="sm" variant="secondary" onClick={() => void handleRefresh()} disabled={pipelineQuery.isFetching || intelligence.isFetching}>
+        <Icon name="refresh" size="sm" />
+        Refresh
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => setGuideOpen(true)}>
+        <Icon name="info" size="sm" />
+        Guide
+      </Button>
+    </div>
+  );
+
+  return (
+    <ErrorBoundary label="Content Pipeline">
+      <div className="mr-auto flex min-h-full w-full max-w-[var(--page-max)] flex-col gap-4" data-rebuild-flag={shellFlagEnabled ? 'on' : 'default'}>
+        <RebuiltTopbarActions fallback={<div data-testid="content-pipeline-topbar-actions-fallback">{topbarActions}</div>}>
+          {topbarActions}
+        </RebuiltTopbarActions>
+
+        <div className="flex flex-wrap items-end gap-4" aria-label="Content Pipeline overview and view controls">
+          <PageHeader
+            title="Content Pipeline"
+            subtitle={(
+              <>
+                Active work for <strong className="font-semibold text-[var(--brand-text-bright)]">{workspace?.name ?? 'this workspace'}</strong> — idea to approved, one card at a time. Scheduled pieces live in <strong className="font-semibold text-[var(--brand-text-bright)]">Calendar</strong>; live pieces and their results in <strong className="font-semibold text-[var(--brand-text-bright)]">Published</strong>.
+              </>
+            )}
+            className="max-w-full flex-[0_1_44ch] [&_p]:mt-1 [&_p]:whitespace-normal [&_p]:overflow-visible [&_p]:text-clip [&_p]:leading-relaxed"
+          />
+          <ToolbarSpacer />
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-auto shrink-0 gap-2 px-2.5 py-1.5 text-left"
+            onClick={openCapacity}
+            disabled={intelligenceSnapshotPending}
+            aria-pressed={capacityOpen || state.tab === 'publish'}
+            aria-busy={intelligenceSnapshotPending}
+          >
+            <Icon name="layers" size="sm" className="text-[var(--teal)]" />
+            <span className="flex flex-col items-start leading-tight">
+              <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">{capacityHeadline}</span>
+              <span className="t-micro text-[var(--brand-text-dim)]">{capacityDetail}</span>
+            </span>
+          </Button>
+          <div className="basis-full overflow-x-auto pb-px">
+            <LensSwitcher
+              id="content-pipeline-rebuilt-lens"
+              options={lensOptions}
+              value={mode}
+              onChange={(value) => openMode(value as ContentPipelineMode)}
+              size="sm"
+            />
+          </div>
+        </div>
+
+        {state.tab === 'published' ? (
+          <Suspense fallback={<ContentPipelineInteriorLoading label="published content" />}>
+            <LazyPublishedContentLens
+              workspaceId={workspaceId}
+              siteLabel={siteLabel}
+              selectedItemId={state.itemId}
+              onOpenItem={state.openPublishedItem}
+              onCloseItem={state.clearPublishedItem}
+            />
+          </Suspense>
+        ) : lifecycleBoardVisible ? lifecycleUnavailable ? (
+          <ErrorState
+            type="data"
+            title="Content Pipeline work did not load"
+            message="Briefs, requests, or drafts could not be loaded. Retry before relying on the lifecycle Board."
+            action={{ label: 'Retry', onClick: retryLifecycleQueries }}
+            className="min-h-[360px]"
+          />
+        ) : lifecycleLoading ? (
+          <ContentPipelineInteriorLoading label="Content Pipeline work" />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {lifecycleStale && (
+              <InlineBanner tone="warning" title="Pipeline work may be stale">
+                The last loaded lifecycle snapshot remains visible. Refresh when the source is healthy.
+              </InlineBanner>
+            )}
+            <ContentLifecycleBoard
+              key={boardFocus}
+              items={lifecycleItems}
+              focus={boardFocus}
+              intakeCount={intakeSnapshot.total}
+              intakeSummary={intakeSnapshot.summary}
+              intakeContent={(
+                <ContentPipelineIntake
+                  workspaceId={workspaceId}
+                  snapshot={intakeSnapshot}
+                  onCreateBrief={handleCreateBrief}
+                />
+              )}
+              onOpenBriefs={openBriefs}
+              onOpenDrafts={openDrafts}
+              onOpenBrief={openBrief}
+              onOpenPost={openPost}
+            />
+          </div>
+        ) : isContentPipelineStandaloneTab(state.tab) ? (
+          state.tab === 'content-health' && healthUnavailable ? (
+            <ErrorState
+              type="data"
+              title="Content health did not load"
+              message="Decay or workspace intelligence data could not be loaded. Retry before treating the workspace as healthy."
+              action={{ label: 'Retry', onClick: retryHealthQueries }}
+              className="min-h-[360px]"
+            />
+          ) : state.tab === 'content-health' && healthLoading ? (
+            <ContentPipelineInteriorLoading label="content health" />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {state.tab === 'content-health' && healthStale && (
+                <InlineBanner tone="warning" title="Content health may be stale">
+                  The last loaded decay and intelligence evidence remains visible. Refresh when the source is healthy.
+                </InlineBanner>
+              )}
+              <ContentPipelineLenses
+                workspaceId={workspaceId}
+                tab={state.tab}
+                pipelineData={pipelineData}
+                contentPipeline={contentPipeline}
+                workspaceTier={workspaceTier}
+                onOpenTab={openWorkflowTab}
+              />
+            </div>
+          )
+        ) : null}
+
+        <ContentPipelineWorkspaces
+          workspaceId={workspaceId}
+          focusedBrief={focusedBrief}
+          blankBriefOpen={blankBriefOpen}
+          focusedPost={focusedPost}
+          postId={state.postId}
+          postWorkspaceOpen={Boolean(state.postId)}
+          capacityOpen={capacityOpen}
+          briefFixContext={briefFixContext}
+          onClearBriefFixContext={clearBriefFixContext}
+          onCloseBrief={closeBriefWorkspace}
+          onClosePost={state.clearPost}
+          onCloseCapacity={closeCapacity}
+        />
+
+        <Drawer
+          open={guideOpen}
+          onClose={() => setGuideOpen(false)}
+          title="Content Pipeline Guide"
+          subtitle="Workflow guide for planning, briefs, drafts, subscriptions, and exports."
+          eyebrow="Workflow guide"
+          width={560}
+        >
+          <Suspense fallback={<ContentPipelineInteriorLoading label="the Content Pipeline guide" compact />}>
+            <LazyContentPipelineGuide />
+          </Suspense>
+        </Drawer>
+      </div>
+    </ErrorBoundary>
+  );
+}
+
+export default ContentPipelineSurface;

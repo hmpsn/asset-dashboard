@@ -1,0 +1,412 @@
+{
+  "gather": {
+    "capabilityClassification": [
+      {
+        "capability": "A1 Public GET set (filters, empty-on-miss)",
+        "resolution": "ui-only",
+        "note": "Endpoint exists at server/routes/recommendations.ts:150; rebuild reads it unchanged."
+      },
+      {
+        "capability": "A2 Allow-list public projection (EMV stripped, impactBand only)",
+        "resolution": "ui-only",
+        "note": "Server boundary already correct (recommendation-public-projection.ts:37-86); rebuild must render banded values only — trust invariant, see Q4."
+      },
+      {
+        "capability": "A3 Restricted clientStatus + delivered + actOn descriptor",
+        "resolution": "ui-only",
+        "note": "actOn descriptor verified at recommendation-public-projection.ts:29-35,76-83; rebuilt cards consume it, never re-derive."
+      },
+      {
+        "capability": "A4 Operator wording overrides + running-order sort",
+        "resolution": "ui-only",
+        "note": "Free ONLY if rebuild reads the A1 path via client-insight-recommendation-view-model.ts; any other fetch silently loses it."
+      },
+      {
+        "capability": "A5 Client-safe response summary GET /:ws/responses",
+        "resolution": "ui-only",
+        "note": "Route verified at recommendations.ts:489; feeds loop footer counts."
+      },
+      {
+        "capability": "A6 Resilient curated feed read + separate query keys",
+        "resolution": "ui-only",
+        "note": "Hooks verified: theIssueApi, useClientTheIssue, queryKeys client.theIssue/curatedRecommendations/recResponses (queryKeys.ts:259,335,342)."
+      },
+      {
+        "capability": "B1 Act-on greenlight (single-writer, atomic request + attribution)",
+        "resolution": "ui-only",
+        "note": "POST route :340 + useActOnRecommendation exist; rebuild reuses hook, must not weaken backend contract."
+      },
+      {
+        "capability": "B2 Server pricing gate + locked-state UI mirror",
+        "resolution": "ui-only",
+        "note": "403 gate at :353-366; rebuild owes the actOn.mode:'locked' TierGate state (kit locked-state requirement)."
+      },
+      {
+        "capability": "B3 Confirm dialog before greenlight",
+        "resolution": "ui-only",
+        "note": "Port from IssueContentCard.tsx:222-235; copying prototype's one-tap approve would regress audit blockers D1/D3."
+      },
+      {
+        "capability": "B4 Greenlight verb split (Request vs Discuss label)",
+        "resolution": "ui-only",
+        "note": "Label logic at IssueContentCard.tsx:105-106; prototype's uniform 'Approve & go' rejected."
+      },
+      {
+        "capability": "B5 Relevance feedback (keyword-feedback spine)",
+        "resolution": "ui-only",
+        "note": "Existing write path via TheIssueClientPage.tsx:207-208; must keep a named home — losing it severs a client-input loop."
+      },
+      {
+        "capability": "B6 'Let's talk' soft-yes advisor pre-seed",
+        "resolution": "ui-only",
+        "note": "No status write at HEAD; default answer to Q2 keeps this behavior."
+      },
+      {
+        "capability": "B7 Legacy self-serve status updates (PATCH pending→in_progress→completed)",
+        "resolution": "open-question",
+        "note": "Route exists (:173); Q3 — proposed default: preserve via T1 carry-over of InsightsEngine mounted as-is."
+      },
+      {
+        "capability": "B8 Legacy client dismiss (DELETE)",
+        "resolution": "open-question",
+        "note": "Route exists (:289); covered by Q3, same T1 carry-over default."
+      },
+      {
+        "capability": "B9 Client-triggered regeneration job",
+        "resolution": "open-question",
+        "note": "Route :118 + useBackgroundTasks exist; covered by Q3, T1 carry-over default."
+      },
+      {
+        "capability": "B10 Per-item purchase CTA / cart / premium upsell",
+        "resolution": "open-question",
+        "note": "Revenue path (MONETIZATION.md); Q3 — retire only with explicit owner sign-off, default preserve."
+      },
+      {
+        "capability": "C1 Curated content-plan hero + 2-state content floor",
+        "resolution": "ui-only",
+        "note": "IssueContentPlanSection.tsx:85-137 reskin; floor state maps to rebuilt empty state."
+      },
+      {
+        "capability": "C2 'Also on your plan' archetype grouping",
+        "resolution": "ui-only",
+        "note": "recArchetypeMap exists; persona-audit outcome — do not flatten to prototype's flat list."
+      },
+      {
+        "capability": "C3 Next-bets $-forecast band",
+        "resolution": "defer-candidate",
+        "note": "Flag `the-issue-client-next-bets` default OFF; omit initially with a DEF-* row + named home, port when flag graduates."
+      },
+      {
+        "capability": "C4 Loop footer greenlit/discussion counts + jump anchor",
+        "resolution": "defer-candidate",
+        "note": "Flag-gated default OFF; DEF-* row + named home; reads existing /responses endpoint when ported."
+      },
+      {
+        "capability": "C5 Verdict/status headline topRec tie-in",
+        "resolution": "open-question",
+        "note": "Q7 boundary — this surface vs Client-portal overview surface must agree who carries topRec."
+      },
+      {
+        "capability": "C6 Overview '#1 Priority' card + contribution bars",
+        "resolution": "ui-only",
+        "note": "OverviewTab.tsx:120-132,395-440 reskin; final home depends on Q1 but capability is pure composition."
+      },
+      {
+        "capability": "C7 Legacy four-priority grouping + affected pages + counts",
+        "resolution": "ui-only",
+        "note": "All fields already on the public projection; rides with the InsightsEngine carry-over (Q3 decides retire)."
+      },
+      {
+        "capability": "C8 competitor rec renderer gate",
+        "resolution": "ui-only",
+        "note": "Guard-by-construction pattern (InsightsEngine.tsx:136-138) must carry to any rebuilt renderer."
+      },
+      {
+        "capability": "C9 Inbox mirror respond-only card",
+        "resolution": "ui-only",
+        "note": "Kept as-is or deep-linked to rebuilt page; cross-surface dep on Inbox auditor."
+      },
+      {
+        "capability": "C10 Approved confirmation (drop-out + toast)",
+        "resolution": "ui-only",
+        "note": "HEAD behavior preserved by default; prototype's persistent card is N5/Q5."
+      },
+      {
+        "capability": "C11 Full states (loading/error/job-aware empty/locked/preview)",
+        "resolution": "ui-only",
+        "note": "All exist at HEAD; kit demands all four states — job-aware empty is richer than the prototype's."
+      },
+      {
+        "capability": "C12 Admin 'Preview as client' read-only mode",
+        "resolution": "ui-only",
+        "note": "previewMode prop threading (TheIssueClientPage.tsx:205-208) must survive the reskin."
+      },
+      {
+        "capability": "D1 WS-driven freshness (RECOMMENDATIONS_UPDATED etc.)",
+        "resolution": "ui-only",
+        "note": "Rebuilt fetch layer must re-register wsInvalidation.ts:416-429 handlers — both-halves contract."
+      },
+      {
+        "capability": "D2 Generation background job plumbing",
+        "resolution": "ui-only",
+        "note": "Job type + notification-bell tracking exist; rides with B9."
+      },
+      {
+        "capability": "D3 Curated-send client email",
+        "resolution": "ui-only",
+        "note": "Server-side, untouched by UI rebuild; listed so it isn't orphaned if send UX moves."
+      },
+      {
+        "capability": "D4 Weekly trust-ladder auto-send",
+        "resolution": "ui-only",
+        "note": "Server-side; rebuilt surface must render auto-sent recs identically to manual sends."
+      },
+      {
+        "capability": "D5 Regen continuity / carry-over / struck≠completed guards",
+        "resolution": "ui-only",
+        "note": "Server invariants untouched; rebuild must not add a UI path that reads struck as completed."
+      },
+      {
+        "capability": "D6 isCuratedForClient predicate",
+        "resolution": "ui-only",
+        "note": "shared/recommendation-predicates.ts; server-side, consumed for free via A1."
+      },
+      {
+        "capability": "E1 Six gating flags + global-only client flag resolution",
+        "resolution": "open-question",
+        "note": "Owner direction exists (UI-shell flags retire with rebuild, backend flags on lifecycle) but each of the 6 flags needs an explicit mapping in the build plan."
+      },
+      {
+        "capability": "E2 Three-tier behavior matrix (premium/growth/free)",
+        "resolution": "ui-only",
+        "note": "Server gates + InsightsEngine variants exist; rebuild renders the matrix, computes nothing."
+      },
+      {
+        "capability": "E3 Deep links to strategy / deep-dive (both ?tab= halves)",
+        "resolution": "ui-only",
+        "note": "Re-home destinations when IA changes; redirect map required per D8."
+      },
+      {
+        "capability": "N1 Standalone client Recommendations page",
+        "resolution": "open-question",
+        "note": "Q1 canonical home; conflicts with D4 'no new client IA' — default: no new tab, C3-era proposal."
+      },
+      {
+        "capability": "N2 Working 'Discuss' status write",
+        "resolution": "open-question",
+        "note": "Q2; if adopted requires sn-recommendations-1. Default: keep advisor pre-seed, no write."
+      },
+      {
+        "capability": "N3 Client-visible operator recall",
+        "resolution": "open-question",
+        "note": "Q6, admin-surface overlap; if a true unsend is wanted requires sn-recommendations-3."
+      },
+      {
+        "capability": "N4 Client-card category taxonomy",
+        "resolution": "defer-candidate",
+        "note": "Third taxonomy over RecType+archetype; recommend reject — archetype labels already serve the job."
+      },
+      {
+        "capability": "N5 Persistent approved card ('we'll update you here')",
+        "resolution": "open-question",
+        "note": "Q5; improvement candidate but needs sn-recommendations-2 status-join data home; violates C2 zero-behavior re-skin if done early."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-recommendations-1",
+        "kind": "endpoint",
+        "description": "Public client 'Discuss' write: single-writer lifecycle fn (sent→discussing) + public POST /api/public/recommendations/:ws/:recId/discuss, plus optionally a client-authored discussion-thread write (thread is admin-write-only today). Only needed if Q2 adopts the prototype Discuss semantics.",
+        "existsToday": "partial",
+        "evidence": "Edge defined in CLIENT_REC_TRANSITIONS (server/state-machines.ts:133-134) and counted (routes/recommendations.ts:480-499); thread table + admin-only write exist (server/rec-discussion.ts; routes :1031-1046 under requireWorkspaceAccess); recommendation-lifecycle.ts:75-213 exports send/autoSent/approve/strike/unstrike/throttle/fix — no discuss writer, no public route.",
+        "whereItLives": "server/recommendation-lifecycle.ts (new discussRecommendation) + server/routes/recommendations.ts public section + server/rec-discussion.ts",
+        "effort": "M",
+        "likelySharedWith": [
+          "client-portal",
+          "cockpit"
+        ]
+      },
+      {
+        "id": "sn-recommendations-2",
+        "kind": "projection",
+        "description": "Approved-card progress join: serialize linked content-request status onto the public rec projection so a persistent 'you approved this — we'll update you here' card has a real data home (N5/Q5). Today only a boolean `delivered` (rec.status==='completed') is exposed.",
+        "existsToday": "no",
+        "evidence": "recommendation-public-projection.ts:76-83 exposes only clientStatus + delivered + actOn; no content-request status field; rec lineage exists on the request created at act-on (routes/recommendations.ts:340-475) but is never joined back into the public read.",
+        "whereItLives": "server/client-insight-recommendation-view-model.ts + server/recommendation-public-projection.ts (allow-list addition)",
+        "effort": "M",
+        "likelySharedWith": [
+          "client-portal",
+          "content-pipeline"
+        ]
+      },
+      {
+        "id": "sn-recommendations-3",
+        "kind": "derivation",
+        "description": "Recall/unsend semantics (N3/Q6): either document recall=strike (no server change) or add a sent→recalled/unsent transition + lifecycle fn. Admin-surface owned; client only observes disappearance.",
+        "existsToday": "partial",
+        "evidence": "strikeRecommendation exists (recommendation-lifecycle.ts:130-183) and struck recs leave the curated set via isCuratedForClient (domains/recommendations/rules.ts:255-264); CLIENT_REC_TRANSITIONS (state-machines.ts:133-134) has no back-edge from sent.",
+        "whereItLives": "server/recommendation-lifecycle.ts + server/state-machines.ts (if new edge)",
+        "effort": "S",
+        "likelySharedWith": [
+          "cockpit"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1 Canonical home: standalone client Recommendations page vs HEAD's 4 mounts (The Issue overview, Health action-plan slot, Overview #1 card, Inbox mirror) — which is canonical; others persist/redirect/fold?",
+        "proposedDefault": "No new tab (D4 locks the 4-tab IA); keep The Issue as canonical, Health slot carries the legacy action plan via T1 carry-over; standalone page is a C3-era proposal.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2 Build the sent→discussing client write (sn-recommendations-1) or keep Discuss = advisor pre-seed? Loop footer already advertises a count nothing can increment.",
+        "proposedDefault": "Keep advisor pre-seed for the rebuild; ship the write as its own reviewed follow-up if wanted.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3 Legacy self-serve capabilities (B7-B10: status updates, dismiss, regenerate, cart purchases) — preserved or deliberately retired?",
+        "proposedDefault": "Preserve via T1: keep InsightsEngine mounted as-is inside the new shell (self-contained), reskin later.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4 Client-facing dollar display: confirm banded impactBand only, never raw $/mo (prototype shows raw '$3,900/mo').",
+        "proposedDefault": "Banded only — A2 is a trust invariant; treat as non-negotiable, seek explicit ratification.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5 Approved-state UX: prototype's persistent 'we'll update you here' card (needs sn-recommendations-2) vs HEAD's drop-out + counts?",
+        "proposedDefault": "Keep HEAD drop-out for C2 zero-behavior re-skin; persistent card as C3 follow-up with the status join.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6 Recall semantics (admin overlap): recall = existing strike, or new unsend transition (sn-recommendations-3)?",
+        "proposedDefault": "Recall = strike; document it — no new transition.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7 Boundary: who owns the verdict/status headline + topRec (C5) — this surface or Client-portal overview? Both auditors must agree.",
+        "proposedDefault": "Client-portal overview owns the headline; this surface supplies topRecommendationId via the existing summary read.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8 Doc drift: FEATURE_AUDIT #607 still describes a per-bet 'Act on this' the code removed.",
+        "proposedDefault": "Update FEATURE_AUDIT #607 in the first rebuild PR touching this surface; no owner decision needed.",
+        "needsOwner": false,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Per-flag disposition for the six gating flags (strategy-the-issue, the-issue-client-spine, the-issue-client-next-bets, the-issue-client-return-hook, client-ia-v2, strategy-competitor-send) under the rebuild's flag strategy.",
+        "proposedDefault": "UI-shell flags map to the rebuild retirement track; strategy-the-issue and strategy-competitor-send stay backend-lifecycle-governed; enumerate the mapping in the build plan per the 2026-07-02 owner direction.",
+        "needsOwner": true,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "N1 Standalone client-portal Recommendations page/route",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "D4 locks the 4-tab client IA with no new IA; consolidation is plausible but unowned (Q1)."
+      },
+      {
+        "proposal": "N2 Working 'Discuss' status write on the client card",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New public write surface (sn-recommendations-1) needing its own review; HEAD's advisor pre-seed is the safe parity behavior."
+      },
+      {
+        "proposal": "N3 Client-visible operator recall (unsend)",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Admin-surface owned; strike already achieves the client-visible effect — decide Q6 before adding a transition."
+      },
+      {
+        "proposal": "N4 Client-card category taxonomy (Opportunity/Anomaly/Site audit/Content)",
+        "recommendation": "reject",
+        "rationale": "A third taxonomy over RecType (15) + archetype (6) with no mapping; archetype labels already give jargon-free grouping, and the prototype's purple category chip violates the Four Laws on client cards."
+      },
+      {
+        "proposal": "N5 Persistent approved card ('You approved this — we'll update you here')",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Genuine UX improvement but creates an update-delivery obligation needing sn-recommendations-2; violates C2's zero-behavior-change re-skin if adopted now."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Content plan hero (curated feed)",
+        "Also on your plan (archetype groups)",
+        "Next bets band (flag-gated, deferred)",
+        "Loop footer (flag-gated, deferred)",
+        "Legacy action plan module (InsightsEngine carry-over, Health/Results slot)",
+        "Overview #1 Priority card",
+        "Inbox mirror card (respond-only, Inbox surface)"
+      ],
+      "primitives": [
+        "GroupBlock",
+        "MetricTile",
+        "Meter",
+        "FilterChip",
+        "SearchField",
+        "Segmented",
+        "Drawer",
+        "KeyValueRow",
+        "Toolbar",
+        "Avatar",
+        "DataTable (legacy priority sections, optional)"
+      ],
+      "dataHooks": [
+        "useClientTheIssue (src/components/client/the-issue/useClientTheIssue.ts)",
+        "theIssueApi (src/api/theIssue.ts:41)",
+        "useActOnRecommendation (src/hooks/client/useActOnRecommendation.ts:27)",
+        "useClientRecResponses (src/hooks/client/useClientRecResponses.ts:17)",
+        "GET /api/public/recommendations/:ws (+?clientStatus=) routes/recommendations.ts:150",
+        "GET /api/public/recommendations/:ws/responses :489",
+        "POST /:ws/:recId/act-on :340",
+        "PATCH :173 / DELETE :289 / POST generate :118 (legacy self-serve)",
+        "queryKeys.client.theIssue/curatedRecommendations/recResponses (src/lib/queryKeys.ts:259,335,342)",
+        "useBackgroundTasks",
+        "useCart",
+        "useWorkspaceEvents via wsInvalidation.ts:416-429"
+      ],
+      "statesPlan": "Skeleton loading; error+retry; job-aware empty (generating/refresh-failed + Refresh CTA); 2-state content floor; TierGate locked from actOn.mode==='locked'; previewMode read-only.",
+      "mountNote": "Flag-gated on ui-rebuild-shell inside the ratified 4-tab client IA per D4 C2 sequencing (after C1 cutover); no new client tab pending Q1; all reads MUST go through the A1 public path or wording-overrides/running-order silently vanish (A4)."
+    },
+    "crossSurfaceDeps": [
+      "client-portal (D4 C1→C2→C3 sequencing gates this surface; Q7 topRec/headline ownership; OverviewTab #1 card lives in its shell)",
+      "inbox (respond-only mirror card C9 + rec-lineage content requests must keep rendering; deep-link target decision)",
+      "cockpit/admin recommendations (operator desk half of recs.js prototype; recall semantics Q6/sn-recommendations-3; send/bulk-send feeders)",
+      "strategy/keywords (page↔keyword mapping verify item from Parity Ledger 'Strategy' row; relevance feedback writes the keyword-feedback spine)",
+      "D8 redirect map required if any mount consolidates"
+    ],
+    "unknowns": [
+      "Whether the loop footer's 'M in discussion' count should render at all while no discussing writer exists (it is structurally always 0 at HEAD) — cosmetic call, not resolved here.",
+      "Exact keyword-feedback write endpoint behind B5 relevance feedback was not re-verified in code this pass (doc evidence TheIssueClientPage.tsx:207-208 accepted); confirm the route name before the build ticket."
+    ],
+    "effortEstimate": "L",
+    "surface": "recommendations"
+  },
+  "verify": {
+    "surface": "recommendations",
+    "verdicts": [
+      {
+        "needId": "sn-recommendations-1",
+        "verdict": "CONFIRMED",
+        "evidence": "CLIENT_REC_TRANSITIONS defines the sent→discussing edge (server/state-machines.ts:132-133); the discussing status is counted in the responses view but only ever READ, never written (server/routes/recommendations.ts:490-505 counts; server/intelligence/client-signals-slice.ts:563,584; server/routes/workspaces.ts:216). No discussRecommendation writer exists anywhere — recommendation-lifecycle.ts exports send/autoSent/approve/strike/unstrike/throttle/fix only (approve at ~120, strike at 130-183, unstrike 184-197, throttle 199-213, fix ~217); a full server-wide grep for 'discussRecommendation' and '/discuss' returns nothing. The only public client write is /act-on (routes/recommendations.ts:341-475), which via approveRecommendation writes ONLY the sent|discussing→approved edge — never sets clientStatus='discussing'. The discussion THREAD write route (routes/recommendations.ts:1038) is gated by requireWorkspaceAccess (admin HMAC), and rec-discussion.ts exposes only listRecDiscussion + addRecDiscussionEntry — no public thread-write. So both halves of the 'partial' claim hold: the discussing state edge is defined+read but has no client writer, and the thread is admin-write-only."
+      },
+      {
+        "needId": "sn-recommendations-2",
+        "verdict": "CONFIRMED",
+        "evidence": "stripEmvFromPublicRecs (server/recommendation-public-projection.ts:36-88) is the public allow-list; when exposeClientStatus it emits only clientStatus (cfStatus), delivered = (r.status==='completed'), and actOn (lines 76-84). No content-request status field, no join to the linked content request — a grep of the projection + client-insight-recommendation-view-model.ts for contentRequest/requestStatus/deliveryStatus returns nothing. Rec→content-request lineage IS created at act-on (recommendationId stamped on the request, routes/recommendations.ts ~395-410; persisted in content-requests.ts:249,280) but is only joined back on the ADMIN side, in strategy-issue-lenses.ts:175-201 (requestByRecId + contentRequestStageOf), reachable only via GET /api/workspaces/:id/issue-lenses under requireWorkspaceAccess (admin HMAC) — never in a public route. So the 'no' verdict for a PUBLIC progress-join holds. Minor note (does not change the verdict): an admin-side join+stage-derivation helper pattern already exists to model the new public one on, but the public projection allow-list addition + view-model wiring is genuinely net-new. M effort stands (allow-list + join + serialization, no migration)."
+      },
+      {
+        "needId": "sn-recommendations-3",
+        "verdict": "CONFIRMED",
+        "evidence": "strikeRecommendation exists (server/recommendation-lifecycle.ts:130-183) and struck recs leave the curated set: isCuratedForClient returns false for lifecycle==='struck' (shared/recommendation-predicates.ts:40-42, re-exported through domains/recommendations/rules.ts:264). CLIENT_REC_TRANSITIONS has NO back-edge from sent (server/state-machines.ts:132-137: sent→[approved,declined,discussing]; approved/declined terminal). A server-wide grep for recall/unsend/recalled/unsent finds no lifecycle fn or route — the sole 'recall' hit is a doc comment on autoSent describing a UI affordance (shared/types/recommendations.ts:74), i.e. recall today is effectively strike, no dedicated writer. Both offered paths are consistent with an S effort: the 'document recall=strike' path is zero server change; the 'add sent→recalled edge' path is a small state-machine + lifecycle-fn addition. S holds."
+      }
+    ]
+  }
+}

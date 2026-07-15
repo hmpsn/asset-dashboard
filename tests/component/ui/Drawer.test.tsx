@@ -1,0 +1,160 @@
+import { useState } from 'react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { Drawer } from '../../../src/components/ui/overlay/Drawer';
+import { Modal } from '../../../src/components/ui/overlay/Modal';
+import { expectNoA11yViolations } from '../a11y';
+
+afterEach(() => {
+  cleanup();
+  document.body.style.overflow = '';
+});
+
+function Harness({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Drawer open={open} onClose={onClose} title="Focus Trap">
+      <button data-testid="first-inside">Inside First</button>
+      <button data-testid="last-inside">Inside Last</button>
+    </Drawer>
+  );
+}
+
+function DrawerWithModal({ onDrawerClose }: { onDrawerClose: () => void }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  return (
+    <Drawer open onClose={onDrawerClose} title="Outer drawer">
+      <button type="button" data-testid="open-inner-modal" onClick={() => setModalOpen(true)}>
+        Open inner modal
+      </button>
+      <button type="button" data-testid="drawer-last">Drawer action</button>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
+        <Modal.Header title="Inner modal" onClose={() => setModalOpen(false)} />
+        <Modal.Body>
+          <button type="button" data-testid="modal-first">Modal first</button>
+          <button type="button" data-testid="modal-last">Modal last</button>
+        </Modal.Body>
+      </Modal>
+    </Drawer>
+  );
+}
+
+describe('Drawer', () => {
+  it('renders nothing when open is false', () => {
+    const { container } = render(<Drawer open={false} title="Hidden" />);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('renders the dialog with title when open', async () => {
+    render(<Drawer open title="My Drawer" />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByText('My Drawer')).toBeInTheDocument();
+    await expectNoA11yViolations(dialog);
+  });
+
+  it('sets aria-modal and aria-labelledby wired to the title', () => {
+    render(<Drawer open title="Labelled Drawer" />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    const labelledBy = dialog.getAttribute('aria-labelledby');
+    expect(labelledBy).toBeTruthy();
+    expect(document.getElementById(labelledBy!)?.textContent).toBe('Labelled Drawer');
+  });
+
+  it('traps focus: Tab from the last focusable wraps to the first', () => {
+    render(<Harness open onClose={() => {}} />);
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    const lastInside = screen.getByTestId('last-inside');
+    lastInside.focus();
+    expect(document.activeElement).toBe(lastInside);
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(closeBtn);
+  });
+
+  it('traps focus backward: Shift+Tab from the first focusable wraps to the last', () => {
+    render(<Harness open onClose={() => {}} />);
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    const lastInside = screen.getByTestId('last-inside');
+    closeBtn.focus();
+    expect(document.activeElement).toBe(closeBtn);
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(lastInside);
+  });
+
+  it('restores focus to the previously-focused element when the drawer closes', () => {
+    const trigger = document.createElement('button');
+    trigger.setAttribute('data-testid', 'outside-trigger');
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const { rerender } = render(<Harness open onClose={() => {}} />);
+    // Focus something inside the drawer to simulate user interaction.
+    screen.getByTestId('first-inside').focus();
+    expect(document.activeElement).not.toBe(trigger);
+
+    rerender(<Harness open={false} onClose={() => {}} />);
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it('fires onClose on Escape key', () => {
+    const onClose = vi.fn();
+    render(<Drawer open onClose={onClose} title="Escape Test" />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('fires onClose on backdrop click when closeOnBackdrop is true (default)', () => {
+    const onClose = vi.fn();
+    render(<Drawer open onClose={onClose} title="Backdrop Test" />);
+    const backdrop = document.querySelector('[data-drawer-backdrop="true"]');
+    expect(backdrop).not.toBeNull();
+    fireEvent.mouseDown(backdrop as Element);
+    fireEvent.click(backdrop as Element);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('does NOT fire onClose on backdrop click when closeOnBackdrop is false', () => {
+    const onClose = vi.fn();
+    render(
+      <Drawer open onClose={onClose} title="No Backdrop Close" closeOnBackdrop={false} />,
+    );
+    const backdrop = document.querySelector('[data-drawer-backdrop="true"]');
+    expect(backdrop).not.toBeNull();
+    fireEvent.mouseDown(backdrop as Element);
+    fireEvent.click(backdrop as Element);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('does not fire onClose when the panel itself is clicked', () => {
+    const onClose = vi.fn();
+    render(<Drawer open onClose={onClose} title="Panel Click" />);
+    const dialog = screen.getByRole('dialog');
+    fireEvent.mouseDown(dialog);
+    fireEvent.click(dialog);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('yields Escape and Tab to a Modal stacked over the Drawer', () => {
+    const onDrawerClose = vi.fn();
+    render(<DrawerWithModal onDrawerClose={onDrawerClose} />);
+
+    const trigger = screen.getByTestId('open-inner-modal');
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+
+    const modalLast = screen.getByTestId('modal-last');
+    const modalClose = screen.getAllByRole('button', { name: /close/i })[1];
+    modalLast.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(modalClose);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onDrawerClose).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(document.activeElement).toBe(trigger);
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+});

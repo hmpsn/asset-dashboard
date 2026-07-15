@@ -412,13 +412,16 @@ describe('dismissSuggestions', () => {
     expect(listSuggestions(freshWs)).toEqual([]);
   });
 
-  it('can dismiss an already-applied suggestion (no status filter on id-based dismiss)', () => {
-    // When specific IDs are passed, dismissSuggestions updates any status row —
-    // there is no status = 'pending' guard in the id-based path.
+  it('does NOT dismiss an already-applied suggestion (guarded: applied → dismissed is illegal)', () => {
+    // R3-PR2: the SEO_SUGGESTION_TRANSITIONS guard now rejects applied → dismissed.
+    // A bulk id-based dismiss reads each row's status and drops illegal moves
+    // (skip-and-report) rather than clobbering an applied suggestion to dismissed.
+    // The write never throws — the illegal id is simply skipped and 0 rows change.
     const s = saveSuggestion(makeSuggestionOpts(wsId));
     markApplied(wsId, [s.id]);
-    const count = dismissSuggestions(wsId, [s.id]);
-    expect(count).toBe(1); // row exists, gets updated to 'dismissed'
+    let count = -1;
+    expect(() => { count = dismissSuggestions(wsId, [s.id]); }).not.toThrow();
+    expect(count).toBe(0); // applied row left untouched
   });
 
   it('is a no-op when given empty array — falls back to dismiss-all for workspace', () => {

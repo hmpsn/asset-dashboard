@@ -233,6 +233,8 @@ const stmts = createStmtCache(() => ({
 
 export interface UpsertDeliverableItemInput {
   id?: string;
+  /** Preserve the original review-row identity timestamp across delete/reinsert resends. */
+  createdAt?: string;
   status: string;
   targetRef?: string | null;
   collectionId?: string | null;
@@ -325,9 +327,16 @@ export function upsertDeliverable(input: UpsertDeliverableInput): ClientDelivera
 
     if (input.items !== undefined) {
       // Items fully replace the existing set (delete-then-reinsert). The parent row's
-      // sort order is honored from the input; created_at is stamped fresh.
+      // existing created_at is authoritative for a stable item id. This prevents a
+      // same-source revision resend from erasing review chronology even when a caller
+      // omits or accidentally supplies a newer timestamp.
+      const existingItems = stmts().getItems.all(resolvedId) as ClientDeliverableItemRow[];
+      const existingMetadata = new Map(
+        existingItems.map(item => [item.id, { createdAt: item.created_at, sortOrder: item.sort_order }]),
+      );
       stmts().deleteItems.run(resolvedId);
       input.items.forEach((item, index) => {
+        const preserved = item.id != null ? existingMetadata.get(item.id) : undefined;
         stmts().insertItem.run({
           id: item.id ?? itemId(),
           deliverable_id: resolvedId,
@@ -341,8 +350,10 @@ export function upsertDeliverable(input: UpsertDeliverableInput): ClientDelivera
           client_note: item.clientNote ?? null,
           applyable: item.applyable ? 1 : 0,
           item_payload: item.itemPayload != null ? JSON.stringify(item.itemPayload) : null,
-          sort_order: Number.isFinite(item.sortOrder) ? (item.sortOrder as number) : index,
-          created_at: now,
+          sort_order: Number.isFinite(item.sortOrder)
+            ? (item.sortOrder as number)
+            : (preserved?.sortOrder ?? index),
+          created_at: preserved?.createdAt ?? item.createdAt ?? now,
         });
       });
     }

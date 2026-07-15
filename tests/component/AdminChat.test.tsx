@@ -1,6 +1,6 @@
 // tests/component/AdminChat.test.tsx
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { AdminChat } from '../../src/components/AdminChat';
@@ -47,6 +47,26 @@ function makeQueryClient() {
   });
 }
 
+function deferred<T>() {
+  let settle: (value: T) => void = () => {
+    throw new Error('Deferred promise resolved before initialization');
+  };
+  const promise = new Promise<T>((resolve) => {
+    settle = resolve;
+  });
+  return { promise, resolve: settle };
+}
+
+function chatElement(queryClient: QueryClient, workspaceId: string, workspaceName: string) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <AdminChat workspaceId={workspaceId} workspaceName={workspaceName} />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
 function renderChat(
   workspaceId = 'ws-test',
   workspaceName = 'Test Workspace',
@@ -66,6 +86,7 @@ function renderChat(
 async function openChat() {
   fireEvent.click(screen.getByRole('button', { name: /admin insights/i }));
   await screen.findByText('Admin Insights', { selector: 'span' });
+  await screen.findByPlaceholderText('Ask anything...');
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -73,6 +94,7 @@ async function openChat() {
 describe('AdminChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     mockChatApi.adminAsk.mockResolvedValue({ answer: 'AI response here', mode: 'analyst' });
     mockChatApi.sessions.mockResolvedValue([]);
     mockChatApi.session.mockResolvedValue({ messages: [] });
@@ -368,5 +390,78 @@ describe('AdminChat', () => {
     await waitFor(() => {
       expect(screen.queryByText('Question A')).not.toBeInTheDocument();
     });
+  });
+
+  it('does not append a late answer from the previous workspace', async () => {
+    const pendingAnswer = deferred<{ answer: string; mode: string }>();
+    mockChatApi.adminAsk.mockReturnValueOnce(pendingAnswer.promise);
+    const queryClient = makeQueryClient();
+    const { rerender } = render(chatElement(queryClient, 'ws-a', 'Workspace A'));
+
+    await openChat();
+    const input = screen.getByPlaceholderText('Ask anything...');
+    fireEvent.change(input, { target: { value: 'Question from A' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(mockChatApi.adminAsk).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: 'ws-a' })));
+
+    rerender(chatElement(queryClient, 'ws-b', 'Workspace B'));
+    await waitFor(() => expect(screen.queryByText('Question from A')).not.toBeInTheDocument());
+
+    await act(async () => {
+      pendingAnswer.resolve({ answer: 'Private answer from A', mode: 'analyst' });
+    });
+
+    expect(screen.queryByText('Private answer from A')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Workspace B').length).toBeGreaterThan(0);
+  });
+
+  it('does not expose a late history list from the previous workspace', async () => {
+    const pendingHistoryA = deferred<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>();
+    const pendingHistoryB = deferred<Array<{ id: string; title: string; messageCount: number; updatedAt: string }>>();
+    mockChatApi.sessions
+      .mockReturnValueOnce(pendingHistoryA.promise)
+      .mockReturnValueOnce(pendingHistoryB.promise);
+    const queryClient = makeQueryClient();
+    const { rerender } = render(chatElement(queryClient, 'ws-a', 'Workspace A'));
+
+    await openChat();
+    fireEvent.click(screen.getByRole('button', { name: /chat history/i }));
+    await waitFor(() => expect(mockChatApi.sessions).toHaveBeenCalledWith('ws-a', 'admin'));
+
+    rerender(chatElement(queryClient, 'ws-b', 'Workspace B'));
+    await waitFor(() => expect(screen.getByText('Give me a full status report on this site')).toBeInTheDocument());
+    await act(async () => {
+      pendingHistoryA.resolve([{ id: 'a-session', title: 'Workspace A private history', messageCount: 2, updatedAt: '2026-01-01T00:00:00.000Z' }]);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /chat history/i }));
+    expect(screen.queryByText('Workspace A private history')).not.toBeInTheDocument();
+
+    await act(async () => {
+      pendingHistoryB.resolve([]);
+    });
+  });
+
+  it('does not append a late loaded session from the previous workspace', async () => {
+    const pendingSession = deferred<{ messages: Array<{ role: string; content: string }> }>();
+    mockChatApi.sessions.mockResolvedValueOnce([
+      { id: 'a-session', title: 'Workspace A history', messageCount: 1, updatedAt: '2026-01-01T00:00:00.000Z' },
+    ]);
+    mockChatApi.session.mockReturnValueOnce(pendingSession.promise);
+    const queryClient = makeQueryClient();
+    const { rerender } = render(chatElement(queryClient, 'ws-a', 'Workspace A'));
+
+    await openChat();
+    fireEvent.click(screen.getByRole('button', { name: /chat history/i }));
+    fireEvent.click(await screen.findByText('Workspace A history'));
+    await waitFor(() => expect(mockChatApi.session).toHaveBeenCalledWith('ws-a', 'a-session'));
+
+    rerender(chatElement(queryClient, 'ws-b', 'Workspace B'));
+    await act(async () => {
+      pendingSession.resolve({ messages: [{ role: 'assistant', content: 'Private session content from A' }] });
+    });
+
+    expect(screen.queryByText('Private session content from A')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Workspace B').length).toBeGreaterThan(0);
   });
 });

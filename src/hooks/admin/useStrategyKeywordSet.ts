@@ -4,15 +4,13 @@
  * - useQuery: fetches the active set (removedAt IS NULL) ordered by slotOrder.
  * - useMutation(add/remove/keep): invalidates both the keyword-set key and the
  *   keywordStrategy key on success so the SiteTargetKeywords display states refresh.
- * - useWorkspaceEvents: both-halves WS contract — Lane A broadcasts
- *   STRATEGY_KEYWORD_SET_UPDATED after every mutation; this handler invalidates
- *   the query key so the UI reflects external mutations (e.g. reconciler runs).
+ * - External STRATEGY_KEYWORD_SET_UPDATED broadcasts are handled once by the
+ *   admin shell's centralized useWsInvalidation registry.
  *
  * `enabled` is gated on the `strategy-keywords-managed-set` feature flag being ON
  * AND workspaceId being present. Flag-OFF → no fetch, no network traffic.
  */
 
-import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   addStrategyKeywordApi,
@@ -21,8 +19,6 @@ import {
   removeStrategyKeywordApi,
 } from '../../api/keyword-strategy';
 import { queryKeys } from '../../lib/queryKeys';
-import { WS_EVENTS } from '../../lib/wsEvents';
-import { useWorkspaceEvents } from '../useWorkspaceEvents';
 import type { ActiveStrategyKeyword } from '../../../shared/types/strategy-keyword-set';
 
 export interface UseStrategyKeywordSetResult {
@@ -84,23 +80,6 @@ export function useStrategyKeywordSet(
     mutationFn: (keyword: string) => keepStrategyKeywordApi(workspaceId, keyword),
     onSuccess: invalidateSet,
   });
-
-  // ── Both-halves WS handler (CLAUDE.md §Data Flow Rule #2) ─────────
-  // Lane A broadcasts STRATEGY_KEYWORD_SET_UPDATED after every mutation/reconcile.
-  // This handler is the second half — it invalidates the query cache so the UI
-  // always reflects the authoritative server state.
-  // useWorkspaceEvents is called unconditionally (Rules of Hooks). The internal
-  // subscription sends 'subscribe' only when workspaceId is present.
-  const wsHandlers = useMemo(
-    () => ({
-      [WS_EVENTS.STRATEGY_KEYWORD_SET_UPDATED]: () =>
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.admin.strategyKeywordSet(workspaceId),
-        }),
-    }),
-    [queryClient, workspaceId],
-  );
-  useWorkspaceEvents(workspaceId || undefined, wsHandlers);
 
   return {
     managedKeywordSet,

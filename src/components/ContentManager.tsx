@@ -8,16 +8,23 @@ import {
 } from 'lucide-react';
 import { PostEditor } from './PostEditor';
 import { useAdminPostWorkflow } from '../hooks/admin/useAdminPostWorkflow';
+import { isDeliverableContentPost } from '../../shared/content-post-integrity';
 
 const STATUS_CONFIG: Record<string, { icon: typeof Clock; color: string; label: string; bg: string; tone: 'amber' | 'red' | 'blue' | 'teal' | 'emerald' }> = {
   generating: { icon: Sparkles, color: 'text-accent-warning', label: 'Generating', bg: 'bg-amber-500/10 border-amber-500/20', tone: 'amber' },
+  needs_attention: { icon: AlertTriangle, color: 'text-accent-warning', label: 'Needs attention', bg: 'bg-amber-500/10 border-amber-500/20', tone: 'amber' },
   error: { icon: AlertTriangle, color: 'text-accent-danger', label: 'Failed', bg: 'bg-red-500/10 border-red-500/20', tone: 'red' },
   draft: { icon: PenLine, color: 'text-accent-info', label: 'Draft', bg: 'bg-blue-500/10 border-blue-500/20', tone: 'blue' },
   review: { icon: Eye, color: 'text-accent-cyan', label: 'In Review', bg: 'bg-cyan-500/10 border-cyan-500/20', tone: 'teal' },
   approved: { icon: CheckCircle2, color: 'text-accent-success', label: 'Approved', bg: 'bg-emerald-500/10 border-emerald-500/20', tone: 'emerald' },
 };
 
-export function ContentManager({ workspaceId }: { workspaceId: string }) {
+interface ContentManagerProps {
+  workspaceId: string;
+  embedded?: boolean;
+}
+
+export function ContentManager({ workspaceId, embedded = false }: ContentManagerProps) {
   const {
     postsQ,
     posts,
@@ -60,14 +67,16 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
   if (activePostId) {
     return (
       <div className="space-y-8">
-        <Button
-          onClick={closePostEditor}
-          variant="link"
-          size="sm"
-          className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] no-underline"
-        >
-          ← Back to Content
-        </Button>
+        {!embedded && (
+          <Button
+            onClick={closePostEditor}
+            variant="link"
+            size="sm"
+            className="text-xs text-[var(--brand-text)] hover:text-[var(--brand-text-bright)] no-underline"
+          >
+            ← Back to Content
+          </Button>
+        )}
         <div className="bg-[var(--surface-2)] border border-[var(--brand-border)] p-4" style={{ borderRadius: 'var(--radius-signature)' }}>
           <PostEditor
             key={activePostId}
@@ -75,6 +84,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
             postId={activePostId}
             onClose={closePostEditor}
             onDelete={closePostEditor}
+            workspaceLayout={embedded}
           />
         </div>
       </div>
@@ -107,11 +117,13 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Content Posts"
-        subtitle={`${posts.length} post${posts.length !== 1 ? 's' : ''}`}
-        icon={<Icon as={FileText} size="lg" className="text-accent-info" />}
-      />
+      {!embedded && (
+        <PageHeader
+          title="Content Posts"
+          subtitle={`${posts.length} post${posts.length !== 1 ? 's' : ''}`}
+          icon={<Icon as={FileText} size="lg" className="text-accent-info" />}
+        />
+      )}
 
       {/* Header stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -189,6 +201,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
           const cfg = STATUS_CONFIG[post.status] || STATUS_CONFIG.draft;
           const PostStatusIcon = cfg.icon;
           const isGenerating = post.status === 'generating';
+          const isDeliverable = isDeliverableContentPost(post);
           const sectionsComplete = post.sections?.filter(s => s.status === 'done').length || 0;
           const totalSections = post.sections?.length || 0;
 
@@ -322,7 +335,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
 
                     {/* Send to client (POST-C1) — separate client-facing action. Teal CTA + optional
                         inline note (Admin Send Convention). Distinct from the internal Review button. */}
-                    {!isGenerating && sendToClientPost !== post.id && (
+                    {isDeliverable && sendToClientPost !== post.id && (
                       <Button
                         onClick={() => beginSendToClient(post.id)}
                         disabled={sendPostToClient.isPending}
@@ -356,7 +369,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     )}
 
                     {/* Score Voice */}
-                    {!isGenerating && !post.voiceScore && (
+                    {isDeliverable && !post.voiceScore && (
                       <Button
                         onClick={() => scoreVoice(post.id)}
                         disabled={scoringVoice === post.id}
@@ -371,7 +384,7 @@ export function ContentManager({ workspaceId }: { workspaceId: string }) {
                     )}
 
                     {/* Export */}
-                    {!isGenerating && (
+                    {isDeliverable && (
                       <IconButton
                         label="Export HTML"
                         icon={Download}

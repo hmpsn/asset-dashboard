@@ -15,11 +15,17 @@ vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
 }));
 
 const mockMutateAsync = vi.fn().mockResolvedValue({});
+const mockBrandMutateAsync = vi.fn().mockResolvedValue({});
 const mockApplyMutateAsync = vi.fn().mockResolvedValue({ applied: 1, failed: 0, results: [] });
 const mockUseUnifiedInbox = vi.fn();
 vi.mock('../../src/hooks/client/useUnifiedInbox', () => ({
   useUnifiedInbox: (...args: unknown[]) => mockUseUnifiedInbox(...args),
   useRespondToDeliverable: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
+  useRespondToBrandReview: () => ({
+    mutateAsync: mockBrandMutateAsync,
+    isPending: false,
+    getLastErrorRefresh: () => null,
+  }),
   useApplyDeliverable: () => ({ mutateAsync: mockApplyMutateAsync, isPending: false }),
 }));
 
@@ -102,6 +108,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockUseUnifiedInbox.mockReturnValue({ unifiedInbox: false, deliverables: [], isLoading: false });
   mockMutateAsync.mockResolvedValue({});
+  mockBrandMutateAsync.mockResolvedValue({});
   mockApplyMutateAsync.mockResolvedValue({ applied: 1, failed: 0, results: [] });
   mockUseClientWorkOrderComments.mockReturnValue({ data: [] });
 });
@@ -161,6 +168,46 @@ function makeInlineApprovalDeliverable(): ClientDeliverable {
   });
 }
 
+function makeBrandReviewDeliverable(
+  status: 'awaiting_client' | 'approved' = 'awaiting_client',
+): ClientDeliverable {
+  return makeDeliverable({
+    id: 'brand-review-1',
+    type: 'brand_generation',
+    kind: 'review',
+    status,
+    title: 'Brand system review',
+    summary: 'Review the proposed mission.',
+    payload: {
+      schemaVersion: 1,
+      family: 'brand_generation',
+      reviewKind: 'brand_suite',
+    },
+    items: [{
+      id: 'brand-review-item-1',
+      deliverableId: 'brand-review-1',
+      status,
+      targetRef: null,
+      collectionId: null,
+      field: 'mission',
+      currentValue: null,
+      proposedValue: 'A clear, grounded mission.',
+      clientValue: null,
+      clientNote: null,
+      applyable: false,
+      itemPayload: {
+        schemaVersion: 1,
+        family: 'brand_generation',
+        reviewKind: 'brand_suite',
+        target: 'mission',
+        reviewToken: 'a'.repeat(64),
+      },
+      sortOrder: 0,
+      createdAt: new Date().toISOString(),
+    }],
+  });
+}
+
 /** A work-order (kind:'order') deliverable for the R5 read-only "Work in progress" track lane. */
 function makeWorkOrderDeliverable(overrides: Partial<ClientDeliverable> = {}): ClientDeliverable {
   return makeDeliverable({
@@ -198,6 +245,26 @@ describe('InboxTab unified inbox', () => {
 
     // Send age (sentAt) is surfaced.
     expect(screen.getByText('Sent 3 days ago')).toBeInTheDocument();
+  });
+
+  it('removes a receipt-completed brand parent from PriorityStrip while retaining review readback', () => {
+    mockUseUnifiedInbox.mockReturnValue({
+      deliverables: [makeBrandReviewDeliverable()],
+      isLoading: false,
+    });
+    const { rerender } = render(<InboxTab {...baseProps} />);
+
+    expect(screen.getAllByText('Brand system review')).toHaveLength(2);
+
+    mockUseUnifiedInbox.mockReturnValue({
+      deliverables: [makeBrandReviewDeliverable('approved')],
+      isLoading: false,
+    });
+    rerender(<InboxTab {...baseProps} />);
+
+    // The completed card remains in Reviews for honest readback, but its PriorityStrip entry leaves.
+    expect(screen.getAllByText('Brand system review')).toHaveLength(1);
+    expect(screen.getByText('Approval recorded')).toBeInTheDocument();
   });
 
   it('routes review and conversation deliverables into their canonical sections', () => {

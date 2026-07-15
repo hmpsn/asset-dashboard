@@ -305,3 +305,76 @@ describe('audit_finding insight auto-resolution', () => {
     }
   });
 });
+
+// ── R3-PR2: resolution_status transition guard (null-origin + idempotency) ──
+describe('resolveInsight transition guard (R3-PR2)', () => {
+  it('null-origin: a freshly computed insight (resolution_status NULL) resolves without crashing', () => {
+    const wsG = seedWorkspace();
+    try {
+      const insight = upsertInsight({
+        workspaceId: wsG.workspaceId,
+        pageId: 'null-origin-page',
+        insightType: 'audit_finding',
+        severity: 'warning',
+        data: { scope: 'page', issueCount: 1, issueMessages: 'x', source: 'manual_review' },
+        impactScore: 40,
+      });
+      expect(insight.resolutionStatus).toBeNull(); // NULL → coerced to `unresolved`
+      const updated = resolveInsight(insight.id, wsG.workspaceId, 'resolved', 'done', 'admin');
+      expect(updated).toBeDefined();
+      expect(updated!.resolutionStatus).toBe('resolved');
+    } finally {
+      wsG.cleanup();
+    }
+  });
+
+  it('idempotent re-resolve (resolved → resolved) is a no-op that does NOT throw', () => {
+    const wsG = seedWorkspace();
+    try {
+      const insight = upsertInsight({
+        workspaceId: wsG.workspaceId,
+        pageId: 'idem-page',
+        insightType: 'audit_finding',
+        severity: 'warning',
+        data: { scope: 'page', issueCount: 1, issueMessages: 'x', source: 'manual_review' },
+        impactScore: 40,
+      });
+      resolveInsight(insight.id, wsG.workspaceId, 'resolved', 'first', 'admin');
+      // Re-resolving an already-resolved insight (bulk MCP re-resolve, cron retry) must not throw.
+      expect(() => resolveInsight(insight.id, wsG.workspaceId, 'resolved', 'again', 'admin')).not.toThrow();
+      const updated = getInsightById(insight.id, wsG.workspaceId);
+      expect(updated!.resolutionStatus).toBe('resolved');
+    } finally {
+      wsG.cleanup();
+    }
+  });
+
+  it('reopen (resolved → in_progress) stays legal (previously tolerated)', () => {
+    const wsG = seedWorkspace();
+    try {
+      const insight = upsertInsight({
+        workspaceId: wsG.workspaceId,
+        pageId: 'reopen-page',
+        insightType: 'audit_finding',
+        severity: 'warning',
+        data: { scope: 'page', issueCount: 1, issueMessages: 'x', source: 'manual_review' },
+        impactScore: 40,
+      });
+      resolveInsight(insight.id, wsG.workspaceId, 'resolved', 'done', 'admin');
+      let reopened;
+      expect(() => { reopened = resolveInsight(insight.id, wsG.workspaceId, 'in_progress'); }).not.toThrow();
+      expect(reopened!.resolutionStatus).toBe('in_progress');
+    } finally {
+      wsG.cleanup();
+    }
+  });
+
+  it('a non-existent insight returns undefined (404 path), never a guard crash', () => {
+    const wsG = seedWorkspace();
+    try {
+      expect(resolveInsight('does-not-exist', wsG.workspaceId, 'resolved')).toBeUndefined();
+    } finally {
+      wsG.cleanup();
+    }
+  });
+});

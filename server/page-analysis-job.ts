@@ -27,6 +27,7 @@ import { getWorkspace } from './workspaces.js';
 import { pageAnalysisAiResultSchema } from './schemas/page-analysis.js';
 import { listEeatAssets } from './eeat-assets.js';
 import { EEAT_RECOMMENDATION_SURFACE, evaluatePageTrustSignals } from './eeat-trust-signals.js';
+import { isKeywordSearchIntent } from '../shared/types/keywords.js';
 import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
 import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
@@ -370,7 +371,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
           const trustSignals = evaluatePageTrustSignals({
             pagePath: normalized,
             pageTitle: page.title,
-            searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
+            searchIntent: isKeywordSearchIntent(analysis.searchIntent) ? analysis.searchIntent : existing?.searchIntent,
             assets: eeatAssets,
             surface: EEAT_RECOMMENDATION_SURFACE.PAGE_INTELLIGENCE,
             maxRecommendations: 4,
@@ -380,7 +381,7 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
             pageTitle: page.title,
             primaryKeyword: resolvedPrimaryKeyword,
             secondaryKeywords: (analysis.secondaryKeywords as string[])?.length ? (analysis.secondaryKeywords as string[]) : existing?.secondaryKeywords || [],
-            searchIntent: (analysis.searchIntent as string) || existing?.searchIntent,
+            searchIntent: isKeywordSearchIntent(analysis.searchIntent) ? analysis.searchIntent : existing?.searchIntent,
             optimizationIssues: (analysis.optimizationIssues as string[]) || [],
             recommendations: (analysis.recommendations as string[]) || [],
             contentGaps: (analysis.contentGaps as string[]) || [],

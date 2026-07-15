@@ -8,7 +8,7 @@
  *  - legacy mode (no soloEntryId) → all entries + chrome render (byte-identical guard).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 // ── Mocks ──
 vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
@@ -17,6 +17,23 @@ vi.mock('../../src/hooks/useWorkspaceEvents', () => ({
 
 // Stub the EntrySections fetch path: only the top-level entries query matters for these assertions.
 const mockEntries = vi.fn();
+const mockSections = vi.fn();
+const publicCopyMocks = vi.hoisted(() => ({
+  approveSection: vi.fn(),
+  suggestEdit: vi.fn(),
+}));
+
+vi.mock('../../src/api/content', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/api/content')>();
+  return {
+    ...actual,
+    publicCopyReview: {
+      ...actual.publicCopyReview,
+      approveSection: publicCopyMocks.approveSection,
+      suggestEdit: publicCopyMocks.suggestEdit,
+    },
+  };
+});
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
@@ -30,9 +47,17 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
       if (head === 'client-copy-entries') {
         return { data: { entries: mockEntries() }, isLoading: false, error: null, refetch: vi.fn() };
       }
-      return { data: undefined, isLoading: true, error: null, refetch: vi.fn() };
+      if (head === 'client-copy-sections') {
+        return { data: { sections: mockSections() }, isLoading: false, error: null, refetch: vi.fn() };
+      }
+      return { data: undefined, isLoading: false, error: null, refetch: vi.fn() };
     },
-    useMutation: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
+    useMutation: (options: { mutationFn: (variables: unknown) => Promise<unknown> }) => ({
+      mutate: vi.fn((variables: unknown) => { void options.mutationFn(variables); }),
+      mutateAsync: vi.fn((variables: unknown) => options.mutationFn(variables)),
+      isPending: false,
+      variables: undefined,
+    }),
   };
 });
 
@@ -61,6 +86,9 @@ function makeEntry(id: string, name: string, blueprintId = 'bp-1', blueprintName
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockSections.mockReturnValue([]);
+  publicCopyMocks.approveSection.mockResolvedValue(undefined);
+  publicCopyMocks.suggestEdit.mockResolvedValue(undefined);
 });
 
 describe('ClientCopyReview solo mode', () => {
@@ -105,5 +133,88 @@ describe('ClientCopyReview solo mode', () => {
     expect(screen.getByText('About page copy')).toBeInTheDocument();
     // Summary stats row present.
     expect(screen.getByText(/awaiting your review/)).toBeInTheDocument();
+  });
+
+  it('keeps a rejected client suggestion open for an explicit retry', async () => {
+    mockEntries.mockReturnValue([makeEntry('entry-1', 'Home hero copy')]);
+    mockSections.mockReturnValue([{
+      id: 'section-1',
+      entryId: 'entry-1',
+      sectionPlanItemId: 'sp_home_hero',
+      generatedCopy: 'Canonical hero copy.',
+      status: 'client_review',
+      aiAnnotation: null,
+      clientSuggestions: null,
+      version: 1,
+      createdAt: '2026-07-14T00:00:00.000Z',
+      updatedAt: '2026-07-14T00:00:00.000Z',
+    }]);
+    publicCopyMocks.suggestEdit.mockRejectedValue(new Error('review token conflict'));
+    render(<ClientCopyReview workspaceId="ws-1" soloEntryId="entry-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest Changes' }));
+    const suggestion = screen.getByPlaceholderText('Type your suggested version here...');
+    fireEvent.change(suggestion, { target: { value: 'Keep this client-authored revision.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Suggestion' }));
+
+    await waitFor(() => {
+      expect(publicCopyMocks.suggestEdit).toHaveBeenCalledWith(
+        'ws-1',
+        'section-1',
+        {
+          originalText: 'Canonical hero copy.',
+          suggestedText: 'Keep this client-authored revision.',
+          expectedUpdatedAt: '2026-07-14T00:00:00.000Z',
+        },
+      );
+    });
+    expect(screen.getByPlaceholderText('Type your suggested version here...')).toHaveValue(
+      'Keep this client-authored revision.',
+    );
+  });
+
+  it('does not reattribute an open suggestion after the canonical section refetches', () => {
+    mockEntries.mockReturnValue([makeEntry('entry-1', 'Home hero copy')]);
+    mockSections.mockReturnValue([{
+      id: 'section-1',
+      entryId: 'entry-1',
+      sectionPlanItemId: 'sp_home_hero',
+      generatedCopy: 'Revision one hero copy.',
+      status: 'client_review',
+      aiAnnotation: null,
+      clientSuggestions: null,
+      version: 1,
+      createdAt: '2026-07-14T00:00:00.000Z',
+      updatedAt: '2026-07-14T00:00:00.000Z',
+    }]);
+    const view = render(<ClientCopyReview workspaceId="ws-1" soloEntryId="entry-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest Changes' }));
+    fireEvent.change(screen.getByPlaceholderText('Type your suggested version here...'), {
+      target: { value: 'Keep this suggestion tied to revision one.' },
+    });
+
+    mockSections.mockReturnValue([{
+      id: 'section-1',
+      entryId: 'entry-1',
+      sectionPlanItemId: 'sp_home_hero',
+      generatedCopy: 'Revision two hero copy.',
+      status: 'client_review',
+      aiAnnotation: null,
+      clientSuggestions: null,
+      version: 2,
+      createdAt: '2026-07-14T00:00:00.000Z',
+      updatedAt: '2026-07-14T01:00:00.000Z',
+    }]);
+    view.rerender(<ClientCopyReview workspaceId="ws-1" soloEntryId="entry-1" />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/changed while you were preparing your suggestion/i);
+    expect(screen.getByPlaceholderText('Type your suggested version here...')).toHaveValue(
+      'Keep this suggestion tied to revision one.',
+    );
+    const submitButton = screen.getByRole('button', { name: 'Submit Suggestion' });
+    expect(submitButton).toBeDisabled();
+    fireEvent.click(submitButton);
+    expect(publicCopyMocks.suggestEdit).not.toHaveBeenCalled();
   });
 });

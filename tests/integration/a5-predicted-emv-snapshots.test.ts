@@ -195,6 +195,25 @@ describe('live PATCH completion path', () => {
     expect(action).not.toBeNull();
     expect(action!.predictedEmv).toBe(480);
   });
+
+  // R6 (B11): the SAME live completion route must snapshot the rec's IDENTITY (title), so a
+  // completed rec's client win survives the next audit regenerating the set. This exercises
+  // the real route threading (not recordAction directly). makeRec sets title = `rec <id>`.
+  it('snapshots the rec title into source_label + source_snapshot on completion', async () => {
+    seedRecSet([makeRec({ id: 'rec-src', title: 'Rewrite the pricing page meta description', affectedPages: ['/pricing'], opportunity: makeOpp(200) })]);
+
+    const res = await patchJson(`/api/public/recommendations/${wsId}/rec-src`, { status: 'completed' });
+    expect(res.status).toBe(200);
+
+    const action = getActionByWorkspaceAndSource(wsId, 'recommendation', 'rec-src');
+    expect(action).not.toBeNull();
+    expect(action!.sourceLabel).toBe('Rewrite the pricing page meta description');
+    expect(action!.sourceSnapshot).toEqual({
+      title: 'Rewrite the pricing page meta description',
+      type: 'recommendation',
+      page: '/pricing',
+    });
+  });
 });
 
 // ── 2. Backfill completion path ──────────────────────────────────────────────

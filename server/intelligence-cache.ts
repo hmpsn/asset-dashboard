@@ -79,6 +79,7 @@ export class LRUCache<T> {
         deleted++;
       }
     }
+    invalidateSingleFlightsByPrefix(prefix);
     return deleted;
   }
 
@@ -127,20 +128,69 @@ export class LRUCache<T> {
 
 // ── Single-flight dedup ─────────────────────────────────────────────────
 
-const inflight = new Map<string, Promise<unknown>>();
+interface SingleFlightGeneration {
+  current: boolean;
+}
+
+interface SingleFlightEntry {
+  generation: SingleFlightGeneration;
+  promise: Promise<unknown>;
+}
+
+const inflight = new Map<string, SingleFlightEntry>();
+
+/**
+ * Detach matching work when the cache it feeds is invalidated.
+ *
+ * The generation token lets the detached computation discover that it is no
+ * longer authoritative before writing its result. Removing the map entry also
+ * ensures the first post-invalidation read starts fresh work immediately.
+ */
+function invalidateSingleFlightsByPrefix(prefix: string): void {
+  for (const [key, entry] of inflight) {
+    if (!key.startsWith(prefix)) continue;
+    entry.generation.current = false;
+    if (inflight.get(key) === entry) inflight.delete(key);
+  }
+}
 
 /**
  * Ensures only one instance of `fn` runs for a given key at a time.
  * Concurrent callers receive the same Promise result.
  * After completion, the key is removed so future calls re-execute.
+ * Generation-aware callers can use `isCurrent` to prevent an invalidated
+ * computation from committing derived state after it settles.
  */
-export async function singleFlight<T>(key: string, fn: () => Promise<T>): Promise<T> {
+export function singleFlight<T>(key: string, fn: () => Promise<T>): Promise<T>;
+export function singleFlight<T>(
+  key: string,
+  fn: (isCurrent: () => boolean) => Promise<T>,
+): Promise<T>;
+export async function singleFlight<T>(
+  key: string,
+  fn: (isCurrent: () => boolean) => Promise<T>,
+): Promise<T> {
   const existing = inflight.get(key);
-  if (existing) return existing as Promise<T>;
+  if (existing) return existing.promise as Promise<T>;
 
-  const promise = fn().finally(() => {
-    inflight.delete(key);
-  });
-  inflight.set(key, promise);
-  return promise;
+  const generation: SingleFlightGeneration = { current: true };
+  const entry: SingleFlightEntry = {
+    generation,
+    promise: Promise.resolve(undefined),
+  };
+  inflight.set(key, entry);
+
+  try {
+    const promise = fn(
+      () => generation.current && inflight.get(key) === entry,
+    ).finally(() => {
+      // A detached, older generation must never remove its replacement.
+      if (inflight.get(key) === entry) inflight.delete(key);
+    });
+    entry.promise = promise;
+    return promise;
+  } catch (error) {
+    if (inflight.get(key) === entry) inflight.delete(key);
+    throw error;
+  }
 }

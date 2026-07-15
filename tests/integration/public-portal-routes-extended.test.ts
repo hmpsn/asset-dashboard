@@ -103,6 +103,10 @@ async function authedPost(
   });
 }
 
+function sectionUpdatedAt(id: string): string {
+  return (db.prepare('SELECT updated_at FROM copy_sections WHERE id = ?').get(id) as { updated_at: string }).updated_at;
+}
+
 // ── 1. GET /api/public/pricing/:id ───────────────────────────────────────────
 
 describe('GET /api/public/pricing/:id', () => {
@@ -655,7 +659,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ expectedUpdatedAt: '2026-07-13T12:00:00.000Z' }),
         workspaceId: approveWs.workspaceId,
         token: approveToken,
       },
@@ -708,7 +712,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ expectedUpdatedAt: sectionUpdatedAt(section.id) }),
         workspaceId: approveWs.workspaceId,
         token: approveToken,
       },
@@ -736,7 +740,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ expectedUpdatedAt: sectionUpdatedAt(section.id) }),
         workspaceId: approveWs.workspaceId,
         token: approveToken,
       },
@@ -765,7 +769,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+        body: JSON.stringify({ expectedUpdatedAt: sectionUpdatedAt(section.id) }),
         workspaceId: approveWs.workspaceId,
         token: approveToken,
       },
@@ -777,6 +781,8 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/approve', () => 
     expect(raw).not.toContain('SECRET INTERNAL REASONING');
     expect(raw).not.toContain('steeringHistory');
     expect(raw).not.toContain('qualityFlags');
+    expect(raw).not.toContain('generationRevision');
+    expect(raw).not.toContain('generationProvenance');
   });
 });
 
@@ -919,6 +925,7 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          expectedUpdatedAt: sectionUpdatedAt(section.id),
           originalText: 'Original generated copy here.',
           suggestedText: 'My improved version here.',
         }),
@@ -951,7 +958,11 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originalText: 'Copy to suggest on.', suggestedText: 'My improved text.' }),
+        body: JSON.stringify({
+          expectedUpdatedAt: sectionUpdatedAt(section.id),
+          originalText: 'Copy to suggest on.',
+          suggestedText: 'My improved text.',
+        }),
         workspaceId: suggestWs.workspaceId,
         token: suggestToken,
       },
@@ -961,6 +972,8 @@ describe('POST /api/public/copy/:workspaceId/section/:sectionId/suggest', () => 
     expect(raw).not.toContain('aiReasoning');
     expect(raw).not.toContain('steeringHistory');
     expect(raw).not.toContain('qualityFlags');
+    expect(raw).not.toContain('generationRevision');
+    expect(raw).not.toContain('generationProvenance');
     expect(raw).not.toContain('INTERNAL_REASONING_LEAK');
   });
 });

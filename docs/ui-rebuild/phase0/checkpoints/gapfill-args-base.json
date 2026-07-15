@@ -1,0 +1,2839 @@
+{
+ "wf1Compact": [
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "zone": "Optimization",
+   "capabilityCount": 43,
+   "statusCounts": {
+    "preserved": 27,
+    "improved": 3,
+    "new_proposed": 5,
+    "at_risk": 8
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/page-rewriter.md",
+   "atRiskCount": 8,
+   "stopAndAskCount": 5,
+   "quickWinTradeoffs": [
+    {
+     "item": "Publish to Webflow (new_proposed #40)",
+     "quickWin": "Export-only egress (all four HEAD export modes), Save/Publish buttons behind a feature flag",
+     "fullVersion": "Server write-target for full-page copy + draft/publish lifecycle, activity log, broadcast, state machine",
+     "risk": "Mockup promises a publish spine and the Parity Ledger already (incorrectly) claims it exists \u2014 operator expectation mismatch"
+    },
+    {
+     "item": "Playbook chips (improved #16)",
+     "quickWin": "Render HEAD's static QUICK_PROMPTS as always-visible chips (pure UI)",
+     "fullVersion": "Chips sourced from the workspace's real playbook patterns already assembled server-side (page-assist-context-builder.ts:152) via a small read endpoint",
+     "risk": "Static chips can contradict the playbook instructions the AI is actually following server-side"
+    },
+    {
+     "item": "Save draft (new_proposed #39)",
+     "quickWin": "localStorage persistence keyed by workspace+slug",
+     "fullVersion": "Server-persisted rewrite drafts (new table + migration, lifecycle states, resume-on-return)",
+     "risk": "Device-local drafts silently lost across browsers; 'Draft saved' toast over-promises"
+    },
+    {
+     "item": "Apply-to-section (at_risk #21)",
+     "quickWin": "Port HEAD's data-section mechanism unchanged under the new UI",
+     "fullVersion": "Per-block apply targets matching the mockup's block-level contenteditable model",
+     "risk": "None material \u2014 the quick win IS full parity; full version is UX polish"
+    },
+    {
+     "item": "Exports (#35-37)",
+     "quickWin": "Keep HEAD export menu verbatim (md copy/.md/.docx/.pdf), optionally add Copy-as-HTML",
+     "fullVersion": "Add 'push to a new draft' pipeline hand-off once its destination is defined (Q2)",
+     "risk": "Matching the mockup's three-mode toast would be a hard-stop capability loss (docx/pdf)"
+    }
+   ]
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Page 'seo-strategy' \u2192 new-IA \"Insights Engine\" (CLIENT \u00b7 OVERVIEW rail zone)",
+   "zone": "Client \u00b7 Overview",
+   "capabilityCount": 61,
+   "statusCounts": {
+    "preserved": 25,
+    "improved": 5,
+    "new_proposed": 5,
+    "at_risk": 26
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/engine.md",
+   "atRiskCount": 26,
+   "stopAndAskCount": 10,
+   "quickWinTradeoffs": [
+    {
+     "item": "Engine spine",
+     "quickWin": "Re-skin HEAD's existing Issue branch (IssueHeader \u2192 StanceBar \u2192 DraftedPovEditor \u2192 BackingMovesQueue + Disclosure groups) with design-system components",
+     "fullVersion": "Full prototype IA: verdict headline + money frame + signals/lost-visibility sections inline",
+     "risk": "Interim milestone ships without the verdict/money framing the redesign exists for"
+    },
+    {
+     "item": "Money frame (B3)",
+     "quickWin": "Show only fields with existing plumbing: avg position (Orient), live backing-move count, per-rec estimatedGain sum labeled 'Agency estimate'",
+     "fullVersion": "Real recovered-value + pipeline-at-stake from outcome tracking / computeROI with provenance pills (new server projection)",
+     "risk": "Quick win flirts with the UI-must-not-compute-money law; either way needs a server field + basis pill sign-off"
+    },
+    {
+     "item": "Lost visibility (D7)",
+     "quickWin": "Mount the existing \u2014 currently dead/unmounted \u2014 LostQueryRecoveryCard as-is",
+     "fullVersion": "Prototype's richer per-query rows (was-#N, impressions-at-risk) + bulk recovery-content action",
+     "risk": "Low \u2014 component and lost_visibility insight data already exist at HEAD"
+    },
+    {
+     "item": "What changed (D4)",
+     "quickWin": "Keep HEAD StrategyDiff inside a Disclosure",
+     "fullVersion": "Prototype's 'Why these matter' cards with per-row Create-brief / Refresh-page CTAs",
+     "risk": "Quick win loses the new CTA affordance (purely additive, can follow)"
+    },
+    {
+     "item": "Curation verbs (C2-C11)",
+     "quickWin": "Keep StrategyCockpit mounted below the Engine spine (HEAD's current layered pattern) until the new move-row detail absorbs the verbs",
+     "fullVersion": "Move-row drawer/detail exposing send/strike/throttle/fix/wording/discussion built on DS Drawer/DataList",
+     "risk": "Quick win = two stacked paradigms on one page; full version without a drawer spec risks silent verb loss \u2014 hard stop: no verb dropped"
+    },
+    {
+     "item": "Send issue commit (C15)",
+     "quickWin": "Reuse HEAD's docked send bar verbatim on the new surface",
+     "fullVersion": "Whatever commit affordance design answers stop-and-ask Q1 with",
+     "risk": "None \u2014 the docked bar is already the audited single-commit pattern"
+    },
+    {
+     "item": "Signals (D6)",
+     "quickWin": "Keep the IntelligenceSignals panel as-is",
+     "fullVersion": "Decide the strategy-signal-fold flag (signals become cockpit recs) and build once",
+     "risk": "Building the panel then folding it = double work; decide before build"
+    }
+   ]
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Upload / Browse)",
+   "zone": "Search & Site Health",
+   "capabilityCount": 43,
+   "statusCounts": {
+    "preserved": 15,
+    "improved": 6,
+    "new_proposed": 4,
+    "at_risk": 22
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/asset-manager.md",
+   "atRiskCount": 22,
+   "stopAndAskCount": 8,
+   "quickWinTradeoffs": [
+    {
+     "item": "Audit mode",
+     "quickWin": "Fold HEAD's 8 issue classes into the browse grid as filter pills fed by the existing audit endpoint; defer the score card",
+     "fullVersion": "Dedicated Audit mode with health score, summary cards, CSV export, lightbox, re-scan",
+     "risk": "Loses score narrative and 'run scan' moment; usedIn page names require the audit endpoint regardless"
+    },
+    {
+     "item": "CMS layer",
+     "quickWin": "Ship CMS badges + CMS filters only; defer field selector AND CMS-aware compression together",
+     "fullVersion": "Full field selector with smart defaults gating filter + compression scope",
+     "risk": "If compression ships without the selector, all-fields default can clobber intentionally-sized OG/meta images"
+    },
+    {
+     "item": "Upload pipeline",
+     "quickWin": "Keep HEAD's Upload sub-tab (DropZones + ProcessingQueue) inside the new shell, reskinned with system primitives",
+     "fullVersion": "Upload modal/drawer from toolbar button; queue as toast-stack/jobs panel",
+     "risk": "Quick win is pure reskin (no risk); full version risks losing cmd-V discoverability and the asset-vs-meta optimization split"
+    },
+    {
+     "item": "Site Audit deep-link receiver",
+     "quickWin": "Support ?filter=oversized|missing-alt|unused on 'media' with contract test",
+     "fullVersion": "Also ?tab=audit|browse|upload + per-issue-class filters",
+     "risk": "None if two-halves contract test is wired; a sender-only link is a silent nav bug"
+    },
+    {
+     "item": "New stat cards (total weight / potential savings)",
+     "quickWin": "Compute client-side from fetched asset list (sum sizes; ~55% heuristic)",
+     "fullVersion": "Server-computed savings from sharp dry-run",
+     "risk": "Heuristic can over-promise savings; label as estimate"
+    },
+    {
+     "item": "Card dimensions (w x h)",
+     "quickWin": "Omit initially \u2014 not in the current endpoint's Asset shape",
+     "fullVersion": "Map dimensions in /api/webflow/assets/:siteId + Asset type (data ticket)",
+     "risk": "None \u2014 additive"
+    },
+    {
+     "item": "Bulk operations wiring",
+     "quickWin": "Keep HEAD wiring exactly (NDJSON alt stream, bulk-compress background job) behind the new bulk bar",
+     "fullVersion": "Migrate bulk alt-text onto the background-job platform for parity with bulk-compress",
+     "risk": "None for quick win; full version is a behavior improvement (survives tab close) under docs/rules/background-generation.md"
+    }
+   ]
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal Links \u00b7 Dead Links)",
+   "zone": "Search & Site Health",
+   "capabilityCount": 46,
+   "statusCounts": {
+    "preserved": 26,
+    "improved": 3,
+    "new_proposed": 6,
+    "at_risk": 14
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/links.md",
+   "atRiskCount": 14,
+   "stopAndAskCount": 7,
+   "quickWinTradeoffs": [
+    {
+     "item": "Redirects tab",
+     "quickWin": "Ship prototype's 404\u2192accept\u2192export-CSV loop on existing scan/snapshot endpoints; re-add edit-target, send-to-client, and a collapsed Chains section from HEAD data",
+     "fullVersion": "GSC 404-hits column, scheduled crawls via background-job platform, full page-status inventory with filters",
+     "risk": "Without chains/page-table the Site Audit deep link lands on a page that can't show what it promised"
+    },
+    {
+     "item": "Redirect confidence display",
+     "quickWin": "Omit the confidence chip entirely (HEAD parity)",
+     "fullVersion": "Expose the real keyword-overlap match score labeled 'match' (never 'AI')",
+     "risk": "Shipping the mockup's fabricated 'AI 96%' invents a number \u2014 hard rule violation"
+    },
+    {
+     "item": "Internal Links tab",
+     "quickWin": "Prototype list + orphans + re-analyze + HEAD's batched send-to-client and copy-HTML kept as-is",
+     "fullVersion": "Per-suggestion send (new payload contract), Insert-into-page (Webflow write path), restored search/filter/grouped view",
+     "risk": "Per-item send without contract work breaks InternalLinkRenderer/inbox routing; dropping Copy before Insert exists leaves no implement path"
+    },
+    {
+     "item": "Dead Links tab",
+     "quickWin": "Prototype list + stats + session-only Redirect/Reviewed row actions; keep HEAD domain selector, Re-check, CSV",
+     "fullVersion": "Persisted reviewed state, scheduled re-crawl, restored 3xx sub-list",
+     "risk": "Dropping the domain selector reintroduces false 404s on staging-gated sites"
+    },
+    {
+     "item": "Scan execution model",
+     "quickWin": "Keep synchronous GET scans (HEAD parity)",
+     "fullVersion": "Move all three scans to the background-job platform with NotificationBell",
+     "risk": "Sync scans block minutes and die on deploy \u2014 acceptable short-term only"
+    },
+    {
+     "item": "Architecture tab",
+     "quickWin": "Mount existing SiteArchitecture component/API under Links tab 4 (route move only)",
+     "fullVersion": "Prototype's richer tree layout + 'Add page' gap CTA wired to content pipeline",
+     "risk": "Low \u2014 API exists; must remove from Page Intelligence in same commit (route-removal checklist + help-text grep)"
+    }
+   ]
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Page Speed) + Content Perf (Page 'content-perf') \u2014 zone: Search & Site Health",
+   "zone": "Search & Site Health",
+   "capabilityCount": 41,
+   "statusCounts": {
+    "preserved": 16,
+    "improved": 8,
+    "new_proposed": 6,
+    "at_risk": 11
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/performance.md",
+   "atRiskCount": 11,
+   "stopAndAskCount": 8,
+   "quickWinTradeoffs": [
+    {
+     "item": "Page Speed tab port",
+     "quickWin": "Mockup layout (side-by-side mobile/desktop, single tested page) reading existing bulk snapshot per-page entries",
+     "fullVersion": "Restore bulk top-N testing UI + per-page expandable results + diagnostics + field/lab badge on the new shell",
+     "risk": "Quick win silently drops B2/B6/B8 \u2014 exactly the additive-parity violation Phase 0 guards against"
+    },
+    {
+     "item": "Verdict (win/early/flat)",
+     "quickWin": "Client-side heuristic from existing trend + position deltas rendered as badges",
+     "fullVersion": "Server-side verdict wired to outcome-tracking types (OutcomeScore/EarlySignal) with persisted auditable scoring",
+     "risk": "Heuristic verdicts can contradict the authoritative outcome-tracking engine; 'win' is client-adjacent language whose meaning must not drift"
+    },
+    {
+     "item": "Add to Insights Engine graduation",
+     "quickWin": "Button opens a pre-filled manual insight/outcome form",
+     "fullVersion": "Automatic graduation: content win \u2192 insight write with broadcast + activity log + client-story surfacing",
+     "risk": "Automatic path touches insight-store contracts (bridge rules, broadcasts, state machines) and needs its own plan"
+    },
+    {
+     "item": "Term-coverage diagnostic (C7)",
+     "quickWin": "Coverage % badge + missing-term chips on Published card, joinback lines in drawer",
+     "fullVersion": "Dedicated brief-execution panel in the piece drawer with evidence links",
+     "risk": "Quick win preserves parity cheaply; total omission is a hard stop"
+    },
+    {
+     "item": "Per-asset Compress (new, A9)",
+     "quickWin": "Deep-link to Asset Manager filtered to the asset",
+     "fullVersion": "In-place compress action calling the existing compression pipeline",
+     "risk": "Verify Asset Manager supports an asset-id deep-link param before promising the flow"
+    },
+    {
+     "item": "Lighthouse category scores (new, B13)",
+     "quickWin": "Skip \u2014 not at HEAD, additive-only doesn't require it",
+     "fullVersion": "Extend runSiteSpeed/runSinglePageSpeed + performance-store to persist a11y/BP/SEO categories",
+     "risk": "None \u2014 net-new, ship later without parity risk"
+    }
+   ]
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "zone": "Strategy & Content",
+   "capabilityCount": 43,
+   "statusCounts": {
+    "preserved": 29,
+    "improved": 2,
+    "new_proposed": 3,
+    "at_risk": 9
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/competitors.md",
+   "atRiskCount": 9,
+   "stopAndAskCount": 7,
+   "quickWinTradeoffs": [
+    {
+     "item": "Head-to-head table",
+     "quickWin": "Build from the existing intel response (organic traffic, keyword count, referring domains); omit Authority/Top-3 columns",
+     "fullVersion": "Extend provider + endpoint with domain rank and a true top-3 aggregate, then add the columns",
+     "risk": "None if columns are omitted; rendering DR/Top-3 from fabricated or top-20-sampled data violates the never-change-a-client-facing-number rule"
+    },
+    {
+     "item": "Per-competitor depth",
+     "quickWin": "Table only",
+     "fullVersion": "Row expand/drawer with comparison bars + traffic value + their top-10 keywords, reusing already-fetched payload",
+     "risk": "Quick win loses the only per-competitor keyword view outside the Hub; full version is cheap since data is already in the response"
+    },
+    {
+     "item": "Competitor send flow",
+     "quickWin": "Ship page without send (matches mockup; UI path already dark at HEAD)",
+     "fullVersion": "Flag-gated Send-to-client on gap rows via existing mint+lifecycle endpoints",
+     "risk": "Quick win silently retires a ledger-listed func and live backend \u2014 requires explicit owner decision, not omission"
+    },
+    {
+     "item": "Competitor alerts card",
+     "quickWin": "Read-only feed (exact HEAD behavior)",
+     "fullVersion": "Expose insightId on the wire and link each alert to its Insights Engine entry / resolve action",
+     "risk": "Low \u2014 read-only is parity; linkage is purely additive"
+    },
+    {
+     "item": "Degraded-data handling",
+     "quickWin": "Generic error state from Build Conventions",
+     "fullVersion": "Carry the three distinct HEAD behaviors: degraded-partial banner, cached-fallback gaps + provenance badge, honest freshness label",
+     "risk": "Quick win collapses 'provider half-failed but data shown' into 'error' \u2014 misleading for operators"
+    },
+    {
+     "item": "Competitor set management",
+     "quickWin": "Read-only chips on Competitors + Edit set \u2192 Workspace settings reusing existing POST/discover endpoints",
+     "fullVersion": "Inline add/remove/auto-discover on the Competitors page itself",
+     "risk": "Low, provided Workspace settings wires save + auto-discover and the strategy-generation flow can still edit the set"
+    }
+   ]
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / KeywordHub",
+   "zone": "Strategy & Content",
+   "capabilityCount": 47,
+   "statusCounts": {
+    "preserved": 15,
+    "improved": 4,
+    "new_proposed": 9,
+    "at_risk": 28
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/keywords.md",
+   "atRiskCount": 28,
+   "stopAndAskCount": 8,
+   "quickWinTradeoffs": [
+    {
+     "item": "Lens model (N1)",
+     "quickWin": "Ship Rankings + Opportunities lenses only (table reshapes of the existing rows response); keep HEAD segments as FilterChips beside the LensSwitcher",
+     "fullVersion": "All 5 lenses incl. Pages/Clusters grouped reads and the Lifecycle kanban (needs stage taxonomy + new reads)",
+     "risk": "3 of 5 promised lenses missing at launch; busier toolbar; upgrade path is purely additive"
+    },
+    {
+     "item": "Per-row rank trend (N5)",
+     "quickWin": "Keep sparkline/history in the drawer only via the existing lazy history fetch (exact HEAD behavior)",
+     "fullVersion": "Extend the rows read-model with 7d history + prev-rank so every row renders \u0394 + sparkline",
+     "risk": "Table looks flatter than the mockup until the read-model lands; zero data risk"
+    },
+    {
+     "item": "Detail drawer",
+     "quickWin": "Port existing KeywordDetailDrawer content wholesale into the system Drawer primitive (keeps pin, live SERP, outcome, per-market local, replaced-by), tokens-only restyle",
+     "fullVersion": "Re-compose per the mockup's 3-section layout, then re-add HEAD-only sections as designed modules",
+     "risk": "Quick win is denser than the mockup; full version risks silently dropping capabilities #28-#36 \u2014 the ledger file is the checklist"
+    },
+    {
+     "item": "Bulk operations",
+     "quickWin": "Reuse KeywordBulkActionBar + confirm/result flow unchanged under the new table",
+     "fullVersion": "Design-system CurationBulkActionBar per the ledger claim",
+     "risk": "Visual inconsistency until the DS component exists \u2014 which is the correct order ('extend the system, not the screen')"
+    },
+    {
+     "item": "Client keyword feedback panel",
+     "quickWin": "Reuse ClientKeywordFeedback component + existing keyword-feedback endpoints inside the new surface",
+     "fullVersion": "Mockup's redesigned rows (tag chips, inline decline reasons, toast on Add-to-Strategy)",
+     "risk": "Low; data wiring identical either way; coordinate with the Strategy auditor since HEAD mounts it on the Strategy page"
+    },
+    {
+     "item": "Status/filter parity",
+     "quickWin": "Expose all 19 server filters through one Filters dropdown (HEAD pattern) + lens counts",
+     "fullVersion": "Owner-approved intent/stage filter taxonomy mapped onto or extending KEYWORD_COMMAND_CENTER_FILTERS",
+     "risk": "Quick win preserves every capability but diverges from the mockup toolbar; full version is blocked on stop-and-ask #3"
+    }
+   ]
+  },
+  {
+   "surface": "AI Visibility",
+   "zone": "Search & Site Health (NOTE: Parity Ledger + aivis.js banner say \"Brand & AI\" \u2014 zone discrepancy flagged as stopAndAsk Q7)",
+   "capabilityCount": 51,
+   "statusCounts": {
+    "preserved": 24,
+    "improved": 5,
+    "new_proposed": 9,
+    "at_risk": 13
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/ai-visibility.md",
+   "atRiskCount": 13,
+   "stopAndAskCount": 10,
+   "quickWinTradeoffs": [
+    {
+     "item": "Core KPI + share of voice",
+     "quickWin": "Port existing single-engine aggregates (SoV ring\u2192score, raw mentions, dated trend, competitors, source domains) into the new layout with manual refresh",
+     "fullVersion": "Multi-engine AI Answer Monitor with tracked prompts and answer transcripts (N1/N2)",
+     "risk": "Engine chips would fake 4-engine coverage over ChatGPT-only data; 'Prompts where cited' KPI impossible without N1 \u2014 strip needs raw mentions as the interim metric"
+    },
+    {
+     "item": "AI Search Ready card",
+     "quickWin": "Render existing aeo-* audit check results as the readiness rows + score; 'Improve' deep-links into the existing AeoReview flow kept as a drill-in",
+     "fullVersion": "One-click AI-drafted on-page fixes per readiness row",
+     "risk": "Shipping the prototype's toast-only 'Improve' literally = a dead action; dropping the AeoReview drill-in silently loses the per-page review + send-to-client pipeline"
+    },
+    {
+     "item": "llms.txt section (\u00a73)",
+     "quickWin": "Straight port of LlmsTxtGenerator (ledger calls the prototype a faithful mirror) plus syntax-highlighted preview",
+     "fullVersion": "Generation theater driven by real job progress; surface auto-regen provenance ('regenerated after schema publish')",
+     "risk": "Low \u2014 backend untouched; only risk is a dangling Settings tab without a redirect (Q9)"
+    },
+    {
+     "item": "AI referral sessions KPI",
+     "quickWin": "Omit the 4th KPI or mark 'coming soon'",
+     "fullVersion": "GA4 referral-source segmentation for chatgpt.com/perplexity.ai/gemini + MoM delta",
+     "risk": "Visibly incomplete KPI strip; better 3 real KPIs than 1 fake"
+    },
+    {
+     "item": "Scan cadence",
+     "quickWin": "Manual refresh + honest freshness stamp",
+     "fullVersion": "Weekly cron with credit-budget enforcement (Q8)",
+     "risk": "Copy must not claim 'scanned weekly' while refresh is manual"
+    }
+   ]
+  },
+  {
+   "surface": "SEO Editor",
+   "zone": "Optimization",
+   "capabilityCount": 52,
+   "statusCounts": {
+    "preserved": 23,
+    "improved": 9,
+    "new_proposed": 12,
+    "at_risk": 20
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/seo-editor.md",
+   "atRiskCount": 20,
+   "stopAndAskCount": 9,
+   "quickWinTradeoffs": [
+    {
+     "item": "Worksheet spreadsheet layout (N1)",
+     "quickWin": "Ship the grid over existing useSeoEditor/useCmsEditor data + existing save/AI endpoints; keep drawer for detail",
+     "fullVersion": "Full master-detail split + docked SERP strip + pinned research drawer",
+     "risk": "Low \u2014 same data contract; row selection must keep driving existing bulk hooks"
+    },
+    {
+     "item": "On-page score (N2)",
+     "quickWin": "Client-side heuristic score exactly as prototyped",
+     "fullVersion": "Score sourced from persisted page analysis so editor and Page Intelligence agree",
+     "risk": "Two disagreeing scores is a trust landmine; label the heuristic or defer"
+    },
+    {
+     "item": "Bulk AI rewrite",
+     "quickWin": "Wire prototype bulk bar to existing BULK_SEO_FIX / SEO_BULK_REWRITE jobs + suggestions panel",
+     "fullVersion": "Progressive per-row inline results with per-cell job progress",
+     "risk": "Full version must re-implement cancel/recovery/WS handling or lose C5-C9 wholesale"
+    },
+    {
+     "item": "Review Queue (N4)",
+     "quickWin": "Queue with Send-to-client + Publish + Skip only; defer Approve/Request-changes",
+     "fullVersion": "Full A/R/S/P keyboard triage once Q4 approval semantics are decided",
+     "risk": "Shipping admin Approve early corrupts the client-approval state machine"
+    },
+    {
+     "item": "Page Intelligence merge (N10)",
+     "quickWin": "Keep page-intelligence Page live; editor Research drawer reads the same persisted analysis",
+     "fullVersion": "Retire the standalone Page; fold analyze-all + persistence + brief/schema/traffic hand-offs into Research mode",
+     "risk": "Premature Page retirement breaks inbound nav/palette/fix-routing links \u2014 route-removal checklist applies"
+    },
+    {
+     "item": "Rank/traffic per row (N6)",
+     "quickWin": "Show strategy keyword + persisted optimizationScore only (already joined via usePageJoin)",
+     "fullVersion": "Join GSC clicks + rank-tracker positions per row",
+     "risk": "API fan-out per list render; needs Data-Source Ledger fan-out audit"
+    },
+    {
+     "item": "Manual rows",
+     "quickWin": "Read-only listing + reason (exact parity)",
+     "fullVersion": "N9 'Add redirect' hand-off into Redirect manager with prefilled source URL",
+     "risk": "None \u2014 additive"
+    },
+    {
+     "item": "H1/slug editing (N3)",
+     "quickWin": "Do NOT ship; show fields read-only with 'edit in Webflow' hint",
+     "fullVersion": "New Webflow write endpoints + slug-change redirect automation",
+     "risk": "An editable input without a write path is a silent data-loss illusion \u2014 hard stop until the API exists"
+    }
+   ]
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4 + Annotations + insight feed)",
+   "zone": "Search & Site Health",
+   "capabilityCount": 68,
+   "statusCounts": {
+    "preserved": 18,
+    "improved": 2,
+    "new_proposed": 7,
+    "at_risk": 41
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/search-traffic.md",
+   "atRiskCount": 20,
+   "stopAndAskCount": 9,
+   "quickWinTradeoffs": [
+    {
+     "item": "Trend charts",
+     "quickWin": "Static SVG chart with annotation markers + prior-period overlay (prototype-style)",
+     "fullVersion": "Interactive chart: line toggles from metric cards, click-to-annotate popover, ranking-drop callouts, dual y-axes, pageviews line",
+     "risk": "Ships a parity regression: click-to-annotate (A3), toggles (O1/Q1/G1), callouts (Q3) are daily-use interactions at HEAD; only acceptable if interactions land in the same phase"
+    },
+    {
+     "item": "Query/page tables",
+     "quickWin": "Static top-N rows",
+     "fullVersion": "Sortable columns, sticky header, full scrollable list, insight badges, external links, CTR column",
+     "risk": "Operators sort by impressions/position constantly; badge loss severs the insight\u2192row cross-link (Q5/Q6/Q7/Q8)"
+    },
+    {
+     "item": "Insight feed",
+     "quickWin": "Mount the existing InsightFeed component inside the new shell unrestyled",
+     "fullVersion": "Redesign feed to the new design system (pills, chips, details, diagnostic CTA)",
+     "risk": "Low \u2014 reusing the live component preserves parity; recommended bridge while question #2 is decided"
+    },
+    {
+     "item": "Annotations",
+     "quickWin": "Timeline list + create form (no chart-click, no edit/delete/filter)",
+     "fullVersion": "Full CRUD + chart-click popover + category filter pills",
+     "risk": "Edit/delete loss breaks annotation-cleanup workflows; medium risk, close in a fast follow at latest"
+    },
+    {
+     "item": "Book roll-up (N1) / rank movers (N2)",
+     "quickWin": "Defer N1 entirely; N2 links out to Keyword Hub",
+     "fullVersion": "Cross-workspace aggregate endpoint + embedded movers on the Keyword Hub read path",
+     "risk": "None at parity level (both are new); embedding movers without the shared read path would create a forbidden second rank-data source"
+    },
+    {
+     "item": "GA4 narrative cards (G5-G7)",
+     "quickWin": "Fold growth/engagement/organic numbers into the narrative header",
+     "fullVersion": "Dedicated Growth Signals, Engagement Analysis, Organic-vs-All cards",
+     "risk": "Narrative alone drops organic-vs-all bounce/engagement comparisons \u2014 the agency's core proof metric; keep at least organic share + bounce comparison"
+    },
+    {
+     "item": "Date presets",
+     "quickWin": "Prototype's 28d/90d/12m",
+     "fullVersion": "Full DATE_PRESETS_SEARCH/FULL sets (7d\u202616mo/1y)",
+     "risk": "Quick win is a straight regression for trivially cheap functionality \u2014 ship full sets day one"
+    }
+   ]
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight store \u2192 client Overview feed, narrative view-model, monthly digest, intelligence summary, resolution machinery) \u00b7 zone: Client \u00b7 Overview \u2192 Insights Engine + Client portal",
+   "zone": "CLIENT \u00b7 OVERVIEW (Insights Engine) + CLIENT-FACING (Client portal)",
+   "capabilityCount": 23,
+   "statusCounts": {
+    "preserved": 9,
+    "improved": 3,
+    "new_proposed": 1,
+    "at_risk": 10
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/insights.md",
+   "atRiskCount": 10,
+   "stopAndAskCount": 7,
+   "quickWinTradeoffs": [
+    {
+     "item": "Client insight feed",
+     "quickWin": "Mount existing InsightsDigest (tokens-only restyle) as an 'Also detected' section below the curated portal story",
+     "fullVersion": "Operator staging queue in Insights Engine \u2014 server insights become stageable proof points/opportunities; only staged items render client-side",
+     "risk": "Quick win preserves parity but keeps the auto-surfaced noise the redesign kills; full version risks insights silently never reaching clients when operators don't stage (dark loop) \u2014 needs an unstaged-insights nudge"
+    },
+    {
+     "item": "Monthly digest",
+     "quickWin": "Pipe existing /digest payload (AI summary + wins + ROI highlights) verbatim into portal 'What we did this month'",
+     "fullVersion": "Operator-composed monthly story with the digest as a pre-filled AI draft",
+     "risk": "Quick win ships unreviewed AI/deterministic copy to clients \u2014 same exposure as today, acceptable bridge"
+    },
+    {
+     "item": "Tier gating",
+     "quickWin": "Wrap portal value-band/digest/opportunities in existing TierGate",
+     "fullVersion": "Portal-native locked states per Content & Access conventions (light-theme lock treatments)",
+     "risk": "TierGate's dark-theme styling clashes with the light portal; semantics preserved either way"
+    },
+    {
+     "item": "Resolution UI",
+     "quickWin": "Keep resolution MCP/agent-only (HEAD status quo \u2014 no UI consumer exists)",
+     "fullVersion": "Resolve/in-progress affordances on Insights Engine feed rows wired to PUT \u2026/resolve",
+     "risk": "Queue endpoint stays dead code and operator resolution stays invisible; zero client-facing risk"
+    },
+    {
+     "item": "Per-card drill-ins",
+     "quickWin": "Static anchors from insight cards to portal proof sections",
+     "fullVersion": "Deep links into the new client IA's Performance/Health/Strategy equivalents",
+     "risk": "Quick win loses evidence drill-down unless portal sections themselves carry the evidence"
+    }
+   ]
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page-intelligence' (Search & Site Health zone)",
+   "zone": "Search & Site Health",
+   "capabilityCount": 70,
+   "statusCounts": {
+    "preserved": 46,
+    "improved": 7,
+    "new_proposed": 4,
+    "at_risk": 13
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/site-audit.md",
+   "atRiskCount": 13,
+   "stopAndAskCount": 12,
+   "quickWinTradeoffs": [
+    {
+     "item": "Category model",
+     "quickWin": "Keep HEAD's 5 CheckCategory values restyled as DS category cards, no per-category scores",
+     "fullVersion": "6-category model (index/onpage/perf/schema/links/mobile) with server-side category mapping + per-category scoring",
+     "risk": "Quick win diverges visually from the prototype; full version is a data ticket touching suppressions keys, CSV/HTML export, client HealthTab, and recommendations"
+    },
+    {
+     "item": "Issue-first pivot",
+     "quickWin": "Keep HEAD's page-first list restyled with DS components",
+     "fullVersion": "Issue-type-first rows with affected-pages expansion + per-page action clusters (audit.js model)",
+     "risk": "Quick win misses the prototype's core triage improvement; full version must re-map suppressions/filters/batch actions onto issue-type grouping"
+    },
+    {
+     "item": "Book-level Site Health (sitehealth.js)",
+     "quickWin": "Read-only cross-client matrix computed from each workspace's existing latest snapshot endpoint",
+     "fullVersion": "Cross-workspace aggregation store + batch-fix background job across clients",
+     "risk": "Quick win's N-per-workspace fan-out is slow at book scale; full version needs new job infra and a safety review for bulk Webflow writes across clients"
+    },
+    {
+     "item": "CWV placement",
+     "quickWin": "Keep dual-strategy CwvSummaryCard inside Site Audit",
+     "fullVersion": "Single field-data strip in audit + full mobile/desktop detail in Performance with cross-link",
+     "risk": "Quick win double-homes CWV (drift); full version must keep the audit CSV/HTML export CWV rows intact"
+    },
+    {
+     "item": "Dead links",
+     "quickWin": "Keep DeadLinkPanel inline (incl. inline redirect form + CSV) with deep-link to Links",
+     "fullVersion": "Slim summary in audit; redirect creation + CSV move wholly into the Links Redirects tab",
+     "risk": "Quick win duplicates redirect UI in two homes; full version must pass the specific broken URL through the deep-link (two-halves contract)"
+    },
+    {
+     "item": "Page Intelligence \u2192 Editor Research merge",
+     "quickWin": "Mount the existing PI analysis/detail panel inside an Editor drawer",
+     "fullVersion": "Full master-detail Research mode per editor.js incl. keyword assign + AI assist writing into live fields",
+     "risk": "Quick win ships two visual languages in one surface; full version built strictly to the mockup drops P5/P10/P13 (bulk analyze, secondaries, local visibility)"
+    },
+    {
+     "item": "Audit history",
+     "quickWin": "Restyle AuditHistory + ScoreTrendChart as-is",
+     "fullVersion": "Add snapshot inspection ('View' per snapshot) + keep action items",
+     "risk": "Quick win is safe; full version needs a snapshot-detail view HEAD only exposes via the public report page"
+    }
+   ]
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin WorkspaceHome (Page 'home')",
+   "zone": "Client \u00b7 Overview",
+   "capabilityCount": 51,
+   "statusCounts": {
+    "preserved": 22,
+    "improved": 6,
+    "new_proposed": 6,
+    "at_risk": 17
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/cockpit.md",
+   "atRiskCount": 12,
+   "stopAndAskCount": 8,
+   "quickWinTradeoffs": [
+    {
+     "item": "Verdict narrative",
+     "quickWin": "Template-composed verdict from existing weeklySummary + attention counts (no AI call)",
+     "fullVersion": "callAI() named-operation per-client verdict via intelligence slices",
+     "risk": "Template copy reads robotic; low waste since data wiring is shared"
+    },
+    {
+     "item": "Stream tiles + work queue",
+     "quickWin": "Client-side mapping of existing attention items + rec statuses into opt/send/money",
+     "fullVersion": "Server-side unified work-queue model with own endpoint + WS events",
+     "risk": "Counts drift from destination screens; unmapped items (e.g. churn) silently dropped \u2014 needs an explicit 'unclassified' bucket"
+    },
+    {
+     "item": "Provenance chips",
+     "quickWin": "Hardcode 'estimate' on money impacts",
+     "fullVersion": "Wire shipped Reconcile provenance field end-to-end",
+     "risk": "Mislabeling measured/actual as estimate is a trust landmine; prefer full \u2014 Reconcile already persists the data"
+    },
+    {
+     "item": "Meeting Brief",
+     "quickWin": "Mount existing MeetingBriefPage as a Cockpit secondary tab unchanged",
+     "fullVersion": "Redesign into new IA (or fold into verdict + Insights Engine) after sign-off",
+     "risk": "Carries old-IA chrome into the new shell; acceptable as additive-parity insurance"
+    },
+    {
+     "item": "Per-client metrics",
+     "quickWin": "Compact KPI strip reusing existing WorkspaceHomeData fields",
+     "fullVersion": "Full drill-through model where Search & Traffic / Site Audit own all numbers",
+     "risk": "Quick win de-risks an unratified behavior change (number-free landing screen)"
+    },
+    {
+     "item": "Work orders",
+     "quickWin": "Keep WorkOrderPanel modal launchable from a Cockpit work-queue row",
+     "fullVersion": "Purpose-built fulfillment lane in Inbox or Pipeline",
+     "risk": "Visual inconsistency only; zero capability loss"
+    },
+    {
+     "item": "Technicals lane",
+     "quickWin": "Feed from existing useAuditSummary + attention rows",
+     "fullVersion": "Dedicated technicals feed with graduate-to-proof-point tracking",
+     "risk": "No graduation semantics in quick win \u2014 fine, graduation is new_proposed anyway"
+    }
+   ]
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline + folded content/calendar/seo-briefs/subscriptions",
+   "zone": "Strategy & Content",
+   "capabilityCount": 83,
+   "statusCounts": {
+    "preserved": 29,
+    "improved": 16,
+    "new_proposed": 10,
+    "at_risk": 38
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/content-pipeline.md",
+   "atRiskCount": 27,
+   "stopAndAskCount": 13,
+   "quickWinTradeoffs": [
+    {
+     "item": "Lifecycle board",
+     "quickWin": "Derive board columns as a view over existing statuses (posts.status + request.status + brief-exists), no schema change; keep ?tab= aliases resolving to modes",
+     "fullVersion": "Unified piece model with persisted queued/scheduled stages and a single advance() writer through state machines",
+     "risk": "Derived mapping can misplace edge states (error, generating, changes_requested, matrix cells); status meanings must not silently change"
+    },
+    {
+     "item": "Brief workspace",
+     "quickWin": "Mount existing BriefDetail editing + BriefGenerator in the full-page shell; keep regenerate-with-feedback",
+     "fullVersion": "Per-field AI assists + readiness model + client questionnaire (N7)",
+     "risk": "Low \u2014 assists/questionnaire are additive new AI ops; shell-first loses nothing"
+    },
+    {
+     "item": "Draft workspace",
+     "quickWin": "Reuse PostEditor (sections, autosave-retry, checklist, fixes, versions) inside new chrome",
+     "fullVersion": "Block-model doc + side-rail review + gate-driven fixes",
+     "risk": "From-scratch editor rebuild risks losing autosave retry-capture, versions, section regen, unification surfacing"
+    },
+    {
+     "item": "6-gate AI review",
+     "quickWin": "Render current ReviewChecklist data in gate styling (data identical, provenance semantics already match)",
+     "fullVersion": "Gate Resolve wired to ai-fix diff apply per gate",
+     "risk": "Shipping Resolve as navigation-only silently drops the FixDiffModal apply path"
+    },
+    {
+     "item": "Calendar",
+     "quickWin": "Read-only calendar mode (prototype) PLUS keep existing day-panel schedule/unschedule",
+     "fullVersion": "Full scheduling interactions + AI suggest-dates panel + all 4 item types plotted",
+     "risk": "Shipping prototype-as-is drops W6.6 scheduling + suggest-dates \u2014 hard stop under additive mandate"
+    },
+    {
+     "item": "Subscription drawer",
+     "quickWin": "Wrap existing ContentSubscriptions in a drawer + capacity ring",
+     "fullVersion": "Quota-aware Start gating in intake (N3)",
+     "risk": "Low \u2014 drawer is nearly 1:1; only past_due/pending states and notes editing need adding"
+    },
+    {
+     "item": "Intake lane",
+     "quickWin": "AiSuggested + pending client requests rendered as intake cards (existing data), snooze in card menu",
+     "fullVersion": "+ strategy work orders (issue-lenses) + decay refreshes with queue-refresh write-back (N2/N6)",
+     "risk": "Strategy/decay sources need new wiring; omitting snooze = capability loss"
+    },
+    {
+     "item": "Exports",
+     "quickWin": "Keep existing Export Menu (5 x CSV/JSON) + per-item export endpoints behind an overflow menu",
+     "fullVersion": "Redesigned export/reporting surface",
+     "risk": "None \u2014 endpoints exist; omitting the menu is silent capability loss"
+    },
+    {
+     "item": "Matrix mode",
+     "quickWin": "Keep MatrixGrid/CellDetailPanel/TemplateEditor/MatrixBuilder as-is behind the new Matrix mode entry",
+     "fullVersion": "Prototype's simplified grid + 'Generate briefs for planned' bulk action (which would implement a HEAD no-op stub \u2014 additive win)",
+     "risk": "Simplified grid loses 8-status detail + cell tooling"
+    }
+   ]
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy & Content",
+   "zone": "Strategy & Content",
+   "capabilityCount": 48,
+   "statusCounts": {
+    "preserved": 25,
+    "improved": 8,
+    "new_proposed": 10,
+    "at_risk": 15
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/local-presence.md",
+   "atRiskCount": 15,
+   "stopAndAskCount": 8,
+   "quickWinTradeoffs": [
+    {
+     "item": "Geo-grid rank map (N1)",
+     "quickWin": "Ship presence tab on HEAD's real per-market single-point posture data (markets x keywords grid colored by posture); defer 49-point scan",
+     "fullVersion": "New geo-grid scan background job (per-node DataForSEO cost), new snapshot table, cost/flag gating like local-gbp",
+     "risk": "Quick win visually under-delivers vs mockup; but the full version renders invented client-facing numbers until the data pipeline exists \u2014 the worse failure"
+    },
+    {
+     "item": "Hero GBP metrics (N2)",
+     "quickWin": "Show rating + review count + completeness ring only (all real at HEAD)",
+     "fullVersion": "GBP Performance API integration (views/calls/directions) behind a new flag + OAuth scope",
+     "risk": "Sparser hero card than the mockup; acceptable vs fabricated metrics"
+    },
+    {
+     "item": "Reviews pipeline funnel + filters (N6)",
+     "quickWin": "Re-skin GbpReviewResponsesPanel's existing statuses (incl. publish_failed\u2192retry) into the funnel/filter/timeline presentation",
+     "fullVersion": "Add nudge-client, view-on-Google, AI rewrite, manual draft, reopen (N7-N10) \u2014 each needs server work",
+     "risk": "Low \u2014 pure re-presentation; must still render declined/cancelled or items vanish"
+    },
+    {
+     "item": "Profile health checklist (N4)",
+     "quickWin": "Render existing completeness missing-signals (photos/attributes/category) as a 3-row checklist",
+     "fullVersion": "Ingest hours/products/Q&A/service-area from GBP data + build each 'Fix' flow",
+     "risk": "Checklist much shorter than mockup; fix CTAs must not dead-end into toasts"
+    },
+    {
+     "item": "Map-pack share of voice (N5)",
+     "quickWin": "Top-5 competitors by review count (existing gbp-reviews data) without the % column",
+     "fullVersion": "Compute share % from local-pack appearance counts already in visibility snapshots (repeat-competitor totalAppearances)",
+     "risk": "Mild \u2014 % is derivable from existing data; cheapest new item, could land in v1"
+    },
+    {
+     "item": "Visibility model preservation (rows 8-13)",
+     "quickWin": "Keep LocalSeoVisibilityPanel capabilities as a Visibility section in the new shell, restyled with design-system primitives",
+     "fullVersion": "Merge posture data into the geo-grid view once geo-grid data exists",
+     "risk": "None \u2014 this is the additive-parity floor; skipping it is a hard-stop capability loss"
+    }
+   ]
+  },
+  {
+   "surface": "Schema",
+   "zone": "Optimization",
+   "capabilityCount": 69,
+   "statusCounts": {
+    "preserved": 35,
+    "improved": 3,
+    "new_proposed": 5,
+    "at_risk": 31
+   },
+   "ledgerFile": "docs/ui-rebuild/phase0/surfaces/schema.md",
+   "atRiskCount": 34,
+   "stopAndAskCount": 9,
+   "quickWinTradeoffs": [
+    {
+     "item": "Generator core",
+     "quickWin": "Ship the mockup's card list (publish/send/copy/regenerate + validation badge + pub tag) backed by existing endpoints",
+     "fullVersion": "Add diff view, JSON editor, per-field findings drill-down, diagnostics, rich-results sections (rows 20-26)",
+     "risk": "Operators can publish AI schema they cannot inspect or correct \u2014 the Edit step becomes a lie; edited-schema contract (getEffectiveSchema) silently drops"
+    },
+    {
+     "item": "Coverage ring + summary strip",
+     "quickWin": "Compute client-side from the existing snapshot (existingSchemas + suggestedSchemas + publishDates)",
+     "fullVersion": "Server-side coverage metric shared with Site Audit + Links (single definition), incl. the 'missing from Site Audit' count",
+     "risk": "Two surfaces showing different 'coverage' numbers violates the never-change-a-number rule; define once (Q5/Q6)"
+    },
+    {
+     "item": "Publish safety rail",
+     "quickWin": "Keep validation-gate + confirm step (server enforces 422s) with mockup's one-click UI catching 422 as an error toast",
+     "fullVersion": "Carry confirm step, graph-validation chip + bulk gate, manual-delivery fallback, retract, history/rollback (rows 29-39)",
+     "risk": "A 422-toast-only flow strands manual-required pages and leaves no undo; retract/rollback loss is a hard regression for a publish-to-production tool"
+    },
+    {
+     "item": "Schema Site Plan",
+     "quickWin": "Re-mount the existing SchemaPlanPanel unchanged inside the new shell (self-contained: own queries + job wiring)",
+     "fullVersion": "Redesign plan review as a first-class sub-view in the new design system",
+     "risk": "Visual inconsistency (old primitives in new shell); acceptable as a bridge \u2014 invisible-by-omission is NOT acceptable (Q1)"
+    },
+    {
+     "item": "CMS pipeline",
+     "quickWin": "Show CMS pages read-only ('publish unavailable') while shipping static-page publish first",
+     "fullVersion": "Full mapping panel + cms-field publish + delivery statuses (rows 35-36, 58)",
+     "risk": "Sites whose money pages are CMS items lose ALL publish capability they have today \u2014 only safe if sequenced within one release train"
+    },
+    {
+     "item": "Impact & completeness",
+     "quickWin": "Defer both panels; keep server endpoints warm",
+     "fullVersion": "Rebuilt impact module (or Insights Engine graduation if signed off) + completeness deep-link widget",
+     "risk": "Impact is the only proof-of-value loop this surface has; losing it undercuts the agency's 'schema worked' story (Q4)"
+    },
+    {
+     "item": "Client plan review",
+     "quickWin": "Keep the unified-inbox schema_plan deliverable renderer exactly as-is (post-Reconcile, already live)",
+     "fullVersion": "Client-dashboard rebuild decides its final form",
+     "risk": "None \u2014 do not touch; newest part of the stack"
+    }
+   ]
+  }
+ ],
+ "atRiskClaims": [
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "capability": "initialPageUrl deep-link auto-load (cross-surface 'rewrite this page' entry). Prop + auto-load path exist but NO caller sets a non-null value at HEAD \u2014 only setRewritePageUrl(null) in onBack.",
+   "evidence": "src/App.tsx:186,438; src/components/page-rewrite-chat/usePageRewriteChatShell.ts:89-92",
+   "why": "Dead-at-HEAD contract; prototype has no deep-link entry. Cannot be dropped by omission without sign-off.",
+   "proposedHome": "New-IA 'Rewrite this page' action on SEO Audit / Page Intelligence rows, or formal retirement"
+  },
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "capability": "Inline edit of the AI rewrite text before applying (contentEditable chat bubble + msgEdits overrides feeding both Apply and Copy)",
+   "evidence": "src/components/page-rewrite-chat/PageRewriteChatPane.tsx:86-97,100; usePageRewriteChatShell.ts:44",
+   "why": "Prototype's rewrite block (.sec) is static; apply() uses canned text (rewrite.js:205-209).",
+   "proposedHome": "Editable rewrite block inside the chat bubble in the new chat pane"
+  },
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "capability": "Apply-to-arbitrary-section: data-section slug matching, replaces content under the matched heading, 2s teal highlight, fallback insert-at-end with 'Section not found' info toast",
+   "evidence": "src/components/page-rewrite-chat/pageRewriteChatActions.ts (applyRewriteToSection); usePageRewriteChatShell.ts:248-253; PageRewriteChatPane.tsx:98-107",
+   "why": "Prototype hardcodes 'Apply to intro' / first paragraph only; arbitrary-section targeting and the fallback path have no demonstrated home.",
+   "proposedHome": "Port HEAD's data-section mechanism unchanged under the new document pane"
+  },
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "capability": "Audit issue chips strip on the loaded document (first 20 issues, severity-coded error/warning/info)",
+   "evidence": "src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx:128-145 (data from server/routes/rewrite-chat.ts:193-201)",
+   "why": "Prototype document pane has no issues display at all \u2014 the data is fetched and would be discarded.",
+   "proposedHome": "Issue chip row under the document pane header"
+  },
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "capability": "Clear-formatting toolbar action (removeFormat + reset block to <p>)",
+   "evidence": "src/components/page-rewrite-chat/pageRewriteChatActions.ts (clearFormattingSelection); PageRewriteDocumentPane.tsx:176-178",
+   "why": "Prototype toolbar has only B/I/H2/H3 (rewrite.js:173-179).",
+   "proposedHome": "Add to the new fixed formatting toolbar"
+  },
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "capability": "Open live page in new tab (target=_blank link on the loaded slug)",
+   "evidence": "src/components/page-rewrite-chat/PageRewriteDocumentPane.tsx:77-85",
+   "why": "Prototype header shows the URL as plain text only (rewrite.js:155).",
+   "proposedHome": "Linkified URL in the page picker / doc pane header"
+  },
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "capability": "DOCX export (docx lib, styled H1-H4, letter-size document)",
+   "evidence": "usePageRewriteChatShell.ts:283-335; pageRewriteChatDocument.ts:118 (serializeDocToDocx)",
+   "why": "Prototype export toast lists only 'HTML, Markdown, or push to a new draft' (rewrite.js:214).",
+   "proposedHome": "Keep in the new export menu verbatim"
+  },
+  {
+   "surface": "Page Rewriter (Page 'rewrite')",
+   "capability": "PDF export (hidden print root, scoped print CSS, window.print, afterprint cleanup)",
+   "evidence": "usePageRewriteChatShell.ts:257-281; pageRewriteChatDocument.ts:100; FEATURE_AUDIT.md:1271-1279 (entry 449)",
+   "why": "Not in prototype export toast; shipped feature per FEATURE_AUDIT #449.",
+   "proposedHome": "Keep in the new export menu verbatim"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "\"Send issue\" \u2014 the ONE client commit (header button + docked send bar; atomic bulk send that clears the staged set)",
+   "evidence": "src/components/KeywordStrategy.tsx:553-560,636-645,696-716; src/components/strategy/issue/IssueHeader.tsx:44-57",
+   "why": "strategy.js has stage toggles and an 'N of M staged' chip but NO send/commit control anywhere \u2014 the single-commit model (audit blocker B5) has no visible home",
+   "proposedHome": "Insights Engine header primary + docked send bar (reuse HEAD pattern)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Cockpit lifecycle facet buckets Active/Sent/Approved/Throttled with counts",
+   "evidence": "src/components/strategy/StrategyCockpit.tsx:28-33,126-143",
+   "why": "Prototype shows only active staged/unstaged moves; no lifecycle browsing",
+   "proposedHome": "Engine move-list facet or a curation lens (Q2)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Category chips (Content/Technical/Quick wins) + sort Value/Impact/Age",
+   "evidence": "src/components/strategy/StrategyCockpit.tsx:41-45,146-182",
+   "why": "Not drawn in prototype",
+   "proposedHome": "Engine move-list toolbar"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Fix-now pin (capped, by value, cross-facet)",
+   "evidence": "src/components/strategy/StrategyCockpit.tsx:75-78,116-123",
+   "why": "Not in prototype",
+   "proposedHome": "Engine top-of-queue pin"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "NeedsAttentionStrip (stale_sent / superseded / new_reply) + jump-to-rec; server staleness scan keeps writing nudges",
+   "evidence": "src/components/strategy/StrategyCockpit.tsx:63,113; NeedsAttentionStrip.tsx:4-14",
+   "why": "No prototype equivalent; without a consumer the staleness scan is a dark loop",
+   "proposedHome": "Engine attention strip (NeedsAttention primitive exists in DS)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "CurationMeter over-send coach ('N sent \u00b7 curate, don't just send')",
+   "evidence": "src/components/strategy/CurationMeter.tsx:8-14",
+   "why": "Not in prototype",
+   "proposedHome": "Engine header caption"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Bulk curation: predicate select-all-in-filter + sticky bulk bar \u2192 Send / Throttle 7-30-90d / Strike(confirm) via atomic POST /bulk",
+   "evidence": "src/components/strategy/StrategyCockpit.tsx:93-103,230-243; CurationBulkActionBar.tsx:4-16; server/routes/recommendations.ts:595",
+   "why": "Prototype has per-row staging only; bulk throttle/strike disappear",
+   "proposedHome": "Engine bulk bar (DS BoardColumn/DataTable multi-select)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Per-row verbs: send-with-note, strike+confirm, unstrike, throttle picker, mark-fixed, undismiss",
+   "evidence": "src/components/strategy/CockpitRow.tsx:145-232; server/routes/recommendations.ts:884,925,943,961,984,543",
+   "why": "Prototype move rows expose only a Stage toggle; ledger's 'present' claim is not drawn",
+   "proposedHome": "Engine move-row drawer/detail (Q2)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Per-rec discussion thread (client replies; GET/POST /discussion + RECOMMENDATIONS_DISCUSSION_UPDATED)",
+   "evidence": "server/routes/recommendations.ts:1031,1038; server/ws-events.ts:155",
+   "why": "Not in prototype; may belong to Recommendations/Inbox surface but no audit has claimed it",
+   "proposedHome": "Recommendations surface (recs.js) or Inbox \u2014 must be claimed explicitly"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Operator wording override (inline title/insight edit, regen-durable, display-boundary applied)",
+   "evidence": "src/components/strategy/CockpitRow.tsx:23-26; server/routes/recommendations.ts:851",
+   "why": "Not in prototype",
+   "proposedHome": "Engine move-row edit affordance"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Add a rec the system missed (AddRecommendationModal \u2192 POST /manual-rec, regen-retained)",
+   "evidence": "src/components/strategy/issue/AddRecommendationModal.tsx:1-14; server/routes/recommendations.ts:806",
+   "why": "Prototype's only additive path is client-request promotion; manual mint absent",
+   "proposedHome": "Engine 'Add move' action"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Client running-order reorder endpoint (UI already cut at HEAD; endpoint live)",
+   "evidence": "server/routes/recommendations.ts:757",
+   "why": "Endpoint-only orphan \u2014 decide revive or formally retire",
+   "proposedHome": "Owner decision"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Cut\u2192sentence contract (cutting a backing move strikes its POV sentence live)",
+   "evidence": "src/components/KeywordStrategy.tsx:191,680; src/components/strategy/issue/DraftedPovEditor.tsx:136-141",
+   "why": "Prototype demonstrates neither cut nor the POV reflow",
+   "proposedHome": "Engine POV editor (carry HEAD behavior)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "POV-staleness nudge (cut/edited moves diverged \u2192 regenerate)",
+   "evidence": "src/components/KeywordStrategy.tsx:574-580,657-673",
+   "why": "Not in prototype",
+   "proposedHome": "Under Engine POV block"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Weekly Issue push cron operator doorbell \u2014 bell consumer + deep-link target (issue.ready \u2192 seo-strategy)",
+   "evidence": "server/strategy-issue-cron.ts:1-33; server/cron-registry.ts:310-312",
+   "why": "Backend survives, but the doorbell's landing surface and bell entry need a named home in the new shell",
+   "proposedHome": "New shell notification rail \u2192 Insights Engine"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Trust ladder per-archetype auto-send (earned toggles, 3-cycle streak, GET/PATCH /api/auto-send-policy, dark-launch flag)",
+   "evidence": "src/components/strategy/issue/TrustLadderPanel.tsx:170-181; server/routes/auto-send-policy.ts:4-5",
+   "why": "Not in prototype",
+   "proposedHome": "Engine collapsed section or wsettings (Q4)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "IssueSetupReadiness checklist (ga4/value/segment/events/webflow/POV rollup + ?tab= deep-links to fix surfaces)",
+   "evidence": "src/components/strategy/issue/IssueSetupReadiness.tsx:1-13; KeywordStrategy.tsx:628-635; server/routes/the-issue-conversion-tracking.ts:46",
+   "why": "Not in prototype \u2014 it is the integrity guard for every money number the Engine shows",
+   "proposedHome": "Engine slot-0 or wsettings/onboarding (Q4)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "AdminLeadsReadout (captured named leads, PII admin-only, unbounded total, Load more, connect CTA)",
+   "evidence": "src/components/strategy/issue/AdminLeadsReadout.tsx:1-28; KeywordStrategy.tsx:726-748; the-issue-conversion-tracking.ts:91-155",
+   "why": "Not in prototype",
+   "proposedHome": "Outcomes/Action Results or Cockpit (Q4)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Outcome-value AI enrich proposer (POST /outcome-value-enrich, never persists)",
+   "evidence": "server/routes/the-issue-admin.ts:28-46",
+   "why": "No visible home; wsettings outcome-value field unverified",
+   "proposedHome": "wsettings outcome-value field"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Full vs incremental generation modes (two header actions)",
+   "evidence": "src/components/KeywordStrategy.tsx:274-279; strategy/hooks/useStrategyGeneration.ts:60,84",
+   "why": "Prototype exposes a single 'Regenerate' + scheduled cadence; mode distinction lost",
+   "proposedHome": "wsettings Strategy inputs (Q8)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "RefreshOrderingPrompt (refresh local SEO data before regenerating \u2014 data-ordering guard)",
+   "evidence": "src/components/KeywordStrategy.tsx:319-337; src/components/keyword-strategy/RefreshOrderingPrompt.tsx",
+   "why": "No prototype equivalent; dropping it silently bakes stale local data into strategies",
+   "proposedHome": "Regenerate flow confirm step (Q8)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "?tab= deep-link continuity for seo-strategy?tab=rankings|content|competitive (contract-tested)",
+   "evidence": "src/components/KeywordStrategy.tsx:74-111; tests/contract/tab-deep-link-wiring.test.ts",
+   "why": "New IA dissolves interior tabs across surfaces; old URLs need a redirect map",
+   "proposedHome": "Redirect map ticket (Q3)"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "StrategyHowItWorks explainer (tooltip/inline; seoDataMode + ranking caveats)",
+   "evidence": "src/components/KeywordStrategy.tsx:286-288,505",
+   "why": "Not in prototype",
+   "proposedHome": "Engine '?' affordance"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "AIContextIndicator pre-generation trust surface",
+   "evidence": "src/components/KeywordStrategy.tsx:339-341",
+   "why": "Not in prototype",
+   "proposedHome": "Engine empty state"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "Feedback-newer-than-strategy nudge",
+   "evidence": "src/components/KeywordStrategy.tsx:354-359",
+   "why": "Not visible in strategy.js or keywords.js",
+   "proposedHome": "Keywords feedback panel or Engine nudge row"
+  },
+  {
+   "surface": "Engine (SEO Decision Engine / Strategy) \u2014 admin Pa",
+   "capability": "CannibalizationTriage sub-verbs when folded into 'a backing move': KeeperSelector override (regen-durable), Mark-resolved outcome, Fix-in-editor, dedicated Send-to-client",
+   "evidence": "src/components/strategy/CannibalizationTriage.tsx:1-11; issue/KeeperSelector.tsx:1-13; KeywordStrategy.tsx:482-486,795",
+   "why": "Ledger folds the card but names none of the 4 verbs; uncertain = at_risk",
+   "proposedHome": "Cannibalization move-type detail view (Q5)"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Search assets by filename/alt text (Browse)",
+   "evidence": "src/components/AssetBrowser.tsx:118,170-175",
+   "why": "Prototype has only filter pills, no search box",
+   "proposedHome": "toolbar search input in Asset Manager grid"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Filters images/svg/used + multi-select OR filter combination",
+   "evidence": "src/components/AssetBrowser.tsx:41-44,119,188-197",
+   "why": "Prototype filter set is exactly all/over/noalt/unused, single-select (assets.js:94,143-148)",
+   "proposedHome": "extend prototype filter bar"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Sort Newest/Name/Size",
+   "evidence": "src/components/AssetBrowser.tsx:139,199-203",
+   "why": "No sort control in prototype",
+   "proposedHome": "toolbar sort select"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Manual inline alt-text edit (click-to-edit, save to Webflow)",
+   "evidence": "src/components/AssetBrowser.tsx:213-228; assets/AssetCard.tsx:184-210",
+   "why": "Prototype only offers AI generation \u2014 no way to hand-correct alt text",
+   "proposedHome": "card alt-edit affordance"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Delete: single asset, bulk delete selected, Delete-All-Unused (with confirm)",
+   "evidence": "AssetBrowser.tsx:485-492; AssetAudit.tsx:172-208; server/routes/webflow.ts:81,116",
+   "why": "Prototype has zero delete affordances",
+   "proposedHome": "bulk bar + per-card action (owner Q6)"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Organize into Folders (preview foldersToCreate/moves/summary -> execute -> moved/failed result)",
+   "evidence": "AssetBrowser.tsx:442-483,541-551; server/routes/webflow-organize.ts:27,143; assets/OrganizePreview.tsx",
+   "why": "Absent from prototype AND from parity-ledger Assets tool list",
+   "proposedHome": "unclear \u2014 stopAndAsk Q3"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "CMS image scan (Image/MultiImage/RichText fields across collections; per-asset usage map)",
+   "evidence": "src/hooks/admin/useAdminAssets.ts:57; server/routes/webflow-cms-images.ts:66; FEATURE_AUDIT.md:1678",
+   "why": "Prototype has no CMS dimension at all",
+   "proposedHome": "CMS layer of Asset Manager grid"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "CMS filters (CMS Images / CMS Missing Alt) mutually exclusive with non-CMS filters",
+   "evidence": "AssetBrowser.tsx:41-44,121-138,167-187",
+   "why": "Not in prototype filter set",
+   "proposedHome": "filter bar CMS group"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "CMS field selector with smart defaults gating both CMS filter and which CMS refs are patched on compress",
+   "evidence": "AssetBrowser.tsx:87-99,302-304,404-406; assets/CmsFieldSelector.tsx:37,55",
+   "why": "Not in prototype; protects OG/meta images from compression-triggered rewrites",
+   "proposedHome": "collapsible panel under filter bar (owner Q4)"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "CMS usage badges per card + RichText-only compress-disabled state",
+   "evidence": "assets/AssetCard.tsx:145,243-252; AssetBrowser.tsx:79-85,709",
+   "why": "Prototype cards have no CMS metadata",
+   "proposedHome": "card badges"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Per-card open-original-in-new-tab",
+   "evidence": "assets/AssetCard.tsx:262",
+   "why": "Not among prototype card actions",
+   "proposedHome": "card overflow action"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Asset audit scan mode (Run Asset Audit entry state, 30-60s scan of pages+CMS+CSS, re-scan)",
+   "evidence": "AssetAudit.tsx:65-77,226-253,498-506; server/routes/webflow-audit.ts:20",
+   "why": "Parity ledger homes 'AssetAudit' at Asset Manager but prototype has no scan/score mode \u2014 filters are computed from live metadata only",
+   "proposedHome": "unclear \u2014 stopAndAsk Q1"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Asset health score (0-100 with color tiers)",
+   "evidence": "AssetAudit.tsx:257-273",
+   "why": "No score anywhere in prototype",
+   "proposedHome": "audit mode header"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "5 extra audit issue classes: low-quality-alt, duplicate-alt, duplicate (size heuristic), unoptimized-png, legacy-format (+ their filter pills and counts)",
+   "evidence": "server/routes/webflow-audit.ts:76-115; AssetAudit.tsx:37-46,321-344",
+   "why": "Prototype covers only oversized/no-alt/unused",
+   "proposedHome": "audit mode filters"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Issue lightbox modal (full preview, badges, used-on list, inline generate-alt/compress/delete/copy-URL)",
+   "evidence": "AssetAudit.tsx:626-721",
+   "why": "No preview modal in prototype",
+   "proposedHome": "asset detail modal"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Audit search (name/page) + sort (Most Issues/Largest/Name)",
+   "evidence": "AssetAudit.tsx:210-221,384-409",
+   "why": "Not in prototype",
+   "proposedHome": "audit toolbar"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Export audit as CSV",
+   "evidence": "AssetAudit.tsx:127-148,488-497",
+   "why": "No export in prototype",
+   "proposedHome": "audit header action"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Used-on page NAMES per issue (not just count)",
+   "evidence": "AssetAudit.tsx:565-571 (title tooltip); usedIn from webflow-audit.ts",
+   "why": "Prototype shows 'in N pages' count only",
+   "proposedHome": "card tooltip / detail modal"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Dual DropZones: Assets (AVIF conversion, SVG minify) vs Meta/OG (optimized JPEG, format kept) with distinct server optimization profiles",
+   "evidence": "MediaTab.tsx:51-60; DropZone.tsx:13-134; server/routes/misc.ts:35,53",
+   "why": "Prototype Upload is a stub toast implying direct-to-Webflow-library upload \u2014 a different behavior than HEAD's optimize-then-upload pipeline",
+   "proposedHome": "unclear \u2014 stopAndAsk Q2"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Clipboard paste upload (global cmd-V, HDPI 2x sharp downscale, toast)",
+   "evidence": "src/App.tsx:267-304,470-472; server/routes/misc.ts:210-253; hint MediaTab.tsx:57-60",
+   "why": "Not in prototype",
+   "proposedHome": "upload mode hint + global listener"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "Processing queue: optimizing -> generating-alt -> uploading(Webflow) -> done/error, live via WS queue:update, alt text shown, copy filename, persisted metadata",
+   "evidence": "ProcessingQueue.tsx; useQueue.ts:9; App.tsx:323,355-357; server/processor.ts:1-100; ws-events.ts:195,201",
+   "why": "Entire local-upload optimization pipeline invisible in prototype and in parity-ledger Assets row",
+   "proposedHome": "unclear \u2014 stopAndAsk Q2"
+  },
+  {
+   "surface": "Asset Manager (Page 'media' \u2014 MediaTab: Audit / Up",
+   "capability": "AI alt-text monthly quota UI (429 'Monthly AI generation limit reached'; bulk stream halts with status message)",
+   "evidence": "server/routes/webflow-alt-text.ts:47-49,154,213",
+   "why": "Server gate survives, but prototype never renders the limit-reached/locked state of AI actions",
+   "proposedHome": "locked state per four-states rule (owner Q7)"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Redirect Chains panel \u2014 multi-hop trace with per-hop status, loop badge, internal/external, final destination, expand/collapse",
+   "evidence": "src/components/RedirectManager.tsx:288-343; server/redirect-scanner.ts:21-29",
+   "why": "Prototype Redirects tab shows only 404\u2192301 suggestions; no chains UI anywhere in links.js. SeoAudit.tsx:550 deep-links 'Review redirect chains in Redirects' here.",
+   "proposedHome": "Collapsed 'Chains (n)' section in new Redirects tab"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "All-pages status inventory table (HTTP badge, path/title, static/cms/GSC source badge, redirects-to) ",
+   "evidence": "src/components/RedirectManager.tsx:473-527",
+   "why": "Prototype lists only 404s with suggestions; the full page inventory including healthy pages has no home.",
+   "proposedHome": "Secondary table/section in new Redirects tab"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Redirects filter tabs (All/Redirects/404s/Errors) + path/title search",
+   "evidence": "src/components/RedirectManager.tsx:214-222,435-471",
+   "why": "Follows the omitted page table; no filter/search UI in prototype.",
+   "proposedHome": "With the page inventory table"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Edit redirect target inline (fix a wrong suggestion) + post-accept 'Change target'",
+   "evidence": "src/components/RedirectManager.tsx:147-151,394-428",
+   "why": "Prototype rows are accept/reject only \u2014 bad suggestions become dead ends.",
+   "proposedHome": "Inline edit on suggestion rows"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Copy all accepted redirect rules to clipboard",
+   "evidence": "src/components/RedirectManager.tsx:167-172,366-368",
+   "why": "No copy affordance in prototype (CSV only).",
+   "proposedHome": "Button next to Export CSV"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Send accepted redirect rules to client (redirect_proposal client action + note \u22642000)",
+   "evidence": "src/components/RedirectManager.tsx:174-203,362-387",
+   "why": "Prototype has client-send only on Internal tab; the redirect producer half vanishes while the client-side consumer (RedirectRenderer in decision-renderers.tsx) still exists.",
+   "proposedHome": "Send-to-client on Redirects tab header"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Internal Links priority filter tabs with counts + free-text search (page/title/anchor)",
+   "evidence": "src/components/InternalLinks.tsx:84-99,252-285",
+   "why": "No filter/search on prototype Internal tab.",
+   "proposedHome": "Toolbar on Internal tab"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Internal Links list vs grouped-by-source-page view toggle",
+   "evidence": "src/components/InternalLinks.tsx:286-305,315-356",
+   "why": "Prototype is flat list only.",
+   "proposedHome": "View toggle on Internal tab"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Copy <a href> HTML snippet per internal-link suggestion",
+   "evidence": "src/components/InternalLinks.tsx:342-350,381-389",
+   "why": "Prototype replaces it with a NEW 'Insert' write action that doesn't exist at HEAD; until Insert ships, Copy is the only implement path.",
+   "proposedHome": "Keep per-row copy until N1 (Insert) is built"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Page link-health scoring (0-100 per page) + Avg Link Score stat + 5-stat row",
+   "evidence": "server/internal-links.ts:247-262; src/components/InternalLinks.tsx:216-222",
+   "why": "Prototype shrinks to 3 stats; per-page score and average have no home (data also feeds page-profile-slice at server/intelligence/page-profile-slice.ts:179).",
+   "proposedHome": "Stat row / orphan panel detail on Internal tab"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Partial-fetch diagnostics (pageCount vs attemptedPageCount warnings: password-protected site, <2 pages, healthy-coverage success)",
+   "evidence": "src/components/InternalLinks.tsx:438-458; server/internal-links.ts:414 (FEATURE_AUDIT.md:4154)",
+   "why": "Prototype has only a generic empty state; these diagnostics were built to fix a real operator-confusion problem.",
+   "proposedHome": "Warning banners on Internal tab"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Dead Links crawl-domain selector (staging vs live custom domains)",
+   "evidence": "src/components/LinkChecker.tsx:48-57,111-124; webflow-analysis.ts:166-176",
+   "why": "No domain choice in prototype; without it staging-gated sites produce false 404s (a previously solved support issue).",
+   "proposedHome": "Pre-run control on Dead tab"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Dead Links 'Redirects' sub-toggle (3xx links found in content \u2014 update-your-links list) + internal/external type filter",
+   "evidence": "src/components/LinkChecker.tsx:43-44,186-217",
+   "why": "Prototype dead tab lists dead links only; the content-level 3xx list is distinct from the Redirects tab's page-level scan and has no home.",
+   "proposedHome": "Sub-toggle on Dead tab"
+  },
+  {
+   "surface": "Links (admin Page 'links' \u2014 Redirects \u00b7 Internal L",
+   "capability": "Dead-links CSV export (8-column dead + redirect links)",
+   "evidence": "src/components/LinkChecker.tsx:82-99,219-227",
+   "why": "No export on prototype dead tab (Redirects-tab CSV is a different dataset).",
+   "proposedHome": "Export button on Dead tab toolbar"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Page Weight CSS-only source filter (All/Pages/CMS/CSS)",
+   "evidence": "src/components/PageWeight.tsx:60,131-137,187-192",
+   "why": "Mockup filter select offers only all/page/cms (performance.js:136); css: rows exist in server scan output",
+   "proposedHome": "Performance \u2192 Page Weight toolbar select (add css option)"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Bulk PageSpeed test: top-N pages (default 3, server max 25), averaged score + averaged vitals panel, per-page expandable result rows",
+   "evidence": "src/components/PageSpeedPanel.tsx:172-194,455-610; server/routes/webflow-pagespeed.ts:26-47",
+   "why": "Mockup Page Speed shows exactly one 'Tested page' at a time (performance.js:187); no bulk mode, no averages, no per-page list",
+   "proposedHome": "Performance \u2192 Page Speed: retain a bulk mode or per-page results list"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Full Core Web Vitals set displayed: FCP, TBT, Speed Index (beyond LCP/INP/CLS)",
+   "evidence": "src/components/PageSpeedPanel.tsx:83-96,263-270,494-501",
+   "why": "Mockup CWV strip renders only LCP/INP/CLS (performance.js:167-170)",
+   "proposedHome": "Performance \u2192 Page Speed CWV strip (secondary row or expandable)"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Field-data (CrUX 'Real users') vs 'Lab test' provenance badge",
+   "evidence": "src/components/PageSpeedPanel.tsx:260-261",
+   "why": "No field/lab distinction anywhere in mockup; this is the actual-ranking-signal trust marker",
+   "proposedHome": "Badge beside score ring"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "PageSpeed Diagnostics section (title/description/displayValue per finding)",
+   "evidence": "src/components/PageSpeedPanel.tsx:297-317,575-604",
+   "why": "Mockup has Opportunities only; Diagnostics section entirely absent",
+   "proposedHome": "Collapsible Diagnostics block under Opportunities"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Content Perf per-piece CTR read-back",
+   "evidence": "src/components/ContentPerformance.tsx:343-345",
+   "why": "Published-tab tiles show clicks/position/impressions/engagement only (pipeline.js:791-796)",
+   "proposedHome": "Extra tile or drawer metric"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "GA4 per-piece detail: sessions, users, bounce rate (engagement time survives)",
+   "evidence": "src/components/ContentPerformance.tsx:363-385",
+   "why": "Mockup shows only engagement time + lift% tile (pipeline.js:779, piece data L440-441)",
+   "proposedHome": "Piece drawer analytics block"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Sort controls (clicks / impressions / sessions / age)",
+   "evidence": "src/components/ContentPerformance.tsx:121,145-153,220-237",
+   "why": "No sort affordance on the mockup Published tab",
+   "proposedHome": "Published tab toolbar"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Term-coverage grading + brief-execution joinback: coverage % badge, matched/required counts, missing-term chips, brief/post lineage, source-evidence indicator (FEATURE_AUDIT #503)",
+   "evidence": "src/components/ContentPerformance.tsx:86-102,267,388-419; server/domains/content/content-performance.ts:114-176",
+   "why": "Published tab and published drawer (pipeline.js:955-966) show outcome + live URL only \u2014 the shipped 2026 diagnostic has no visible home; biggest loss risk on this surface",
+   "proposedHome": "Published card footer chips + piece-drawer brief-execution section"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Matrix-published cells included in performance list with 'Content Plan' source badge (dedup by keyword, FEATURE_AUDIT #162)",
+   "evidence": "src/components/ContentPerformance.tsx:268-272; server/domains/content/content-performance.ts:2 (listMatrices)",
+   "why": "Mockup pieces carry source chips (decay/ai/strategy) but no matrix-sourced published example; inclusion uncertain \u2192 at_risk per rules",
+   "proposedHome": "Source chip on Published cards (verify matrix items flow in)"
+  },
+  {
+   "surface": "Performance (Page 'performance': Page Weight + Pag",
+   "capability": "Delivered-but-not-yet-published requests tracked in performance list",
+   "evidence": "src/components/ContentPerformance.tsx:183-188 (empty-state contract), server/routes/public-content.ts:580-582 (status set incl. delivered)",
+   "why": "Mockup Published tab filters stage==='published' only (pipeline.js:766)",
+   "proposedHome": "Published tab with status badge, or explicit owner decision to drop"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "Competitor per-gap Send-to-client flow (mint competitor rec + lifecycle send, optimistic Sent badge, WhyHowResult why-line, client feedback pill; doubly flag-gated strategy-command-center && strategy-competitor-send)",
+   "evidence": "src/components/strategy/CompetitiveIntel.tsx:122-228 (UI), server/routes/recommendations.ts:695-720 (mint endpoint)",
+   "why": "Prototype shows only Create brief on gap rows. NUANCE: the UI is already unreachable at HEAD \u2014 GapRow renders only in the 'full' variant's embedded gaps section (CompetitiveIntel.tsx:419, gated !merged) and the only JSX mount is variant='merged' (StrategyCompetitiveTab.tsx:66). Backend is live. The Parity Ledger row (Platform Parity Ledger.html:414) explicitly lists 'Competitor send flows' as a carried func, so it cannot be dropped by omission.",
+   "proposedHome": "Rebuilt Competitors \u2192 keyword gaps card, per-row action next to Create brief (owner decision: carry / backend-only / retire)"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "Per-competitor expandable detail: you-vs-them comparison bars incl. Traffic Value ($ organicCost)",
+   "evidence": "src/components/strategy/CompetitiveIntel.tsx:381-394",
+   "why": "Prototype flattens head-to-head to a table (competitors.js:277-286); traffic value appears nowhere in the mockup",
+   "proposedHome": "Row expand / drawer on the head-to-head table (data already in the intel response)"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "Per-competitor 'Their Top Keywords' list (top 10 with position, volume, KD)",
+   "evidence": "src/components/strategy/CompetitiveIntel.tsx:397-411",
+   "why": "Not in the prototype's head-to-head table; only per-competitor keyword-level view outside the Keyword Hub",
+   "proposedHome": "Same expand/drawer as above (topKeywords already fetched, limit 20)"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "Per-gap 'View in Hub' deep-link (seo-keywords + buildHubDeepLinkQuery)",
+   "evidence": "src/components/strategy/KeywordGaps.tsx:92-102",
+   "why": "Prototype gap rows have only Create brief; the cross-surface keyword-investigation affordance is not drawn",
+   "proposedHome": "Gap-row secondary action linking to the new Keywords surface"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "Refresh button (invalidates competitorIntelAll cache)",
+   "evidence": "src/components/strategy/CompetitiveIntel.tsx:336-343",
+   "why": "No refresh affordance anywhere in the prototype view",
+   "proposedHome": "Head-to-head / page-level card header action"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "Degraded/partial provider-failure messaging with Retry ('Some live provider data is unavailable \u2014 showing the metrics that loaded' / 'Live fetch failed \u2014 showing cached data')",
+   "evidence": "src/components/strategy/CompetitiveIntel.tsx:455-463 (server degraded flag: server/routes/seo-provider.ts:96-147)",
+   "why": "Prototype is static happy-path; generic four-state convention does not cover the degraded-yet-rendering distinction",
+   "proposedHome": "Surface state matrix \u2014 explicit 'degraded' banner state on the intel cards"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "Cached keyword-gap fallback from stored strategy blob + amber 'from strategy' provenance badge + honest freshness label",
+   "evidence": "src/components/strategy/CompetitiveIntel.tsx:296-297,429,465-474",
+   "why": "No provenance/fallback affordance in the prototype; violates provenance-honesty conventions if silently dropped",
+   "proposedHome": "Gaps card provenance badge + card-footer freshness line"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "ShareBar own-domain trust guard (renders nothing when own domain lacks measurable traffic, <2 domains, or total<=0 \u2014 prevents a misleading competitor-only share-of-voice chart)",
+   "evidence": "src/components/strategy/ShareBar.tsx:47-51",
+   "why": "Prototype always renders SoV; this is a documented trust-landmine guard, not chrome",
+   "proposedHome": "Behavior spec on the rebuilt Share-of-voice card (degrade to nothing / not-measured state)"
+  },
+  {
+   "surface": "Competitors (admin) \u2014 zone: Strategy & Content",
+   "capability": "SEO provider cache-clear + diagnose admin utilities paired with the page's Refresh",
+   "evidence": "server/routes/seo-provider.ts:250-303",
+   "why": "No visible home; the clear-cache success message explicitly references 'Refresh on Competitive Intelligence' \u2014 orphaned if Refresh is dropped",
+   "proposedHome": "Keep endpoints; pair with carried Refresh (or Workspace settings diagnostics)"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "?tab= deep-link receiver (seeds one of 7 segments; two-halves contract)",
+   "evidence": "src/components/KeywordHub.tsx:185-198; src/lib/keywordHubDeepLink.ts:22-44",
+   "why": "Prototype has no URL-param handling; contract test + pr-check enforce it",
+   "proposedHome": "New surface must re-implement receiver against the new lens/filter ids"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "?q= deep-link opens detail drawer on mount (normalized keyword identity)",
+   "evidence": "src/components/KeywordHub.tsx:189-197,283-295",
+   "why": "No prototype equivalent; cross-surface keyword links depend on it",
+   "proposedHome": "Carry into new drawer wiring"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Cross-surface deep-link senders (buildHubDeepLinkQuery) from Strategy opportunity/gap/target components + drawer replaced-by",
+   "evidence": "src/lib/keywordHubDeepLink.ts:1-14; senders in src/components/strategy/KeywordOpportunities.tsx, KeywordGaps.tsx, SiteTargetKeywords.tsx, issue/KeywordTargetsLens.tsx, src/lib/strategyNextActionTarget.ts",
+   "why": "Renaming the surface without repointing every sender is a silent navigation bug",
+   "proposedHome": "Route-removal-checklist pass in the rebuild PR"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Truncation honesty banner \u2014 N keywords hidden by display cap (rawEvidenceTotal vs rawEvidenceReturned)",
+   "evidence": "src/components/KeywordHub.tsx:243-252,675-686; shared/types/keyword-command-center.ts:311-315",
+   "why": "Prototype renders an uncapped static list; trust signal has no home",
+   "proposedHome": "Toolbar/table footer disclosure in new table"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Metric-window disclosure label (GSC_METRIC_WINDOW_DAYS; rank=window avg; volume=provider estimate)",
+   "evidence": "src/components/KeywordHub.tsx:664-671; shared/keyword-window.ts",
+   "why": "Number-provenance disclosure absent from prototype",
+   "proposedHome": "Table caption in new surface"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "7 status segment pills with live counts (All/Striking Distance/In Strategy/Tracked/Needs Review/Retired/Local)",
+   "evidence": "src/components/keyword-hub/HubSegmentBar.tsx:46-54; KeywordHub.tsx:155-178,343-351",
+   "why": "Prototype lenses are a view axis, not the status axis; Needs Review/Retired/Local homes undemonstrated (ledger claims 'CurationMeter review-queue triage' but mockup shows none)",
+   "proposedHome": "FilterChips + CurationMeter per ledger \u2014 needs stop-and-ask #3 decision"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "12 advanced filters (content, page_assigned, raw_evidence, local_candidates, visible_locally, possible_match, not_visible, not_checked, provider_degraded, requested, declined, lost_visibility)",
+   "evidence": "src/components/keyword-hub/HubAdvancedFilters.tsx:1-14,29-37; shared/types/keyword-command-center.ts:22-49",
+   "why": "Prototype shows only static Intent/Stage chips; local-posture + feedback filters have no home",
+   "proposedHome": "Filters dropdown (quick win) or owner-approved new taxonomy"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "User column sorting \u2014 8 HubSortKeys incl. dedicated opportunity/clicks/difficulty server sorts + sort-summary badge",
+   "evidence": "src/components/KeywordHub.tsx:92-131,647-654; shared/types/keyword-command-center.ts:320",
+   "why": "Prototype sorts are fixed per lens; no user sort affordance anywhere",
+   "proposedHome": "Sortable headers on the new DataList"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Server pagination (50/page, Page N of M, total count)",
+   "evidence": "src/components/KeywordHub.tsx:210-220; src/components/keyword-hub/HubKeywordList.tsx:303-338",
+   "why": "Prototype renders a full static list; real universes are capped+paged (keyword-hub OOM guard)",
+   "proposedHome": "Pagination footer on new table"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "GSC clicks column in the row grid",
+   "evidence": "src/components/keyword-hub/HubKeywordList.tsx:186-194,257-259",
+   "why": "No lens in the prototype shows clicks; only rank/volume/difficulty/opportunity appear",
+   "proposedHome": "Rankings-lens column or drawer-only (owner call)"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Local-visibility posture column (Visible/Possible/Not Visible/Degraded + lifecycle fallback)",
+   "evidence": "src/components/keyword-hub/HubKeywordList.tsx:104-135; KeywordHub.tsx:200,714",
+   "why": "Keyword-level local evidence was deliberately kept in Hub (FEATURE_AUDIT.md:87); prototype only links out to Local Presence",
+   "proposedHome": "Column or row badge \u2014 tied to stop-and-ask #8"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Row provenance badges: lifecycle StatusBadge + 'From gap' + 'Auto-managed' (three-state strategyOwned===true)",
+   "evidence": "src/components/keyword-hub/HubKeywordRowMeta.tsx:27-52; shared/types/keyword-command-center.ts:252-266",
+   "why": "Prototype rows show intent chip + volume only; reconcile-ownership visibility lost",
+   "proposedHome": "Row meta slot in new table"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Per-row lifecycle action menu \u2014 full 7-verb catalog incl. promote_evidence, pause_tracking, restore (server-computed nextActions, contract-tested)",
+   "evidence": "src/components/keyword-command-center/KeywordActionMenu.tsx:26-53; shared/types/keyword-command-center.ts:59-69; KeywordHub.tsx:394-397",
+   "why": "Prototype drawer CTAs cover only stage + open-editor; 5 of 7 verbs have no visible home",
+   "proposedHome": "Row overflow menu + drawer actions"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Hard delete (separate non-lifecycle channel, eligibility mirror of server isHardDeleteEligible, red reserved for it, confirm dialog)",
+   "evidence": "src/components/keyword-command-center/KeywordActionMenu.tsx:18-20,55-60; KeywordHub.tsx:398-407; server/routes/keyword-command-center.ts:165",
+   "why": "No delete affordance anywhere in prototype",
+   "proposedHome": "Row menu / drawer danger zone"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Protected-keyword model: isProtected/protectionReason, disabledReason-gated force override with reason shown before confirm (drawer + bulk)",
+   "evidence": "shared/types/keyword-command-center.ts:241-243; KeywordHub.tsx:360-362,451-467,763-788",
+   "why": "Prototype has no protection concept; silently dropping it re-enables one-click damage to client-requested/strategy-owned keywords",
+   "proposedHome": "ConfirmDialog flows in new surface"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Add keyword input (manual add via rank-tracking path, Enter/Add, error band)",
+   "evidence": "src/components/KeywordHub.tsx:266-270,498-509,528-551; server/routes/rank-tracking.ts:75",
+   "why": "No add affordance in prototype; the unfiltered empty-state CTA depends on it",
+   "proposedHome": "Toolbar action in new surface"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Drawer Origin/provenance section + 'View in Strategy' back-link",
+   "evidence": "src/components/keyword-command-center/KeywordDetailDrawer.tsx:169-196,268-291",
+   "why": "Mockup drawer has no provenance section",
+   "proposedHome": "Drawer section"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Drawer source labels (strategy/page_assignment/content_gap/feedback/client_request/manual/rank_data/local_*)",
+   "evidence": "KeywordDetailDrawer.tsx:354; shared/types/keyword-command-center.ts:99-113",
+   "why": "Not demonstrated",
+   "proposedHome": "Drawer section"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Closed-loop outcome read-back chip (baseline\u2192current verdict, W5.1)",
+   "evidence": "KeywordDetailDrawer.tsx:39-40,316-322",
+   "why": "Not demonstrated for Keywords; Outcomes may re-home it but that is unconfirmed",
+   "proposedHome": "Drawer section or Outcomes surface"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Pin/unpin tracked keyword (also feeds protection + hard-delete eligibility)",
+   "evidence": "KeywordDetailDrawer.tsx:67,413-422; server/routes/rank-tracking.ts:94",
+   "why": "Not demonstrated",
+   "proposedHome": "Drawer header action"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Live SERP detail: national live rank vs GSC avg, AI Overview present/cited, SERP-feature badges (P6 paid data)",
+   "evidence": "KeywordDetailDrawer.tsx:478-508; shared/types/keyword-command-center.ts:131-146",
+   "why": "Not demonstrated; dropping it orphans the paid national refresh job output",
+   "proposedHome": "Drawer rankings section"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Per-market local visibility breakdown in drawer (pack rank, match confidence, show-all >6) + on-demand check_local_visibility refresh + local candidate lifecycle/priority panel",
+   "evidence": "KeywordDetailDrawer.tsx:34,196-198,543-581,648-703; KeywordHub.tsx:447-450",
+   "why": "Prototype only links to Local Presence; keyword-level per-market evidence needs an explicit owner",
+   "proposedHome": "Keywords drawer OR Local Presence \u2014 stop-and-ask #8"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Replaced-by chain navigation (deprecated keyword \u2192 replacement, in-place select or deep-link fallback)",
+   "evidence": "KeywordDetailDrawer.tsx:45-51,598-621; KeywordHub.tsx:729",
+   "why": "Not demonstrated",
+   "proposedHome": "Drawer section"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "Lost-visibility flag on rows/drawer + lost_visibility filter",
+   "evidence": "KeywordDetailDrawer.tsx:240; shared/types/keyword-command-center.ts:255-256 (isLostVisibility), filters :40",
+   "why": "Recovery workflow moved to Insights Engine per ledger, but the per-keyword flag and filter have no stated home",
+   "proposedHome": "Row/drawer badge + filter"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "review_page handoff \u2192 Page Intelligence with fixContext state",
+   "evidence": "src/components/KeywordHub.tsx:422-434",
+   "why": "Target surface is being merged into SEO Editor (Research mode) per ledger \u2014 handoff must be remapped, not dropped",
+   "proposedHome": "Remap to SEO Editor Research mode"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "GSC query-variant aggregation (variantCount/variants) + value transparency (valueReasons, currentMonthly/upsideMonthly $)",
+   "evidence": "shared/types/keyword-command-center.ts:244-273",
+   "why": "Prototype opp-score/est-gain only loosely map; $ fields are display-only by rebuild rules and the mapping is unspecified",
+   "proposedHome": "Drawer opportunity section (mapping spec needed)"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "National SERP refresh trigger (flag national-serp-tracking + Growth+ tier + budget gate + job serialization + NotificationBell progress)",
+   "evidence": "KeywordHub.tsx:562-575; server/routes/rank-tracking.ts:133-161; shared/types/feature-flags.ts:38",
+   "why": "Not demonstrated; the paid data it produces feeds the drawer live-SERP section",
+   "proposedHome": "Toolbar action, gates unchanged"
+  },
+  {
+   "surface": "Keywords (2\u21921 merge) \u2014 HEAD Page 'seo-keywords' / ",
+   "capability": "WebSocket live invalidation: RANK_TRACKING_UPDATED, SERP_SNAPSHOTS_REFRESHED, STRATEGY_UPDATED \u2192 React Query invalidation",
+   "evidence": "src/components/KeywordHub.tsx:321-341",
+   "why": "Prototype is static; mandatory data-flow rule \u2014 rebuilt surface must re-register all three handlers",
+   "proposedHome": "useWorkspaceEvents wiring in new shell"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Growth/Premium tier gate on AI-visibility refresh \u2014 surface needs a locked state",
+   "evidence": "server/routes/rank-tracking.ts:175-177; server/llm-mentions.ts:81-91",
+   "why": "Prototype shows no locked/tier state; DS mandates every surface owes loading/empty/error/locked",
+   "proposedHome": "AI Visibility locked-state variant (state kit)"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Explicit 'not measured' share-of-voice state (brand unidentifiable \u2260 red 0%)",
+   "evidence": "src/components/strategy/AiVisibilityPanel.tsx:145-179",
+   "why": "Prototype always renders a numeric score; the deliberate P8-review distinction has no visible home",
+   "proposedHome": "KPI strip score cell with an explicit 'not measured' variant"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Raw mention-volume KPI (mentions in AI answers \u2014 what HEAD actually measures)",
+   "evidence": "src/components/strategy/AiVisibilityPanel.tsx:182-191",
+   "why": "Prototype KPI strip replaces it with 'Prompts where cited' which depends on the unbuilt Answer Monitor (N1)",
+   "proposedHome": "KPI strip slot (interim metric until N1 ships)"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Mention-volume trend over dated snapshots (the before/after AEO proof, \u22652 snapshots + delta)",
+   "evidence": "src/components/strategy/AiVisibilityPanel.tsx:26-63,194-199; server/llm-mentions-store.ts:220",
+   "why": "Prototype has only MoM text deltas and an unused .spark CSS hook \u2014 no dated trend chart; accrued snapshot history would be orphaned",
+   "proposedHome": "Trend chart within the KPI strip or \u00a71 header"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Aggregate cited source-domains list (top-5 off-site AEO targeting list)",
+   "evidence": "src/components/strategy/AiVisibilityPanel.tsx:215-227",
+   "why": "Prototype shows only per-prompt 'Sources pulled' chips (needs N1); the aggregate list has no home",
+   "proposedHome": "Right rail card next to Share of AI voice"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Refresh error surfacing (403 tier / 409 already-running band) + workspace/global job-conflict messages",
+   "evidence": "src/components/strategy/AiVisibilityPanel.tsx:110-118; server/routes/rank-tracking.ts:171-172",
+   "why": "No error affordance demonstrated in prototype; HEAD explicitly added this after failures looked like dead clicks",
+   "proposedHome": "Error-state variant per mutation contract"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "?tab=llms-txt deep link into Workspace Settings (two-halves contract wired)",
+   "evidence": "src/components/WorkspaceSettings.tsx:71-107",
+   "why": "Prototype relocates the generator to AI Visibility \u00a73; old deep links and the Settings tab retirement are undecided",
+   "proposedHome": "Redirect workspace-settings?tab=llms-txt \u2192 AI Visibility \u00a73 (route-removal checklist)"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "AEO site review background job (AEO_SITE_REVIEW, maxPages 15, traffic-prioritized, requires completed audit)",
+   "evidence": "src/components/AeoReview.tsx:91-103,179-199; server/routes/aeo-review.ts:104",
+   "why": "Prototype's 'Improve' button is a toast stub; the real review job has no demonstrated home",
+   "proposedHome": "Drill-in behind AI Search Ready 'Improve' (owner decision Q4)"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Single-page on-demand AEO review (merges into stored site review)",
+   "evidence": "src/components/AeoReview.tsx:105-132; server/routes/aeo-review.ts:40",
+   "why": "Not represented anywhere in the prototype",
+   "proposedHome": "Same drill-in as AEO site review (Q4)"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Per-page AEO change recommendations: 12 typed change types, effort/priority chips, quick-win counts, estimated minutes, per-page score",
+   "evidence": "src/components/AeoReview.tsx:28-56,232-268",
+   "why": "Prototype readiness card is site-level 5 checks only; the per-page drill-down depth is absent",
+   "proposedHome": "AeoReview drill-in (Q4)"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Effort + priority filters on the AEO change list",
+   "evidence": "src/components/AeoReview.tsx:73-74,232-233,304,322",
+   "why": "No filter UI in the prototype readiness section",
+   "proposedHome": "AeoReview drill-in (Q4)"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "Send AEO page recommendations to client (aeo_change client action: diff payload, optional note, requiresSourceResearch withholding, omitted-count messaging)",
+   "evidence": "src/components/AeoReview.tsx:134-176",
+   "why": "A live admin\u2192client-inbox pipeline (client renderers exist in DecisionDetailModal et al.); zero representation in the prototype \u2014 losing it breaks an existing workflow",
+   "proposedHome": "AeoReview drill-in send action (Q4)"
+  },
+  {
+   "surface": "AI Visibility",
+   "capability": "?tab=aeo-review deep link within SEO Audit ('AI Search Ready' sub-tab)",
+   "evidence": "src/components/SeoAudit.tsx:74,317",
+   "why": "Site Audit ledger note splits AI Search Ready out to this surface; the existing deep link needs a redirect target",
+   "proposedHome": "Redirect seo-audit?tab=aeo-review \u2192 AI Visibility \u00a72"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "OG title/description mirrored into every static save payload",
+   "evidence": "src/components/editor/useSeoEditorPageWorkflow.ts:102-110",
+   "why": "Prototype edits title/meta only; the openGraph write is invisible in the mock and easy to drop from a rebuilt save path",
+   "proposedHome": "Keep in the PUT /api/webflow/pages/:pageId/seo payload contract"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Per-page inline error states (network/permission/validation) with auto-dismiss",
+   "evidence": "src/components/editor/useSeoEditorPageWorkflow.ts:111-156; PageEditRow.tsx:185-194",
+   "why": "Static prototype renders no error states",
+   "proposedHome": "Build Conventions mutation-feedback contract per row"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "AI 3-variation picker + paired title+desc set picker (choose 1 of 3)",
+   "evidence": "src/components/editor/PageEditRow.tsx:235-271,301-319,350-368",
+   "why": "Prototype AI writes a single value straight into the field (editor.js:1667-1678); the review-choice step disappears",
+   "proposedHome": "Variation popover on worksheet cells / drawer fields"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Analyze Page + auto-persist analysis to keywordStrategy.pageMap, 'Analysis on file' state, Re-analyze",
+   "evidence": "src/components/editor/useSeoEditorPageWorkflow.ts:214-249; PageEditRow.tsx:196-219",
+   "why": "Prototype Research mode shows intelligence from seed data with no analyze/persist action; the persist path feeds AI rewrite context (buildPageAnalysisContext)",
+   "proposedHome": "Research mode of merged editor (pending Q2)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Recommendations-engine metadata flags per page (traffic-at-risk, priority now/soon/later, banners)",
+   "evidence": "src/components/SeoEditor.tsx:45,152-160; PageEditRow.tsx:156-184",
+   "why": "Prototype recommendations are local heuristics, not useRecommendations wiring",
+   "proposedHome": "Row flag + Research drawer (pending Q3)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Recommendation-weighted page sort (flagged pages first)",
+   "evidence": "src/components/SeoEditor.tsx:162-165 (filterAndSortSeoPages)",
+   "why": "Prototype sorts by on-page score ascending (editor.js:1217) \u2014 rec-priority ordering lost",
+   "proposedHome": "Fold rec flags into score/sort (pending Q3)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "fixContext inbound deep-link: cross-surface 'Fix in SEO Editor' auto-expand + scroll, re-fires per new target",
+   "evidence": "src/components/editor/useSeoEditorSessionState.ts:69-86; src/types/fix-context.ts:1-11",
+   "why": "Prototype has internal jumpFix only; every Fix-in-editor CTA (Site Audit, Cannibalization triage, dead links, Page Intelligence) depends on this receiver",
+   "proposedHome": "Worksheet row focus via fixContext receiver"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Session persistence of unsaved edits/variations/expanded rows across tab switches (localStorage + RQ cache, cache-restore skip)",
+   "evidence": "src/components/editor/useSeoEditorSessionState.ts:37-66; seoEditorPersistence.ts",
+   "why": "Prototype state is in-memory; regresses FEATURE_AUDIT.md:4636 behavior",
+   "proposedHome": "Same persistence layer behind the new shell"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Pattern Apply (append/prepend to selected titles/descriptions with diff preview + truncation)",
+   "evidence": "src/components/editor/useSeoEditorBulkWorkflow.ts:249-282; server/routes/webflow-seo-apply.ts:40",
+   "why": "Entirely absent from the prototype",
+   "proposedHome": "Bulk bar action (no home yet)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Bulk AI rewrite of ALL selected pages (not just missing) as background job with progress + cancel",
+   "evidence": "src/components/editor/useSeoEditorBulkWorkflow.ts:284-308,356-372; webflow-seo-jobs.ts:62",
+   "why": "Prototype 'AI-fix missing' is synchronous and only fills empty fields (editor.js:1695-1698)",
+   "proposedHome": "Bulk bar 'AI rewrite' wired to SEO_BULK_REWRITE job"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Persistent server-side SEO Suggestions panel (3-variation rows, select, Apply-N-to-Webflow, Dismiss All, survives reloads)",
+   "evidence": "src/components/editor/SeoSuggestionsPanel.tsx:15-199; server/routes/webflow-seo-suggestions.ts:35-175",
+   "why": "No prototype equivalent; bulk-AI review-then-apply persistence would be silently lost",
+   "proposedHome": "Undecided (Q6)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Analyze All Pages / Analyze Remaining background job with progress, cancel, 'N/M analyzed' counter",
+   "evidence": "src/components/editor/useSeoEditorBulkWorkflow.ts:183-206,340-354; webflow-seo-jobs.ts:27",
+   "why": "No prototype analyze action; tied to Page Intelligence merge decision",
+   "proposedHome": "Research mode toolbar (pending Q2)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Background-job lifecycle mechanics: WS BULK_OPERATION_PROGRESS/COMPLETE/FAILED handlers, job-id persistence, mount-time recovery of in-flight jobs",
+   "evidence": "src/components/editor/useSeoEditorBulkWorkflow.ts:82-181,90-122",
+   "why": "Invisible in a static prototype but mandated by docs/rules/background-generation.md",
+   "proposedHome": "Carried by whichever bulk actions survive"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Apply bulk-rewrite preview sequentially to Webflow with per-page progress",
+   "evidence": "src/components/editor/useSeoEditorBulkWorkflow.ts:310-338",
+   "why": "Pairs with the suggestions/preview flows that have no home",
+   "proposedHome": "With C5/C6 resolution"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Site-wide 'Publish Site' (POST /api/webflow/publish/:siteId)",
+   "evidence": "src/components/SeoEditor.tsx:131-144; server/routes/webflow.ts:250",
+   "why": "Prototype publish is per-row/per-selection status flip only; whole-site publish has no home",
+   "proposedHome": "Undecided (Q5)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "CMS bulk AI rewrite with 4 target modes (Names / Titles / Descriptions / All SEO fields) + auto-expand during processing",
+   "evidence": "src/components/CmsEditor.tsx:114-133; FEATURE_AUDIT.md:4636",
+   "why": "Prototype bulk AI covers missing title/desc only; the Name-rewrite mode has no home",
+   "proposedHome": "CMS bulk bar mode picker (no home yet)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Per-CMS-item approval history ('N changes in history' expandable from approval batches)",
+   "evidence": "src/components/cms-editor/CmsEditorCollections.tsx:436-444; CmsEditor.tsx:93-96",
+   "why": "No prototype equivalent",
+   "proposedHome": "CMS row drawer (no home yet)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Missing-SEO-fields tip for collections without dedicated SEO fields",
+   "evidence": "src/components/CmsEditor.tsx:233-247",
+   "why": "Guidance block absent from prototype",
+   "proposedHome": "CMS section header hint"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "Pending-approvals 'Sent to Client' panel with Retract (incl. approved/rejected batches), inline confirm, page-state invalidation",
+   "evidence": "src/components/SeoEditorWrapper.tsx:118-125; src/components/PendingApprovals.tsx:46-58,126-132,169-172",
+   "why": "Prototype flips row status to 'In review' but has no batch panel and no retract \u2014 the only admin path to withdraw a batch from a client",
+   "proposedHome": "Undecided (Q7)"
+  },
+  {
+   "surface": "SEO Editor",
+   "capability": "7-state PageEditState tracking (clean/issue-detected/fix-proposed/in-review/approved/rejected/live) with summary bar + per-status counts + colored borders",
+   "evidence": "shared/types/workspace.ts:288; src/hooks/usePageEditStates.ts:70-76; SeoEditorTrackingSummary.tsx:38-63",
+   "why": "Prototype status model is only draft/sent/approved/live (editor.js:674); rejected, issue-detected, fix-proposed have no rendering",
+   "proposedHome": "Status pill vocabulary decision (Q4)"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Unified Overview sub-tab: merged GSC+GA4 trend chart (6 series, dual axes), cross-source MetricToggleCard row, integration-aware pruning (O1-O3, S1)",
+   "evidence": "src/components/AnalyticsOverview.tsx:20-27,136-151,161-197; src/hooks/admin/useAnalyticsOverview.ts:59-104",
+   "why": "Prototype has only 3 sub-tabs (search/analytics/annos, traffic.js:537-540); no blended cross-source chart or toggle-card row anywhere",
+   "proposedHome": "Either a 4th Overview sub-view or explicit owner sign-off to cut"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Metric-card click-to-toggle chart lines (all three tabs)",
+   "evidence": "AnalyticsOverview.tsx:167-177; SearchDetail.tsx:175-213; TrafficDetail.tsx:135-153; useToggleSet hook",
+   "why": "Prototype KPI tiles are static HTML (traffic.js:448-458,551-560); no toggle interaction demonstrated",
+   "proposedHome": "Rebuild chart component must expose line toggles"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Priority insight feed on-surface: 20+ typed renderers, severity summary pills, domain filter chips, expandable details (I1-I4, O4, Q12, G4)",
+   "evidence": "src/hooks/admin/useInsightFeed.ts:38-481; src/components/insights/InsightFeed.tsx:28-104; SummaryPills.tsx:20-53; SearchDetail.tsx:234-241; TrafficDetail.tsx:195-202",
+   "why": "traffic.js renders no insight feed; Parity Ledger marks 'Insights narrative \u2014 present' but only a narrative headline + graduation-bridge callout exist in the prototype",
+   "proposedHome": "Unclear split between Search & Traffic and Insights Engine (issue/cockpit views) \u2014 owner decision"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Run Deep Diagnostic CTA on anomaly_digest insights \u2192 diagnostics report deep-link with running/failed/completed states (I5)",
+   "evidence": "src/components/insights/InsightFeedItem.tsx:17-68,112-116",
+   "why": "Diagnostics is the Parity Ledger's single Gap row ('no home\u2026 decide whether it belongs in Settings/Admin, or is intentionally cut'); both CTA and destination are homeless",
+   "proposedHome": "Unassigned \u2014 owner decision"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Insight badges on GSC query/page rows (LOW CTR, NEAR P1, CANNIBAL, RANK UP/DROP, DECAY) (Q6)",
+   "evidence": "src/components/SearchDetail.tsx:37-61,299-345",
+   "why": "Prototype rows carry only an untyped green 'fav' dot (traffic.js:461-462)",
+   "proposedHome": "Row-badge slot in the new table primitive"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Ranking-drop callout bubbles pinned to insight detectedAt dates on the search trend chart (Q3)",
+   "evidence": "SearchDetail.tsx:101-112; charts/AnnotatedTrendChart.tsx:36-41,395-413",
+   "why": "Not demonstrated in prototype charts",
+   "proposedHome": "New chart component callout layer"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Click-anywhere-on-chart create-annotation popover (label+category, Enter/Escape, click-outside) on all three charts (A3)",
+   "evidence": "charts/AnnotatedTrendChart.tsx:186-270,288-302; wired at AnalyticsOverview.tsx:132-134, SearchDetail.tsx:225-227, TrafficDetail.tsx:184-188",
+   "why": "Prototype annotation markers are display-only SVG with title tooltips (traffic.js:381-390); 'Add annotation' button is a toast stub (traffic.js:692)",
+   "proposedHome": "Chart primitive interaction"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Annotation CRUD UI: create form, inline edit, delete, category filter pills, count badge (A1-A2)",
+   "evidence": "src/components/AnalyticsAnnotations.tsx:48-67,90-154,159-219; server google.ts:477-535",
+   "why": "Prototype timeline is read-only with a stubbed add button; no edit/delete/filter",
+   "proposedHome": "Annotations sub-view must ship full CRUD"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Sortable query/page tables (clicks/impressions/ctr/position asc/desc), sticky header, full scrollable list, no-truncate query text, external-link page rows (Q5, Q8, Q14)",
+   "evidence": "SearchDetail.tsx:128-138,279-349,289-297,315",
+   "why": "Prototype tables are static, capped demo rows, ellipsized, non-link",
+   "proposedHome": "New table primitive with sort contract"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "CTR everywhere on the search tab: CTR KPI card with pt-delta + per-row CTR column (Q7)",
+   "evidence": "SearchDetail.tsx:194-202,287-289",
+   "why": "Prototype search tab drops CTR from both KPIs and rows (traffic.js:448-465)",
+   "proposedHome": "Restore CTR KPI + column"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "GSC breakdown cards: Devices (share/clicks/CTR/position), Top Countries (top 8), Search Types (web/image/video) (Q9-Q11)",
+   "evidence": "SearchDetail.tsx:354-423",
+   "why": "Absent from prototype search tab entirely",
+   "proposedHome": "Detail drawer/explorer or sidebar cards \u2014 needs decision"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "GA4 Organic vs All Traffic card (organic share, organic-vs-all bounce, organic-vs-all engagement) (G7)",
+   "evidence": "TrafficDetail.tsx:262-305; ga4Admin.organic src/api/analytics.ts:113-114",
+   "why": "Whole card absent from prototype \u2014 core SEO-agency proof metric",
+   "proposedHome": "Keep as card or fold into narrative \u2014 owner decision"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "GA4 Growth Signals + Engagement Analysis cards (user/session/pageview growth, bounce change, top-page and organic avg engagement) (G5-G6)",
+   "evidence": "TrafficDetail.tsx:205-258",
+   "why": "Only partially covered by prototype narrative headline and nvr card",
+   "proposedHome": "Narrative header can absorb IF numbers preserved"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "GA4 Top Pages table (pageviews+users per path \u2014 distinct from Landing Pages) and GA4 Top Countries (G8, G11)",
+   "evidence": "TrafficDetail.tsx:308-329,376-381",
+   "why": "Prototype keeps only landing pages; all-pageviews table and countries have no home",
+   "proposedHome": "Needs decision"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Full date-range presets: 7d/28d/90d/6mo/16mo (GSC) and 7d-1y (GA4) + exact date-window readout (O7, G3)",
+   "evidence": "src/components/ui/constants.ts:154-169; TrafficDetail.tsx:126-131",
+   "why": "Prototype range switch is 28d/90d/12m only; loses 7d and the 16-month GSC YoY lookback",
+   "proposedHome": "Ship full preset sets day one (cheap)"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "All loading/empty/error/locked states: GSC/GA4 not-configured EmptyStates, error banner, GA4 Retry via query invalidation, per-card empty states, needsSite gating (O8, Q13, G14, S3)",
+   "evidence": "AnalyticsOverview.tsx:113-130; SearchDetail.tsx:140-170; TrafficDetail.tsx:82-121,327,351,372,412; App.tsx:361",
+   "why": "Static prototype demonstrates none of the four mandatory states",
+   "proposedHome": "Build Conventions state matrix per surface"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Keyboard shortcut '3' \u2192 analytics-hub (S2)",
+   "evidence": "src/App.tsx:259",
+   "why": "No shortcut map in prototype",
+   "proposedHome": "Global shell shortcut registry"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "Dormant admin GSC AI chat endpoint gscAdmin.chat \u2192 POST /api/google/search-chat/:siteId (D4)",
+   "evidence": "src/api/analytics.ts:148-149; server/routes/google.ts:192",
+   "why": "No HEAD UI caller; rebuild must decide retire-vs-rehome rather than silently drop the server op",
+   "proposedHome": "Owner decision"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "AnomalyAlerts ownership ambiguity (D5)",
+   "evidence": "src/components/WorkspaceHome.tsx:614 (mounted on Home, not AnalyticsHub)",
+   "why": "Parity Ledger lists AnomalyAlerts as a Search & Traffic tool ('present'), but at HEAD it belongs to WorkspaceHome \u2014 risk of double-count or drop between surface auditors",
+   "proposedHome": "Coordinate with Home/Command Center auditor"
+  },
+  {
+   "surface": "Search & Traffic (Page 'analytics-hub' \u2014 GSC + GA4",
+   "capability": "GA4 pageviews trend line on traffic chart (part of G2)",
+   "evidence": "TrafficDetail.tsx:41-45,180",
+   "why": "Prototype GA4 chart draws users+sessions only (traffic.js:417-438)",
+   "proposedHome": "Third line or toggle in rebuilt chart"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "Unified auto-computed client insights feed (server narrative + local cards merged, priority/sentiment sorted, server-first dedupe)",
+   "evidence": "src/components/client/InsightsDigest.tsx:462-476,497-514",
+   "why": "Prototype portal renders only operator-STAGED content below a send boundary; TheIssueClientPage (flag-ON overview) has no narrative mount either \u2014 no home for auto-surfacing",
+   "proposedHome": "Insights Engine staging queue \u2192 portal, or an 'Also detected' auto section in the portal (owner decision Q1)"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "Server narrative insight cards pushed to clients (outcome-language headline/narrative/impact, actionTaken, severity badges incl. warning/critical)",
+   "evidence": "src/components/client/InsightsDigest.tsx:440-460; server/client-insight-narrative-view-model.ts:12-53",
+   "why": "Portal never shows a negative/critical insight card; all client content is operator-composed in the mockup",
+   "proposedHome": "Staged proof-points/opportunities sections in portal.js:543-572 (semantics change \u2014 needs sign-off)"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "21-type client icon/story render coverage (milestone_attribution, lost_visibility, local_visibility_shift, serp_feature_opportunity, \u2026)",
+   "evidence": "src/components/client/InsightsDigest.tsx:378-400; shared/types/analytics.ts:190-211",
+   "why": "No per-type client render path demonstrated in the prototype",
+   "proposedHome": "Story registry retained as contract; render inside whichever client feed model wins"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "Per-insight-type deep-link actions to client tabs (performance/health/strategy/inbox)",
+   "evidence": "src/components/client/InsightsDigest.tsx:416-438,536",
+   "why": "Portal is a curated microsite with no per-card navigation",
+   "proposedHome": "Anchor links to portal proof sections (quick win) or new client IA deep links"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "Local data-card generators without portal analogue: Core Web Vitals card, new-vs-returning, pinned key-events card, content-plan progress (3 variants), low-hanging-fruit",
+   "evidence": "src/components/client/InsightsDigest.tsx:194-218,273-295,220-238,314-352,156-171",
+   "why": "portal.js covers rankings/traffic/health/opportunities analogues but omits these five card families entirely",
+   "proposedHome": "Portal proof column additions or explicit cut list (sign-off)"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "Client Overview empty/onboarding state (setup checklist when no GSC/GA4/audit)",
+   "evidence": "src/components/client/OverviewTab.tsx:588-619",
+   "why": "Portal always renders a populated story; onboard.js is operator-side only \u2014 client empty state undemonstrated",
+   "proposedHome": "Portal empty variant per Build Conventions four-state rule"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "Automated AI monthly digest (24h cache + coalescing, deterministic fallback, wins/issues/metric deltas/ROI highlights incl. attributedValue), growth-gated",
+   "evidence": "src/components/client/MonthlyDigest.tsx:16-46; server/monthly-digest.ts:18-54; shared/types/narrative.ts:17-50",
+   "why": "Portal 'What we did this month' is operator-staged; the automated digest generator has no confirmed home",
+   "proposedHome": "Auto-render into portal monthly section (quick win) or digest-as-draft for operator composition"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "IntelligenceSummaryCard (high-priority insight count, briefs in progress, action win rate Growth+)",
+   "evidence": "src/components/client/IntelligenceSummaryCard.tsx:14-81; server/routes/client-intelligence.ts:23",
+   "why": "No portal analogue for the counts grid",
+   "proposedHome": "Fold into portal value band, or drop with sign-off"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "PredictionShowcaseCard ('we called it' predictions, server-populated weCalledIt)",
+   "evidence": "src/components/client/OverviewTab.tsx:560; src/components/client/PredictionShowcaseCard.tsx",
+   "why": "No portal section for prediction-proof framing",
+   "proposedHome": "Portal hook/value band candidate"
+  },
+  {
+   "surface": "Insights \u2014 client-facing insight delivery (insight",
+   "capability": "Tier gating + upsell teasers on client insight surfaces (TierGate growth+ on MonthlyDigest & win rate, onGateHit upsell tracking)",
+   "evidence": "src/components/client/MonthlyDigest.tsx:33-37; FEATURE_AUDIT.md:4708",
+   "why": "portal.js shows zero tier differentiation or locked states \u2014 monetization semantics undemonstrated",
+   "proposedHome": "TierGate wrap (quick win) or portal-native locked states per Content & Access conventions"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "'Include dead link scan' opt-out toggle when running an audit (skipLinkCheck)",
+   "evidence": "src/components/SeoAudit.tsx:399-404; src/hooks/admin/useSeoAuditWorkflow.ts:39,87",
+   "why": "audit.js re-run flow is a bare toast; no scan-options control anywhere in the prototype",
+   "proposedHome": "Site Audit re-run affordance (option popover)"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Severity click-to-filter (Errors/Warnings/Info stat cards filter the page list)",
+   "evidence": "src/components/SeoAudit.tsx:524-526,454-458",
+   "why": "Mockup has severity SORT (audit.js:512) and severity pills (audit.js:606-611) but the pills are not filters",
+   "proposedHome": "Site Audit toolbar / category-card row"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Search box over pages + issues",
+   "evidence": "src/components/SeoAudit.tsx:78,463-468; src/components/audit/AuditFilters.tsx:42-51",
+   "why": "audit.js has no search input at all",
+   "proposedHome": "Site Audit toolbar"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "noindex badge on page rows + noindex-excluded-from-score explanation",
+   "evidence": "src/components/SeoAudit.tsx:747,767-772; server/seo-audit.ts:222-223",
+   "why": "No noindex concept anywhere in the mockup",
+   "proposedHome": "Site Audit affected-page rows"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Batch add-to-tasks: All / Errors-only / Filtered (POST /api/requests/batch)",
+   "evidence": "src/components/SeoAudit.tsx:210-233; src/components/audit/AuditBatchActions.tsx:89-119",
+   "why": "Prototype only has per-page 'Create task' (audit.js:429-431); no bulk task path",
+   "proposedHome": "Site Audit bulk bar (alongside bulk AI accept)"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Send-to-client optional inline note field",
+   "evidence": "src/components/SeoAudit.tsx:165-196; src/components/audit/AuditIssueRow.tsx:150-181",
+   "why": "audit.js 'Send to client' (line 426-428,644) fires with no note affordance",
+   "proposedHome": "Site Audit per-page action cluster"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Scheduled audits config UI: interval (1/7/14/30d), score-drop alert threshold, enable/disable/update, last-run",
+   "evidence": "src/components/audit/ScheduledAuditSettings.tsx:31-133; server/routes/audit-schedules.ts:17-33",
+   "why": "audit.js:654 stubs Schedule as a toast saying '(Settings panel)' \u2014 placeholder, no real home named",
+   "proposedHome": "Site Audit header drawer OR Workspace settings (owner decision)"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Snapshot Action Items CRUD (title/desc/priority, planned\u2192in-progress\u2192completed cycle, progress bar)",
+   "evidence": "src/components/audit/ActionItemsPanel.tsx:43-84; server/routes/reports.ts:278-306",
+   "why": "Prototype History sub-tab (audit.js:532-555) has sparkline + snapshot rows only; action items absent",
+   "proposedHome": "Site Audit History, or fold into Requests/Inbox (owner decision)"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "SeoAuditGuide + PageIntelligenceGuide sub-tabs",
+   "evidence": "src/components/SeoAudit.tsx:331-339,351; src/components/PageIntelligence.tsx:243",
+   "why": "No guide affordance in audit.js or editor.js Research mode (Schema kept one per Parity Ledger \u2014 pattern inconsistent)",
+   "proposedHome": "Per-surface Workflow Guide pattern (needs decision)"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Page Intelligence: SECONDARY keywords editing on page\u2194keyword mapping (writes pageMap.secondaryKeywords)",
+   "evidence": "src/components/page-intelligence/usePageIntelligenceKeywordEditing.ts:40-43",
+   "why": "editor.js Research mode edits a single target keyword only (editor.js:984-991); secondaries have no visible home",
+   "proposedHome": "Editor Research keyword block or Keywords drawer"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Page Intelligence: bulk 'Analyze All / Analyze Remaining' cancellable background job with progress",
+   "evidence": "src/components/page-intelligence/usePageIntelligenceAnalysis.ts:27-52; PageIntelligencePagesHeader.tsx:90-103",
+   "why": "editor.js Research is one-page-at-a-time; no bulk analysis affordance",
+   "proposedHome": "SEO Editor toolbar (Research mode)"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Page Intelligence: page-scoped Local SEO visibility panel + per-keyword local visibility badges",
+   "evidence": "src/components/PageIntelligence.tsx:38-55,272-276; page-intelligence/PageIntelligencePageDetails.tsx:88-95",
+   "why": "editor.js Research shows no local visibility; Keywords rank lenses are keyword-scoped, not page-scoped",
+   "proposedHome": "Editor Research detail OR confirm Keywords/Local Presence coverage is sufficient"
+  },
+  {
+   "surface": "Site Audit (3\u21921 merge) \u2014 Pages 'seo-audit' + 'page",
+   "capability": "Fix Queue ranked triage LIST (score \u00d7 traffic across all pages)",
+   "evidence": "src/components/PageIntelligence.tsx:148-149; PageIntelligencePagesHeader.tsx:142-150",
+   "why": "editor.js collapses this to a per-page fix-priority chip (editor.js:970-972); the cross-page ranked queue view disappears",
+   "proposedHome": "Editor Edit-mode sort or Research entry list"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "Meeting Brief tab \u2014 AI-generated brief with generate/regenerate, At-a-Glance strip, RecommendationsList, BlueprintProgress, OV divergence panel + ?tab=meeting-brief deep link",
+   "evidence": "src/components/WorkspaceHome.tsx:420-425; src/components/admin/MeetingBrief/MeetingBriefPage.tsx:41-63",
+   "why": "Zero 'meeting' hits across all 41 mockup views; no Parity Ledger row",
+   "proposedHome": "Keep as Cockpit secondary tab (quick win) or fold into Insights Engine \u2014 owner decision"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "WorkOrderPanel \u2014 purchased-fix fulfillment: order list, client\u2194team conversation, reply, Mark complete, one-way Close out, terminal guard (+ its NeedsAttention entry)",
+   "evidence": "src/components/WorkspaceHome.tsx:201-219,671-675; src/components/admin/WorkOrderPanel.tsx:1-72",
+   "why": "Mockup mentions 'work order \u2192 pipeline' only conceptually (recs.js:221, strategy.js:435); no fulfillment/conversation UI anywhere",
+   "proposedHome": "Inbox or Pipeline lane; or keep modal launchable from Cockpit work queue"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "Churn signals (critical/warning rows with type/severity/description) in attention triage",
+   "evidence": "src/components/WorkspaceHome.tsx:138,221-229",
+   "why": "No churn mention in any mockup file; prototype has only a static On track/At risk health chip (cockpit.js:63)",
+   "proposedHome": "Cockpit health chip detail popover or work-queue rows \u2014 needs decision"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "Traffic Value hero card \u2014 per-client organicTrafficValue + adSpendEquivalent (useAdminROI)",
+   "evidence": "src/components/WorkspaceHome.tsx:88,490-503",
+   "why": "ROI appears only in business.js (book-level); no per-client traffic-value roll-up in cockpit.js",
+   "proposedHome": "Cockpit KPI strip or Search & Traffic \u2014 needs decision"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "Overall Health composite client-signals score (0-100)",
+   "evidence": "src/components/WorkspaceHome.tsx:598-609",
+   "why": "Prototype replaces the number with a qualitative chip (On track/At risk) \u2014 a status-meaning change the kit forbids without sign-off",
+   "proposedHome": "Cockpit health chip, keeping the numeric score accessible"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "ActivityFeed \u2014 recent activity log with 14-type icon map + mcp-chat badge",
+   "evidence": "src/components/workspace-home/ActivityFeed.tsx:17-52; WorkspaceHome.tsx:660",
+   "why": "No activity-feed equivalent in any mockup view (settings/diagnostics hits are unrelated)",
+   "proposedHome": "Action Results feed or a Cockpit rail section \u2014 needs decision"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "Weekly Accomplishments strip (this-week counts of SEO updates/audits/briefs/publishes/requests resolved)",
+   "evidence": "src/components/workspace-home/WeeklyAccomplishments.tsx:13-38; WorkspaceHome.tsx:429",
+   "why": "Verdict narrative is forward-looking, not a done-this-week recap; absorption not demonstrated",
+   "proposedHome": "Verdict narrative sub-line or Action Results"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "SeoChangeImpact \u2014 recent SEO changes with source labels + on-demand before/after GSC deltas (clicks/impr/CTR/pos), too-recent guard",
+   "evidence": "src/components/workspace-home/SeoChangeImpact.tsx:37-80; WorkspaceHome.tsx:648-651",
+   "why": "Change-level before/after measurement not demonstrably in outcomes.js (Action Results)",
+   "proposedHome": "Action Results \u2014 needs verification"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "Content Velocity stat (trailing-3-mo avg/mo, trend %, this-month published)",
+   "evidence": "src/components/WorkspaceHome.tsx:569-582; FEATURE_AUDIT.md:6929",
+   "why": "Only 'velocity' hit in mockup is roadmap.js (unrelated context)",
+   "proposedHome": "Content Pipeline surface or Cockpit flight meter annotation"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "BriefingReviewQueue (flag client-briefing-v2) \u2014 approve/publish/skip-with-note/generate-now on weekly briefing drafts with category badges",
+   "evidence": "src/components/admin/BriefingReviewQueue.tsx:38-62; WorkspaceHome.tsx:627-631",
+   "why": "Cockpit shows only a 'Send' action on the monthly update (cockpit.js:68); the review workflow isn't demonstrated in cockpit.js or recs.js",
+   "proposedHome": "Recommendations surface (recs.js) \u2014 needs verification"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "Data freshness indicator (relative timestamp, amber stale >1h, 30s tick) + manual Refresh button",
+   "evidence": "src/components/WorkspaceHome.tsx:314-318,380-396; FEATURE_AUDIT.md:3954",
+   "why": "No freshness/refresh affordance in cockpit.js; not found as a Build Conventions pattern",
+   "proposedHome": "System-wide Build Conventions pattern \u2014 needs decision"
+  },
+  {
+   "surface": "Cockpit (Client \u00b7 Overview) \u2014 HEAD: admin Workspac",
+   "capability": "Keyboard shortcut \u2318/Ctrl+1 \u2192 home (with 2=audit, 3=analytics scheme)",
+   "evidence": "src/App.tsx:259-260",
+   "why": "No shortcut scheme visible in mockup nav or conventions docs",
+   "proposedHome": "Command palette / nav conventions in rebuild"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Cannibalization warnings band (intelligence slice) + growth-tier gate + honest badge count",
+   "evidence": "src/components/ContentPipeline.tsx:121,169-180,250-255",
+   "why": "No cannibalization surface or tier concept anywhere in pipeline.js / brief / draft workspaces",
+   "proposedHome": "Content Health mode or board card attention state (Q5)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Export menu: briefs/requests/matrices/templates/strategy x CSV/JSON",
+   "evidence": "src/components/ContentPipeline.tsx:57-63,140-143; server/routes/data-export.ts:73-135",
+   "why": "Prototype has zero export affordances",
+   "proposedHome": "Overflow menu on new pipeline header (endpoints already exist)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Brief exports: client-HTML/PDF export, Copy-as-Markdown ('Copy for AI Tool'), Copy JSON",
+   "evidence": "src/hooks/admin/useAdminBriefWorkflow.ts:330-341; src/components/briefs/BriefList.tsx:81-94; server/routes/content-briefs.ts:229",
+   "why": "brief-workspace.js has no export/copy actions",
+   "proposedHome": "Brief workspace header overflow"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Post exports (markdown/html/pdf) + copy-to-clipboard",
+   "evidence": "src/components/PostEditor.tsx:349-362,624-628; server/routes/content-posts.ts:424-455; ContentManager.tsx:373-384",
+   "why": "draft-workspace.js has no export/copy",
+   "proposedHome": "Draft workspace header overflow"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Post version history + revert",
+   "evidence": "src/components/PostEditor.tsx:195-199,371-383; server/routes/content-posts.ts:496-538",
+   "why": "Zero versioning UI in prototype",
+   "proposedHome": "Draft workspace side rail (Q8)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "AI-fix flows: issue-key fix + Generate-With-Feedback (section/intro/conclusion/meta/whole-post) + FixDiffModal apply/dismiss",
+   "evidence": "src/components/PostEditor.tsx:385-515; server/routes/content-posts.ts:471",
+   "why": "Prototype gate 'Resolve' link is a toast stub (pipeline.js:947) \u2014 no diff-apply flow designed",
+   "proposedHome": "Wire gate Resolve \u2192 ai-fix diff modal (Q8)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Regenerate single post section",
+   "evidence": "src/components/PostEditor.tsx:322-341; server/routes/content-posts.ts:222",
+   "why": "No per-block regenerate in draft workspace",
+   "proposedHome": "Draft workspace block action"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Regenerate brief with feedback + regenerate outline-only with feedback (background jobs)",
+   "evidence": "src/hooks/admin/useAdminBriefWorkflow.ts:245-275,584-622; server/routes/content-briefs.ts:196,213",
+   "why": "Brief workspace has one-shot Generate + 'Suggest outline' assist; persisted regenerate-with-feedback has no home",
+   "proposedHome": "Brief workspace action row"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Client request production lifecycle: approve\u2192in_progress, Deliver Brief/Content with deliveryUrl+deliveryNotes, resubmit-to-client, post_review handoff, decline",
+   "evidence": "src/components/briefs/RequestList.tsx:124-260; src/hooks/admin/useAdminBriefWorkflow.ts:42-50,188-202; server/routes/content-requests.ts:78",
+   "why": "Intake covers only entry; Parity Ledger 'Requests \u2192 Inbox' row doesn't cover these embedded per-request actions",
+   "proposedHome": "Undecided: Inbox vs pipeline drawer (Q3)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Request serviceType (brief_only vs full_post) badges + Upgraded badge + upgrade path",
+   "evidence": "src/components/briefs/RequestList.tsx:145-146,209-216",
+   "why": "Monetization-relevant distinction absent from prototype",
+   "proposedHome": "Q3"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Delete brief / delete request / delete post with confirm + 6s undo window (optimistic restore)",
+   "evidence": "src/hooks/admin/useAdminBriefWorkflow.ts:400-512; src/components/ContentManager.tsx:386-402",
+   "why": "Prototype only has intake dismiss; no delete/undo on cards or workspaces",
+   "proposedHome": "Card/drawer overflow menu"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Briefs search + sort (date/keyword/difficulty); posts search + sort (date/title/status/words) + status-filter cards; calendar type-filter pills + month stats",
+   "evidence": "src/components/ContentBriefs.tsx:181-209; ContentManager.tsx:117-172; ContentCalendar.tsx:315-348",
+   "why": "Board/calendar modes have no search/filter/sort controls",
+   "proposedHome": "Board toolbar"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Generation style selector (standard/concise/hybrid) on brief gen, brief edit, post gen",
+   "evidence": "src/hooks/admin/useAdminBriefWorkflow.ts:119; src/components/briefs/BriefDetail.tsx:258; FEATURE_AUDIT.md:1231",
+   "why": "Not in prototype",
+   "proposedHome": "Advanced controls in brief/draft workspaces (Q11)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Brief generator advanced options: reference URLs + page-type select + template-crossref auto-hint",
+   "evidence": "src/components/briefs/BriefGenerator.tsx:71-97,139; src/hooks/admin/useAdminBriefWorkflow.ts:147,624-629; server/routes/content-briefs.ts:119",
+   "why": "Brief workspace context panel has notes+questionnaire but no refUrls/pageType/crossref fields",
+   "proposedHome": "Brief workspace context section"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Suggested-brief snooze (1 week / 1 month) with snoozed-until badge",
+   "evidence": "src/components/pipeline/AiSuggested.tsx:151-167; server/routes/suggested-briefs.ts:116-140",
+   "why": "Intake cards have Start/Dismiss/Send-to-client only",
+   "proposedHome": "Intake card menu (Q10)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Calendar scheduling interactions: schedule-a-draft picker on future days + unschedule (clear planned date)",
+   "evidence": "src/components/ContentCalendar.tsx:94-154,504-550,596-607; server/routes/content-posts.ts:397",
+   "why": "Prototype calendar is display-only",
+   "proposedHome": "Calendar mode day panel (Q7)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "AI 'Suggest dates' for unscheduled drafts + apply-one/apply-all panel",
+   "evidence": "src/components/ContentCalendar.tsx:156-188,303-401; server/routes/content-posts.ts:139-186",
+   "why": "No AI scheduling in prototype",
+   "proposedHome": "Calendar mode header (Q7)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Calendar plotting of briefs/requests/matrix items and 'created'-kind posts",
+   "evidence": "src/hooks/admin/useContentCalendar.ts:78-148",
+   "why": "Prototype plots only scheduled+published posts (pipeline.js:661-664)",
+   "proposedHome": "Q7 (or explicit owner decision to drop)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Publish with optional AI image generation (generateImage) + publish confirm + publish error surface",
+   "evidence": "src/components/PostEditor.tsx:293-311",
+   "why": "Prototype 'Publish now' has no image option",
+   "proposedHome": "Draft workspace publish confirm (Q8)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Unification status badge (Unified/Unify Failed/Skipped + note) and error-post recovery framing",
+   "evidence": "src/components/PostEditor.tsx:596-603,695",
+   "why": "Generation-internals surfacing absent; board shows only happy path",
+   "proposedHome": "Draft workspace header"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Template editor depth: sections/variables editing, duplicate, delete; matrix builder 4-step wizard (dimensions, url/keyword pattern, cross-product preview); matrix PUT/DELETE",
+   "evidence": "src/components/matrix/TemplateEditor.tsx; MatrixBuilder.tsx:28-167; server/routes/content-templates.ts:96-211; content-matrices.ts:73-269",
+   "why": "Prototype templates strip is read-only rows + toast stubs; 'Build a matrix' is a button with no flow",
+   "proposedHome": "Matrix mode sub-flows"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Matrix cell detail panel: keyword candidates w/ authority assessment, recommended-keyword apply, validation volume/difficulty/CPC, custom keyword, cell PATCH (status/notes), per-cell generate-brief/send-review",
+   "evidence": "src/components/matrix/CellDetailPanel.tsx:42-261; MatrixGrid.tsx:380-381; server/routes/content-matrices.ts:148",
+   "why": "Prototype matrix cells are toast stubs (pipeline.js:729); 8 cell statuses collapse to 4",
+   "proposedHome": "Matrix mode cell drawer (Q4)"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Matrix bulk export CSV (wired) + client plan-review loop (send-template-review, batch-approve, public content-plan reads)",
+   "evidence": "src/components/ContentPlanner.tsx:88-107; server/routes/content-plan-review.ts:80-196; data-export.ts:127",
+   "why": "Only 'Send sample for approval' survives visibly in prototype matrix footer",
+   "proposedHome": "Matrix mode footer + client portal"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Subscription 'pending' and 'past_due' statuses + notes editing in drawer",
+   "evidence": "src/components/ContentSubscriptions.tsx:18-24,156-165",
+   "why": "Prototype drawer shows active/paused only; notes displayed but not editable",
+   "proposedHome": "Subscription drawer"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Content Pipeline Guide (floating help + slide-over)",
+   "evidence": "src/components/ContentPipeline.tsx:324-359; ContentPipelineGuide.tsx",
+   "why": "Parity Ledger marks it present at 'guide' but no guide element exists in pipeline.js",
+   "proposedHome": "Verify \u2014 help affordance on new surface"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "API-only endpoints with no UI caller found: validate-keyword(s), matrix recommend-keywords (cell+seed), matrix cannibalization check",
+   "evidence": "server/routes/content-briefs.ts:337,400; content-matrices.ts:203-255; src/api/content.ts:65-73,282-291 (wrappers, no component callers)",
+   "why": "Consumers unverified (possibly server-internal/MCP); cannot be assumed droppable",
+   "proposedHome": "Q12 \u2014 confirm consumers"
+  },
+  {
+   "surface": "Content Pipeline (admin) \u2014 Pages content-pipeline ",
+   "capability": "Workspace-tier awareness on this surface (free/growth/premium from cached workspaces)",
+   "evidence": "src/components/ContentPipeline.tsx:117-118,177",
+   "why": "No tier gating concept in prototype pipeline",
+   "proposedHome": "Q5"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "?tab= deep links for 4 tabs (overview|visibility|reviews|setup), receiver-side useSearchParams wiring",
+   "evidence": "src/components/local-seo/LocalPresencePage.tsx:16-27,188-197",
+   "why": "Prototype has only 2 JS-state sub-tabs (presence/reviews) with no URL param (local.js:257,268-271); existing bookmarks and the tab-deep-link contract test would break",
+   "proposedHome": "New shell keeps ?tab= receiver + alias/redirect map for the 4 legacy values"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Overview 'Local operating status' card: workspace posture badge, setupLabel/setupDetail narrative, per-market status chips",
+   "evidence": "src/components/local-seo/LocalPresencePage.tsx:92-125",
+   "why": "Prototype connection chip covers connect/sync state only, not posture/setup-state narrative or market chips",
+   "proposedHome": "Fold into connection chip flyout or a status strip under the hero card (needs sign-off)"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Local keyword visibility stat grid + 5-posture model (visible/possible_match/not_visible/local_pack_present/provider_degraded) incl. Degraded provider-warning column",
+   "evidence": "src/components/local-seo/LocalSeoVisibilityPanel.tsx:24-30,197-220",
+   "why": "Prototype replaces the Visibility tab with a 7x7 geo-grid rendering data HEAD does not collect; the real posture model has no visible home",
+   "proposedHome": "Keep a Visibility section/sub-tab on real data (stop-and-ask #3)"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Setup-state callout (has_data/ready_no_data/needs_market/non_local) with load+refresh error messaging ('Keyword and ranking data were not changed')",
+   "evidence": "src/components/local-seo/LocalSeoVisibilityPanel.tsx:156-195",
+   "why": "No equivalent state narrative anywhere in the prototype",
+   "proposedHome": "Visibility section header callout"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Manual 'Refresh' local visibility trigger with background-job tracking and in-flight detection (findActiveJob), disabled-state reasons",
+   "evidence": "src/components/local-seo/LocalSeoVisibilityPanel.tsx:330-334,406-416; server/routes/local-seo.ts:225-250",
+   "why": "Prototype implies auto-sync only ('synced 2h ago'); the only refresh path shown is drawer Save-and-refresh",
+   "proposedHome": "Refresh action on connection chip or Visibility section header"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Per-market visibility trend sparklines over the snapshot window (LocalSeoVisibilityTrend, TrendBadge delta)",
+   "evidence": "src/components/local-seo/LocalSeoVisibilityTrend.tsx:63-99; mounted LocalSeoVisibilityPanel.tsx:424",
+   "why": "Prototype shows only a single avg-position delta per keyword; the per-market time series surface disappears",
+   "proposedHome": "Visibility section"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Repeat Competitors list: wins-against-client, appearances, markets, suggested tracking keywords with one-click Track (rank-tracking add, per-keyword pending/tracked/error)",
+   "evidence": "src/components/local-seo/LocalSeoVisibilityPanel.tsx:70-154,312,317-329,447-455",
+   "why": "Prototype share-of-voice table shows competitors but has no Track action or suggested keywords",
+   "proposedHome": "Share-of-voice table row expansion or side panel"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "First-load visibility error state with retry (renders before featureEnabled check so panel never silently vanishes on its 3 mount surfaces)",
+   "evidence": "src/components/local-seo/LocalSeoVisibilityPanel.tsx:352-367",
+   "why": "No error state demonstrated in any prototype view",
+   "proposedHome": "Design-system ErrorState per Build Conventions four-states rule"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Manual 'Refresh GBP & reviews' trigger incl. flag/tier/budget/conflict gating surfaced as an error band + flag-ON empty-state bootstrap (chicken-and-egg fix)",
+   "evidence": "src/components/local-seo/GbpReviewsPanel.tsx:81-129; server/routes/local-seo.ts:287-312",
+   "why": "Prototype assumes data is already synced; without a UI trigger the first GBP refresh can never be kicked off (a previously-shipped bug)",
+   "proposedHome": "Connection chip action or Reviews header"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Claim-status suppression (no 'Verified' badge \u2014 provider defaults is_claimed=true so unclaimed is never reliably reported)",
+   "evidence": "src/components/local-seo/GbpReviewsPanel.tsx:44-47",
+   "why": "Prototype shows a Verified badge (local.js:320), directly contradicting a shipped correctness decision \u2014 inverted risk: rebuild may reintroduce an unreliable signal",
+   "proposedHome": "Keep suppressed unless a reliable data source is added (stop-and-ask #4)"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Flag-OFF empty-payload contract (gbp-reviews returns empty not 404; panel renders nothing) + flag-ON empty state with refresh CTA",
+   "evidence": "server/routes/local-seo.ts:257-262; GbpReviewsPanel.tsx:106-129",
+   "why": "No locked/empty treatment shown in prototype",
+   "proposedHome": "Locked/empty states per Build Conventions"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Authenticated review sync surface: 'Sync reviews' trigger (disabled unless connected+mapped), aggregate stats (average/stored/unanswered/low-rating/newest), per-location sync status synced/partial/failed + lastError, recent excerpts, copy-policy guidance",
+   "evidence": "src/components/google-business-profile/GbpAuthenticatedReviewsPanel.tsx:18-165; server/routes/google-business-profile.ts:207-274",
+   "why": "Prototype reviews pipeline treats all reviews as already synced; sync trigger and per-location sync health have no home",
+   "proposedHome": "Reviews pipeline header + connection chip (stop-and-ask #5)"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Connection-gated empty states ('Connect GBP first', 'Map a GBP location first')",
+   "evidence": "src/components/google-business-profile/GbpAuthenticatedReviewsPanel.tsx:63-85",
+   "why": "Prototype only shows the connected+synced happy path (plus a reconnect chip)",
+   "proposedHome": "Empty states in Reviews pipeline"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "Review-response 'declined' and 'cancelled' statuses (rendered with status-tone map at HEAD)",
+   "evidence": "src/components/google-business-profile/GbpReviewResponsesPanel.tsx:17-27",
+   "why": "Prototype pipeline stages omit both (local-reviews.js:119-136) \u2014 items in these states would become invisible",
+   "proposedHome": "Extra pipeline stages or an 'Archived/closed' filter"
+  },
+  {
+   "surface": "Local Presence (Page 'local-seo') \u2014 zone: Strategy",
+   "capability": "GBP refresh tier gate surfaced as locked/error UI (Growth+ 403, flag 404, already-running 409 all render in an alert band)",
+   "evidence": "server/routes/local-seo.ts:299-311; GbpReviewsPanel.tsx:96-104",
+   "why": "No locked-state treatment anywhere in the prototype views",
+   "proposedHome": "TierGate-equivalent locked state in the design system"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 8: Schema-type recommendations deep-link + per-page banners + count badge",
+   "evidence": "src/lib/recTypeTab.ts:17; SchemaSuggester.tsx:89,561; SchemaPageCard.tsx:136-138; SchemaPageCardDetails.tsx",
+   "why": "No recommendation affordance anywhere in schema.js"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 11: Pre-scan setup screen (hero CTA, page inventory search, per-page type select, per-page Generate, 24-role Page Type Guide)",
+   "evidence": "SchemaGeneratorSetup.tsx:69-215; SchemaSuggester.tsx:293-350",
+   "why": "Prototype starts at the results view; no pre-scan per-page type setup"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 20: 'Already on page' existing-schemas section",
+   "evidence": "SchemaPageCardDetails.tsx:27-42",
+   "why": "Existing-schema awareness also feeds diff (row 25) and coverage math; absent from mockup"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 21 (detail): Per-field validation findings drill-down (grouped by field, severity-sorted, expandable)",
+   "evidence": "SchemaPageCardDetails.tsx:49-130",
+   "why": "Badge carries in mockup (schema.js:154) but the per-field findings drill-down has no home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 22: Generation diagnostics section (per-page generation provenance)",
+   "evidence": "SchemaPageCard.tsx:95,178; SchemaPageCardDetails.tsx (GenerationDiagnosticsSection)",
+   "why": "No mockup home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 24: Rich-results eligibility section (per rich-result type)",
+   "evidence": "SchemaPageCard.tsx:94,179; SchemaPageCardDetails.tsx (RichResultsEligibilitySection)",
+   "why": "No mockup home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 25: Side-by-side diff of current on-page schema vs suggested",
+   "evidence": "SchemaPageCard.tsx:186-199,247-265",
+   "why": "No mockup home; requires existingSchemaJson capture (already in snapshot)"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 26: Inline JSON editor with live parse validation, per-page edited-JSON override (getEffectiveSchema), edited publish-confirm copy, parse errors block publish",
+   "evidence": "SchemaEditor.tsx; useSchemaSuggesterPublishingWorkflow.ts:75-80,142-173; SchemaPageCard.tsx:203-216,266-278,320,336",
+   "why": "Stepper's 'Edit' step exists in mockup but no editor UI does; dropping it silently breaks the effective-schema contract"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 27 (script variant): Copy script (<script type=application/ld+json> wrapper) as distinct target from raw Copy JSON-LD",
+   "evidence": "useSchemaSuggesterPublishingWorkflow.ts:175-189; SchemaPageCard.tsx:217-243; SchemaSuggester.tsx:630-635",
+   "why": "Mockup has Copy JSON-LD only; the two-target distinction (custom code vs Page Settings field) is user-facing guidance at HEAD"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 31: Whole-site @graph validation status chip; errors block bulk publish",
+   "evidence": "useSchemaValidation.ts:24-31; BulkPublishPanel.tsx:31-62; SchemaSuggester.tsx:142-144; webflow-schema.ts:691-705; server/schema/whole-site-graph-validator.ts",
+   "why": "Cross-page @id reference integrity is the core 'unified @graph' guarantee; mockup has no site-graph element"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 33: Stale-schema detection (published >90d badge + regenerate warning)",
+   "evidence": "SchemaPageCard.tsx:97-101,130-132,516-523",
+   "why": "No mockup home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 35: CMS-page publishing to mapped CMS field (delivery statuses ready/blocked/failed/written/unchanged, 'publish unavailable' notices, distinct flow + badge)",
+   "evidence": "SchemaPageCard.tsx:296-330; useSchemaSuggesterPublishingWorkflow.ts:246-249; server/domains/schema/publish-schema-to-cms-field.ts; FEATURE_AUDIT.md:668",
+   "why": "Whole CMS delivery pipeline invisible in mockup (with rows 36, 47)"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 36: CMS retract restriction ('Clear via Webflow CMS to retract' notice; CMS rollback excluded in history)",
+   "evidence": "SchemaPageCard.tsx:411-419; SchemaVersionHistory.tsx:135-142",
+   "why": "Part of the invisible CMS pipeline"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 37: Manual-delivery fallback ('manual-required' publish result \u2192 paste instructions + char-count vs API limit + Copy JSON-LD)",
+   "evidence": "useSchemaSuggesterPublishingWorkflow.ts:124-127; SchemaPageCard.tsx:426-459; SchemaDeliveryDecision type",
+   "why": "Webflow API char-limit reality; silently dropping this bricks large schemas"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 38: Retract published schema per page (strips JSON-LD via API, optional site publish, snapshot removal, state reset, activity, Retracted badge)",
+   "evidence": "SchemaPageCard.tsx:398-422; useSchemaSuggesterPublishingWorkflow.ts:263-275; webflow-schema.ts:528-560; FEATURE_AUDIT.md:2630",
+   "why": "Undo safety net; no mockup home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 39: Per-page publish version history + rollback (static pages only, 'current' marker)",
+   "evidence": "SchemaVersionHistory.tsx; SchemaPageCard.tsx:497-540; webflow-schema.ts:564-607",
+   "why": "No mockup home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 40: Save as Site Template (homepage Org+WebSite nodes; auto-save on homepage publish; GET/PUT/PATCH template endpoints)",
+   "evidence": "useSchemaSuggesterPublishingWorkflow.ts:219-240; SchemaPageCard.tsx:369-397; webflow-schema.ts:379-461",
+   "why": "Template also seeds subpage generation (getOrSeedSiteTemplate); no mockup home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 42/43 (note field): Optional note textarea on bulk + per-page send-to-client",
+   "evidence": "useSchemaSuggesterPublishingWorkflow.ts:82-105,191-217; BulkPublishPanel.tsx:78-101; SchemaPageCard.tsx:460-496",
+   "why": "Mockup send actions carry no note field \u2014 admin-send convention requires one (CLAUDE.md)"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 45: PendingApprovals panel filtered to 'Schema' batches with batch retract + refresh key",
+   "evidence": "SchemaSuggester.tsx:541-549; src/components/PendingApprovals.tsx:2,19-27,46",
+   "why": "Only place the admin sees/retracts open schema batches from this surface; absent from mockup"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 47: Generate site-wide schema plan as background job (SCHEMA_PLAN_GENERATION) from inventory + keyword strategy + competitor crawl",
+   "evidence": "SchemaPlanPanel.tsx:164-183; server/schema-plan.ts:38,123-128; server/schema-plan-generation-job.ts; FEATURE_AUDIT.md:8345",
+   "proposedHome": "Q1 options: re-mount SchemaPlanPanel as bridge, or design a plan sub-view",
+   "why": "Entire Schema Site Plan subsystem (rows 47-55) absent from schema.js"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 48: Review/edit page roles (24-role taxonomy, color/tone map, role change auto-manages primaryType + entityRefs, dirty-state + Save)",
+   "evidence": "SchemaPlanPanel.tsx:185-224,458-572; shared/types/schema-plan.ts (SCHEMA_ROLE_*)",
+   "proposedHome": "Q1",
+   "why": "Plan subsystem absent from prototype"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 49: Plan status lifecycle draft \u2192 sent_to_client \u2192 client_approved/changes_requested \u2192 active (state machine)",
+   "evidence": "server/state-machines.ts:233,585; server/schema-store.ts:457-469; SchemaPlanPanel.tsx:258-260",
+   "proposedHome": "Q1",
+   "why": "Plan subsystem absent from prototype"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 50: Send plan to client (status flip + email + unified-inbox schema_plan dual-write + SCHEMA_PLAN_SENT broadcast + activity)",
+   "evidence": "SchemaPlanPanel.tsx:226-240; server/domains/schema/schema-plan-admin-mutations.ts:111-130; server/domains/inbox/schema-plan-dual-write.ts",
+   "proposedHome": "Q1",
+   "why": "Plan subsystem absent from prototype"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 51: Activate plan (generation follows plan roles; whole-site validator checks against active plan)",
+   "evidence": "SchemaPlanPanel.tsx:242-256; webflow-schema.ts:514-518,698",
+   "proposedHome": "Q1",
+   "why": "Active plan FEEDS generation and graph validation \u2014 cannot be silently dropped"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 52: Retract/delete plan with inline confirm + activity log",
+   "evidence": "SchemaPlanPanel.tsx:408-455; webflow-schema.ts:521-525; schema-plan-admin-mutations.ts:174",
+   "proposedHome": "Q1",
+   "why": "Plan subsystem absent from prototype"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 53: Plan mutations locked while regeneration job runs (banner + disabled controls; 409s carry jobId)",
+   "evidence": "SchemaPlanPanel.tsx:120-121,349-353; webflow-schema.ts:496,638-644",
+   "proposedHome": "Q1",
+   "why": "Plan subsystem absent from prototype"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 54: Canonical entities viewer + Page Type Guide + role-count summary chips",
+   "evidence": "SchemaPlanPanel.tsx:459-530",
+   "proposedHome": "Q1",
+   "why": "Plan subsystem absent from prototype"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 55: CLIENT plan review via unified-inbox schema_plan deliverable (read-only roles + entities; Approve/Request-changes propagates via respondToSchemaPlanFeedback; guarded against active regeneration)",
+   "evidence": "src/components/client/DeliverableDetailModal.tsx:96-160; server/domains/inbox/send-to-client.ts:204-206; server/domains/schema/schema-plan-feedback.ts:73-80; webflow-schema.ts:631-652",
+   "proposedHome": "Client dashboard rebuild (separate sign-off per Handoff Brief)",
+   "why": "Client-facing; schema.js is admin-only"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 57: Business-profile completeness callout (LocalBusiness intent inference, per-workspace localStorage dismiss, deep link to brand?tab=business-footprint)",
+   "evidence": "SchemaSuggester.tsx:60-79,150-159; SchemaGeneratorSetup.tsx:20-63",
+   "why": "Drives the highest-value schema type for local businesses; no mockup home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 58: CMS field-mapping panel (auto-detect collections, map 12 field targets per collection max 4, optimistic save, error surface; broadcasts SCHEMA_CMS_MAPPING_UPDATED)",
+   "evidence": "SchemaGeneratorSetup.tsx:230-288; useSchemaSuggesterCmsWorkflow.ts:12-121; webflow-schema.ts:155-270",
+   "proposedHome": "Q2: same-surface advanced panel, settings-level config, or sequenced later",
+   "why": "CMS pipeline invisible in mockup"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 59: Schema completeness widget (% pages without actionable missing-field findings, progress bar, missing-field groups with 'Fix \u2192' deep-links to workspace-settings/brand)",
+   "evidence": "SchemaCompletenessWidget.tsx:27-139; fieldTargets.ts",
+   "why": "Cross-surface fix routing (business-footprint / intelligence-profile / eeat-assets); no mockup home"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 60: Schema Impact panel (GSC 28-day before/after per deployment, clicks/impressions/CTR/position deltas, <7d pending, hidden when GSC absent)",
+   "evidence": "SchemaImpactPanel.tsx; src/api/schema.ts:101-103; server/routes/seo-change-tracker.ts:59; FEATURE_AUDIT.md:3805",
+   "proposedHome": "Prototype hints 'graduates into the Insights Engine' (schema.js:224) \u2014 related but NOT equivalent (Q4)",
+   "why": "Only proof-of-value loop on this surface; graduation (single wins) vs aggregate deltas are different capabilities"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 66: Competitor schema intelligence endpoint (GET /api/competitor-schema/:workspaceId; also feeds plan generation)",
+   "evidence": "server/routes/competitor-schema.ts:18-81; server/schema-plan.ts:123-128; FEATURE_AUDIT.md:4306",
+   "proposedHome": "Q7: surface in rebuild (Schema? Competitors?) or leave internal-only",
+   "why": "Zero UI consumers at HEAD \u2014 dark for UI but tested + used by plan generation"
+  },
+  {
+   "surface": "Schema",
+   "capability": "Row 69: Orphaned SchemaHealthDashboard (aggregated validation rows + re-validate) \u2014 mounted nowhere",
+   "evidence": "src/components/schema/SchemaHealthDashboard.tsx:139; only tests/component/SchemaHealthDashboard.test.tsx imports it",
+   "proposedHome": "Q8: confirm delete vs port",
+   "why": "Its data IS surfaced via row-30 badges; likely dead code but retirement needs sign-off"
+  }
+ ]
+}

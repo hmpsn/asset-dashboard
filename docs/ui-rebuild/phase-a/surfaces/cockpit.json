@@ -1,0 +1,535 @@
+{
+  "gather": {
+    "surface": "cockpit",
+    "capabilityClassification": [
+      {
+        "capability": "Row 1: default landing /ws/:id → home",
+        "resolution": "ui-only",
+        "note": "Route stays; rename target to Cockpit within existing routes.ts Page 'home'."
+      },
+      {
+        "capability": "Row 2: nav registry 'home' entry",
+        "resolution": "ui-only",
+        "note": "Rename Home→Cockpit in navRegistry.tsx:115; registry-driven nav propagates."
+      },
+      {
+        "capability": "Row 3: keyboard shortcut ⌘/Ctrl+1→home",
+        "resolution": "open-question",
+        "note": "Newly-found: no shortcut scheme in prototype; keep-or-define-scheme is an owner call."
+      },
+      {
+        "capability": "Row 4: ?tab=meeting-brief deep link",
+        "resolution": "open-question",
+        "note": "Falls with Meeting Brief (doc Q2); if tab kept, two-halves receiver must be rewired."
+      },
+      {
+        "capability": "Row 5: aggregated GET /api/workspace-home/:id with safe() fallbacks",
+        "resolution": "ui-only",
+        "note": "Endpoint verified at server/routes/workspace-home.ts:32-80; rebuild reads it unchanged."
+      },
+      {
+        "capability": "Row 6: contextual loading state",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "Row 7: error state with Retry",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "Row 8: ~15 WS-event query invalidation",
+        "resolution": "ui-only",
+        "note": "Re-wire existing wsInvalidation.ts fan-out to the rebuilt component; no server change."
+      },
+      {
+        "capability": "Row 9: data freshness indicator",
+        "resolution": "open-question",
+        "note": "Doc Q8 — system-wide Build Conventions pattern vs per-surface."
+      },
+      {
+        "capability": "Row 10: manual Refresh button",
+        "resolution": "open-question",
+        "note": "Doc Q8, same decision as row 9."
+      },
+      {
+        "capability": "Row 11: header name/subtitle/settings shortcut",
+        "resolution": "ui-only",
+        "note": "Client-zone header + nav gear in new shell."
+      },
+      {
+        "capability": "Row 12: OnboardingChecklist",
+        "resolution": "ui-only",
+        "note": "Delegates to the onboard surface (cross-surface dep); existing localStorage/dismiss logic ports."
+      },
+      {
+        "capability": "Row 13: NeedsAttention → 3 stream tiles + grouped queue",
+        "resolution": "defer-candidate",
+        "note": "Quick win: client-side mapping of existing attention items with explicit 'unclassified' bucket (DEF-* row); full path is sn-cockpit-2."
+      },
+      {
+        "capability": "Row 14: client-requests deep link",
+        "resolution": "ui-only",
+        "note": "From-client rail → Inbox link; ?tab= receiver contract must carry over."
+      },
+      {
+        "capability": "Row 15: work-orders attention rows",
+        "resolution": "open-question",
+        "note": "Doc Q3 — Inbox vs Pipeline vs keep modal."
+      },
+      {
+        "capability": "Row 16: churn-signal attention rows",
+        "resolution": "open-question",
+        "note": "Doc Q5 — health chip drops type/severity/description detail; data exists (workspace-home churnSignals)."
+      },
+      {
+        "capability": "Row 17: content-decay attention row",
+        "resolution": "ui-only",
+        "note": "Pipeline → Content Health per ledger; deep link retargets."
+      },
+      {
+        "capability": "Row 18: pending-briefs attention row",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "Row 19: SEO-audit-errors attention row",
+        "resolution": "ui-only",
+        "note": "Technicals lane fed from existing useAuditSummary."
+      },
+      {
+        "capability": "Row 20: rank-drops attention row",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "Row 21: pages-needing-review attention row",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "Row 22: post-dismiss setup items",
+        "resolution": "ui-only",
+        "note": "onboard surface owns setup permanently."
+      },
+      {
+        "capability": "Row 23: Site Health hero card",
+        "resolution": "open-question",
+        "note": "Doc Q4 — number-free Cockpit vs compact KPI strip."
+      },
+      {
+        "capability": "Row 24: Search Clicks hero card",
+        "resolution": "open-question",
+        "note": "Doc Q4."
+      },
+      {
+        "capability": "Row 25: Traffic Value / ROI card",
+        "resolution": "open-question",
+        "note": "Doc Q4 — no per-client home anywhere in prototype; useAdminROI hook exists (src/hooks/admin/useAdminROI.ts:6)."
+      },
+      {
+        "capability": "Row 26: Users (GA4) card",
+        "resolution": "open-question",
+        "note": "Doc Q4; data survives in workspace-home ga4Data/comparison regardless."
+      },
+      {
+        "capability": "Row 27: Rank Changes card → mini-board",
+        "resolution": "ui-only",
+        "note": "Mini-board composes existing ranks from the aggregate payload."
+      },
+      {
+        "capability": "Row 28: Content Decay card",
+        "resolution": "ui-only"
+      },
+      {
+        "capability": "Row 29: Content Pipeline card → stage meter",
+        "resolution": "ui-only",
+        "note": "Meter from existing contentPipeline cells fields (src/api/platform.ts:80)."
+      },
+      {
+        "capability": "Row 30: Content Velocity card",
+        "resolution": "open-question",
+        "note": "Newly-found: at_risk with no doc open question; contentVelocity data already on the payload — decide a home or DEF."
+      },
+      {
+        "capability": "Row 31: Coverage Gaps card",
+        "resolution": "ui-only",
+        "note": "Folds into Insights Engine per ledger; verify count visibility survives (cross-surface)."
+      },
+      {
+        "capability": "Row 32: Overall Health composite score",
+        "resolution": "open-question",
+        "note": "Doc Q6 — 0–100 score → qualitative chip is a status-meaning change requiring ratification."
+      },
+      {
+        "capability": "Row 33: WorkOrderPanel modal (conversation, complete, close-out)",
+        "resolution": "open-question",
+        "note": "Doc Q3; API fully exists (src/api/work-orders.ts:8-23) so quick-win modal carry-over is zero server work."
+      },
+      {
+        "capability": "Row 34: Weekly Accomplishments strip",
+        "resolution": "open-question",
+        "note": "Doc Q7 — verdict absorption undemonstrated; weeklySummary is server-computed already (workspace-home.ts:86-95)."
+      },
+      {
+        "capability": "Row 35: AnomalyAlerts panel (ack/dismiss/scan)",
+        "resolution": "ui-only",
+        "note": "Moves to Search & Traffic (cross-surface); POST /api/anomalies/scan verified (server/routes/anomalies.ts:63)."
+      },
+      {
+        "capability": "Row 36: home TabBar Overview|Meeting Brief",
+        "resolution": "open-question",
+        "note": "Tied to Q2."
+      },
+      {
+        "capability": "Row 37: Meeting Brief page",
+        "resolution": "open-question",
+        "note": "Doc Q2; backend intact (server/routes/meeting-brief.ts:12-14) — quick-win T1 carry-over as Cockpit tab is viable."
+      },
+      {
+        "capability": "Row 38: section TabBar Overview|Pipeline|Activity",
+        "resolution": "ui-only",
+        "note": "Merged into queue+rail layout; children accounted for in rows 39-45."
+      },
+      {
+        "capability": "Row 39: BriefingReviewQueue (client-briefing-v2)",
+        "resolution": "open-question",
+        "note": "Doc Q11 — approve/publish/skip-note/generate-now home not demonstrated in recs surface."
+      },
+      {
+        "capability": "Row 40: AdminRecommendationQueue",
+        "resolution": "ui-only",
+        "note": "Recommendations surface owns it (cross-surface); OV/emvPerWeek carry is an unknown to verify there."
+      },
+      {
+        "capability": "Row 41: SeoWorkStatus grid",
+        "resolution": "ui-only",
+        "note": "Moves to Site Audit + SEO Editor surfaces per ledger."
+      },
+      {
+        "capability": "Row 42: SeoChangeImpact before/after",
+        "resolution": "open-question",
+        "note": "Doc Q10 — Action Results carry unconfirmed."
+      },
+      {
+        "capability": "Row 43: ActivityFeed",
+        "resolution": "open-question",
+        "note": "Doc Q7 — no home in prototype; drop is forbidden."
+      },
+      {
+        "capability": "Row 44: RankingsSnapshot",
+        "resolution": "ui-only",
+        "note": "Keyword mini-board supersedes it from same ranks data."
+      },
+      {
+        "capability": "Row 45: ActiveRequestsAnnotations",
+        "resolution": "ui-only",
+        "note": "Requests → Inbox rail; annotations → Search & Traffic (cross-surface)."
+      },
+      {
+        "capability": "P1: verdict headline + narrative",
+        "resolution": "needs-server-work",
+        "note": "sn-cockpit-1 — hard floor bans client-composed verdicts, so even the template quick-win is server-derived."
+      },
+      {
+        "capability": "P2: Monetization 'to pitch' stream",
+        "resolution": "needs-server-work",
+        "note": "sn-cockpit-5; also gated on Q9 sign-off as net-new scope."
+      },
+      {
+        "capability": "P3: provenance chips on money impacts",
+        "resolution": "needs-server-work",
+        "note": "sn-cockpit-3 — field persisted already; serialization onto cockpit rows missing. Doc itself rejects the hardcode-estimate quick win."
+      },
+      {
+        "capability": "P4: promote-to-signal on client requests",
+        "resolution": "needs-server-work",
+        "note": "sn-cockpit-4; new endpoint, gated on Q9."
+      },
+      {
+        "capability": "P5: technicals graduate-to-proof-point",
+        "resolution": "defer-candidate",
+        "note": "New lifecycle semantics; quick-win technicals lane from useAuditSummary has no graduation and loses nothing."
+      },
+      {
+        "capability": "P6: client-switcher book roll-up",
+        "resolution": "needs-server-work",
+        "note": "sn-cockpit-6 (partial exists); primarily global-ops/workspace-switcher scope, not Cockpit."
+      }
+    ],
+    "serverNeeds": [
+      {
+        "id": "sn-cockpit-1",
+        "kind": "derivation",
+        "description": "Per-client verdict (status + narrative sub) derived server-side and added to the workspace-home payload; template-composed from weeklySummary + attention counts first, upgradeable to a callAI named operation.",
+        "existsToday": "no",
+        "evidence": "rg 'verdict' server/ hits only ROI outcomeVerdict in server/the-issue-export.ts — no per-client daily verdict generator; weeklySummary inputs exist at server/routes/workspace-home.ts:86-95.",
+        "whereItLives": "server/routes/workspace-home.ts (or new server/cockpit-verdict.ts) + shared/types addition",
+        "effort": "M",
+        "likelySharedWith": [
+          "global-ops (all-clients Today)",
+          "client-portal Overview"
+        ]
+      },
+      {
+        "id": "sn-cockpit-2",
+        "kind": "endpoint",
+        "description": "Unified server-side work-queue model classifying items into opt/send/money streams (+ explicit unclassified bucket) with counts guaranteed to match destination screens. Full version of the row-13 quick win.",
+        "existsToday": "no",
+        "evidence": "Attention items are assembled client-side in src/components/WorkspaceHome.tsx:189-307; no stream/queue concept in server/routes/workspace-home.ts:43-80.",
+        "whereItLives": "server/routes/workspace-home.ts or server/domains/ work-queue module",
+        "effort": "L",
+        "likelySharedWith": [
+          "global-ops (home.js Today reuses the same streams)"
+        ]
+      },
+      {
+        "id": "sn-cockpit-3",
+        "kind": "field",
+        "description": "Serialize the existing OutcomeProvenance (estimate/measured/actual ladder) onto cockpit money-impact rows so P3 chips render the real field, never hardcoded.",
+        "existsToday": "partial",
+        "evidence": "OutcomeProvenance persisted and typed at shared/types/roi.ts:71 and shared/types/outcome-tracking.ts:293; absent from WorkspaceHomeData (src/api/platform.ts:69-90).",
+        "whereItLives": "server/routes/workspace-home.ts serialization + shared/types",
+        "effort": "S",
+        "likelySharedWith": [
+          "recommendations",
+          "global-ops"
+        ]
+      },
+      {
+        "id": "sn-cockpit-4",
+        "kind": "endpoint",
+        "description": "'Promote to signal' — POST turning a client request into an Insights Engine backing move/insight, with activity log + broadcast.",
+        "existsToday": "no",
+        "evidence": "server/routes/insights.ts has only router.put (line 27, resolve); rg 'promote_to_signal|promoteToSignal' across src/ server/ shared/ = 0 hits.",
+        "whereItLives": "server/routes/insights.ts + insights store",
+        "effort": "M",
+        "likelySharedWith": [
+          "insights"
+        ]
+      },
+      {
+        "id": "sn-cockpit-5",
+        "kind": "projection",
+        "description": "Monetization 'to pitch' stream source: an admin-facing queue of upsell/scope-expansion plays per client. No such queue exists; only client-side purchase-rec upsells.",
+        "existsToday": "partial",
+        "evidence": "Upsell exists only as client purchase flows: shared/types/recommendations.ts:35 (productType) and server/briefing-candidates.ts:210 ('Recommended for You' upsell flow); no admin pitch queue found via rg 'upsell|monetization' server/.",
+        "whereItLives": "new module under server/domains/recommendations/ or briefing-candidates adjacency",
+        "effort": "M",
+        "likelySharedWith": [
+          "recommendations",
+          "global-ops"
+        ]
+      },
+      {
+        "id": "sn-cockpit-6",
+        "kind": "projection",
+        "description": "Book roll-up for the client switcher popover (open requests / at-risk / in-setup per workspace) — extend the existing all-workspace aggregation rather than a new endpoint.",
+        "existsToday": "partial",
+        "evidence": "GET /api/workspace-overview aggregate exists (src/api/platform.ts:64-66); at-risk/in-setup fields not confirmed on it.",
+        "whereItLives": "server route behind /api/workspace-overview",
+        "effort": "S",
+        "likelySharedWith": [
+          "global-ops",
+          "engine (workspace switcher)"
+        ]
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Q1: Parity Ledger has no row for Workspace Home — confirm cockpit.js (+home.js) replaces it and add the ledger row pre-build.",
+        "proposedDefault": "Add 'Workspace Home → Cockpit (+ Today)' ledger row with per-function statuses before any build PR.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q2: Meeting Brief home — keep as Cockpit tab, move to Insights Engine, or retire?",
+        "proposedDefault": "T1 carry-over: keep MeetingBriefPage as a secondary Cockpit tab unchanged (additive-parity insurance); redesign later.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q3: work-order fulfillment (conversation/complete/close-out) home — Inbox, Pipeline, or keep modal?",
+        "proposedDefault": "Keep WorkOrderPanel modal launchable from a Cockpit queue row (zero server work; API intact).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q4: is Cockpit intentionally number-free, or does it carry a compact KPI strip? Traffic Value/ROI has no per-client home at all.",
+        "proposedDefault": "Compact KPI strip reusing existing WorkspaceHomeData fields incl. traffic value — de-risks an unratified behavior change.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q5: where do churn-signal detail rows live in the new IA?",
+        "proposedDefault": "Render churn signals as work-queue rows in the unclassified/risk bucket; health chip alone is insufficient.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q6: composite 0-100 client-signals health score → qualitative 'On track/At risk' chip is a status-meaning change.",
+        "proposedDefault": "Keep the number (chip label derived FROM the score, score shown on hover/detail).",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q7: Activity feed + Weekly accomplishments have no prototype home.",
+        "proposedDefault": "Keep WeeklyAccomplishments strip under the verdict; mount ActivityFeed in a Drawer from the toolbar.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q8: freshness indicator + manual refresh — system-wide Build Conventions pattern or per-surface?",
+        "proposedDefault": "Promote to a system-wide shell/toolbar convention; decide once, apply to all rebuilt surfaces.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q9: sign-off on net-new P1-P6 (verdict, monetization stream, provenance chips, promote-to-signal, graduation, switcher roll-up).",
+        "proposedDefault": "Adopt P1 (server template) + P3 (real field); defer P2/P4/P5/P6 to C3-style individually-flagged follow-ups.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q10: confirm Action Results carries SeoChangeImpact's change-level before/after GSC measurement.",
+        "proposedDefault": "If unconfirmed by the outcomes surface discovery, carry SeoChangeImpact into Cockpit's queue detail as T1.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Q11: confirm briefing review workflow (approve/publish/skip-note/generate-now) lands on the Recommendations surface.",
+        "proposedDefault": "If not, mount BriefingReviewQueue behind its existing client-briefing-v2 flag inside Cockpit's send stream.",
+        "needsOwner": true,
+        "source": "surface-doc"
+      },
+      {
+        "question": "Newly-found: keyboard shortcut scheme (⌘1/2/3) has no home in the prototype or Build Conventions.",
+        "proposedDefault": "Preserve ⌘1→Cockpit wiring in the rebuilt shell; defining a full scheme is a shell-level (F4/engine) decision.",
+        "needsOwner": false,
+        "source": "newly-found"
+      },
+      {
+        "question": "Newly-found: Content Velocity card (row 30) is at_risk with no doc open question and no prototype home.",
+        "proposedDefault": "Include velocity in the Q4 KPI strip (data already on the payload); otherwise DEF-* ledger row.",
+        "needsOwner": true,
+        "source": "newly-found"
+      }
+    ],
+    "kitNewFeatures": [
+      {
+        "proposal": "P1 verdict headline + narrative",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Core to the Cockpit concept; ship the server-derived template version (sn-cockpit-1) — hard floor forbids client-composed verdicts, AI upgrade later."
+      },
+      {
+        "proposal": "P2 Monetization 'to pitch' stream",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "No HEAD queue exists (sn-cockpit-5); it is product scope, not UI parity — ship Cockpit with opt/send streams + unclassified first."
+      },
+      {
+        "proposal": "P3 provenance chips (estimate/measured/actual)",
+        "recommendation": "adopt-in-rebuild",
+        "rationale": "Reconcile already persists OutcomeProvenance; wiring is S (sn-cockpit-3) and the hardcode alternative is a trust landmine the doc itself rejects."
+      },
+      {
+        "proposal": "P4 promote-to-signal on client requests",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New cross-surface endpoint + workflow (sn-cockpit-4) with no HEAD equivalent; needs its own flag + sign-off."
+      },
+      {
+        "proposal": "P5 technicals graduation to proof point",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "New lifecycle semantics; the quick-win technicals lane from useAuditSummary loses nothing."
+      },
+      {
+        "proposal": "P6 client-switcher book roll-up",
+        "recommendation": "defer-to-C3-style-followup",
+        "rationale": "Belongs to the shell/global-ops switcher, not this surface; /api/workspace-overview partially covers it (sn-cockpit-6)."
+      }
+    ],
+    "composition": {
+      "lensesOrTabs": [
+        "Cockpit (single view: verdict header + 3 stream tiles + grouped work queue + From-client rail + Technicals lane + keyword mini-board + content-in-flight meter)",
+        "Meeting Brief (T1 carry-over tab, pending Q2)",
+        "Activity (Drawer, pending Q7)"
+      ],
+      "primitives": [
+        "PageContainer",
+        "Toolbar (+freshness/refresh per Q8)",
+        "MetricTile (stream tiles / optional KPI strip)",
+        "GroupBlock (queue groups, rails)",
+        "DataTable or KeyValueRow (work-queue rows)",
+        "Meter (content-in-flight stages)",
+        "Sparkline (KPI strip trends)",
+        "Drawer (work-order panel / activity feed)",
+        "Segmented (Cockpit|Meeting Brief tabs)",
+        "Avatar (From-client rail)",
+        "FilterChip (queue stream filter)"
+      ],
+      "dataHooks": [
+        "useWorkspaceHome (src/hooks/admin/useWorkspaceHome.ts → GET /api/workspace-home/:id?days=28)",
+        "useAdminROI (src/hooks/admin/useAdminROI.ts)",
+        "useAuditSummary (src/hooks/useAuditSummary.ts)",
+        "workOrders api (src/api/work-orders.ts: list/update/comments)",
+        "anomalies api incl. POST /api/anomalies/scan (src/api/misc.ts:149)",
+        "meeting-brief (GET/POST /api/workspaces/:id/meeting-brief, server/routes/meeting-brief.ts)",
+        "churnSignals (src/api/misc.ts:153, also embedded in workspace-home payload)"
+      ],
+      "statesPlan": "Loading: contextual skeleton; error: retry + refresh (rows 6-7 preserved); empty/new-client: delegate to onboard flow with Technicals-lane fill; per-source degradation already handled by the endpoint's safe() fallbacks; no tier lock (admin surface).",
+      "mountNote": "Rebuilt behind ui-rebuild-shell inside RebuiltAppChrome at existing Page 'home' (no URL change, so no D8 redirect map); rename navRegistry entry Home→Cockpit; re-wire the ~15-event wsInvalidation fan-out to the same workspaceHome query key."
+    },
+    "crossSurfaceDeps": [
+      "global-ops/home.js all-clients Today: defines the co-* CSS layout system cockpit.js reuses (must be ported as shared primitives, not copied) and shares the stream model (sn-cockpit-2) + switcher roll-up (sn-cockpit-6)",
+      "onboard surface: owns OnboardingChecklist/setup permanently (rows 12/22); 'fills the Technicals lane'",
+      "search-traffic: receives AnomalyAlerts (verify ack/dismiss/scan actions, not just display), annotations, GSC/GA4 numbers",
+      "site-audit + seo-editor: receive SeoWorkStatus grid and own the health score drill-through",
+      "recommendations: owns AdminRecommendationQueue (verify OV/emvPerWeek breakdown) and is the doc's proposed home for the briefing review workflow (Q11)",
+      "content-pipeline: receives decay + content-health cards and the in-flight meter's destination links",
+      "insights engine: Coverage Gaps fold (row 31) + promote-to-signal target (P4)",
+      "outcomes/Action Results: proposed home for SeoChangeImpact before/after (Q10)",
+      "Parity Ledger itself: missing Workspace Home row must be added before build (Q1)"
+    ],
+    "unknowns": [
+      "Whether the Recommendations surface detail carries the full OV/emvPerWeek admin breakdown (row 40) — verification belongs to that surface's discovery, not grep-resolvable here.",
+      "Whether outcomes.js/Action Results carries change-level before/after GSC measurement (row 42) — same cross-surface verification.",
+      "Whether /api/workspace-overview already returns at-risk/in-setup fields for sn-cockpit-6 — payload typed as unknown[] (src/api/platform.ts:64-66); route internals not read within scope."
+    ],
+    "effortEstimate": "XL"
+  },
+  "verify": {
+    "surface": "sn-cockpit",
+    "verdicts": [
+      {
+        "needId": "sn-cockpit-1",
+        "verdict": "CONFIRMED",
+        "evidence": "No per-client daily verdict/status generator exists — rg 'verdict' server/ hits only the ROI outcomeVerdict (server/the-issue-export.ts:63-108, shared/types/roi.ts:57) which is money-ratio outcome value, NOT a status+narrative home verdict. No 'narrative'/composeVerdict/homeStatus generator found (rg across server/ shared/ = 0). weeklySummary inputs confirmed present at server/routes/workspace-home.ts:83-96 (recentActivity → seoUpdates/auditsRun/contentGenerated/contentPublished/requestsResolved) and attention counts are assembled client-side. Template-composed-first, upgradeable-to-callAI is sound; effort M is fair.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-cockpit-2",
+        "verdict": "CONFIRMED",
+        "evidence": "Attention items are assembled client-side: src/components/WorkspaceHome.tsx builds `const attentionItems: AttentionItem[] = []` then ~10 `attentionItems.push({...})` calls (new requests, work orders, decay, pending content, audit errors, rank drops, review cells, setup gaps) sorted by severityOrder. server/routes/workspace-home.ts:31-125 returns raw arrays (ranks/requests/contentRequests/workOrders/contentPipeline/…) with NO stream/queue/opt/send/money classification — rg 'stream|workQueue|unclassified' server/routes/workspace-home.ts server/domains/ = 0. Effort L is defensible given counts must match destination screens.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-cockpit-3",
+        "verdict": "ADJUSTED",
+        "evidence": "Direction CONFIRMED but the cited line references are wrong. OutcomeProvenance (the estimate/measured/actual ladder) is defined at shared/types/outcome-tracking.ts:139-145 — NOT :293. Line 293 is `OutcomeCoverageProvenance` (a DISTINCT admin-only PERSISTED per-row column; the type doc at :147-160 explicitly warns 'do not import one where the other is expected'). The roi.ts field-use is at shared/types/roi.ts:71 `provenance: OutcomeProvenance` inside outcomeVerdict (roi.ts:52 is the wrong anchor — that's the priorPeriodCount comment block). Absent-from-WorkspaceHomeData is correct (src/api/platform.ts:68-90 has no provenance). Effort S is CORRECT and worth affirming: OutcomeProvenance is 'computed-at-read-time … never persisted' (outcome-tracking.ts:151-152), so this is pure serialization — NO migration, NO row-mapper/DB-column lockstep. Use OutcomeProvenance, never OutcomeCoverageProvenance.",
+        "correction": "Serialize OutcomeProvenance (shared/types/outcome-tracking.ts:139, exposed on roi.ts:71 outcomeVerdict.provenance) onto cockpit money rows. Do NOT confuse with the persisted admin-only OutcomeCoverageProvenance at outcome-tracking.ts:293. Effort S stands (read-time value, no migration)."
+      },
+      {
+        "needId": "sn-cockpit-4",
+        "verdict": "CONFIRMED",
+        "evidence": "server/routes/insights.ts defines exactly two routes: router.get('/api/insights/:workspaceId/queue', :15) and router.put(..., :27, resolve). No other /api/insights route exists anywhere (rg \"router.(get|post|...)('/api/insights\" server/ = only insights.ts:15). rg 'promote_to_signal|promoteToSignal' across src/ server/ shared/ = 0 hits; all 'promote' hits are unrelated (keyword-set/local-seo/briefing-cron). A 'promote to signal' POST with activity log + broadcast does not exist. Effort M is fair.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-cockpit-5",
+        "verdict": "CONFIRMED",
+        "evidence": "Upsell exists ONLY as client purchase flows, no admin pitch queue. shared/types/recommendations.ts:35 `productType?: string // for purchasable fix upsell` (+ productPrice) is a client purchase field on a rec. server/briefing-candidates.ts:210 comment confirms content-gap candidates 'drive the \"Recommended for You\" section and one of the highest-margin upsell flows … (per-brief content generation pricing)' — a client-facing flow, not an admin monetization queue. rg 'upsell|monetization|pitch|scope.expansion' server/ surfaces only client purchase/sales-report/pricing code; no per-client admin upsell-play queue. partial + effort M are accurate.",
+        "correction": ""
+      },
+      {
+        "needId": "sn-cockpit-6",
+        "verdict": "CONFIRMED",
+        "evidence": "GET /api/workspace-overview exists at server/routes/workspaces.ts:108 (surfaced via src/api/platform.ts workspaceOverview.list, '/api/workspace-overview'). Its per-workspace return object (workspaces.ts:247-296) already carries the raw signals needed: requests {total,new,active} (open-requests), churnSignals {critical,warning} (at-risk proxy), and hasGsc/hasGa4/hasPassword/tier/isTrial (in-setup proxies). No literal at-risk/in-setup FIELDS (rg 'atRisk|inSetup|lifecycleStatus' = 0), confirming 'not confirmed on it' — but the aggregation is the right place to derive them. 'Extend the existing all-workspace aggregation rather than a new endpoint' is correct; effort S is fair (derivation over existing per-ws map).",
+        "correction": ""
+      }
+    ]
+  }
+}

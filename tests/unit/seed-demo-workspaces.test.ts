@@ -1,8 +1,64 @@
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { assertDemoSeedEnvironmentSafe, DEMO_WORKSPACES } from '../../scripts/seed-demo-workspaces.ts';
+import {
+  assertDemoSeedEnvironmentSafe,
+  DEMO_WORKSPACES,
+  PROVIDER_RICH_DEMO_WORKSPACE,
+} from '../../scripts/seed-demo-workspaces.ts';
+import { LOCAL_PROVIDER_FIXTURE } from '../../server/providers/local-provider-fixtures.ts';
+import type { ClientActionSourceType } from '../../shared/types/client-actions.ts';
 
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
 const ORIGINAL_OVERRIDE = process.env.ALLOW_NON_LOCAL_DEMO_SEED;
+
+// R5-PR2 (B9) phantom-entry cleanup: scripts/seed-demo-workspaces.ts seeded a
+// client_actions row with source_type='content_post', which is NOT a member of
+// ClientActionSourceType (shared/types/client-actions.ts). server/client-actions.ts
+// silently coerces any out-of-union source_type to 'aeo_change' at read time, so the
+// bug was invisible at runtime — this is a static source-scan guard against
+// regressing it. See docs/rules/action-catalog.md "Historical / additive-only
+// vocabulary" section.
+const VALID_CLIENT_ACTION_SOURCE_TYPES: ClientActionSourceType[] = [
+  'aeo_change',
+  'internal_link',
+  'redirect_proposal',
+  'content_decay',
+  'cannibalization',
+];
+
+function readSeedScriptSource(): string {
+  const filePath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../scripts/seed-demo-workspaces.ts');
+  return readFileSync(filePath, 'utf-8');
+}
+
+describe('seed demo workspaces — client_actions.source_type is in-union', () => {
+  it('the seeded client_actions INSERT never uses an out-of-union source_type literal', () => {
+    const source = readSeedScriptSource();
+    const insertMatch = source.match(
+      /INSERT INTO client_actions[\s\S]*?\.run\(([\s\S]*?)\);/,
+    );
+    expect(insertMatch, 'client_actions INSERT block found in seed script').toBeTruthy();
+
+    const runArgsBlock = insertMatch![1];
+    // Positional args are (id, seed.id, source_type, source_id, ...). `seed.id` is not a
+    // string literal, so the source_type literal is the SECOND quoted string in the block
+    // (the first is the row id, e.g. 'client_action_demo_premium_1').
+    const stringLiterals = [...runArgsBlock.matchAll(/'([^']*)'/g)].map(m => m[1]);
+    const sourceTypeLiteral = stringLiterals[1];
+    expect(sourceTypeLiteral).toBeDefined();
+    expect(
+      VALID_CLIENT_ACTION_SOURCE_TYPES,
+      `seeded client_actions.source_type "${sourceTypeLiteral}" must be a member of ClientActionSourceType`,
+    ).toContain(sourceTypeLiteral);
+  });
+
+  it('never reintroduces the historical out-of-union "content_post" literal as a client_actions source_type', () => {
+    const source = readSeedScriptSource();
+    expect(source).not.toMatch(/'content_post',\s*\n\s*'post_demo_premium_1'/);
+  });
+});
 
 afterEach(() => {
   process.env.NODE_ENV = ORIGINAL_NODE_ENV;
@@ -57,5 +113,18 @@ describe('seed demo workspaces safety', () => {
     expect(broken?.gscPropertyUrl).toBeNull();
     expect(broken?.ga4PropertyId).toBeNull();
     expect(broken?.seoDataProvider).toBe('dataforseo');
+  });
+
+  it('defines a separate provider-rich fixture without changing canonical scenario parity', () => {
+    expect(PROVIDER_RICH_DEMO_WORKSPACE).toMatchObject({
+      id: LOCAL_PROVIDER_FIXTURE.workspaceId,
+      domain: LOCAL_PROVIDER_FIXTURE.domain,
+      webflowSiteId: LOCAL_PROVIDER_FIXTURE.siteId,
+      gscPropertyUrl: LOCAL_PROVIDER_FIXTURE.gscPropertyUrl,
+      ga4PropertyId: LOCAL_PROVIDER_FIXTURE.ga4PropertyId,
+      scenario: 'provider-rich',
+      tier: 'premium',
+    });
+    expect(DEMO_WORKSPACES.some((workspace) => workspace.id === LOCAL_PROVIDER_FIXTURE.workspaceId)).toBe(false);
   });
 });

@@ -3,12 +3,17 @@
  * Uses .passthrough() on all object schemas for forward compatibility.
  */
 import { z } from 'zod';
+import { KEYWORD_SEARCH_INTENTS } from '../../shared/types/keywords.js';
 import { METRICS_SOURCE } from '../../shared/types/keywords.js';
 import {
   EEAT_ASSET_TYPE,
   EEAT_RECOMMENDATION_SURFACE,
   TRUST_SIGNAL_SEVERITY,
 } from '../../shared/types/eeat-assets.js';
+import {
+  AUDIT_CATEGORY_SCORE_VERSION,
+  AUDIT_DISPLAY_CATEGORIES,
+} from '../../shared/types/seo-audit.js';
 
 // ── Event config ──
 
@@ -47,7 +52,7 @@ export const pageKeywordMapSchema = z.object({
   pageTitle: z.string(),
   primaryKeyword: z.string(),
   secondaryKeywords: z.array(z.string()),
-  searchIntent: z.string().optional(),
+  searchIntent: z.enum(KEYWORD_SEARCH_INTENTS).optional(),
   currentPosition: z.number().optional(),
   previousPosition: z.number().optional(),
   impressions: z.number().optional(),
@@ -331,13 +336,18 @@ export const intelligenceProfileSchema = z.object({
 
 export const competitorDomainsSchema = z.array(z.string());
 
-// ── Recommendation set (recommendation_sets table) ──
+// ── Recommendation item payload (recommendation_items.payload column) ──
+//
+// After the R7 blob→rows cutover, recommendationSchema validates each
+// recommendation_items.payload on read (itemRowToRecommendation → parseJsonSafe)
+// and recommendationSummarySchema validates recommendation_sets.summary. The
+// legacy recommendation_sets.recommendations blob is a retired '[]' archive
+// placeholder and is no longer read.
 
 // Mirrors the Recommendation interface in shared/types/recommendations.ts.
 // .passthrough() preserves any new fields added to the in-memory model that
-// aren't yet captured in the schema. parseJsonSafeArray validates each
-// recommendation individually so a single malformed row doesn't drop the
-// entire set.
+// aren't yet captured in the schema. Per-row payloads are validated one at a
+// time (parseJsonSafe), so a single malformed row doesn't drop the whole set.
 // Mirrors OpportunityScore / OpportunityComponent in
 // shared/types/recommendations.ts. Validated at the read boundary so a corrupt
 // opportunity blob is caught rather than silently passed through .passthrough().
@@ -470,11 +480,23 @@ const seoIssueSchema = z.object({
   check: z.string(),
   severity: z.enum(['error', 'warning', 'info']),
   category: z.string().optional(),
+  displayCategory: z.enum(AUDIT_DISPLAY_CATEGORIES).optional(),
   message: z.string().optional(),
   recommendation: z.string().optional(),
   value: z.string().optional(),
   suggestedFix: z.string().optional(),
   affectedPages: z.array(z.string()).optional(),
+}).passthrough();
+
+const auditCategoryScoreSchema = z.object({
+  category: z.enum(AUDIT_DISPLAY_CATEGORIES),
+  label: z.string(),
+  score: z.number(),
+  denominatorPages: z.number(),
+  affectedPages: z.number(),
+  errors: z.number(),
+  warnings: z.number(),
+  infos: z.number(),
 }).passthrough();
 
 const pageSeoResultSchema = z.object({
@@ -533,6 +555,8 @@ export const seoAuditResultSchema = z.object({
   infos: z.number().optional().default(0),
   pages: z.array(pageSeoResultSchema).catch([]),
   siteWideIssues: z.array(seoIssueSchema).catch([]),
+  categoryScoreVersion: z.literal(AUDIT_CATEGORY_SCORE_VERSION).optional(),
+  categoryScores: z.array(auditCategoryScoreSchema).optional().catch(undefined),
   cwvSummary: cwvSummarySchema.optional(),
   deadLinkSummary: z.object({
     total: z.number(),

@@ -44,12 +44,20 @@ function makeQueryClient() {
   });
 }
 
-function renderTab(workspaceId = 'ws-test', queryClient?: QueryClient) {
+function renderTab(
+  workspaceId = 'ws-test',
+  queryClient?: QueryClient,
+  options: { focusFirstExisting?: boolean; onClearFocus?: () => void } = {},
+) {
   const qc = queryClient ?? makeQueryClient();
   return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <BrandscriptTab workspaceId={workspaceId} />
+        <BrandscriptTab
+          workspaceId={workspaceId}
+          focusFirstExisting={options.focusFirstExisting}
+          onClearFocus={options.onClearFocus}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -167,6 +175,58 @@ describe('BrandscriptTab', () => {
 
     await screen.findByText('My StoryBrand Script');
     expect(screen.getByRole('button', { name: /delete brandscript/i })).toBeInTheDocument();
+  });
+
+  it('renders row selection and delete as separate sibling buttons', async () => {
+    mockBrandscriptsApi.list.mockResolvedValue([makeBrandscript()]);
+
+    const { container } = renderTab();
+
+    const name = await screen.findByText('My StoryBrand Script');
+    const selectButton = name.closest('button');
+    const deleteButton = screen.getByRole('button', { name: /delete brandscript/i });
+
+    expect(selectButton).not.toBeNull();
+    expect(selectButton).not.toContainElement(deleteButton);
+    expect(container.querySelector('button button')).toBeNull();
+
+    fireEvent.click(deleteButton);
+    expect(await screen.findByText('Delete Brandscript')).toBeInTheDocument();
+    expect(screen.queryByText('← All brandscripts')).not.toBeInTheDocument();
+  });
+
+  it('opens the first real Brandscript only when overview focus is requested', async () => {
+    mockBrandscriptsApi.list.mockResolvedValue([
+      makeBrandscript({ id: 'bs-current', name: 'Current StoryBrand' }),
+      makeBrandscript({ id: 'bs-older', name: 'Older StoryBrand' }),
+    ]);
+
+    const { unmount } = renderTab('ws-test', undefined, { focusFirstExisting: true });
+
+    expect(await screen.findByText('← All brandscripts')).toBeInTheDocument();
+    expect(screen.getByText('Current StoryBrand')).toBeInTheDocument();
+
+    unmount();
+    mockBrandscriptsApi.list.mockResolvedValue([makeBrandscript()]);
+    renderTab();
+
+    expect(await screen.findByText('My StoryBrand Script')).toBeInTheDocument();
+    expect(screen.queryByText('← All brandscripts')).not.toBeInTheDocument();
+  });
+
+  it('returns an overview-focused Brandscript to its library and clears focus', async () => {
+    const onClearFocus = vi.fn();
+    mockBrandscriptsApi.list.mockResolvedValue([makeBrandscript()]);
+
+    renderTab('ws-test', undefined, { focusFirstExisting: true, onClearFocus });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Back to all brandscripts' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('← All brandscripts')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('My StoryBrand Script')).toBeInTheDocument();
+    expect(onClearFocus).toHaveBeenCalledTimes(1);
   });
 
   // ── Create form ───────────────────────────────────────────────────────────
@@ -302,6 +362,21 @@ describe('BrandscriptTab', () => {
     fireEvent.click(screen.getByText('My StoryBrand Script'));
 
     await screen.findByText('Hero Message');
+  });
+
+  it('renders readable collapsed Markdown previews while preserving raw editor content', async () => {
+    const rawContent = '## **External Problem:** Corporate offices that feel profit-driven.';
+    const sections = [makeSection({ content: rawContent })];
+    mockBrandscriptsApi.list.mockResolvedValue([makeBrandscript({ sections })]);
+
+    renderTab();
+    fireEvent.click(await screen.findByText('My StoryBrand Script'));
+
+    expect(await screen.findByText('External Problem: Corporate offices that feel profit-driven.')).toBeInTheDocument();
+    expect(screen.queryByText(/##|\*\*/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Hero Message'));
+    expect(await screen.findByPlaceholderText('Enter section content...')).toHaveValue(rawContent);
   });
 
   it('detail view shows "No sections yet" when sections array is empty', async () => {

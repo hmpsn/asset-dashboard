@@ -21,7 +21,9 @@ import {
 } from '../../server/outcome-scoring-defaults.js';
 import type { ActionType, ScoringConfig } from '../../shared/types/outcome-tracking.js';
 
-// All action types defined in shared/types/outcome-tracking.ts
+// All action types defined in shared/types/outcome-tracking.ts. Kept in lockstep with the
+// real ActionType union — the DEFAULT_SCORING_CONFIG completeness assertions below are only
+// as strong as this list. Reconcile R8-PR1 (B13) added `gbp_review_reply` (ships dark).
 const ALL_ACTION_TYPES: ActionType[] = [
   'insight_acted_on',
   'content_published',
@@ -33,6 +35,14 @@ const ALL_ACTION_TYPES: ActionType[] = [
   'internal_link_added',
   'meta_updated',
   'voice_calibrated',
+  'competitor_gap_closed',
+  'cluster_published',
+  'cannibalization_resolved',
+  'local_visibility_won',
+  'local_service_added',
+  'topic_cluster_keep',
+  'content_gap_keep',
+  'gbp_review_reply',
 ];
 
 // ── DEFAULT_SCORING_CONFIG ─────────────────────────────────────────────────────

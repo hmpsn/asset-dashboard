@@ -24,6 +24,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   setupWebflowMocks,
+  mockWebflowError,
   mockWebflowSuccess,
   getCapturedRequests,
   resetWebflowMocks,
@@ -37,6 +38,7 @@ setupWebflowMocks();
 // Import server modules that make Webflow API calls
 import {
   listPages,
+  listPagesWithCompleteness,
   getPageDomNodes,
   getPageDom,
   updatePageSeo,
@@ -126,6 +128,62 @@ describe('Webflow ID Semantics — correct entity IDs in API URLs', () => {
       // Must NOT contain pageId or collectionId in the sites endpoint
       expect(req.endpoint).not.toContain(PAGE_ID);
       expect(req.endpoint).not.toContain(COLLECTION_ID);
+    });
+
+    it('listPages retrieves every page when a site has more than 100 pages', async () => {
+      const firstPage = Array.from({ length: 100 }, (_, index) => ({
+        id: `page-${index}`,
+        title: `Page ${index}`,
+        slug: `page-${index}`,
+      }));
+      mockWebflowSuccess(
+        `/sites/${SITE_ID}/pages?limit=100&offset=0`,
+        { pages: firstPage, pagination: { total: 101 } },
+      );
+      mockWebflowSuccess(
+        `/sites/${SITE_ID}/pages?limit=100&offset=100`,
+        {
+          pages: [{ id: 'page-100', title: 'Page 100', slug: 'page-100' }],
+          pagination: { total: 101 },
+        },
+      );
+
+      const pages = await listPages(SITE_ID, TOKEN);
+
+      expect(pages).toHaveLength(101);
+      expect(pages.at(-1)?.id).toBe('page-100');
+      expect(getCapturedRequests().map(request => request.endpoint)).toEqual([
+        `/sites/${SITE_ID}/pages?limit=100&offset=0`,
+        `/sites/${SITE_ID}/pages?limit=100&offset=100`,
+      ]);
+    });
+
+    it('reports an incomplete fresh page census when a later page cannot be read', async () => {
+      mockWebflowSuccess(
+        `/sites/${SITE_ID}/pages?limit=100&offset=0`,
+        {
+          pages: Array.from({ length: 100 }, (_, index) => ({
+            id: `page-${index}`,
+            title: `Page ${index}`,
+            slug: `page-${index}`,
+          })),
+          pagination: { total: 101 },
+        },
+      );
+      mockWebflowError(
+        `/sites/${SITE_ID}/pages?limit=100&offset=100`,
+        503,
+        'Webflow unavailable',
+      );
+
+      const census = await listPagesWithCompleteness(SITE_ID, TOKEN);
+
+      expect(census).toMatchObject({ complete: false });
+      expect(census.pages).toHaveLength(100);
+      expect(getCapturedRequests().map(request => request.endpoint)).toEqual([
+        `/sites/${SITE_ID}/pages?limit=100&offset=0`,
+        `/sites/${SITE_ID}/pages?limit=100&offset=100`,
+      ]);
     });
 
     it('getPageDomNodes uses pageId in /pages/{pageId}/dom', async () => {

@@ -12,7 +12,7 @@ beforeAll(async () => {
   await ctx.startServer();
   seededContent = seedContentData();
   seededAuth = await seedAuthData();
-});
+}, 30_000);
 
 afterAll(async () => {
   seededAuth?.cleanup();

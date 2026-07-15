@@ -51,6 +51,8 @@ export interface RecommendationFinalizationContext {
   effectiveBusinessPriorities: string[];
   outcomeLearnings: LearningsSlice | null;
   intelligence: WorkspaceIntelligence | null;
+  /** Frozen before the first commit attempt so a CAS retry refreshes lifecycle only. */
+  strategySignals: StrategySignal[];
   actionTypeForRecommendation: RecommendationActionTypeResolver;
 }
 
@@ -156,6 +158,37 @@ function mintSignalRecs(
   return minted;
 }
 
+export function captureRecommendationFinalizationSignals(ctx: {
+  workspaceId: string;
+  workspaceName: string;
+  workspaceBusinessContext?: string;
+  intelligence: WorkspaceIntelligence | null;
+}): StrategySignal[] {
+  if (!isFeatureEnabled('strategy-signal-fold', ctx.workspaceId)) return [];
+  try {
+    const keywordEvaluationContext = ctx.intelligence
+      ? buildStrategyKeywordEvaluationContext({
+          workspaceId: ctx.workspaceId,
+          workspaceName: ctx.workspaceName,
+          businessContext: ctx.workspaceBusinessContext,
+          seoContext: ctx.intelligence.seoContext,
+          clientSignals: ctx.intelligence.clientSignals,
+          declinedKeywords: [...new Set([
+            ...(ctx.intelligence.clientSignals?.keywordFeedback.rejected ?? []),
+            ...getDeclinedKeywords(ctx.workspaceId),
+          ])],
+          requestedKeywords: getRequestedKeywords(ctx.workspaceId),
+          approvedKeywords: ctx.intelligence.clientSignals?.keywordFeedback.approved ?? [],
+          strictBusinessFit: true,
+        })
+      : undefined;
+    return buildStrategySignals(getInsights(ctx.workspaceId), { keywordEvaluationContext });
+  } catch (err) {
+    log.warn({ err, workspaceId: ctx.workspaceId }, 'signal-fold: failed to capture recommendation signals — continuing without them');
+    return [];
+  }
+}
+
 export function finalizeRecommendations(
   recs: Recommendation[],
   ctx: RecommendationFinalizationContext,
@@ -167,13 +200,11 @@ export function finalizeRecommendations(
     existing,
     failedCategories,
     inFlightContentKeywords,
-    intelligence,
     now,
     outcomeLearnings,
     slugToPageId,
-    workspaceBusinessContext,
+    strategySignals,
     workspaceId,
-    workspaceName,
   } = ctx;
 
   let autoResolved = 0;
@@ -326,40 +357,9 @@ export function finalizeRecommendations(
   // sent/struck signal rec is respected and never re-minted. Flag-OFF: mints nothing → the
   // rec set is byte-identical. Reuses the exact read path the standalone card used
   // (getInsights → buildStrategySignals).
-  if (isFeatureEnabled('strategy-signal-fold', workspaceId)) {
-    try {
-      // Parity with the standalone IntelligenceSignals card (server/routes/keyword-strategy.ts):
-      // it threaded a keywordEvaluationContext into buildStrategySignals to suppress
-      // declined/business-misfit keywords. Reuse the SAME read path here so the mint never emits
-      // recs for keywords the card would have suppressed. The seoContext + clientSignals slices
-      // were already assembled into `recommendationContext` above (slices: [...'seoContext',
-      // 'clientSignals'...]) — no extra intelligence build. If that context was unavailable
-      // (build failed → null), fall back to the unfiltered feed (same fail-open direction the
-      // route uses in its catch).
-      const keywordEvaluationContext = intelligence
-        ? buildStrategyKeywordEvaluationContext({
-            workspaceId,
-            workspaceName,
-            businessContext: workspaceBusinessContext,
-            seoContext: intelligence.seoContext,
-            clientSignals: intelligence.clientSignals,
-            declinedKeywords: [...new Set([
-              ...(intelligence.clientSignals?.keywordFeedback.rejected ?? []),
-              ...getDeclinedKeywords(workspaceId),
-            ])],
-            requestedKeywords: getRequestedKeywords(workspaceId),
-            approvedKeywords: intelligence.clientSignals?.keywordFeedback.approved ?? [],
-            strictBusinessFit: true,
-          })
-        : undefined;
-      const signals = buildStrategySignals(getInsights(workspaceId), { keywordEvaluationContext });
-      const mintedSignalRecs = mintSignalRecs(signals, recs, { workspaceId, now, assignedTo });
-      if (mintedSignalRecs > 0) {
-        log.info({ workspaceId, mintedSignalRecs }, 'signal-fold: minted intelligence signals as recommendations');
-      }
-    } catch (err) { // non-fatal — a signal-fold failure must never block the rest of the rec set
-      log.warn({ err, workspaceId }, 'signal-fold: failed to mint signal recs — continuing without them');
-    }
+  if (strategySignals.length > 0) {
+    const mintedSignalRecs = mintSignalRecs(strategySignals, recs, { workspaceId, now, assignedTo });
+    log.info({ workspaceId, mintedSignalRecs }, 'signal-fold: minted intelligence signals as recommendations');
   }
 
   // ── Canonical OV scoring + one gain basis chokepoint. ──

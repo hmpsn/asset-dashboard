@@ -323,7 +323,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
 
     const res = await patchJson(
       `/api/copy/${workspaceId}/section/${section!.id}/status`,
-      { status: 'client_review' },
+      { status: 'client_review', expectedRevision: section!.generationRevision },
     );
     expect(res.status).toBe(200);
     const body = await res.json() as CopySection;
@@ -334,7 +334,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
   it('returns 404 for a nonexistent sectionId', async () => {
     const res = await patchJson(
       `/api/copy/${ws.workspaceId}/section/nonexistent-section-id/status`,
-      { status: 'draft' },
+      { status: 'draft', expectedRevision: 0 },
     );
     expect(res.status).toBe(404);
     const body = await res.json();
@@ -346,7 +346,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     // sections start at 'pending'; pending → approved is not a valid transition
     const res = await patchJson(
       `/api/copy/${workspaceId}/section/${sections[0].id}/status`,
-      { status: 'approved' },
+      { status: 'approved', expectedRevision: sections[0].generationRevision },
     );
     expect(res.status).toBe(404);
     const body = await res.json();
@@ -357,7 +357,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     const { workspaceId, sections } = seedEntry(ws.workspaceId);
     const res = await patchJson(
       `/api/copy/${workspaceId}/section/${sections[0].id}/status`,
-      {},
+      { expectedRevision: sections[0].generationRevision },
     );
     expect(res.status).toBe(400);
   });
@@ -366,7 +366,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     const { workspaceId, sections } = seedEntry(ws.workspaceId);
     const res = await patchJson(
       `/api/copy/${workspaceId}/section/${sections[0].id}/status`,
-      { status: 'not_a_real_status' },
+      { status: 'not_a_real_status', expectedRevision: sections[0].generationRevision },
     );
     expect(res.status).toBe(400);
   });
@@ -376,7 +376,10 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     const section = makeSectionDraft(sections[0].id, workspaceId);
 
     broadcastState.calls = [];
-    await patchJson(`/api/copy/${workspaceId}/section/${section!.id}/status`, { status: 'client_review' });
+    await patchJson(`/api/copy/${workspaceId}/section/${section!.id}/status`, {
+      status: 'client_review',
+      expectedRevision: section!.generationRevision,
+    });
 
     const broadcast = broadcastState.calls.find(c => c.event === WS_EVENTS.COPY_SECTION_UPDATED);
     expect(broadcast).toBeDefined();
@@ -391,7 +394,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
 
     const res = await patchJson(
       `/api/copy/${wsB.workspaceId}/section/${section!.id}/status`,
-      { status: 'client_review' },
+      { status: 'client_review', expectedRevision: section!.generationRevision },
     );
     expect(res.status).toBe(404);
     // Original section must remain unchanged
@@ -416,7 +419,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
 
     const res = await patchJson(
       `/api/copy/${workspaceId}/section/${section!.id}/text`,
-      { copy: 'Manually edited copy text.' },
+      { copy: 'Manually edited copy text.', expectedRevision: section!.generationRevision },
     );
     expect(res.status).toBe(200);
     const body = await res.json() as CopySection;
@@ -428,7 +431,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
   it('returns 404 for a nonexistent sectionId', async () => {
     const res = await patchJson(
       `/api/copy/${ws.workspaceId}/section/nonexistent-section-text/text`,
-      { copy: 'Some text.' },
+      { copy: 'Some text.', expectedRevision: 0 },
     );
     expect(res.status).toBe(404);
     const body = await res.json();
@@ -440,7 +443,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
     const section = makeSectionDraft(sections[0].id, workspaceId);
     const res = await patchJson(
       `/api/copy/${workspaceId}/section/${section!.id}/text`,
-      {},
+      { expectedRevision: section!.generationRevision },
     );
     expect(res.status).toBe(400);
   });
@@ -450,7 +453,10 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
     const section = makeSectionDraft(sections[0].id, workspaceId);
 
     broadcastState.calls = [];
-    await patchJson(`/api/copy/${workspaceId}/section/${section!.id}/text`, { copy: 'New text.' });
+    await patchJson(`/api/copy/${workspaceId}/section/${section!.id}/text`, {
+      copy: 'New text.',
+      expectedRevision: section!.generationRevision,
+    });
 
     const broadcast = broadcastState.calls.find(c => c.event === WS_EVENTS.COPY_SECTION_UPDATED);
     expect(broadcast).toBeDefined();
@@ -465,7 +471,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
 
     const res = await patchJson(
       `/api/copy/${wsB.workspaceId}/section/${section!.id}/text`,
-      { copy: 'Cross-workspace attack.' },
+      { copy: 'Cross-workspace attack.', expectedRevision: section!.generationRevision },
     );
     expect(res.status).toBe(404);
     // Verify original copy unchanged

@@ -19,10 +19,16 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 
+const mockInvalidateMonthlyDigestCache = vi.hoisted(() => vi.fn());
+
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn(),
+}));
+
+vi.mock('../../server/monthly-digest-cache.js', () => ({
+  invalidateMonthlyDigestCache: mockInvalidateMonthlyDigestCache,
 }));
 
 import { seedApprovalData } from '../fixtures/approval-seed.js';
@@ -175,11 +181,14 @@ describe('recalcBatchStatus — exhaustive item combinations', () => {
     resetToPending(workspaceId, batchId, [itemIds[1], itemIds[2]]);
     approveItems(workspaceId, batchId, [itemIds[1], itemIds[2]]);
     // Now all 3 items are approved; mark them all applied
+    mockInvalidateMonthlyDigestCache.mockClear();
     markBatchApplied(workspaceId, batchId, itemIds);
 
     const batch = getBatch(workspaceId, batchId)!;
     expect(batch.status).toBe('applied');
     expect(batch.items.length > 0 && batch.items.every(i => i.status === 'applied')).toBe(true);
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledOnce();
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(workspaceId);
   });
 
   // ── 9. [A, App, P] → partial ───────────────────────────────────────────

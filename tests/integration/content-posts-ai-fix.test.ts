@@ -21,6 +21,11 @@ setupOpenAIMocks();
 
 const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: unknown }>,
+  throwNext: false,
+}));
+
+const activityState = vi.hoisted(() => ({
+  throwNext: false,
 }));
 
 vi.mock('../../server/workspace-intelligence.js', () => ({
@@ -33,15 +38,39 @@ vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn((workspaceId: string, event: string, payload: unknown) => {
+    if (broadcastState.throwNext) {
+      broadcastState.throwNext = false;
+      throw new Error('Injected broadcast failure');
+    }
     broadcastState.calls.push({ workspaceId, event, payload });
   }),
 }));
 
+vi.mock('../../server/activity-log.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/activity-log.js')>();
+  return {
+    ...actual,
+    addActivity: (...args: Parameters<typeof actual.addActivity>) => {
+      if (activityState.throwNext) {
+        activityState.throwNext = false;
+        throw new Error('Injected activity failure');
+      }
+      return actual.addActivity(...args);
+    },
+  };
+});
+
 // ── Imports (after mock declarations) ─────────────────────────────────────────
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { getPost, savePost } from '../../server/content-posts-db.js';
+import { createClientUser, deleteClientUser, signClientToken } from '../../server/client-users.js';
+import {
+  getPost,
+  listPostVersions,
+  savePost,
+  updatePostField,
+} from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';
-import { listJobs, cancelJob } from '../../server/jobs.js';
+import { listJobs, cancelJob, updateJob } from '../../server/jobs.js';
 
 // ── Test server helpers ────────────────────────────────────────────────────────
 
@@ -49,6 +78,8 @@ let baseUrl = '';
 let stopServer: () => void;
 let wsId = '';
 let postId = '';
+let clientUserId = '';
+let clientToken = '';
 const originalAppPassword = process.env.APP_PASSWORD;
 
 async function startTestServer(): Promise<void> {
@@ -63,10 +94,14 @@ async function startTestServer(): Promise<void> {
 }
 
 async function postJson(path: string, body: unknown): Promise<Response> {
+  const match = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)\/(?:ai-fix|ai-review|score-voice)$/);
+  const requestBody = match && body && typeof body === 'object' && !('expectedRevision' in body)
+    ? { ...body, expectedRevision: getPost(match[1], match[2])?.generationRevision ?? 0 }
+    : body;
   return fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
 }
 
@@ -75,6 +110,7 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 // POSTs, then (when accepted) polls /api/jobs/:id until terminal and returns the job.
 interface JobRunResult {
   httpStatus: number;
+  jobId?: string;
   jobStatus?: 'done' | 'error' | 'cancelled';
   result?: Record<string, unknown>;
   jobError?: string;
@@ -92,12 +128,49 @@ async function runJob(path: string, body: unknown, timeoutMs = 10_000): Promise<
     if (jobRes.status === 200) {
       const job = (await jobRes.json()) as { status: string; result?: Record<string, unknown>; error?: string };
       if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') {
-        return { httpStatus: res.status, jobStatus: job.status as JobRunResult['jobStatus'], result: job.result, jobError: job.error };
+        return {
+          httpStatus: res.status,
+          jobId,
+          jobStatus: job.status as JobRunResult['jobStatus'],
+          result: job.result,
+          jobError: job.error,
+        };
       }
     }
     await new Promise(r => setTimeout(r, 30));
   }
   throw new Error(`Timed out waiting for job ${jobId}`);
+}
+
+function seedApplyTestPost(id: string) {
+  const now = new Date().toISOString();
+  savePost(wsId, {
+    id,
+    workspaceId: wsId,
+    briefId: 'brief_none',
+    targetKeyword: 'apply fix safety',
+    title: 'Apply Fix Safety',
+    metaDescription: 'Apply fix safety test post',
+    seoTitle: 'Apply Fix Safety',
+    seoMetaDescription: 'Apply fix safety test post description',
+    introduction: '<p>Original introduction for apply testing.</p>',
+    sections: [{
+      index: 0,
+      heading: 'Safety section',
+      content: '<p>Original section content.</p>',
+      wordCount: 3,
+      targetWordCount: 100,
+      keywords: [],
+      status: 'done',
+    }],
+    conclusion: '<p>Original conclusion.</p>',
+    totalWordCount: 11,
+    targetWordCount: 500,
+    status: 'draft',
+    createdAt: now,
+    updatedAt: now,
+  });
+  return getPost(wsId, id)!;
 }
 
 // ── Setup / teardown ──────────────────────────────────────────────────────────
@@ -107,6 +180,15 @@ beforeAll(async () => {
 
   const ws = createWorkspace('AI Fix Test Workspace');
   wsId = ws.id;
+  const clientUser = await createClientUser(
+    `ai-fix-${Date.now()}@test.local`,
+    'ClientPass1!',
+    'AI Fix Test Client',
+    wsId,
+    'client_member',
+  );
+  clientUserId = clientUser.id;
+  clientToken = signClientToken(clientUser);
   db.prepare(
     `INSERT OR IGNORE INTO content_briefs
        (id, workspace_id, target_keyword, secondary_keywords, suggested_title,
@@ -175,6 +257,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(wsId);
+  if (clientUserId) deleteClientUser(clientUserId, wsId);
   deleteWorkspace(wsId);
   stopServer?.();
   if (originalAppPassword === undefined) {
@@ -187,6 +270,8 @@ afterAll(() => {
 beforeEach(() => {
   resetOpenAIMocks();
   broadcastState.calls = [];
+  broadcastState.throwNext = false;
+  activityState.throwNext = false;
   // Defensive: clear any still-active job for the test workspace so the
   // workspace-scoped review/fix dedupe guard does not 409 the next op (W6.2).
   for (const job of listJobs(wsId)) {
@@ -240,6 +325,167 @@ describe('POST /api/content-posts/:wsId/:postId/ai-fix', () => {
     expect(after?.introduction).toBe(before?.introduction);
     expect(after?.updatedAt).toBe(before?.updatedAt);
     expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('applies the stored suggestion once and persists its worker provenance with that revision', async () => {
+    const applyPostId = `post_apply_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const before = seedApplyTestPost(applyPostId);
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Accepted AI repair.</p>');
+
+    const run = await runJob(`/api/content-posts/${wsId}/${applyPostId}/ai-fix`, {
+      issueKey: 'brand_voice',
+      reason: 'Make the introduction clearer',
+    });
+    expect(run.jobStatus).toBe('done');
+    expect(run.jobId).toEqual(expect.any(String));
+    const storedProvenance = run.result?.provenance;
+    expect(storedProvenance).toBeDefined();
+
+    const versionsBefore = listPostVersions(wsId, applyPostId).length;
+    const tampered = await postJson(`/api/content-posts/${wsId}/${applyPostId}/ai-fix/apply`, {
+      jobId: run.jobId,
+      suggestedText: '<p>Client-echoed replacement must not be accepted.</p>',
+      provenance: { runId: 'client-echo' },
+    });
+    expect(tampered.status).toBe(400);
+    expect(getPost(wsId, applyPostId)?.generationRevision).toBe(before.generationRevision);
+
+    const res = await postJson(`/api/content-posts/${wsId}/${applyPostId}/ai-fix/apply`, {
+      jobId: run.jobId,
+    });
+    expect(res.status).toBe(200);
+    const responsePost = await res.json() as NonNullable<ReturnType<typeof getPost>>;
+    const after = getPost(wsId, applyPostId)!;
+
+    expect(after.introduction).toBe('<p>Accepted AI repair.</p>');
+    expect(after.generationRevision).toBe(before.generationRevision + 1);
+    expect(responsePost.generationRevision).toBe(after.generationRevision);
+    expect(after.generationProvenance).toEqual(storedProvenance);
+    expect(after.generationProvenance).toMatchObject({
+      executionChainId: run.jobId,
+      operation: 'content-post-feedback-fix',
+    });
+    expect(listPostVersions(wsId, applyPostId)).toHaveLength(versionsBefore + 1);
+
+    const clientActivityRes = await fetch(`${baseUrl}/api/public/activity/${wsId}?limit=100`, {
+      headers: { Cookie: `client_user_token_${wsId}=${clientToken}` },
+    });
+    expect(clientActivityRes.status).toBe(200);
+    const clientActivities = await clientActivityRes.json() as Array<{
+      title: string;
+      description?: string;
+      metadata?: Record<string, unknown>;
+    }>;
+    const appliedActivity = clientActivities.find(activity => (
+      activity.metadata?.action === 'ai_fix_applied'
+      && activity.metadata?.postId === applyPostId
+    ));
+    expect(appliedActivity).toMatchObject({
+      description: 'An AI-assisted content edit was reviewed and applied.',
+      metadata: { postId: applyPostId, action: 'ai_fix_applied' },
+    });
+    expect(JSON.stringify(appliedActivity)).not.toContain('Make the introduction clearer');
+    expect(JSON.stringify(appliedActivity)).not.toContain(run.jobId!);
+  });
+
+  it('returns the accepted repair after post-commit activity and broadcast failures', async () => {
+    const applyPostId = `post_apply_effect_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const before = seedApplyTestPost(applyPostId);
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Repair survives fan-out failure.</p>');
+    const run = await runJob(`/api/content-posts/${wsId}/${applyPostId}/ai-fix`, {
+      issueKey: 'brand_voice',
+      reason: 'Improve clarity',
+    });
+    expect(run.jobStatus).toBe('done');
+    const versionsBefore = listPostVersions(wsId, applyPostId).length;
+    activityState.throwNext = true;
+    broadcastState.throwNext = true;
+
+    const res = await postJson(`/api/content-posts/${wsId}/${applyPostId}/ai-fix/apply`, {
+      jobId: run.jobId,
+    });
+    expect(res.status).toBe(200);
+    const responsePost = await res.json() as NonNullable<ReturnType<typeof getPost>>;
+    const after = getPost(wsId, applyPostId)!;
+    expect(responsePost.generationRevision).toBe(before.generationRevision + 1);
+    expect(after.generationRevision).toBe(before.generationRevision + 1);
+    expect(after.introduction).toBe('<p>Repair survives fan-out failure.</p>');
+    expect(after.generationProvenance).toEqual(run.result?.provenance);
+    expect(listPostVersions(wsId, applyPostId)).toHaveLength(versionsBefore + 1);
+  });
+
+  it('rejects a stored suggestion after a human edit without mutating the newer post', async () => {
+    const applyPostId = `post_apply_stale_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    seedApplyTestPost(applyPostId);
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Stale AI repair.</p>');
+
+    const run = await runJob(`/api/content-posts/${wsId}/${applyPostId}/ai-fix`, {
+      issueKey: 'brand_voice',
+      reason: 'Make the introduction clearer',
+    });
+    expect(run.jobStatus).toBe('done');
+    const sourceRevision = run.result?.sourceRevision as number;
+    const humanEdited = updatePostField(
+      wsId,
+      applyPostId,
+      { introduction: '<p>Newer human-authored introduction.</p>' },
+      sourceRevision,
+    )!;
+    const versionsBefore = listPostVersions(wsId, applyPostId).length;
+    broadcastState.calls = [];
+
+    const res = await postJson(`/api/content-posts/${wsId}/${applyPostId}/ai-fix/apply`, {
+      jobId: run.jobId,
+    });
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'generation_revision_conflict' });
+
+    const after = getPost(wsId, applyPostId)!;
+    expect(after.introduction).toBe('<p>Newer human-authored introduction.</p>');
+    expect(after.generationRevision).toBe(humanEdited.generationRevision);
+    expect(after.generationProvenance).toEqual(humanEdited.generationProvenance);
+    expect(listPostVersions(wsId, applyPostId)).toHaveLength(versionsBefore);
+    expect(broadcastState.calls).toHaveLength(0);
+  });
+
+  it('rejects script-only AI output before a suggestion becomes applyable', async () => {
+    const applyPostId = `post_apply_empty_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const before = seedApplyTestPost(applyPostId);
+    mockOpenAIResponse('content-post-feedback-fix', '<script>alert("unsafe")</script>');
+
+    const run = await runJob(`/api/content-posts/${wsId}/${applyPostId}/ai-fix`, {
+      issueKey: 'brand_voice',
+      reason: 'Improve clarity',
+    });
+    expect(run.jobStatus).toBe('error');
+    expect(run.jobError).toContain('empty content after sanitization');
+    expect(getPost(wsId, applyPostId)).toEqual(before);
+    expect(listPostVersions(wsId, applyPostId)).toHaveLength(0);
+  });
+
+  it('revalidates a corrupted stored suggestion and creates no repair revision or version', async () => {
+    const applyPostId = `post_apply_corrupt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const before = seedApplyTestPost(applyPostId);
+    mockOpenAIResponse('content-post-feedback-fix', '<p>Initially valid repair.</p>');
+    const run = await runJob(`/api/content-posts/${wsId}/${applyPostId}/ai-fix`, {
+      issueKey: 'brand_voice',
+      reason: 'Improve clarity',
+    });
+    expect(run.jobStatus).toBe('done');
+    updateJob(run.jobId!, {
+      result: {
+        ...run.result,
+        suggestedText: '<script>alert("stored corruption")</script>',
+      },
+    });
+
+    const res = await postJson(`/api/content-posts/${wsId}/${applyPostId}/ai-fix/apply`, {
+      jobId: run.jobId,
+    });
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'ai_fix_job_result_invalid' });
+    expect(getPost(wsId, applyPostId)).toEqual(before);
+    expect(listPostVersions(wsId, applyPostId)).toHaveLength(0);
   });
 
   it('word_count_target — returns AiFixResult targeting a section', async () => {

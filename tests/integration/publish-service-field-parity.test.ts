@@ -47,8 +47,17 @@ vi.mock('../../server/outcome-measurement.js', () => ({
 }));
 
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { savePost } from '../../server/content-posts-db.js';
+import { getPost, savePost, updatePostField } from '../../server/content-posts-db.js';
 import { upsertBrief } from '../../server/content-brief.js';
+import {
+  captureContentPublishAuthority,
+  publishPostToWebflow,
+} from '../../server/domains/content/publish-post-to-webflow.js';
+import { broadcastToWorkspace } from '../../server/broadcast.js';
+import { queueKeywordStrategyPostUpdateFollowOns } from '../../server/keyword-strategy-follow-ons.js';
+import { listActivity } from '../../server/activity-log.js';
+import { WS_EVENTS } from '../../server/ws-events.js';
+import * as webflowCms from '../../server/webflow-cms.js';
 import db from '../../server/db/index.js';
 import type { ContentBrief, GeneratedPost, PostSection } from '../../shared/types/content.js';
 
@@ -214,8 +223,12 @@ describe('publish field-map parity', () => {
     const briefId = `brief_parity_manual_${Date.now()}`;
     seedBrief(briefId);
     const post = seedPost(briefId, 'approved');
+    const sourceRevision = getPost(wsId, post.id)!.generationRevision;
 
-    const res = await postJson(`/api/content-posts/${wsId}/${post.id}/publish-to-webflow`, { generateImage: true });
+    const res = await postJson(`/api/content-posts/${wsId}/${post.id}/publish-to-webflow`, {
+      generateImage: true,
+      expectedRevision: sourceRevision,
+    });
     expect(res.status).toBe(200);
 
     const fieldData = capturedCreateFieldData();
@@ -235,8 +248,12 @@ describe('publish field-map parity', () => {
     const briefId = `brief_parity_auto_${Date.now()}`;
     seedBrief(briefId);
     const post = seedPost(briefId, 'review');
+    const sourceRevision = getPost(wsId, post.id)!.generationRevision;
 
-    const res = await patchJson(`/api/content-posts/${wsId}/${post.id}`, { status: 'approved' });
+    const res = await patchJson(`/api/content-posts/${wsId}/${post.id}`, {
+      status: 'approved',
+      expectedRevision: sourceRevision,
+    });
     expect(res.status).toBe(200);
 
     // Auto-publish runs as a background job — wait for the Webflow create to land.
@@ -251,5 +268,78 @@ describe('publish field-map parity', () => {
     expect(fieldData['seo-title']).toBe('Parity SEO Title');
     expect(fieldData['seo-description']).toBe('Parity SEO meta description.');
     expect(fieldData['published-on']).toBeTruthy();
+  });
+
+  it('preserves a concurrent local edit and reports reconciliation when Webflow goes live first', async () => {
+    configurePublishTarget();
+    const briefId = `brief_publish_conflict_${Date.now()}`;
+    seedBrief(briefId);
+    const seeded = seedPost(briefId, 'approved');
+    const source = getPost(wsId, seeded.id)!;
+    const publishSpy = vi.spyOn(webflowCms, 'publishCollectionItems').mockImplementationOnce(async () => {
+      updatePostField(
+        wsId,
+        seeded.id,
+        { title: 'Concurrent operator winner' },
+        source.generationRevision,
+      );
+      return { success: true };
+    });
+
+    try {
+      await expect(publishPostToWebflow(wsId, seeded.id, {
+        expectedRevision: source.generationRevision,
+        authority: captureContentPublishAuthority(wsId, source),
+      })).rejects.toMatchObject({
+        code: 'local_revision_conflict',
+        httpStatus: 409,
+      });
+    } finally {
+      publishSpy.mockRestore();
+    }
+
+    expect(getPost(wsId, seeded.id)).toMatchObject({
+      title: 'Concurrent operator winner',
+      webflowItemId: undefined,
+      publishedAt: undefined,
+    });
+  });
+
+  it('runs deferred publish effects once even when the runner is retried', async () => {
+    configurePublishTarget();
+    const briefId = `brief_deferred_effects_${Date.now()}`;
+    seedBrief(briefId);
+    const seeded = seedPost(briefId, 'approved');
+    const source = getPost(wsId, seeded.id)!;
+    vi.mocked(broadcastToWorkspace).mockClear();
+    vi.mocked(queueKeywordStrategyPostUpdateFollowOns).mockClear();
+
+    const committed = await publishPostToWebflow(wsId, seeded.id, {
+      expectedRevision: source.generationRevision,
+      authority: captureContentPublishAuthority(wsId, source),
+      deferPostCommitEffects: true,
+    });
+
+    expect(getPost(wsId, seeded.id)).toMatchObject({
+      webflowItemId: 'wf_parity_item',
+      publishedAt: expect.any(String),
+    });
+    expect(broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(listActivity(wsId).some(activity =>
+      activity.type === 'content_published'
+      && (activity.metadata as { postId?: string } | undefined)?.postId === seeded.id,
+    )).toBe(false);
+
+    committed.runPostCommitEffects();
+    committed.runPostCommitEffects();
+
+    expect(vi.mocked(broadcastToWorkspace).mock.calls.filter(
+      ([, event]) => event === WS_EVENTS.CONTENT_PUBLISHED,
+    )).toHaveLength(1);
+    expect(queueKeywordStrategyPostUpdateFollowOns).toHaveBeenCalledTimes(1);
+    expect(listActivity(wsId).filter(activity =>
+      activity.type === 'content_published'
+      && (activity.metadata as { postId?: string } | undefined)?.postId === seeded.id,
+    )).toHaveLength(1);
   });
 });

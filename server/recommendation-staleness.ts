@@ -1,17 +1,17 @@
 // server/recommendation-staleness.ts
 // Strategy v3 (spec §4.5, §8) — the self-managing nudge engine for SENT recs.
-// Flag-gated behind 'strategy-staleness-scan' (contract §10). Idempotent with NO
-// persisted nudge state and NO migration (contract §0): the nudge array is derived
-// fresh on every scan from clientStatus==='sent' + sentAt age; the admin-only
-// rec_nudge_stale activity is deduplicated via the activity log. Mirrors the
-// action_backlog_alert dedup pattern in outcome-crons.ts.
+// Runs unconditionally for every workspace (flag-sunset W2a — 'strategy-staleness-scan'
+// retired, was globally ON in prod). Idempotent with NO persisted nudge state and NO
+// migration (contract §0): the nudge array is derived fresh on every scan from
+// clientStatus==='sent' + sentAt age; the admin-only rec_nudge_stale activity is
+// deduplicated via the activity log. Mirrors the action_backlog_alert dedup pattern
+// in outcome-crons.ts.
 
 import type { Recommendation } from '../shared/types/recommendations.js';
 import { createLogger } from './logger.js';
 import { listWorkspaces } from './workspaces.js';
 import { loadRecommendations } from './recommendations.js';
 import { addActivity, countActivityByType, listActivityByType } from './activity-log.js';
-import { isFeatureEnabled } from './feature-flags.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { WS_EVENTS } from './ws-events.js';
 
@@ -136,7 +136,8 @@ function hasNudgeActivity(workspaceId: string, recId: string, nudgeKind: RecNudg
 }
 
 /**
- * The self-managing nudge pass (spec §8). Flag-gated behind 'strategy-staleness-scan'.
+ * The self-managing nudge pass (spec §8). Runs unconditionally for every workspace
+ * (flag-sunset W2a — 'strategy-staleness-scan' retired, was globally ON in prod).
  * For every workspace: derive its attention nudges via scanWorkspaceStaleness, and for each
  * NEW nudge (deduplicated on recId+nudgeKind within NUDGE_DEDUP_DAYS) write one admin-only
  * rec_nudge_stale activity and broadcast RECOMMENDATIONS_UPDATED so the cockpit's
@@ -147,8 +148,6 @@ export function runSentRecStalenessScan(now: number = Date.now()): StalenessScan
   let nudgesWritten = 0;
 
   for (const ws of listWorkspaces()) {
-    // Per-workspace flag check (multi-tenant rollout — staging-only until validated).
-    if (!isFeatureEnabled('strategy-staleness-scan', ws.id)) continue;
     workspacesScanned++;
 
     const set = loadRecommendations(ws.id);

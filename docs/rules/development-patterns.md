@@ -428,8 +428,19 @@ const gaps = stmts().selectByWorkspace.all(workspaceId).map(rowToKeywordGap);
 
 Status transitions on approval batches, content items, and outcome actions must go through `validateTransition()` in `server/state-machines.ts` before any DB write. This prevents impossible transitions (e.g. `applied → pending`) that corrupt workflows.
 
+The signature is **4-arg** and it **THROWS** — it does not return an error string:
+
 ```ts
-import { validateTransition } from '../state-machines.js';
+validateTransition<T extends string>(
+  entity: string,                                // label used only in the error message
+  transitions: Record<string, readonly string[]>, // the entity's *_TRANSITIONS map
+  from: T,                                        // current status
+  to: T,                                          // desired next status
+): T                                              // returns `to` on success; throws InvalidTransitionError otherwise
+```
+
+```ts
+import { APPROVAL_ITEM_TRANSITIONS, InvalidTransitionError, validateTransition } from '../state-machines.js';
 
 router.patch('/api/approvals/:workspaceId/:batchId/status',
   requireWorkspaceAccess('workspaceId'),
@@ -438,8 +449,13 @@ router.patch('/api/approvals/:workspaceId/:batchId/status',
     const batch = stmts().selectBatch.get(req.params.batchId);
     if (!batch) return res.status(404).json({ error: 'Not found' });
 
-    const error = validateTransition(batch.status, req.body.status);
-    if (error) return res.status(400).json({ error });
+    try {
+      // throws InvalidTransitionError if batch.status → req.body.status is illegal
+      validateTransition('approval_item', APPROVAL_ITEM_TRANSITIONS, batch.status, req.body.status);
+    } catch (err) {
+      if (err instanceof InvalidTransitionError) return res.status(400).json({ error: err.message });
+      throw err;
+    }
 
     stmts().updateStatus.run(req.body.status, req.params.batchId);
     res.json({ ok: true });
@@ -447,7 +463,7 @@ router.patch('/api/approvals/:workspaceId/:batchId/status',
 );
 ```
 
-`validateTransition` returns `null` on success or an error string on invalid transition. Always check before mutating.
+`validateTransition` returns the new status on success and throws `InvalidTransitionError` on an illegal move — wrap the call in `try/catch` (or let the shared error middleware map it) and never mutate before it passes. Every `*_TRANSITIONS` table is also wrapped by the shared lifecycle envelope (`LIFECYCLE_REGISTRY` in `shared/types/lifecycle.ts`); the census of which status unions are lifecycles vs. classifications lives in `docs/rules/lifecycle-state-machines.md`.
 
 ---
 

@@ -29,6 +29,7 @@ import { useClientAuth } from '../hooks/useClientAuth';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useClientSearch } from '../hooks/client/useClientSearch';
 import { useClientGA4 } from '../hooks/client/useClientGA4';
+import { useBrandSummary } from '../hooks/client/useBrandSummary';
 import {
   useClientActivity,
   useClientRankHistory,
@@ -131,6 +132,7 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
   const pricingQ = useClientPricing(workspaceId, dataEnabled);
   const contentPlanQ = useClientContentPlan(workspaceId, dataEnabled);
   const copyEntriesQ = useClientCopyEntries(workspaceId, dataEnabled);
+  const brandSummaryQ = useBrandSummary(workspaceId, dataEnabled);
 
   // ── Client IA v2 flag ──
   // Read unconditionally at the top level (Rules of Hooks). Drives the nav
@@ -374,8 +376,14 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     [WS_EVENTS.DELIVERABLE_SENT]: () => invalidateClientEvent(WS_EVENTS.DELIVERABLE_SENT),
     // ws-invalidation-ok — client dashboard keeps unified-inbox cache fresh even when the inbox tab is not mounted
     [WS_EVENTS.DELIVERABLE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.DELIVERABLE_UPDATED),
+    // ws-invalidation-ok — client dashboard keeps recommendation response state fresh when Local Presence is not mounted
+    [WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED]: () => invalidateClientEvent(WS_EVENTS.GBP_REVIEW_RESPONSES_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.COPY_SECTION_UPDATED]: () => invalidateClientEvent(WS_EVENTS.COPY_SECTION_UPDATED),
+    // ws-invalidation-ok — client dashboard keeps voice-backed intelligence fresh when Brand is not mounted
+    [WS_EVENTS.VOICE_PROFILE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.VOICE_PROFILE_UPDATED),
+    // ws-invalidation-ok — client dashboard keeps approved brand pieces fresh when Brand is not mounted
+    [WS_EVENTS.BRAND_IDENTITY_UPDATED]: () => invalidateClientEvent(WS_EVENTS.BRAND_IDENTITY_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.POST_UPDATED]: () => invalidateClientEvent(WS_EVENTS.POST_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
@@ -385,14 +393,16 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     // ws-invalidation-ok — client dashboard clears stale diagnostic loading/error-adjacent data after terminal failure
     [WS_EVENTS.DIAGNOSTIC_FAILED]: () => invalidateClientEvent(WS_EVENTS.DIAGNOSTIC_FAILED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
-    [WS_EVENTS.WORKSPACE_UPDATED]: () => {
-      getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(data => { if (data?.id) setWs(data); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
-      invalidateClientEvent(WS_EVENTS.WORKSPACE_UPDATED);
+    [WS_EVENTS.WORKSPACE_UPDATED]: (data: unknown) => {
+      getOptional<WorkspaceInfo>(`/api/public/workspace/${workspaceId}`).then(updatedWorkspace => { if (updatedWorkspace?.id) setWs(updatedWorkspace); }).catch((err) => { console.error('ClientDashboard operation failed:', err); });
+      invalidateClientEvent(WS_EVENTS.WORKSPACE_UPDATED, data);
     },
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.PAGE_STATE_UPDATED]: () => invalidateClientEvent(WS_EVENTS.PAGE_STATE_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.RECOMMENDATIONS_UPDATED]: () => invalidateClientEvent(WS_EVENTS.RECOMMENDATIONS_UPDATED),
+    // ws-invalidation-ok — client dashboard keeps curated recommendation discussions fresh across client sessions
+    [WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED]: () => invalidateClientEvent(WS_EVENTS.RECOMMENDATIONS_DISCUSSION_UPDATED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
     [WS_EVENTS.BRIEFING_PUBLISHED]: () => invalidateClientEvent(WS_EVENTS.BRIEFING_PUBLISHED),
     // ws-invalidation-ok — client dashboard owns client-side cache invalidation; admin hook is not mounted on /client routes
@@ -652,6 +662,10 @@ export function ClientDashboard({ workspaceId, betaMode = false, initialTab }: {
     <ErrorBoundary label="Brand">
       <BrandTab
         businessProfile={ws?.businessProfile ?? undefined}
+        brandSummary={brandSummaryQ.data}
+        brandSummaryLoading={brandSummaryQ.isLoading}
+        brandSummaryError={brandSummaryQ.isError}
+        onRetryBrandSummary={() => { void brandSummaryQ.refetch(); }}
         onSaveBusinessProfile={async (profile) => {
           const res = await patch<{ businessProfile: BusinessProfile }>(`/api/public/workspaces/${workspaceId}/business-profile`, profile);
           if (res?.businessProfile) {

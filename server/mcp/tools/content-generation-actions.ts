@@ -5,10 +5,14 @@ import {
 } from '../../../shared/types/mcp-action-schemas.js';
 import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.js';
 import { getBrief } from '../../content-brief.js';
-import { startContentBriefGenerationJob } from '../../content-brief-generation-job.js';
+import {
+  ContentRequestGenerationConflictError,
+  startContentBriefGenerationJob,
+} from '../../content-brief-generation-job.js';
 import { createContentPostGenerationJob, runContentPostGenerationJob } from '../../content-posts.js';
 import { getContentRequest } from '../../content-requests.js';
-import { hasActiveJob } from '../../jobs.js';
+import { ActiveJobResourceConflict } from '../../jobs.js';
+import { GenerationRevisionConflictError } from '../../generation-provenance.js';
 import { recordPaidCall } from '../paid-call-counter.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
@@ -23,6 +27,25 @@ import {
 } from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-content-generation-actions');
+
+function generationStartConflict(err: unknown): McpToolErrorResponse | null {
+  if (err instanceof ActiveJobResourceConflict) {
+    return mcpError(
+      `[${err.code}] A generation job is already active for this resource. active_job_id=${err.jobId}`,
+    );
+  }
+  if (err instanceof ContentRequestGenerationConflictError) {
+    return mcpError(
+      `[${err.code}] Content request ${err.requestId} changed. Re-read it before retrying.`,
+    );
+  }
+  if (err instanceof GenerationRevisionConflictError) {
+    return mcpError(
+      `[${err.code}] ${err.artifactType} ${err.artifactId} changed from expected revision ${err.expectedRevision}. Re-read it before retrying.`,
+    );
+  }
+  return null;
+}
 
 export const contentGenerationActionTools: Tool[] = [
   {
@@ -49,6 +72,7 @@ async function handleStartBriefGeneration(
     workspace_id: workspaceId,
     target_keyword: targetKeyword,
     request_id: requestId,
+    expected_request_updated_at: expectedRequestUpdatedAt,
     business_context: businessContext,
     page_type: pageType,
     reference_urls: referenceUrls,
@@ -64,11 +88,6 @@ async function handleStartBriefGeneration(
     return mcpError('Provide target_keyword (standalone brief) or request_id (request brief).');
   }
 
-  const activeBriefJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_GENERATION, workspaceId);
-  if (activeBriefJob) {
-    return mcpError(`Content brief generation is already running for this workspace (${activeBriefJob.id})`);
-  }
-
   let started: { jobId: string };
   try {
     if (requestId) {
@@ -81,6 +100,7 @@ async function handleStartBriefGeneration(
         source: 'request',
         workspaceId,
         requestId,
+        expectedRequestUpdatedAt,
         generationStyle,
       });
     } else {
@@ -95,6 +115,8 @@ async function handleStartBriefGeneration(
       });
     }
   } catch (err) {
+    const conflict = generationStartConflict(err);
+    if (conflict) return conflict;
     const message = err instanceof Error ? err.message : String(err);
     log.error({ err, workspaceId, targetKeyword, requestId }, 'start_brief_generation failed');
     return mcpError(`Failed to start brief generation: ${message}`);
@@ -121,6 +143,7 @@ async function handleStartPostGeneration(
   const {
     workspace_id: workspaceId,
     brief_id: briefId,
+    expected_brief_revision: expectedBriefRevision,
     generation_style: generationStyle,
   } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
@@ -129,11 +152,6 @@ async function handleStartPostGeneration(
   const brief = getBrief(workspaceId, briefId);
   if (!brief) return mcpError(`Brief not found: ${briefId}`);
 
-  const activePostJob = hasActiveJob(BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION, workspaceId);
-  if (activePostJob) {
-    return mcpError(`Content post generation is already running for this workspace (${activePostJob.id})`);
-  }
-
   // createContentPostGenerationJob persists the post skeleton, creates the job, and
   // broadcasts the start (POST_UPDATED + CONTENT_UPDATED) inside the shared service.
   // runContentPostGenerationJob runs the grounded section-by-section generation and owns
@@ -141,8 +159,15 @@ async function handleStartPostGeneration(
   // kicks it off and returns the job_id — it never writes the DB or broadcasts directly.
   let started;
   try {
-    started = createContentPostGenerationJob(workspaceId, brief, generationStyle);
+    started = createContentPostGenerationJob(
+      workspaceId,
+      brief,
+      generationStyle,
+      expectedBriefRevision,
+    );
   } catch (err) {
+    const conflict = generationStartConflict(err);
+    if (conflict) return conflict;
     const message = err instanceof Error ? err.message : String(err);
     log.error({ err, workspaceId, briefId }, 'start_post_generation failed');
     return mcpError(`Failed to start post generation: ${message}`);
@@ -152,6 +177,7 @@ async function handleStartPostGeneration(
     brief: started.brief,
     postId: started.postId,
     jobId: started.jobId,
+    expectedRevision: started.expectedRevision,
   });
 
   // Paid provider/AI work runs inside the job — count it (see start_brief_generation).

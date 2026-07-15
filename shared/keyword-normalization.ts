@@ -1,3 +1,5 @@
+import type { KeywordIdentity } from './types/keyword-identity.js';
+
 /**
  * Memoization cache for `normalizeKeywordForComparison`.
  *
@@ -15,6 +17,16 @@
  */
 const NORMALIZE_CACHE_MAX = 50_000;
 const normalizeCache = new Map<string, string>();
+const normalizeV2Cache = new Map<string, string>();
+
+function setBounded(cache: Map<string, string>, raw: string, normalized: string): string {
+  if (cache.size >= NORMALIZE_CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(raw, normalized);
+  return normalized;
+}
 
 /**
  * Canonical semantic keyword comparison for the keyword operating loop.
@@ -32,18 +44,65 @@ export function normalizeKeywordForComparison(keyword: string | null | undefined
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (normalizeCache.size >= NORMALIZE_CACHE_MAX) {
-    // FIFO eviction: drop the oldest insertion. Cheap and keeps memory bounded;
-    // exact eviction policy is irrelevant to correctness (the function is pure).
-    const oldest = normalizeCache.keys().next().value;
-    if (oldest !== undefined) normalizeCache.delete(oldest);
-  }
-  normalizeCache.set(raw, normalized);
-  return normalized;
+  return setBounded(normalizeCache, raw, normalized);
 }
 
 export function keywordComparisonKey(keyword: string | null | undefined): string {
   return normalizeKeywordForComparison(keyword);
+}
+
+/** Explicit persisted-identity name for the current ASCII comparison contract. */
+export function keywordIdentityKeyV1(keyword: string | null | undefined): string {
+  return normalizeKeywordForComparison(keyword);
+}
+
+/**
+ * Additive Unicode-safe comparison identity used only by K3 compatibility
+ * stores until K3c. Raw provider/display strings are never rewritten.
+ */
+export function keywordIdentityKeyV2(keyword: string | null | undefined): string {
+  const raw = keyword == null ? '' : String(keyword);
+  const cached = normalizeV2Cache.get(raw);
+  if (cached !== undefined) return cached;
+
+  const normalized = raw
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/(^|[^\p{L}\p{N}\p{M}])c\+\+(?![+#])/gu, '$1c plus plus ')
+    .replace(/(^|[^\p{L}\p{N}\p{M}])c#(?![+#])/gu, '$1c sharp ')
+    .replace(/(^|[^\p{L}\p{N}\p{M}])f#(?![+#])/gu, '$1f sharp ')
+    .replace(/(^|[^\p{L}\p{N}\p{M}])asp\.net(?![\p{L}\p{M}])/gu, '$1asp dot net ')
+    .replace(/(^|[^\p{L}\p{N}\p{M}])\.net(?![\p{L}\p{M}])/gu, '$1dot net ')
+    .replace(/(?<=[\p{L}\p{N}\p{M}])\s*&\s*(?=[\p{L}\p{N}\p{M}])/gu, ' and ')
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, ' ')
+    .replace(/ +/g, ' ')
+    .trim()
+    .split(' ')
+    .map(token => token.replace(/^\p{M}+/u, ''))
+    .filter(token => /[\p{L}\p{N}]/u.test(token))
+    .join(' ');
+
+  return setBounded(normalizeV2Cache, raw, normalized);
+}
+
+export function keywordIdentityKeys(keyword: string | null | undefined): KeywordIdentity {
+  const raw = keyword == null ? '' : String(keyword);
+  return {
+    raw,
+    v1: keywordIdentityKeyV1(raw),
+    v2: keywordIdentityKeyV2(raw),
+  };
+}
+
+/** V2-first lookup order with duplicate keys collapsed deterministically. */
+export function keywordIdentityLookupKeys(
+  keyword: string | null | undefined,
+): readonly string[] {
+  const { v1, v2 } = keywordIdentityKeys(keyword);
+  const keys: string[] = [];
+  if (v2) keys.push(v2);
+  if (v1 && v1 !== v2) keys.push(v1);
+  return keys;
 }
 
 const JUNK_MAX_CHARS = 150;

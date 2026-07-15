@@ -3,12 +3,17 @@
  * Handles creative writing with Claude/GPT, page-type-specific prompts,
  * unification passes, and SEO meta generation.
  */
-import { callAI } from './ai.js';
-import type { AIOperationId } from './ai-operation-registry.js';
+import { callAI, renderAIProviderInput, type AICallOptions, type AICallResult } from './ai.js';
+import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { isAnthropicConfigured } from './anthropic-helpers.js';
-import { buildSystemPrompt } from './prompt-assembly.js';
+import {
+  buildSystemPrompt,
+  buildSystemPromptFromAuthority,
+  type SystemPromptAuthority,
+} from './prompt-assembly.js';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import type { ContentBrief } from '../shared/types/content.js';
 import type { GeneratedPost } from '../shared/types/content.ts';
 import { createLogger } from './logger.js';
@@ -19,7 +24,16 @@ import {
   getPageTypeCopyContract,
   requiresPageTypeDensityReview,
 } from './page-type-copy-contract.js';
-import { buildSeoPromptContext } from './intelligence/generation-context-builders.js';
+import {
+  buildContentGenerationContextV2,
+  buildSeoPromptContext,
+} from './intelligence/generation-context-builders.js';
+import { isFeatureEnabled } from './feature-flags.js';
+import { countVisibleHtmlWords, visibleTextFromHtml } from '../shared/content-post-integrity.js';
+import {
+  fingerprintRenderedAIInput,
+  type AcceptedGenerationExecution,
+} from './generation-provenance.js';
 export { CREATIVE_WRITING_RULES, WRITING_QUALITY_RULES } from './writing-quality.js';
 
 const log = createLogger('content-posts-ai');
@@ -43,6 +57,13 @@ const unifyResponseSchema = z.object({
   sections: z.array(z.string()).optional(),
   conclusion: z.string().optional(),
 });
+
+export interface UnifiedPostCandidate {
+  introduction?: string;
+  sections?: string[];
+  conclusion?: string;
+  invalidReason?: 'section_census_mismatch';
+}
 
 const voiceScoringResponseSchema = z.object({
   voiceScore: z.number().finite(),
@@ -70,7 +91,7 @@ function stripCodeFence(text: string): string {
  * prompt-level instruction; both paths run the result through `stripCodeFence`
  * so callers can use `parseJsonFallback` / `JSON.parse` directly.
  */
-export async function callCreativeAI(opts: {
+export interface CreativeAICallOptions {
   operation?: AIOperationId;
   systemPrompt: string;
   userPrompt: string;
@@ -89,59 +110,167 @@ export async function callCreativeAI(opts: {
   researchMode?: boolean;
   /** Optional caller cancellation signal. */
   signal?: AbortSignal;
-}): Promise<string> {
+  /** Optional quality-tier fallback for complex cross-context creative work. */
+  openAIModel?: 'gpt-5.4' | 'gpt-5.5';
+  /** B2 sets zero so every paid dispatcher invocation is reserved explicitly. */
+  maxRetries?: number;
+  /** Bounded callers may disable the automatic Claude-to-OpenAI fallback. */
+  allowProviderFallback?: boolean;
+  /** Called before each Claude/OpenAI dispatch; throwing blocks that paid call. */
+  beforeProviderDispatch?: (dispatch: {
+    provider: 'anthropic' | 'openai';
+    fallback: boolean;
+  }) => void | Promise<void>;
+  /** Durable budget reservation hook invoked with the exact rendered provider input. */
+  beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void | Promise<void>;
+  /** Logical workflow/job correlation shared across composite content stages. */
+  executionChainId?: string;
+  /** Receives each successful provider result; callers retain it only if that output is adopted. */
+  onExecution?: (execution: AcceptedGenerationExecution) => void;
+}
+
+export interface BoundedProviderDispatch {
+  provider: 'anthropic' | 'openai';
+  fallback: boolean;
+  renderedInput: ReturnType<typeof renderAIProviderInput>;
+  maxOutputTokens: number;
+}
+
+export const CREATIVE_JSON_ONLY_INSTRUCTION = 'IMPORTANT: Return ONLY a single valid JSON object. No prose, no preamble, no markdown code fences. The response must start with { and end with }.';
+
+/**
+ * Provider-specific callAI input for the creative wrapper. Exported so strict
+ * provenance callers can fingerprint the same instruction shape this function
+ * actually dispatches without reimplementing its Claude/OpenAI adaptation.
+ */
+export function renderCreativeProviderCallInput(
+  input: Pick<CreativeAICallOptions, 'systemPrompt' | 'userPrompt' | 'json'>,
+  provider: 'anthropic' | 'openai',
+): Pick<AICallOptions, 'system' | 'messages'> {
+  const effectiveSystem = input.json === true
+    ? `${input.systemPrompt}\n\n${CREATIVE_JSON_ONLY_INSTRUCTION}`
+    : input.systemPrompt;
+  return provider === 'anthropic'
+    ? {
+        system: effectiveSystem,
+        messages: [{ role: 'user', content: input.userPrompt }],
+      }
+    : {
+        messages: [{ role: 'user', content: `${effectiveSystem}\n\n${input.userPrompt}` }],
+      };
+}
+
+/** Claude-preferred creative dispatch that preserves execution/token provenance. */
+export async function callCreativeAIWithMetadata(
+  opts: CreativeAICallOptions,
+): Promise<AICallResult> {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
   const temperature = opts.temperature ?? CLAUDE_TEMP;
   const json = opts.json === true;
   const featureLabel = feature ?? opts.operation ?? 'creative-ai';
-
-  // Claude has no structured JSON mode — lean on the system prompt instead.
-  const effectiveSystem = json
-    ? `${systemPrompt}\n\nIMPORTANT: Return ONLY a single valid JSON object. No prose, no preamble, no markdown code fences. The response must start with { and end with }.`
-    : systemPrompt;
+  const executionChainId = opts.executionChainId ?? randomUUID();
+  const researchMode = opts.researchMode
+    ?? (opts.operation ? getAIOperationRuntimeDefaults(opts.operation).defaultResearchMode : false);
+  let claudeAttemptFailed = false;
 
   if (isAnthropicConfigured()) {
+    const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'anthropic');
+    await opts.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
+    await opts.beforeBoundedProviderDispatch?.({
+      provider: 'anthropic',
+      fallback: false,
+      renderedInput: renderAIProviderInput({
+        provider: 'anthropic',
+        ...providerInput,
+        researchMode,
+      }),
+      maxOutputTokens: maxTokens,
+    });
+    let result: AICallResult | undefined;
     try {
-      const result = await callAI({
+      result = await callAI({
         operation: opts.operation,
         provider: 'anthropic',
         model: CLAUDE_MODEL,
-        system: effectiveSystem,
-        messages: [{ role: 'user', content: userPrompt }],
+        ...providerInput,
         maxTokens,
         temperature,
         feature,
         workspaceId,
-        maxRetries: 3,      // patient retries — quality over speed
+        maxRetries: opts.maxRetries,
         timeoutMs: 90_000,
-        researchMode: opts.researchMode,
+        researchMode,
         signal: opts.signal,
+        executionChainId,
+      });
+    } catch (err) {
+      if (opts.signal?.aborted) throw err;
+      if (opts.allowProviderFallback === false) throw err;
+      claudeAttemptFailed = true;
+      log.info(`[${featureLabel}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
+    }
+    if (result) {
+      opts.onExecution?.({
+        execution: result.execution,
+        inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+          provider: 'anthropic',
+          ...providerInput,
+          researchMode,
+        })),
       });
       log.info(`[${featureLabel}] Generated with Claude`);
       const text = result.text.trim();
-      return json ? stripCodeFence(text) : text;
-    } catch (err) {
-      if (opts.signal?.aborted) throw err;
-      log.info(`[${featureLabel}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
+      return { ...result, text: json ? stripCodeFence(text) : text };
     }
   }
 
   // Fallback to GPT (or primary if no Anthropic key)
+  await opts.beforeProviderDispatch?.({
+    provider: 'openai',
+    fallback: claudeAttemptFailed,
+  });
+  const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'openai');
+  await opts.beforeBoundedProviderDispatch?.({
+    provider: 'openai',
+    fallback: claudeAttemptFailed,
+    renderedInput: renderAIProviderInput({
+      provider: 'openai',
+      ...providerInput,
+      researchMode,
+    }),
+    maxOutputTokens: maxTokens,
+  });
   const result = await callAI({
     operation: opts.operation,
-    model: CONTENT_MODEL,
-    messages: [{ role: 'user', content: `${effectiveSystem}\n\n${userPrompt}` }],
+    provider: 'openai',
+    model: opts.openAIModel ?? CONTENT_MODEL,
+    ...providerInput,
     maxTokens,
     temperature,
     feature,
     workspaceId,
-    researchMode: opts.researchMode,
+    maxRetries: opts.maxRetries,
+    researchMode,
     signal: opts.signal,
+    executionChainId,
+    ...(claudeAttemptFailed ? { fallbackUsed: true } : {}),
     ...(json ? { responseFormat: { type: 'json_object' as const } } : {}),
+  });
+  opts.onExecution?.({
+    execution: result.execution,
+    inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+      provider: 'openai',
+      ...providerInput,
+      researchMode,
+    })),
   });
   log.info(`[${featureLabel}] Generated with GPT`);
   const text = result.text.trim();
-  return json ? stripCodeFence(text) : text;
+  return { ...result, text: json ? stripCodeFence(text) : text };
+}
+
+export async function callCreativeAI(opts: CreativeAICallOptions): Promise<string> {
+  return (await callCreativeAIWithMetadata(opts)).text;
 }
 
 export async function buildVoiceContext(workspaceId: string): Promise<string> {
@@ -163,8 +292,26 @@ const PAGE_TYPE_WRITER_ROLE: Record<string, string> = {
   resource: 'You are an educational content writer creating actionable guides and resources that establish thought leadership.',
 };
 
-interface ContentAIGenerationOptions {
+export interface ContentAIGenerationOptions {
   signal?: AbortSignal;
+  executionChainId?: string;
+  maxRetries?: number;
+  allowProviderFallback?: boolean;
+  beforeBoundedProviderDispatch?: CreativeAICallOptions['beforeBoundedProviderDispatch'];
+  onExecution?: (execution: AcceptedGenerationExecution) => void;
+  /** Captured once by content-generation-context-v2 and reused across every stage. */
+  promptAuthority?: SystemPromptAuthority;
+}
+
+function buildContentSystemPrompt(
+  workspaceId: string,
+  baseInstructions: string,
+  options: ContentAIGenerationOptions,
+  opts?: { skipProseRules?: boolean },
+): string {
+  return options.promptAuthority
+    ? buildSystemPromptFromAuthority(baseInstructions, options.promptAuthority, opts)
+    : buildSystemPrompt(workspaceId, baseInstructions, undefined, opts);
 }
 
 const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
@@ -297,7 +444,11 @@ export function buildBriefContextBlock(brief: ContentBrief, siteDomain?: string)
   }
 
   if (brief.internalLinkSuggestions?.length) {
-    const domain = siteDomain ? `https://${siteDomain}` : '';
+    const normalizedDomain = siteDomain
+      ?.trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/^\/+|\/+$/g, '');
+    const domain = normalizedDomain ? `https://${normalizedDomain}` : '';
     const linkLines = brief.internalLinkSuggestions.map(l => {
       const slug = l.startsWith('/') ? l : `/${l}`;
       return domain ? `- ${domain}${slug}` : `- ${slug}`;
@@ -374,13 +525,14 @@ ${CREATIVE_WRITING_RULES}
 Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = buildSystemPrompt(
+  const systemPrompt = buildContentSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the introduction field requested by the user prompt. No markdown.`,
-    undefined,
+    options,
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-introduction',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: 600,
@@ -388,6 +540,11 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -474,13 +631,14 @@ ${CREATIVE_WRITING_RULES}
 Return ONLY the section content in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = buildSystemPrompt(
+  const systemPrompt = buildContentSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the section field requested by the user prompt. No markdown.`,
-    undefined,
+    options,
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-section',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: Math.max(800, sectionTarget * 2),
@@ -488,6 +646,11 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -542,13 +705,14 @@ ${CREATIVE_WRITING_RULES}
 Return ONLY the closing section in clean HTML (starting with <h2>). No labels, no meta-commentary, no markdown.`;
 
   // Split role (system) from the writing instructions (user)
-  const systemPrompt = buildSystemPrompt(
+  const systemPrompt = buildContentSystemPrompt(
     workspaceId,
     `${role} Return only clean HTML for the conclusion field requested by the user prompt. No markdown.`,
-    undefined,
+    options,
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-conclusion',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: 800,
@@ -556,6 +720,11 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -565,7 +734,7 @@ export function countWords(text: string): number {
 
 /** Strip HTML tags for plain-text extraction */
 export function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return visibleTextFromHtml(html);
 }
 
 /**
@@ -574,7 +743,7 @@ export function stripHtml(html: string): string {
  * `countWords()` would miscount because it treats `<p>Hello</p>` as 4 words.
  */
 export function countHtmlWords(html: string): number {
-  return countWords(stripHtml(html));
+  return countVisibleHtmlWords(html);
 }
 
 /**
@@ -622,21 +791,47 @@ Return valid JSON only:
 }`;
 
   try {
-    const systemPrompt = buildSystemPrompt(
+    const systemPrompt = buildContentSystemPrompt(
       workspaceId,
       'You are an expert SEO copywriter. Return only valid JSON with seoTitle and seoMetaDescription.',
+      options,
     );
+    const messages = [{ role: 'user' as const, content: prompt }];
+    await options.beforeBoundedProviderDispatch?.({
+      provider: 'openai',
+      fallback: false,
+      renderedInput: renderAIProviderInput({
+        provider: 'openai',
+        system: systemPrompt,
+        messages,
+        researchMode: false,
+      }),
+      maxOutputTokens: 200,
+    });
     const result = await callAI({
       operation: 'content-post-seo-meta',
       system: systemPrompt,
-      messages: [{ role: 'user', content: prompt }],
+      messages,
       maxTokens: 200,
       temperature: 0.5,
       workspaceId,
+      maxRetries: options.maxRetries,
       signal: options.signal,
+      executionChainId: options.executionChainId,
     });
     const parsed = parseStructuredAIOutput(result.text, seoMetaResponseSchema, 'content-post-seo-meta');
-    if (parsed.seoTitle && parsed.seoMetaDescription) return parsed;
+    if (parsed.seoTitle && parsed.seoMetaDescription) {
+      options.onExecution?.({
+        execution: result.execution,
+        inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+          provider: result.execution.provider,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: prompt }],
+          researchMode: false,
+        })),
+      });
+      return parsed;
+    }
     return null;
   } catch (err) {
     log.warn({ err: err }, 'SEO meta generation failed');
@@ -655,7 +850,7 @@ export async function unifyPost(
   voiceCtx: string,
   workspaceId: string,
   options: ContentAIGenerationOptions = {},
-): Promise<{ introduction?: string; sections?: string[]; conclusion?: string } | null> {
+): Promise<UnifiedPostCandidate | null> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const targetTotal = brief.wordCountTarget || 1800;
@@ -745,10 +940,10 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
 
   const rawResult = await callCreativeAI({
     operation: 'content-post-unify',
-    systemPrompt: buildSystemPrompt(
+    systemPrompt: buildContentSystemPrompt(
       workspaceId,
       'You are a senior editor performing a cohesion and word-count review. Return only valid JSON.',
-      undefined,
+      options,
       { skipProseRules: true },
     ),
     userPrompt: prompt,
@@ -759,14 +954,21 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     json: true,
     researchMode: true,
     signal: options.signal,
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 
   try {
     const parsed = parseStructuredAIOutput(rawResult, unifyResponseSchema, 'content-post-unify');
-    // Validate sections count matches
+    // Preserve the invalid candidate signal so the caller can reject the whole
+    // unification result atomically. Never hide a wrong-size sections array by
+    // converting it to an omitted field.
     if (parsed.sections && parsed.sections.length !== post.sections.length) {
-      log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — skipping section updates`);
-      parsed.sections = undefined;
+      log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — rejecting candidate`);
+      return { ...parsed, invalidReason: 'section_census_mismatch' };
     }
     return parsed;
   } catch (err) {
@@ -786,8 +988,19 @@ export async function scoreVoiceMatch(
   post: GeneratedPost,
   brief: ContentBrief,
   workspaceId: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<{ voiceScore: number | null; voiceFeedback: string }> {
-  const voiceCtx = await buildVoiceContext(workspaceId);
+  const contextV2 = isFeatureEnabled('content-generation-context-v2', workspaceId)
+    ? await buildContentGenerationContextV2(workspaceId, {
+        targetKeyword: brief.targetKeyword,
+        sourceEvidence: brief.sourceEvidence,
+        providerMetricsObservedAt: brief.keywordValidation?.validatedAt ?? null,
+      })
+    : null;
+  const voiceCtx = contextV2?.projections.voiceReview ?? await buildVoiceContext(workspaceId);
+  const promptOptions = contextV2
+    ? { ...options, promptAuthority: contextV2.authority }
+    : options;
 
   // Build a text summary of the post content for analysis
   const allContent = [
@@ -828,18 +1041,35 @@ Return ONLY valid JSON in this exact format:
   "voiceFeedback": "<2-4 sentences: specific callouts about voice match, including both positives and areas for improvement>"
 }`;
 
-  const systemPrompt = buildSystemPrompt(
+  const systemPrompt = buildContentSystemPrompt(
     workspaceId,
     'You are a brand voice analyst. Return only valid JSON with voiceScore and voiceFeedback.',
+    promptOptions,
   );
+
+  const messages = [{ role: 'user' as const, content: prompt }];
+  await options.beforeBoundedProviderDispatch?.({
+    provider: 'openai',
+    fallback: false,
+    renderedInput: renderAIProviderInput({
+      provider: 'openai',
+      system: systemPrompt,
+      messages,
+      researchMode: false,
+    }),
+    maxOutputTokens: 500,
+  });
 
   const result = await callAI({
     operation: 'voice-scoring',
     system: systemPrompt,
-    messages: [{ role: 'user', content: prompt }],
+    messages,
     maxTokens: 500,
     temperature: 0.3,
     workspaceId,
+    maxRetries: options.maxRetries,
+    executionChainId: options.executionChainId,
+    signal: options.signal,
   });
 
   try {
@@ -848,6 +1078,15 @@ Return ONLY valid JSON in this exact format:
     const feedback = typeof parsed.voiceFeedback === 'string' && parsed.voiceFeedback.trim()
       ? parsed.voiceFeedback
       : 'No feedback provided.';
+    options.onExecution?.({
+      execution: result.execution,
+      inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+        provider: result.execution.provider,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+        researchMode: false,
+      })),
+    });
     log.info(`Voice score for post ${post.id}: ${score}/100`);
     return { voiceScore: score, voiceFeedback: feedback };
   } catch (err) {

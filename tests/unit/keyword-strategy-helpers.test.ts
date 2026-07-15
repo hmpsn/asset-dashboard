@@ -6,6 +6,25 @@ import {
   upsertKeywordPoolCandidate,
 } from '../../server/keyword-strategy-helpers.js';
 
+describe('keyword pool field evidence', () => {
+  it('normalizes invalid CPC and intent while preserving field-level provenance', () => {
+    const pool = new Map();
+    upsertKeywordPoolCandidate(pool, 'dentist', {
+      volume: 20, difficulty: 10, source: 'related', cpc: Number.POSITIVE_INFINITY,
+      intent: 'invalid' as never,
+    });
+    expect(pool.get('dentist')).toEqual(expect.objectContaining({ cpc: undefined, intent: undefined }));
+    upsertKeywordPoolCandidate(pool, 'dentist', {
+      volume: 10, difficulty: 20, source: 'discovery:keyword_ideas', cpc: 8.5,
+      intent: 'transactional',
+    });
+    expect(pool.get('dentist')).toEqual(expect.objectContaining({
+      source: 'discovery:keyword_ideas', cpc: 8.5, cpcSource: 'discovery:keyword_ideas',
+      intent: 'transactional', intentSource: 'discovery:keyword_ideas',
+    }));
+  });
+});
+
 describe('computeOpportunityScore', () => {
   it('returns undefined when volume is 0 and no other signals', () => {
     expect(computeOpportunityScore({ volume: 0 })).toBeUndefined();
@@ -81,6 +100,64 @@ describe('content gap sort order', () => {
 });
 
 describe('keyword pool source quality', () => {
+  it('merges optional CPC and intent evidence without erasing stronger source provenance', () => {
+    const pool = new Map<string, { volume: number; difficulty: number; source: string; cpc?: number; intent?: string }>();
+
+    upsertKeywordPoolCandidate(pool, 'cosmetic dentistry', {
+      volume: 1200,
+      difficulty: 36,
+      source: 'gap:example.com',
+    });
+    upsertKeywordPoolCandidate(pool, 'Cosmetic Dentistry', {
+      volume: 900,
+      difficulty: 38,
+      source: 'discovery:keyword_ideas',
+      cpc: 8.5,
+      cpcSource: 'discovery:keyword_ideas',
+      intent: 'commercial',
+      intentSource: 'discovery:keyword_ideas',
+    });
+
+    expect(pool.get('cosmetic dentistry')).toEqual({
+      volume: 1200,
+      difficulty: 36,
+      source: 'gap:example.com',
+      cpc: 8.5,
+      cpcSource: 'discovery:keyword_ideas',
+      intent: 'commercial',
+      intentSource: 'discovery:keyword_ideas',
+    });
+  });
+
+  it('preserves optional evidence in either source insertion order', () => {
+    const pool = new Map<string, import('../../server/keyword-strategy-helpers.js').KeywordPoolCandidate>();
+
+    upsertKeywordPoolCandidate(pool, 'dental implants', {
+      volume: 600,
+      difficulty: 31,
+      source: 'discovery:keyword_ideas',
+      cpc: 9,
+      cpcSource: 'discovery:keyword_ideas',
+      intent: 'transactional',
+      intentSource: 'discovery:keyword_ideas',
+    });
+    upsertKeywordPoolCandidate(pool, 'Dental Implants', {
+      volume: 1800,
+      difficulty: 42,
+      source: 'gap:competitor.com',
+    });
+
+    expect(pool.get('dental implants')).toEqual({
+      volume: 1800,
+      difficulty: 42,
+      source: 'gap:competitor.com',
+      cpc: 9,
+      cpcSource: 'discovery:keyword_ideas',
+      intent: 'transactional',
+      intentSource: 'discovery:keyword_ideas',
+    });
+  });
+
   it('upgrades a GSC-only candidate with stronger provider evidence', () => {
     const pool = new Map<string, { volume: number; difficulty: number; source: string }>();
 

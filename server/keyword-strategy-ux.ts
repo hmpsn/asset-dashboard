@@ -3,7 +3,7 @@ import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { strategyHistoryStrategySchema, strategyHistoryPageMapSchema, type StrategyHistoryStrategy } from './schemas/workspace-schemas.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { createLogger } from './logger.js';
-import { getDeclinedKeywords, getRequestedKeywords } from './keyword-feedback.js';
+import { getDeclinedKeywords, getRequestedKeywords, readKeywordFeedbackIndex } from './keyword-feedback.js';
 import { buildStrategyKeywordEvaluationContext } from './keyword-strategy-context.js';
 import { evaluateKeywordCandidate, normalizeKeyword } from './keyword-intelligence/rules.js';
 import { getTrackedKeywords } from './rank-tracking.js';
@@ -49,18 +49,10 @@ const RAW_EVIDENCE_NOTE = 'Raw provider evidence is useful context, but it is fi
 const EMPTY_STRATEGY_HISTORY: StrategyHistoryStrategy = {};
 
 const stmts = createStmtCache(() => ({
-  feedback: db.prepare<[workspaceId: string]>(
-    'SELECT keyword, status FROM keyword_feedback WHERE workspace_id = ?',
-  ),
   latestHistory: db.prepare<[workspaceId: string]>(
     'SELECT strategy_json, page_map_json, generated_at FROM strategy_history WHERE workspace_id = ? ORDER BY generated_at DESC LIMIT 1',
   ),
 }));
-
-interface FeedbackRow {
-  keyword: string;
-  status: 'approved' | 'declined' | 'requested' | string;
-}
 
 interface StrategyHistoryRow {
   strategy_json: string;
@@ -98,19 +90,6 @@ interface BuildSummaryOptions {
   currentPageMap?: Array<{ pagePath: string; primaryKeyword: string }>;
   trackedKeywords?: TrackedKeyword[];
   skipped?: number;
-}
-
-function feedbackMap(workspaceId: string): Map<string, KeywordStrategyExplanation['feedbackStatus']> {
-  const rows = stmts().feedback.all(workspaceId) as FeedbackRow[];
-  const map = new Map<string, KeywordStrategyExplanation['feedbackStatus']>();
-  for (const row of rows) {
-    const normalized = normalizeKeyword(row.keyword);
-    if (!normalized) continue;
-    if (row.status === 'approved' || row.status === 'declined' || row.status === 'requested') {
-      map.set(normalized, row.status);
-    }
-  }
-  return map;
 }
 
 function trackingMap(trackedKeywords: TrackedKeyword[]): Map<string, TrackedKeyword> {
@@ -369,7 +348,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
   const surface = options.surface ?? 'admin';
   const trackedKeywords = options.trackedKeywords ?? getTrackedKeywords(options.workspaceId, { includeInactive: true });
   const trackedByKeyword = trackingMap(trackedKeywords);
-  const feedbackByKeyword = feedbackMap(options.workspaceId);
+  const feedbackByKeyword = readKeywordFeedbackIndex(options.workspaceId);
   const explanations = new Map<string, KeywordStrategyExplanation>();
   let evaluationContext = buildStrategyKeywordEvaluationContext({
     workspaceId: options.workspaceId,
@@ -474,7 +453,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
         tracked ? 'Rank tracking connected' : null,
       ]),
       tracked,
-      feedbackStatus: feedbackByKeyword.get(normalized),
+      feedbackStatus: feedbackByKeyword.get(keyword)?.status,
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
       valueReasons: computeValueReasons(keyword, { volume: metric?.volume, difficulty: metric?.difficulty }),
@@ -500,7 +479,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
         page.difficulty != null ? `Difficulty ${page.difficulty}` : null,
       ]),
       tracked,
-      feedbackStatus: feedbackByKeyword.get(normalized),
+      feedbackStatus: feedbackByKeyword.get(keyword)?.status,
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
       // Page-keyword cpc is admin/scoring-internal only, same as content gaps (#1103):
@@ -535,7 +514,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
         gap.difficulty != null ? `Difficulty ${gap.difficulty}` : null,
       ]),
       tracked,
-      feedbackStatus: feedbackByKeyword.get(normalized),
+      feedbackStatus: feedbackByKeyword.get(keyword)?.status,
       businessReasons: result.reasons.map(reason => reason.message),
       fitSignals: result.fitSignals,
       // Content-gap cpc is admin/scoring-internal only (#1103): score stays
@@ -566,7 +545,7 @@ export async function buildKeywordStrategyUxPayload(options: BuildKeywordStrateg
           gap.difficulty != null ? `Difficulty ${gap.difficulty}` : null,
         ]),
         tracked: trackedByKeyword.get(normalized),
-        feedbackStatus: feedbackByKeyword.get(normalized),
+        feedbackStatus: feedbackByKeyword.get(gap.keyword)?.status,
         businessReasons: result.reasons.map(reason => reason.message),
         fitSignals: result.fitSignals,
         rawEvidenceOnly: true,

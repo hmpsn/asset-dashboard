@@ -105,8 +105,6 @@ export const WS_EVENTS = {
   DELIVERABLE_SENT: 'deliverable:sent',
   DELIVERABLE_UPDATED: 'deliverable:updated',
 
-  // Meeting Brief
-  MEETING_BRIEF_GENERATED: 'meeting-brief:generated',
 
   // The Issue — strategy POV (Lane B). Broadcast on generate/regenerate and on every operator
   // edit (PATCH bumps the version) so the cockpit's useStrategyPov handler invalidates its cache.
@@ -185,6 +183,13 @@ export const WS_EVENTS = {
 } as const;
 
 export type WsEventName = typeof WS_EVENTS[keyof typeof WS_EVENTS];
+
+/**
+ * BRAND_IDENTITY_UPDATED is shared with client subscribers and is invalidation-only.
+ * Brand deliverable ids, versions, statuses, and draft types stay behind authenticated
+ * read boundaries; every producer must emit this canonical empty payload.
+ */
+export const BRAND_IDENTITY_UPDATED_PAYLOAD: Readonly<Record<string, never>> = Object.freeze({});
 
 // --- Admin-global events (broadcast to all admin connections) ---
 

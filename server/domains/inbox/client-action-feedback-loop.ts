@@ -49,6 +49,12 @@ const ensureLifecycleTrackedActionTx = db.transaction((params: {
       notes: `Lifecycle action recorded from client action ${params.actionStatus}: ${params.actionTitle}`,
       relatedActions: [params.sourceId],
     },
+    // R6 (B11): the client action's title IS its display identity — snapshot it so the
+    // win title stays real even if the client action is later archived. Guarded on a
+    // non-empty title (FM-2).
+    ...(params.actionTitle?.trim()
+      ? { source: { label: params.actionTitle.trim(), snapshot: { title: params.actionTitle.trim(), type: 'client_action', page: params.pageUrl ?? undefined } } }
+      : {}),
   });
 });
 

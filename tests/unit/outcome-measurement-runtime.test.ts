@@ -229,6 +229,21 @@ describe('outcome measurement runtime paths', () => {
     expect(h.updateActionContext).not.toHaveBeenCalled();
   });
 
+  it('broadcasts only opaque scoring invalidations for client-hidden actions', async () => {
+    h.getPendingActions.mockReturnValue([
+      makeAction({ actionType: 'voice_calibrated' }),
+    ]);
+
+    const result = await measurePendingOutcomes(undefined, new Map([['ws-1', 1]]));
+
+    expect(result.errors).toBe(0);
+    expect(result.measured).toBe(2);
+    expect(h.broadcastToWorkspace).toHaveBeenCalledTimes(2);
+    for (const call of h.broadcastToWorkspace.mock.calls) {
+      expect(call).toEqual(['ws-1', 'outcome_scored', {}]);
+    }
+  });
+
   it('records insufficient_data when search-metric impressions are below minimum', async () => {
     h.getPendingActions.mockReturnValue([
       makeAction({

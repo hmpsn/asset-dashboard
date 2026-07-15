@@ -12,6 +12,8 @@ import type { SiteInventorySlice } from './site-inventory.js';
 import type { EntityResolutionSlice } from './entity-resolution.js';
 import type { EeatAsset, EeatAssetType } from './eeat-assets.js';
 import type { StoredGenerationQuality } from './generation-quality.js';
+import type { BrandVoiceReadinessState } from './brand-generation.js';
+import type { BriefSourceEvidence } from './content.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -134,6 +136,50 @@ export interface WorkspaceIntelligence {
   generationQuality?: GenerationQualitySlice;
   /** Unified brand voice (authority-resolved block) + approved identity. Read-only; non-formattable; assembled on request. */
   brand?: BrandSlice;
+}
+
+// ── Content generation context v2 ──────────────────────────────────────
+
+export type ContentGenerationContextV2Stage = 'brief' | 'draft' | 'voiceReview';
+export type ContentGenerationEvidenceKind = 'keyword_metrics' | 'serp' | 'references' | 'style_examples';
+
+export interface ContentGenerationPromptAuthority {
+  systemVoiceBlock: string;
+  userVoiceBlock: string;
+  identityPromptBlock: string;
+  customNotes: string | null;
+  voice: BrandSlice['voice'];
+}
+
+export interface ContentGenerationContextV2Options {
+  targetKeyword: string;
+  pagePath?: string;
+  /** Explicit matrix targets disable keyword-only page-map matching. */
+  allowKeywordTargetMatch?: boolean;
+  sourceEvidence?: BriefSourceEvidence;
+  /** A real provider observation timestamp. Null/omitted means metrics are unavailable. */
+  providerMetricsObservedAt?: string | null;
+  /** Matrix generation may supply its already-frozen voice/identity through this input. */
+  authority?: ContentGenerationPromptAuthority;
+  budgets?: Partial<Record<ContentGenerationContextV2Stage, number>>;
+  includeLocalSeo?: boolean;
+}
+
+export interface ContentGenerationContextV2Result {
+  intelligence: WorkspaceIntelligence;
+  slices: readonly IntelligenceSlice[];
+  authority: ContentGenerationPromptAuthority;
+  projections: Record<ContentGenerationContextV2Stage, string>;
+  tokenEstimates: Record<ContentGenerationContextV2Stage, number>;
+  evidence: {
+    capturedAt: string;
+    freshThrough: string;
+    observedAt: readonly string[];
+    missing: readonly ContentGenerationEvidenceKind[];
+  };
+  matchedPagePath?: string;
+  learningsAvailability: LearningsSlice['availability'] | 'degraded';
+  effectiveInputFingerprint: string;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────
@@ -336,7 +382,19 @@ export interface LearningsSlice {
     primary_metric: string;
     thresholds: { strong_win: number; win: number; neutral_band: number };
   }>>;
+  /**
+   * Audience-safe projection for public/client consumers. It is recomputed from
+   * catalog-visible actions using the canonical learnings math; internal/admin
+   * fields above remain unchanged. Missing means an older/custom assembler did
+   * not provide a projection and public consumers must fail closed.
+   */
+  clientProjection?: ClientSafeLearningsProjection | null;
 }
+
+export type ClientSafeLearningsProjection = Omit<
+  LearningsSlice,
+  'clientProjection' | 'platformPriors' | 'forPage'
+>;
 
 export interface PageProfileSlice {
   pagePath: string;
@@ -708,8 +766,18 @@ export interface BrandSlice {
     elevatorPitch?: string;
     positioning?: string;
   };
-  /** Voice metadata. P1: status only (structured tone/guardrails deferred to a later phase). */
-  voice: { status: 'calibrated' | 'legacy' | 'none' };
+  /**
+   * Voice metadata. `status` preserves the legacy prompt-compatibility signal; only
+   * `readiness === 'finalized'` proves that the current revision has an immutable,
+   * operator-approved authority snapshot. `unavailable` means the readiness read
+   * failed and must never be interpreted as finalized.
+   */
+  voice: {
+    status: 'calibrated' | 'legacy' | 'none';
+    readiness: BrandVoiceReadinessState | 'unavailable';
+    profileRevision: number | null;
+    voiceVersion: number | null;
+  };
   /** Authority-resolved voice block — inject directly; never re-derive from structured fields.
    *  INVARIANT: byte-identical to `SeoContextSlice.effectiveBrandVoiceBlock` (both sourced from
    *  `buildEffectiveBrandVoiceBlock(workspaceId)`). The duplication across two slices is

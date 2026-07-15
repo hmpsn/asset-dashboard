@@ -5,21 +5,16 @@
  *   - rowToBrandscript mapping (re-implemented from private fn)
  *   - rowToSection mapping (re-implemented from private fn)
  *   - rowToTemplate mapping (re-implemented from private fn)
- *   - extractKbField parsing (re-implemented from private fn)
- *   - prefillFromQuestionnaire section-building logic (via mocks)
  *   - createTemplate round-trip
  *   - completeBrandscript section-draft matching logic (re-implemented)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Mocks — hoisted before any imports that touch the mocked modules
 // ---------------------------------------------------------------------------
 
-const mockGetWorkspace = vi.hoisted(() => vi.fn());
-const mockListBrandscripts = vi.hoisted(() => vi.fn(() => []));
-const mockCreateBrandscript = vi.hoisted(() => vi.fn());
 const mockStmts = vi.hoisted(() => ({
   listByWorkspace: { all: vi.fn(() => []) },
   getById: { get: vi.fn(() => undefined) },
@@ -47,10 +42,6 @@ vi.mock('../../server/db/index.js', () => ({
     })),
     transaction: vi.fn((fn: () => unknown) => fn),
   },
-}));
-
-vi.mock('../../server/workspaces.js', () => ({
-  getWorkspace: mockGetWorkspace,
 }));
 
 vi.mock('../../server/ai.js', () => ({
@@ -153,16 +144,6 @@ function rowToTemplate(row: TemplateRow): BrandscriptTemplate {
     sections,
     createdAt: row.created_at,
   };
-}
-
-/**
- * Mirror of the private `extractKbField` in brandscript.ts
- */
-function extractKbField(kb: string, label: string): string | undefined {
-  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`^${escapedLabel}:\\s*(.+?)(?=\\n[A-Z][\\w\\s/]+:|\\n\\n|$)`, 'ms');
-  const m = kb.match(pattern);
-  return m?.[1]?.trim() || undefined;
 }
 
 /**
@@ -320,61 +301,6 @@ describe('rowToTemplate (re-implemented from private fn)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractKbField
-// ---------------------------------------------------------------------------
-
-describe('extractKbField (re-implemented from private fn)', () => {
-  const kb = `About: We build custom software for small businesses
-Key Services/Products: Web development, SEO, Content marketing
-Industry: Technology
-Differentiators: Fast delivery and transparent pricing
-
-Competitor Strengths: Large agencies have more resources`;
-
-  it('extracts a simple single-line field', () => {
-    const result = extractKbField(kb, 'Industry');
-    expect(result).toBe('Technology');
-  });
-
-  it('extracts multi-word label correctly', () => {
-    const result = extractKbField(kb, 'Key Services/Products');
-    expect(result).toBe('Web development, SEO, Content marketing');
-  });
-
-  it('returns undefined for missing label', () => {
-    const result = extractKbField(kb, 'NonExistentField');
-    expect(result).toBeUndefined();
-  });
-
-  it('trims whitespace from extracted value', () => {
-    const kb2 = 'About:   Leading agency   ';
-    const result = extractKbField(kb2, 'About');
-    expect(result).toBe('Leading agency');
-  });
-
-  it('escapes regex metacharacters in label (Key Services/Products)', () => {
-    // The "/" in "Key Services/Products" must be escaped or treated safely
-    const result = extractKbField(kb, 'Key Services/Products');
-    expect(result).toBeDefined();
-    expect(result).not.toBeUndefined();
-  });
-
-  it('returns undefined for empty knowledge base', () => {
-    expect(extractKbField('', 'About')).toBeUndefined();
-  });
-
-  it('handles multi-line values ending at double newline', () => {
-    const kb3 = `About: We are a company
-that builds great products
-
-Other: stuff`;
-    const result = extractKbField(kb3, 'About');
-    // Should capture the first line content
-    expect(result).toBeDefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
 // matchDraftedSection (completeBrandscript section merging logic)
 // ---------------------------------------------------------------------------
 
@@ -447,104 +373,5 @@ describe('matchDraftedSection (completeBrandscript section-draft merge)', () => 
     expect(result[0].id).toBe('bss_guide');
     expect(result[0].sortOrder).toBe(2);
     expect(result[0].createdAt).toBe('2026-01-01T00:00:00.000Z');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// prefillFromQuestionnaire section structure
-// ---------------------------------------------------------------------------
-
-describe('prefillFromQuestionnaire section structure', () => {
-  it('builds 8 sections for StoryBrand framework', () => {
-    // Mirror the sections array construction in prefillFromQuestionnaire
-    const sections: { title: string; purpose: string; content?: string }[] = [
-      { title: 'Character', purpose: 'Who is the hero? Define your customer and what they want.' },
-      { title: 'Problem', purpose: 'What challenges does the hero face? External, internal, and philosophical problems.' },
-      { title: 'Guide', purpose: 'Position your brand as the guide with empathy and authority.' },
-      { title: 'Plan', purpose: 'Give the hero a clear plan to engage with you.' },
-      { title: 'Call to Action', purpose: 'What direct and transitional actions should the hero take?' },
-      { title: 'Failure', purpose: 'What negative consequences does the hero avoid by working with you?' },
-      { title: 'Success', purpose: 'What does transformation look like for the hero?' },
-      { title: 'Unique Value Proposition', purpose: 'What makes your brand different from the competition?' },
-    ];
-    expect(sections).toHaveLength(8);
-    const titles = sections.map(s => s.title);
-    expect(titles).toContain('Character');
-    expect(titles).toContain('Problem');
-    expect(titles).toContain('Guide');
-    expect(titles).toContain('Plan');
-    expect(titles).toContain('Call to Action');
-    expect(titles).toContain('Failure');
-    expect(titles).toContain('Success');
-    expect(titles).toContain('Unique Value Proposition');
-  });
-
-  it('builds audience content from target audience and personas', () => {
-    const targetAudience = 'Small business owners';
-    const personas = [
-      {
-        name: 'Sarah',
-        description: 'A bakery owner',
-        painPoints: ['No time for marketing'],
-        goals: ['Grow online presence'],
-        objections: ['Too expensive'],
-      },
-    ];
-    const audienceParts: string[] = [];
-    if (targetAudience) audienceParts.push(targetAudience);
-    for (const p of personas) {
-      const parts: string[] = [];
-      if (p.description) parts.push(p.description);
-      if (p.painPoints.length) parts.push(`Pain points: ${p.painPoints.join('; ')}`);
-      if (p.goals.length) parts.push(`Goals: ${p.goals.join('; ')}`);
-      if (p.objections.length) parts.push(`Objections: ${p.objections.join('; ')}`);
-      if (parts.length) audienceParts.push(`${p.name}: ${parts.join('. ')}`);
-    }
-    const audienceContent = audienceParts.join('\n\n');
-    expect(audienceContent).toContain('Small business owners');
-    expect(audienceContent).toContain('Sarah');
-    expect(audienceContent).toContain('Pain points: No time for marketing');
-  });
-
-  it('builds problem content from persona pain points', () => {
-    const personas = [
-      { painPoints: ['Slow website', 'Poor SEO ranking'] },
-      { painPoints: ['No time', 'No budget'] },
-    ];
-    const painPoints = personas.flatMap(p => p.painPoints).filter(Boolean);
-    const problemContent = painPoints.length > 0
-      ? `Key challenges your audience faces:\n${painPoints.map(pp => `- ${pp}`).join('\n')}`
-      : undefined;
-    expect(problemContent).toContain('Slow website');
-    expect(problemContent).toContain('Poor SEO ranking');
-    expect(problemContent).toContain('Key challenges your audience faces:');
-  });
-
-  it('returns undefined for problem content when no pain points', () => {
-    const personas: { painPoints: string[] }[] = [];
-    const painPoints = personas.flatMap(p => p.painPoints).filter(Boolean);
-    const problemContent = painPoints.length > 0 ? 'some content' : undefined;
-    expect(problemContent).toBeUndefined();
-  });
-
-  it('builds success content from persona goals', () => {
-    const personas = [
-      { goals: ['Get 100 leads per month', 'Rank #1 on Google'] },
-    ];
-    const allGoals = personas.flatMap(p => p.goals).filter(Boolean);
-    const successContent = allGoals.length > 0
-      ? `When your audience succeeds:\n${allGoals.map(g => `- ${g}`).join('\n')}`
-      : undefined;
-    expect(successContent).toContain('Get 100 leads per month');
-    expect(successContent).toContain('Rank #1 on Google');
-  });
-
-  it('builds failure content from competitor strengths', () => {
-    const competitorStrengths = 'Bigger teams and established track records';
-    const failureContent = competitorStrengths
-      ? `Without the right partner, your audience may settle for competitors who: ${competitorStrengths}`
-      : undefined;
-    expect(failureContent).toContain('Bigger teams');
-    expect(failureContent).toContain('Without the right partner');
   });
 });

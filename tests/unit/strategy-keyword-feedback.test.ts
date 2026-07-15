@@ -8,7 +8,7 @@
  * keyword text, so this suite verifies both halves of that contract.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { render, renderHook, screen, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
@@ -22,6 +22,7 @@ vi.mock('../../src/api', () => ({
 
 import { keywordFeedback as kwFeedbackApi } from '../../src/api';
 import { useStrategyKeywordFeedback } from '../../src/components/client/strategy/useStrategyKeywordFeedback';
+import { StrategyDeclinedKeywordsSection } from '../../src/components/client/strategy/StrategyDeclinedKeywordsSection';
 
 const mockedApi = vi.mocked(kwFeedbackApi);
 
@@ -241,7 +242,7 @@ describe('useStrategyKeywordFeedback — removeFeedback', () => {
     await act(async () => {
       await result.current.removeFeedback('FOO');
     });
-    expect(mockedApi.remove).toHaveBeenCalledWith('ws-1', 'foo');
+    expect(mockedApi.remove).toHaveBeenCalledWith('ws-1', 'FOO');
     expect(result.current.getFeedbackStatus('foo')).toBeUndefined();
     expect(result.current.getFeedbackStatus('bar')).toBe('approved');
     expect(setToast).toHaveBeenCalledWith(expect.stringContaining('restored'));
@@ -320,6 +321,52 @@ describe('useStrategyKeywordFeedback — derived selectors', () => {
     await waitFor(() => expect(result.current.keywordFeedback.size).toBe(1));
     expect(result.current.getFeedbackStatus('  PIZZA Delivery  ')).toBe('approved');
     expect(result.current.getFeedbackStatus('not-tracked')).toBeUndefined();
+  });
+
+  it('keeps v1-colliding Unicode-safe identities distinct and preserves requested display text', async () => {
+    mockedApi.get.mockResolvedValueOnce([
+      { keyword: 'C', status: 'declined' },
+      { keyword: 'C#', status: 'requested' },
+      { keyword: '東京', status: 'approved' },
+    ]);
+    const { result } = renderHook(
+      () => useStrategyKeywordFeedback({ workspaceId: 'ws-1' }),
+      { wrapper: createWrapper() },
+    );
+    await waitFor(() => expect(result.current.keywordFeedback.size).toBe(3));
+    expect(result.current.getFeedbackStatus('c')).toBe('declined');
+    expect(result.current.getFeedbackStatus('Ｃ＃')).toBe('requested');
+    expect(result.current.getFeedbackStatus('東京')).toBe('approved');
+    expect(result.current.requestedKeywords).toEqual(['C#']);
+  });
+
+  it('renders and restores declined punctuation-sensitive keywords with their retained raw values', async () => {
+    mockedApi.get.mockResolvedValueOnce([
+      { keyword: 'C#', status: 'declined' },
+      { keyword: 'C++', status: 'declined' },
+    ]);
+    mockedApi.remove.mockResolvedValueOnce({ deleted: 'C#' });
+
+    function DeclinedKeywordHarness() {
+      const feedback = useStrategyKeywordFeedback({ workspaceId: 'ws-1' });
+      return React.createElement(StrategyDeclinedKeywordsSection, {
+        declinedKeywords: feedback.declinedKeywords,
+        expandedSections: new Set(['declined-keywords']),
+        toggleSection: vi.fn(),
+        undoFeedback: feedback.undoFeedback,
+        isLoadingFeedback: feedback.isLoadingFeedback,
+      });
+    }
+
+    render(React.createElement(DeclinedKeywordHarness), { wrapper: createWrapper() });
+
+    expect(await screen.findByText('C#')).toBeInTheDocument();
+    expect(screen.getByText('C++')).toBeInTheDocument();
+    expect(screen.queryByText('c sharp')).not.toBeInTheDocument();
+    expect(screen.queryByText('c plus plus')).not.toBeInTheDocument();
+
+    screen.getAllByRole('button', { name: 'Restore' })[0].click();
+    await waitFor(() => expect(mockedApi.remove).toHaveBeenCalledWith('ws-1', 'C#'));
   });
 
   it('exposes undoFeedback as an alias of removeFeedback', () => {

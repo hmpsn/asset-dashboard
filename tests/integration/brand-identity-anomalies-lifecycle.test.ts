@@ -304,8 +304,7 @@ describe('PATCH /api/brand-identity/:workspaceId/:id — content update', () => 
       c => c.workspaceId === wsA && c.event === 'brand-identity:updated',
     );
     expect(relevant.length).toBeGreaterThanOrEqual(1);
-    const payload = relevant[0].payload as { deliverableId: string };
-    expect(payload.deliverableId).toBe(id);
+    expect(relevant[0].payload).toEqual({});
   });
 });
 

@@ -6,9 +6,11 @@ import {
   baselineSnapshotSchema,
   trailingHistorySchema,
   actionContextSchema,
+  trackedActionSourceSnapshotSchema,
   deltaSummarySchema,
   competitorContextSchema,
   earlySignalEnum,
+  outcomeCoverageProvenanceEnum,
   playbookStepSchema,
   playbookOutcomeSchema,
   workspaceLearningsDataSchema,
@@ -24,6 +26,7 @@ import type {
   DeltaSummary,
   PlaybookOutcome,
   EarlySignal,
+  OutcomeCoverageProvenance,
 } from '../../shared/types/outcome-tracking.js';
 
 // --- Row interfaces (snake_case from DB) ---
@@ -47,6 +50,10 @@ export interface TrackedActionRow {
   // P4: OV predictedEmv snapshot (CPC-proxy placeholder, nullable). NULL when no
   // opportunity was available at record time (e.g. outcome-backfill).
   predicted_emv: number | null;
+  // R6 (B11): source-identity snapshot columns (nullable). source_label is the flat
+  // denormalized title; source_snapshot is the { title?, type?, page? } JSON blob.
+  source_label: string | null;
+  source_snapshot: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +70,10 @@ export interface ActionOutcomeRow {
   measured_at: string;
   attributed_value: number | null;
   value_basis: string | null;
+  // R9 (B15): admin-only coverage-funnel signal (nullable). NULL = legacy row recorded
+  // before this column existed; computeOutcomeCoverage() treats NULL as the 'estimate_ga4'
+  // read-fallback. See OutcomeCoverageProvenance doc in shared/types/outcome-tracking.ts.
+  provenance: string | null;
 }
 
 export interface ActionPlaybookRow {
@@ -122,6 +133,13 @@ export function rowToTrackedAction(row: TrackedActionRow): TrackedAction {
     baselineConfidence: row.baseline_confidence as TrackedAction['baselineConfidence'],
     context: parseJsonSafe(row.context, actionContextSchema, EMPTY_CONTEXT, { field: 'context', table: 'tracked_actions' }),
     predictedEmv: row.predicted_emv ?? null,
+    sourceLabel: row.source_label ?? null,
+    // R6 (B11): parse the source-identity blob at the read boundary. null when the
+    // column is NULL (no source threaded / legacy row) — parseJsonSafe returns the
+    // `null` fallback for a NULL/empty column, degrading gracefully.
+    sourceSnapshot: row.source_snapshot
+      ? parseJsonSafe(row.source_snapshot, trackedActionSourceSnapshotSchema, null, { field: 'source_snapshot', table: 'tracked_actions' })
+      : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -144,6 +162,14 @@ export function rowToActionOutcome(row: ActionOutcomeRow): ActionOutcome {
     measuredAt: row.measured_at,
     attributedValue: row.attributed_value ?? null,
     valueBasis: row.value_basis ?? null,
+    // R9 (B15): validate against the enum rather than a bare cast — an unrecognized stored
+    // value degrades to null (treated as the estimate_ga4 fallback downstream) instead of
+    // silently widening the type.
+    provenance: row.provenance != null
+      ? (outcomeCoverageProvenanceEnum.safeParse(row.provenance).success
+          ? row.provenance as OutcomeCoverageProvenance
+          : null)
+      : null,
   };
 }
 

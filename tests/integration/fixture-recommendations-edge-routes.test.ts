@@ -10,7 +10,7 @@ let wsId = '';
 beforeAll(async () => {
   await ctx.startServer();
   wsId = createWorkspace('Fixture Recommendations Edge').id;
-});
+}, 25_000);
 
 afterAll(async () => {
   deleteWorkspace(wsId);

@@ -6,7 +6,7 @@
  *                                Top3Entry.priority field is set (G1).
  *   (3) one-basis parity      — flag ON → content_gaps.opportunity_score + briefing-candidates
  *                                + rec estimatedGain all derive from the OV/EMV basis.
- *   (4) brief-cache bust      — a re-tier changes the brief prompt hash (G8).
+ *   (4) brief-cache bust      — RETIRED with the meeting-brief generator (G8 died with it).
  *   (5) flag-OFF snapshot     — umbrella OFF → priorities, estimatedGain strings,
  *                                content_gaps.opportunity_score, summary counts AND
  *                                topRecommendationId equal the pre-P4 legacy baseline.
@@ -31,6 +31,7 @@ import {
   buildOvGainString,
   resolveEstimatedGain,
   loadRecommendations,
+  saveRecommendations,
 } from '../../server/recommendations.js';
 import { recordOvDivergence, listOvDivergence, type Top3Entry } from '../../server/ov-divergence.js';
 import { sortRecommendations } from '../../server/recommendations.js';
@@ -257,22 +258,19 @@ describe('P4 (C1) legacy opportunity blob (no predictedEmv) survives loadRecomme
         opportunity: legacyOpportunity as unknown as Recommendation['opportunity'],
       });
 
-      // Write the pre-P4 blob straight into the recommendation_sets row (the actual stored shape).
-      db.prepare(
-        `INSERT INTO recommendation_sets (workspace_id, generated_at, recommendations, summary)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(workspace_id) DO UPDATE SET
-           generated_at = excluded.generated_at, recommendations = excluded.recommendations, summary = excluded.summary`,
-      ).run(
-        s.workspaceId,
-        new Date().toISOString(),
-        JSON.stringify([legacyRec]),
-        JSON.stringify({
+      // R7 cutover: the pre-P4 rec now lands in recommendation_items.payload (the actual stored
+      // shape post-cutover) via the normalized write path. The same recommendationSchema validates
+      // the payload on read, so this still exercises the pre-P4 opportunity backward-compat round-trip.
+      saveRecommendations({
+        workspaceId: s.workspaceId,
+        generatedAt: new Date().toISOString(),
+        recommendations: [legacyRec],
+        summary: {
           fixNow: 1, fixSoon: 0, fixLater: 0, ongoing: 0, totalImpactScore: 72,
           trafficAtRisk: 0, estimatedRecoverableClicks: 0, estimatedRecoverableImpressions: 0,
           topRecommendationId: 'rec_legacy_pre_p4',
-        }),
-      );
+        },
+      });
 
       const loaded = loadRecommendations(s.workspaceId);
       expect(loaded).not.toBeNull();
@@ -297,34 +295,9 @@ describe('P4 (C1) legacy opportunity blob (no predictedEmv) survives loadRecomme
   });
 });
 
-// ── (4) brief-cache bust on re-tier (G8) ──────────────────────────────────────
-
-describe('P4 (4) brief prompt hash busts when the rec #1 re-tiers', () => {
-  it('a different top tier (or top id) produces a different brief prompt hash', async () => {
-    const { buildPromptHash } = await import('../../server/meeting-brief-generator.js');
-    // Minimal intelligence object — only the fields buildPromptHash reads need to exist;
-    // everything else is optional-chained to undefined, which is fine for a hash-stability test.
-    const intel = {} as Parameters<typeof buildPromptHash>[0];
-
-    // Same intel + notes, only the rec signal changes (id same, tier flips fix_soon → fix_now):
-    const hashSoon = buildPromptHash(intel, null, { topRecommendationId: 'rec_1', topTier: 'fix_soon' });
-    const hashNow = buildPromptHash(intel, null, { topRecommendationId: 'rec_1', topTier: 'fix_now' });
-    expect(hashNow).not.toBe(hashSoon); // a re-tier busts the cache
-
-    // A different #1 id also busts:
-    const hashOther = buildPromptHash(intel, null, { topRecommendationId: 'rec_2', topTier: 'fix_soon' });
-    expect(hashOther).not.toBe(hashSoon);
-
-    // Identical signal → identical hash (no spurious busts).
-    const hashSoon2 = buildPromptHash(intel, null, { topRecommendationId: 'rec_1', topTier: 'fix_soon' });
-    expect(hashSoon2).toBe(hashSoon);
-
-    // Pre-P4 baseline (null rec signal) differs from any present signal — proves the field is
-    // now part of the key (the legacy hash had NO rec/tier signal).
-    const hashNull = buildPromptHash(intel, null, null);
-    expect(hashNull).not.toBe(hashSoon);
-  });
-});
+// (4) brief-cache bust on re-tier (G8) — RETIRED with the meeting-brief generator: the
+// buildPromptHash contract died with the brief. The strategy POV's equivalent contract
+// (buildStrategyPovHash busts on rec content/order/variant) is covered by its own tests.
 
 // Reference RecPriority so the import is used (the union is part of the tier contract).
 const _tierOrder: RecPriority[] = ['fix_now', 'fix_soon', 'fix_later', 'ongoing'];

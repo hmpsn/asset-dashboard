@@ -6,6 +6,10 @@ import {
   History,
 } from 'lucide-react';
 import { useAutoSave } from '../hooks/useAutoSave';
+import {
+  useSerializedArtifactSave,
+  type SerializedArtifactAuthorityCapture,
+} from '../hooks/useSerializedArtifactSave';
 import { contentBriefs, contentPosts } from '../api/content';
 import { getText } from '../api/client';
 import { useAdminPost, useAdminPostVersions, usePublishTarget } from '../hooks/admin';
@@ -19,11 +23,12 @@ import { FixDiffModal } from './post-editor/FixDiffModal';
 import { useBackgroundTasks, isTerminalJobStatus, type BackgroundJob } from '../hooks/useBackgroundTasks';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import { adminRichTextClass } from './post-editor/richTextStyles';
-import type { AiFeedbackTarget, AiFixRequest, AiFixResult, AIReviewResponse, ContentBrief, ContentReviewEvidence, IssueKey, StoredAIReview } from '../../shared/types/content';
+import type { AiFeedbackTarget, AiFixJobResult, AiFixRequest, AiFixResult, AIReviewResponse, ContentBrief, ContentReviewEvidence, IssueKey, StoredAIReview } from '../../shared/types/content';
 import { queryKeys } from '../lib/queryKeys';
 import { countWordsFromHtml } from '../lib/utils';
 import { formatDate } from '../utils/formatDates';
 import { useToast } from './Toast';
+import { isDeliverableContentPost } from '../../shared/content-post-integrity';
 
 interface PostSection {
   index: number;
@@ -50,7 +55,7 @@ interface GeneratedPost {
   targetWordCount?: number;
   seoTitle?: string;
   seoMetaDescription?: string;
-  status: 'generating' | 'draft' | 'review' | 'approved' | 'error';
+  status: 'generating' | 'needs_attention' | 'draft' | 'review' | 'approved' | 'error';
   unificationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
   unificationNote?: string;
   reviewChecklist?: ReviewChecklist;
@@ -60,6 +65,7 @@ interface GeneratedPost {
   webflowCollectionId?: string;
   publishedAt?: string;
   publishedSlug?: string;
+  generationRevision?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +85,7 @@ interface PostEditorProps {
   postId: string;
   onClose: () => void;
   onDelete?: () => void;
+  workspaceLayout?: boolean;
 }
 
 type EditingTarget =
@@ -93,42 +100,16 @@ interface FeedbackFixModalState {
   target: AiFeedbackTarget;
   label: string;
   sectionIndex?: number;
+  sourceRevision: number | null;
 }
 
-interface PostFixPayload {
-  introduction: string;
-  sections: Array<{ index: number; content: string }>;
-  conclusion: string;
-}
-
-function tryParsePostFixPayload(input: string): PostFixPayload | null {
-  try {
-    const parsed = JSON.parse(input) as unknown;
-    if (!parsed || typeof parsed !== 'object') return null;
-    const candidate = parsed as Partial<PostFixPayload>;
-    if (typeof candidate.introduction !== 'string') return null;
-    if (!Array.isArray(candidate.sections)) return null;
-    if (typeof candidate.conclusion !== 'string') return null;
-    const validSections = candidate.sections.every(section =>
-      section
-      && typeof section === 'object'
-      && typeof section.index === 'number'
-      && Number.isInteger(section.index)
-      && typeof section.content === 'string');
-    if (!validSections) return null;
-    return {
-      introduction: candidate.introduction,
-      sections: candidate.sections as Array<{ index: number; content: string }>,
-      conclusion: candidate.conclusion,
-    };
-  } catch {
-    return null;
-  }
-}
+const STALE_RICH_TEXT_EDIT_MESSAGE = 'This post changed while you were editing. Cancel and reopen the editor before saving.';
+const STALE_FEEDBACK_FIX_MESSAGE = 'This post changed after you opened the feedback form. Cancel and reopen it before generating a preview.';
 
 function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
   const cfg: Record<string, { color: string; label: string }> = {
     generating: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', label: 'Generating...' },
+    needs_attention: { color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', label: 'Needs attention' },
     error: { color: 'text-red-400 bg-red-500/10 border-red-500/20', label: 'Failed' },
     draft: { color: 'text-blue-400 bg-blue-500/10 border-blue-500/20', label: 'Draft' },
     review: { color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', label: 'In Review' },
@@ -138,7 +119,7 @@ function PostStatusBadge({ status }: { status: GeneratedPost['status'] }) {
   return <span className={`t-caption-sm px-2 py-0.5 rounded-[var(--radius-sm)] border font-medium ${c.color}`}>{c.label}</span>;
 }
 
-export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEditorProps) {
+export function PostEditor({ workspaceId, postId, onClose, onDelete, workspaceLayout = false }: PostEditorProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -196,10 +177,20 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const versionsQ = useAdminPostVersions(workspaceId, postId, showVersions);
   const versions = (versionsQ.data ?? []) as Array<{ id: string; versionNumber: number; trigger: string; triggerDetail?: string; totalWordCount: number; createdAt: string }>;
   const versionsLoading = versionsQ.isLoading;
+  const renderedPostAuthority = post ? post.generationRevision ?? 0 : undefined;
+  const lastRenderedPostAuthorityRef = useRef<number | undefined>(renderedPostAuthority);
+  const canonicalPostAuthorityRef = useRef<number | undefined>(renderedPostAuthority);
+  if (!Object.is(lastRenderedPostAuthorityRef.current, renderedPostAuthority)) {
+    lastRenderedPostAuthorityRef.current = renderedPostAuthority;
+    canonicalPostAuthorityRef.current = renderedPostAuthority;
+  }
 
   const [expandedSectionsByPost, setExpandedSectionsByPost] = useState<Record<string, Set<number>>>({});
   const [editingTarget, setEditingTarget] = useState<EditingTarget>(null);
   const [titleBuffer, setTitleBuffer] = useState('');
+  const [titleEditAuthority, setTitleEditAuthority] = useState<number | null>(null);
+  const [richTextEditSession, setRichTextEditSession] = useState<SerializedArtifactAuthorityCapture | null>(null);
+  const [titleSaving, setTitleSaving] = useState(false);
   const [regenerating, setRegenerating] = useState<number | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -212,11 +203,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const [fixLoading, setFixLoading] = useState(false);
   const [fixApplying, setFixApplying] = useState(false);
   const [fixResult, setFixResult] = useState<AiFixResult | null>(null);
+  const [fixJobId, setFixJobId] = useState<string | null>(null);
   const [fixIssueLabel, setFixIssueLabel] = useState('');
   const [feedbackFixModal, setFeedbackFixModal] = useState<FeedbackFixModalState>({
     open: false,
     target: 'section',
     label: '',
+    sourceRevision: null,
   });
   const [feedbackText, setFeedbackText] = useState('');
   // Only the section-level retry banner uses this. Intro/conclusion retry is driven by
@@ -235,36 +228,143 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const editingSection = editingTarget?.type === 'section' ? editingTarget.index : null;
   const canStartEdit = editingTarget === null;
   const canStartSectionEdit = editingTarget === null || editingTarget.type === 'section';
+  const requireSettledEditor = (action: string): boolean => {
+    if (editingTarget === null) return true;
+    toast(`Finish or cancel the current edit before ${action}.`, 'error');
+    return false;
+  };
   const editTitle = () => {
+    if (!post) return;
     setTitleBuffer(post?.title ?? '');
+    setTitleEditAuthority(canonicalPostAuthorityRef.current ?? post.generationRevision ?? 0);
     setEditingTarget({ type: 'title' });
   };
+  const cancelTitleEdit = () => {
+    setTitleEditAuthority(null);
+    setEditingTarget(null);
+  };
   const editSection = (index: number | null) => {
-    setEditingTarget(index === null ? null : { type: 'section', index });
+    if (index === null) {
+      setRichTextEditSession(null);
+      setEditingTarget(null);
+      return;
+    }
+    if (!post || canonicalPostAuthorityRef.current === undefined) return;
+    setRichTextEditSession(serializedSaveField.captureAuthority());
+    setEditingTarget({ type: 'section', index });
+  };
+  const editIntroduction = () => {
+    if (!post || canonicalPostAuthorityRef.current === undefined) return;
+    setRichTextEditSession(serializedSaveField.captureAuthority());
+    setEditingTarget({ type: 'intro' });
+  };
+  const editConclusion = () => {
+    if (!post || canonicalPostAuthorityRef.current === undefined) return;
+    setRichTextEditSession(serializedSaveField.captureAuthority());
+    setEditingTarget({ type: 'conclusion' });
+  };
+  const finishRichTextEdit = () => {
+    setRichTextEditSession(null);
+    setEditingTarget(null);
+  };
+
+  const serializedSaveField = useSerializedArtifactSave<number, Record<string, unknown>, GeneratedPost>({
+    authority: post ? post.generationRevision ?? 0 : undefined,
+    save: (expectedRevision, updates) => contentPosts.update(
+      workspaceId,
+      postId,
+      expectedRevision,
+      updates,
+    ) as Promise<GeneratedPost>,
+    getAcceptedAuthority: updated => updated.generationRevision,
+    onAccepted: updated => {
+      canonicalPostAuthorityRef.current = updated.generationRevision;
+      queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
+    },
+  });
+
+  const saveField = async (updates: Record<string, unknown>) => {
+    if (!post) return;
+    try {
+      await serializedSaveField(updates);
+    } catch (err) {
+      console.error('PostEditor save failed:', err);
+      throw err; // rethrow so useAutoSave can catch it and transition to 'error'
+    }
+  };
+
+  const prepareFieldSave = (
+    updates: Record<string, unknown>,
+    editSession?: SerializedArtifactAuthorityCapture | null,
+  ) => {
+    if (editSession === null) {
+      const rejectStaleEdit = async () => { throw new Error(STALE_RICH_TEXT_EDIT_MESSAGE); };
+      rejectStaleEdit.retry = rejectStaleEdit;
+      return rejectStaleEdit;
+    }
+    const prepared = editSession === undefined
+      ? serializedSaveField.prepare(updates)
+      : serializedSaveField.prepareAt(editSession, updates);
+    const normalizeEditError = (err: unknown): unknown => {
+      if (editSession !== undefined
+        && err instanceof Error
+        && err.message.startsWith('This content changed')) {
+        return new Error(STALE_RICH_TEXT_EDIT_MESSAGE);
+      }
+      return err;
+    };
+    const run = async () => {
+      try {
+        await prepared();
+      } catch (err) {
+        console.error('PostEditor save failed:', err);
+        throw normalizeEditError(err);
+      }
+    };
+    run.retry = async () => {
+      try {
+        await prepared.retry();
+      } catch (err) {
+        console.error('PostEditor save retry failed:', err);
+        throw normalizeEditError(err);
+      }
+    };
+    return run;
   };
 
   // Auto-save for section editing via RichTextEditor (SectionEditor new interface)
-  const sectionAutoSaveFn = async (html: string) => {
+  const buildSectionSave = (html: string) => {
     if (editingSection === null || !post) return;
-    // Capture the target synchronously BEFORE any await so the onError callback can
-    // reliably read it even if editingSection changes while the request is in-flight.
-    lastSectionSaveAttempt.current = { sectionIndex: editingSection, html };
     const sections = [...post.sections];
     const idx = sections.findIndex(s => s.index === editingSection);
     if (idx === -1) return;
     sections[idx] = { ...sections[idx], content: html, wordCount: countWordsFromHtml(html) };
-    await saveField({ sections });
+    return { sectionIndex: editingSection, html, updates: { sections } };
   };
-  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, saveStatus: sectionSaveStatus, resetSaveOk: resetSectionSaveOk } = useAutoSave(
+  const sectionAutoSaveFn = async (html: string) => {
+    const attempt = buildSectionSave(html);
+    if (!attempt) return;
+    // Capture the target synchronously BEFORE any await so the onError callback can
+    // reliably read it even if editingSection changes while the request is in-flight.
+    lastSectionSaveAttempt.current = {
+      sectionIndex: attempt.sectionIndex,
+      html: attempt.html,
+    };
+    await saveField(attempt.updates);
+  };
+  const { scheduleAutoSave: scheduleSectionSave, flush: flushSection, retry: retrySection, saveStatus: sectionSaveStatus } = useAutoSave(
     sectionAutoSaveFn,
     2000,
     // onError: capture the section index and html at error time so retry is safe even if
     // the user switches to a different section before clicking retry (Finding 4).
-    (_err) => {
+    (err) => {
       if (lastSectionSaveAttempt.current !== null) {
         sectionSaveErrorCapture.current = lastSectionSaveAttempt.current;
       }
       setAutoSaveError('section');
+      if (err instanceof Error && err.message === STALE_RICH_TEXT_EDIT_MESSAGE) {
+        toast(err.message, 'error');
+      }
     },
     // onSuccess: clear stale error so re-opening any section doesn't show a ghost retry
     // affordance from a previous failure that has since been resolved (Finding 3).
@@ -272,30 +372,58 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       sectionSaveErrorCapture.current = null;
       setAutoSaveError(prev => (prev === 'section' ? null : prev));
     },
+    (html) => {
+      const attempt = buildSectionSave(html);
+      if (!attempt) return async () => {};
+      lastSectionSaveAttempt.current = {
+        sectionIndex: attempt.sectionIndex,
+        html: attempt.html,
+      };
+      return prepareFieldSave(attempt.updates, richTextEditSession);
+    },
   );
 
   // Intro/conclusion error + retry UI is driven entirely by their own saveStatus
   // ('error' → retry button), so they do not write to autoSaveError (which only
   // gates the section-level retry banner). Avoid write-only state.
-  const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, saveStatus: introSaveStatus } = useAutoSave(
+  const { scheduleAutoSave: scheduleIntroSave, flush: flushIntro, retry: retryIntro, saveStatus: introSaveStatus } = useAutoSave(
     async (html: string) => { await saveField({ introduction: html }); },
     2000,
+    (err) => {
+      if (err instanceof Error && err.message === STALE_RICH_TEXT_EDIT_MESSAGE) {
+        toast(err.message, 'error');
+      }
+    },
+    undefined,
+    (html) => prepareFieldSave({ introduction: html }, richTextEditSession),
   );
 
-  const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
+  const { scheduleAutoSave: scheduleConclusionSave, flush: flushConclusion, retry: retryConclusion, saveStatus: conclusionSaveStatus } = useAutoSave(
     async (html: string) => { await saveField({ conclusion: html }); },
     2000,
+    (err) => {
+      if (err instanceof Error && err.message === STALE_RICH_TEXT_EDIT_MESSAGE) {
+        toast(err.message, 'error');
+      }
+    },
+    undefined,
+    (html) => prepareFieldSave({ conclusion: html }, richTextEditSession),
   );
 
   const invalidatePost = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.post(workspaceId, postId) });
   const invalidateVersions = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.postVersions(workspaceId, postId) });
 
   const handlePublish = async (generateImage = false) => {
-    if (!post) return;
+    if (!post || !requireSettledEditor('publishing')) return;
     setPublishing(true);
     setPublishError('');
     try {
-      const data = await contentPosts.publishToWebflow(workspaceId, postId, { generateImage });
+      const data = await contentPosts.publishToWebflow(
+        workspaceId,
+        postId,
+        post.generationRevision ?? 0,
+        { generateImage },
+      );
       if (!data.success) {
         setPublishError(data.error || 'Publish failed');
       } else {
@@ -308,33 +436,44 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
     setPublishing(false);
   };
 
-  const saveField = async (updates: Record<string, unknown>) => {
-    if (!post) return;
-    try {
-      const updated = await contentPosts.update(workspaceId, postId, updates) as GeneratedPost;
-      queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
-    } catch (err) {
-      console.error('PostEditor save failed:', err);
-      throw err; // rethrow so useAutoSave can catch it and transition to 'error'
-    }
-  };
-
   const handleRegenerate = async (sectionIndex: number) => {
+    if (!post || !requireSettledEditor('regenerating content')) return;
+    const sourceBrief = briefQ.data as ContentBrief | undefined;
+    if (sourceBrief?.generationRevision === undefined) {
+      toast('The source brief is not ready. Refresh before regenerating this section.', 'error');
+      return;
+    }
     setRegenerating(sectionIndex);
     try {
-      const updated = await contentPosts.regenerateSection(workspaceId, postId, { sectionIndex }) as GeneratedPost;
+      const updated = await contentPosts.regenerateSection(
+        workspaceId,
+        postId,
+        post.generationRevision ?? 0,
+        sourceBrief.generationRevision,
+        sectionIndex,
+      ) as GeneratedPost;
       queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
     } catch (err) { console.error('PostEditor operation failed:', err); }
     setRegenerating(null);
   };
 
-  const saveTitleEdit = () => {
+  const saveTitleEdit = async () => {
     if (!post) return;
-    // Exit edit mode optimistically; surface failure via toast if the save throws.
-    setEditingTarget(null);
-    saveField({ title: titleBuffer }).catch((err) => {
+    if (titleEditAuthority === null
+      || (post.generationRevision ?? 0) !== titleEditAuthority) {
+      toast('This post changed while you were editing the title. Cancel and reopen it before saving.', 'error');
+      return;
+    }
+    setTitleSaving(true);
+    try {
+      await saveField({ title: titleBuffer });
+      setTitleEditAuthority(null);
+      setEditingTarget(null);
+    } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to save title', 'error');
-    });
+    } finally {
+      setTitleSaving(false);
+    }
   };
 
   const copyAllHTML = () => {
@@ -363,15 +502,26 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   };
 
   const handleDelete = async () => {
-    await contentPosts.remove(workspaceId, postId);
-    onDelete?.();
-    onClose();
+    if (!post || !requireSettledEditor('deleting this post')) return;
+    try {
+      await contentPosts.remove(workspaceId, postId, post.generationRevision ?? 0);
+      onDelete?.();
+      onClose();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete post', 'error');
+    }
   };
 
   const handleRevert = async (versionId: string) => {
+    if (!post || !requireSettledEditor('restoring a version')) return;
     setReverting(versionId);
     try {
-      const reverted = await contentPosts.revertVersion(workspaceId, postId, versionId) as GeneratedPost;
+      const reverted = await contentPosts.revertVersion(
+        workspaceId,
+        postId,
+        versionId,
+        post.generationRevision ?? 0,
+      ) as GeneratedPost;
       queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), reverted);
       invalidateVersions();
     } catch (err) { console.error('PostEditor operation failed:', err); }
@@ -383,15 +533,24 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const fixGenRef = useRef(0);
 
   const handleRequestFix = async (issueKey: string, reason: string) => {
-    if (fixLoading) return;
+    if (fixLoading || !requireSettledEditor('requesting an AI fix')) return;
     const gen = ++fixGenRef.current;
     setFixLoading(true);
     setFixIssueLabel(CHECKLIST_ITEMS.find(i => i.key === issueKey)?.label ?? issueKey);
     try {
-      const { jobId } = await contentPosts.aifix(workspaceId, postId, { issueKey: issueKey as IssueKey, reason });
+      if (!post) return;
+      const { jobId } = await contentPosts.aifix(
+        workspaceId,
+        postId,
+        post.generationRevision ?? 0,
+        { issueKey: issueKey as IssueKey, reason },
+      );
       tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, jobId, { workspaceId });
-      const result = await awaitJobResult<AiFixResult>(jobId);
-      if (gen === fixGenRef.current) setFixResult(result);
+      const result = await awaitJobResult<AiFixJobResult>(jobId);
+      if (gen === fixGenRef.current) {
+        setFixResult(result);
+        setFixJobId(jobId);
+      }
     } catch (err) {
       console.error('PostEditor operation failed:', err);
       if (gen === fixGenRef.current) toast(err instanceof Error ? err.message : 'AI fix failed', 'error');
@@ -401,40 +560,60 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   };
 
   const openFeedbackFix = (target: AiFeedbackTarget, label: string, sectionIndex?: number) => {
-    setFeedbackFixModal({ open: true, target, label, sectionIndex });
+    const sourceRevision = canonicalPostAuthorityRef.current;
+    if (!post || sourceRevision === undefined) {
+      toast('Refresh the post before requesting an AI preview.', 'error');
+      return;
+    }
+    setFeedbackFixModal({ open: true, target, label, sectionIndex, sourceRevision });
     setFeedbackText('');
   };
 
   const closeFeedbackFix = () => {
-    setFeedbackFixModal(prev => ({ ...prev, open: false }));
+    setFeedbackFixModal(prev => ({ ...prev, open: false, sourceRevision: null }));
     setFeedbackText('');
   };
 
   const handleRequestFeedbackFix = async () => {
-    if (fixLoading) return;
+    if (fixLoading || !requireSettledEditor('requesting an AI fix')) return;
     const trimmedFeedback = feedbackText.trim();
     if (!trimmedFeedback) return;
+    const request = feedbackFixModal;
+    if (request.sourceRevision === null
+      || !Object.is(request.sourceRevision, canonicalPostAuthorityRef.current)) {
+      toast(STALE_FEEDBACK_FIX_MESSAGE, 'error');
+      return;
+    }
     const gen = ++fixGenRef.current;
     setFixLoading(true);
-    setFixIssueLabel(feedbackFixModal.label);
+    setFixIssueLabel(request.label);
     closeFeedbackFix();
     try {
-      const body: AiFixRequest = feedbackFixModal.target === 'section'
+      const body: AiFixRequest = request.target === 'section'
         ? {
           mode: 'feedback',
           target: 'section',
           feedback: trimmedFeedback,
-          sectionIndex: feedbackFixModal.sectionIndex,
+          sectionIndex: request.sectionIndex,
         }
         : {
           mode: 'feedback',
-          target: feedbackFixModal.target,
+          target: request.target,
           feedback: trimmedFeedback,
         };
-      const { jobId } = await contentPosts.aifix(workspaceId, postId, body);
+      if (!post) return;
+      const { jobId } = await contentPosts.aifix(
+        workspaceId,
+        postId,
+        request.sourceRevision,
+        body,
+      );
       tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, jobId, { workspaceId });
-      const result = await awaitJobResult<AiFixResult>(jobId);
-      if (gen === fixGenRef.current) setFixResult(result);
+      const result = await awaitJobResult<AiFixJobResult>(jobId);
+      if (gen === fixGenRef.current) {
+        setFixResult(result);
+        setFixJobId(jobId);
+      }
     } catch (err) {
       console.error('PostEditor operation failed:', err);
       if (gen === fixGenRef.current) toast(err instanceof Error ? err.message : 'AI fix failed', 'error');
@@ -446,69 +625,25 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   const handleDismissFix = () => {
     fixGenRef.current++;
     setFixResult(null);
+    setFixJobId(null);
     setFixLoading(false);
   };
 
-  const handleApplyFix = async (result: AiFixResult) => {
-    if (!post) return;
+  const feedbackFixAuthorityConflict = feedbackFixModal.open
+    && (feedbackFixModal.sourceRevision === null
+      || !Object.is(feedbackFixModal.sourceRevision, canonicalPostAuthorityRef.current));
+
+  const handleApplyFix = async (_result: AiFixResult) => {
+    if (!post || !fixJobId) return;
     setFixApplying(true);
     try {
-      if (result.field === 'introduction') {
-        await saveField({ introduction: result.suggestedText });
-      } else if (result.field === 'section' && result.sectionIndex !== undefined) {
-        const idx = post.sections.findIndex(s => s.index === result.sectionIndex);
-        if (idx === -1) {
-          console.warn('PostEditor: AI fix section index no longer present', result.sectionIndex);
-        } else {
-          const sections = [...post.sections];
-          sections[idx] = {
-            ...sections[idx],
-            content: result.suggestedText,
-            wordCount: countWordsFromHtml(result.suggestedText),
-          };
-          await saveField({ sections });
-        }
-      } else if (result.field === 'conclusion') {
-        await saveField({ conclusion: result.suggestedText });
-      } else if (result.field === 'meta') {
-        let parsed: { seoTitle: string; seoMetaDescription: string };
-        try {
-          parsed = JSON.parse(result.suggestedText);
-        } catch (err) {
-          console.error('PostEditor: meta fix returned malformed JSON', err);
-          handleDismissFix();
-          setFixApplying(false);
-          return;
-        }
-        await saveField({ seoTitle: parsed.seoTitle, seoMetaDescription: parsed.seoMetaDescription });
-      } else if (result.field === 'post') {
-        const parsed = tryParsePostFixPayload(result.suggestedText);
-        if (!parsed) {
-          console.error('PostEditor: post fix returned malformed JSON');
-          handleDismissFix();
-          setFixApplying(false);
-          return;
-        }
-        const sectionByIndex = new Map(parsed.sections.map(section => [section.index, section.content]));
-        const nextSections = post.sections.map(section => {
-          const suggestedContent = sectionByIndex.get(section.index);
-          if (!suggestedContent) return section;
-          return {
-            ...section,
-            content: suggestedContent,
-            wordCount: countWordsFromHtml(suggestedContent),
-          };
-        });
-        await saveField({
-          introduction: parsed.introduction,
-          sections: nextSections,
-          conclusion: parsed.conclusion,
-        });
-      }
+      const updated = await contentPosts.applyAiFix(workspaceId, postId, fixJobId) as GeneratedPost;
+      queryClient.setQueryData(queryKeys.admin.post(workspaceId, postId), updated);
       handleDismissFix();
-      invalidatePost();
+      invalidateVersions();
     } catch (err) {
       console.error('PostEditor operation failed:', err);
+      toast(err instanceof Error ? err.message : 'Failed to apply AI fix', 'error');
     } finally {
       setFixApplying(false);
     }
@@ -535,6 +670,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
   );
 
   const isGenerating = post.status === 'generating';
+  const needsAttention = post.status === 'needs_attention';
+  const isDeliverable = isDeliverableContentPost(post);
   const completedSections = post.sections.filter(s => s.status === 'done').length;
   const totalSections = post.sections.length;
   const progress = isGenerating ? Math.round(((completedSections + (post.introduction ? 1 : 0)) / (totalSections + 2)) * 100) : 100;
@@ -565,13 +702,13 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
       )}
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className={`flex items-start justify-between gap-4 ${workspaceLayout ? 'flex-col' : ''}`}>
         <div className="flex-1 min-w-0">
           {editingTitle ? (
             <div className="flex items-center gap-2">
-              <FormInput value={titleBuffer} onChange={setTitleBuffer} className="flex-1" />
-              <IconButton icon={Check} label="Save title" size="sm" variant="solid" className="bg-teal-600/20 text-teal-300 hover:bg-teal-600/30" onClick={saveTitleEdit} />
-              <IconButton icon={X} label="Cancel title edit" size="sm" variant="solid" className="bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]" onClick={() => setEditingTarget(null)} />
+              <FormInput value={titleBuffer} onChange={setTitleBuffer} disabled={titleSaving} className="flex-1" />
+              <IconButton icon={Check} label="Save title" size="sm" variant="solid" disabled={titleSaving} className="bg-teal-600/20 text-teal-300 hover:bg-teal-600/30" onClick={() => { void saveTitleEdit(); }} />
+              <IconButton icon={X} label="Cancel title edit" size="sm" variant="solid" disabled={titleSaving} className="bg-[var(--surface-3)] text-[var(--brand-text)] hover:text-[var(--brand-text-bright)]" onClick={cancelTitleEdit} />
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
@@ -606,8 +743,8 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             <span className="t-caption-sm text-[var(--brand-text-muted)] flex items-center gap-1"><Icon as={Clock} size="sm" />{formatDate(post.updatedAt)}</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {!isGenerating && (
+        <div className={`flex items-center gap-1.5 flex-shrink-0 ${workspaceLayout ? 'flex-wrap' : ''}`}>
+          {isDeliverable && (
             <>
               <Button
                 variant="secondary"
@@ -652,7 +789,9 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   </span>
                 ) : (
                   <Button
-                    onClick={() => setPublishConfirm(true)}
+                    onClick={() => {
+                      if (requireSettledEditor('publishing')) setPublishConfirm(true);
+                    }}
                     disabled={publishing}
                     size="sm"
                     variant="secondary"
@@ -666,8 +805,26 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
               )}
             </>
           )}
-          <IconButton icon={Trash2} label="Delete post" variant="danger" size="sm" onClick={() => setDeleteConfirm(true)} />
-          <IconButton icon={X} label="Close editor" variant="ghost" size="sm" onClick={onClose} />
+          <IconButton
+            icon={Trash2}
+            label="Delete post"
+            variant="danger"
+            size="sm"
+            onClick={() => {
+              if (requireSettledEditor('deleting this post')) setDeleteConfirm(true);
+            }}
+          />
+          {!workspaceLayout && (
+            <IconButton
+              icon={X}
+              label="Close editor"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (requireSettledEditor('closing the editor')) onClose();
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -698,7 +855,19 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
         </SectionCard>
       )}
 
-      {!isGenerating && post.status !== 'approved' && post.status !== 'error' && (
+      {needsAttention && (
+        <SectionCard className="!border-amber-500/20">
+          <div className="flex items-start gap-2">
+            <Icon as={AlertTriangle} size="md" className="text-amber-400 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-300">Generation needs attention</p>
+              <p className="t-caption text-[var(--brand-text-muted)] mt-1">Some required content could not be generated. Review the marked sections before moving this post into review.</p>
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {post.status === 'draft' || post.status === 'review' ? (
         <ReviewChecklist
           postStatus={post.status}
           reviewChecklist={post.reviewChecklist}
@@ -711,12 +880,21 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             });
           }}
           onChangeStatus={(status) => {
+            if (!requireSettledEditor('changing post status')) return;
             saveField({ status }).catch((err) => {
               toast(err instanceof Error ? err.message : 'Failed to update status', 'error');
             });
           }}
           onRunAIReview={async () => {
-            const { jobId } = await contentPosts.aiReview(workspaceId, postId);
+            if (!post) throw new Error('Post not loaded');
+            if (!requireSettledEditor('running an AI review')) {
+              throw new Error('Finish or cancel the current edit before running an AI review.');
+            }
+            const { jobId } = await contentPosts.aiReview(
+              workspaceId,
+              postId,
+              post.generationRevision ?? 0,
+            );
             tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW, jobId, { workspaceId });
             const result = await awaitJobResult<AIReviewResponse>(jobId);
             // The review verdicts are persisted on the post by the job; refresh so the
@@ -728,7 +906,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
           evidence={reviewEvidence}
           persistedAIReview={post.aiReview}
         />
-      )}
+      ) : null}
 
       {/* Version History Panel */}
       {showVersions && (
@@ -757,7 +935,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   variant="ghost"
                   size="sm"
                   icon={Pencil}
-                  onClick={() => setEditingTarget({ type: 'intro' })}
+                  onClick={editIntroduction}
                   className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] !px-0 !py-0 bg-transparent hover:bg-transparent"
                 >
                   Edit
@@ -781,7 +959,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                       onClick={async () => {
                         const { ok } = await flushIntro();
                         // Only exit edit mode if the save succeeded (Finding 2).
-                        if (ok) setEditingTarget(null);
+                        if (ok) finishRichTextEdit();
                       }}
                       className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
@@ -800,7 +978,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                         variant="ghost"
                         size="sm"
                         icon={AlertTriangle}
-                        onClick={() => { void flushIntro(); }}
+                        onClick={() => { void retryIntro(); }}
                         className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
                       >
                         Save failed — retry
@@ -854,30 +1032,10 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                     icon={AlertTriangle}
                     onClick={() => {
                       setAutoSaveError(null);
-                      // Retry uses the captured index+html from error time, not the current
-                      // editingSection, to prevent cross-section corruption (Finding 4).
-                      const capture = sectionSaveErrorCapture.current;
-                      if (capture !== null && post) {
-                        const sections = [...post.sections];
-                        const idx = sections.findIndex(s => s.index === capture.sectionIndex);
-                        if (idx !== -1) {
-                          sections[idx] = { ...sections[idx], content: capture.html, wordCount: countWordsFromHtml(capture.html) };
-                          // This save bypasses the hook (it replays the captured payload, which
-                          // may target a different section than the one currently in flight).
-                          // On success we must (a) reset the hook's ok-state so the next Done's
-                          // flush() returns { ok: true } and edit mode can exit, and (b) clear the
-                          // capture so the failure is no longer retryable. On failure, re-arm the
-                          // error+capture so the section stays visibly retryable (invariant 2).
-                          saveField({ sections })
-                            .then(() => {
-                              sectionSaveErrorCapture.current = null;
-                              resetSectionSaveOk();
-                            })
-                            .catch(() => {
-                              setAutoSaveError('section');
-                            });
-                        }
-                      }
+                      // The hook retains the exact prepared payload and retries
+                      // only against the authority used by the failed request.
+                      // A newer canonical revision rejects without a PATCH.
+                      void retrySection();
                     }}
                     className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
                   >
@@ -901,7 +1059,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                   variant="ghost"
                   size="sm"
                   icon={Pencil}
-                  onClick={() => setEditingTarget({ type: 'conclusion' })}
+                  onClick={editConclusion}
                   className="text-[var(--brand-text-muted)] hover:text-[var(--brand-text-bright)] !px-0 !py-0 bg-transparent hover:bg-transparent"
                 >
                   Edit
@@ -925,7 +1083,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                       onClick={async () => {
                         const { ok } = await flushConclusion();
                         // Only exit edit mode if the save succeeded (Finding 2).
-                        if (ok) setEditingTarget(null);
+                        if (ok) finishRichTextEdit();
                       }}
                       className="bg-teal-600/20 border-teal-500/30 text-teal-300 hover:bg-teal-600/30"
                     >
@@ -944,7 +1102,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                         variant="ghost"
                         size="sm"
                         icon={AlertTriangle}
-                        onClick={() => { void flushConclusion(); }}
+                        onClick={() => { void retryConclusion(); }}
                         className="t-caption-sm text-red-400 hover:text-red-300 !px-0 !py-0 bg-transparent hover:bg-transparent gap-1"
                       >
                         Save failed — retry
@@ -1072,6 +1230,11 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
                 rows={6}
                 className="w-full"
               />
+              {feedbackFixAuthorityConflict && (
+                <p role="alert" className="t-caption text-red-400">
+                  {STALE_FEEDBACK_FIX_MESSAGE}
+                </p>
+              )}
             </div>
           </Modal.Body>
           <Modal.Footer>
@@ -1085,7 +1248,7 @@ export function PostEditor({ workspaceId, postId, onClose, onDelete }: PostEdito
             </Button>
             <Button
               onClick={handleRequestFeedbackFix}
-              disabled={!feedbackText.trim() || fixLoading}
+              disabled={!feedbackText.trim() || fixLoading || feedbackFixAuthorityConflict}
               size="sm"
               variant="secondary"
               icon={Sparkles}

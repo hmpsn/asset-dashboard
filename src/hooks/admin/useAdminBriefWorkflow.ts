@@ -46,7 +46,10 @@ export type RequestStatusUpdateExtra = {
   clientFeedback?: string;
   serviceType?: 'brief_only' | 'full_post';
   upgradedAt?: string;
+  clientNote?: string;
   internalNote?: string;
+  expectedBriefRevision?: number;
+  expectedPostRevision?: number;
 };
 
 export function extractGeneratedBriefResult(result: unknown): { brief?: ContentBrief; briefId?: string; requestId?: string } | null {
@@ -96,14 +99,121 @@ export function renderBriefMarkdown(b: ContentBrief): string {
   return lines.join('\n');
 }
 
+interface BriefFieldSaveQueueDependencies {
+  readCurrent: (briefId: string) => ContentBrief | undefined;
+  persist: (
+    briefId: string,
+    updates: Partial<ContentBrief>,
+    expectedRevision: number,
+  ) => Promise<ContentBrief>;
+  commit: (updated: ContentBrief, expectedRevision: number) => ContentBrief | undefined;
+  onStale: () => void;
+  onError: (error: unknown) => void;
+}
+
+interface BriefFieldSaveLane {
+  tail: Promise<void>;
+  pending: number;
+  rootArtifact: ContentBrief;
+  lastLocalArtifact: ContentBrief | null;
+  failed: boolean;
+}
+
+/**
+ * Serializes per-brief field edits captured from one operator-visible revision.
+ * A queued edit may advance only over the exact cache object committed by the
+ * preceding local edit. Any refetch/external replacement breaks that identity
+ * chain and rejects the remaining draft instead of silently rebasing it.
+ */
+export function createBriefFieldSaveQueue(dependencies: BriefFieldSaveQueueDependencies) {
+  const lanes = new Map<string, BriefFieldSaveLane>();
+
+  const enqueue = (
+    briefId: string,
+    updates: Partial<ContentBrief>,
+    expectedRevision?: number,
+  ): Promise<boolean> => {
+    const observed = dependencies.readCurrent(briefId);
+    if (!observed) {
+      dependencies.onStale();
+      return Promise.resolve(false);
+    }
+    const pinnedRevision = expectedRevision ?? observed.generationRevision ?? 0;
+    let lane = lanes.get(briefId);
+    if (!lane) {
+      lane = {
+        tail: Promise.resolve(),
+        pending: 0,
+        rootArtifact: observed,
+        lastLocalArtifact: null,
+        failed: false,
+      };
+      lanes.set(briefId, lane);
+    }
+    const activeLane = lane;
+    const canFollowLocalChain = observed === activeLane.rootArtifact
+      || observed === activeLane.lastLocalArtifact;
+    activeLane.pending += 1;
+
+    const run = async (): Promise<boolean> => {
+      if (activeLane.failed) return false;
+      const current = dependencies.readCurrent(briefId);
+      if (!current) {
+        activeLane.failed = true;
+        dependencies.onStale();
+        return false;
+      }
+
+      const currentRevision = current.generationRevision ?? 0;
+      const hasPinnedAuthority = currentRevision === pinnedRevision;
+      const followsOwnLocalCommit = canFollowLocalChain && activeLane.lastLocalArtifact === current;
+      if (!hasPinnedAuthority && !followsOwnLocalCommit) {
+        activeLane.failed = true;
+        dependencies.onStale();
+        return false;
+      }
+
+      try {
+        const updated = await dependencies.persist(briefId, updates, currentRevision);
+        const committed = dependencies.commit(updated, currentRevision);
+        if (!committed) {
+          activeLane.failed = true;
+          dependencies.onStale();
+          return false;
+        }
+        activeLane.lastLocalArtifact = committed;
+        return true;
+      } catch (error) {
+        activeLane.failed = true;
+        dependencies.onError(error);
+        return false;
+      }
+    };
+
+    const result = activeLane.tail.then(run);
+    activeLane.tail = result.then(() => undefined);
+    void result.finally(() => {
+      activeLane.pending -= 1;
+      if (activeLane.pending === 0 && lanes.get(briefId) === activeLane) {
+        lanes.delete(briefId);
+      }
+    });
+    return result;
+  };
+
+  return { enqueue };
+}
+
 export function useAdminBriefWorkflow({
   workspaceId,
   fixContext,
   clearFixContext,
+  initialBriefId,
 }: {
   workspaceId: string;
   fixContext?: BriefWorkflowFixContext | null;
   clearFixContext?: () => void;
+  initialBriefId?: string | null;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -117,7 +227,7 @@ export function useAdminBriefWorkflow({
   const [pendingRequestBriefJob, setPendingRequestBriefJob] = useState<{ jobId: string; requestId: string } | null>(null);
   const [businessCtx, setBusinessCtx] = useState('');
   const [generationStyle, setGenerationStyle] = useState<ContentGenerationStyle>(DEFAULT_CONTENT_GENERATION_STYLE);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(() => initialBriefId ?? null);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [loadingBrief, setLoadingBrief] = useState<string | null>(null);
   const [briefError, setBriefError] = useState<string | null>(null);
@@ -156,16 +266,66 @@ export function useAdminBriefWorkflow({
   const posts = (postsQ.data ?? []) as PostSummary[];
   const templateCrossref = templateCrossrefQ.data ?? null;
   const loading = briefsQ.isLoading || requestsQ.isLoading || postsQ.isLoading;
+  const initialBriefListLoaded = briefsQ.data !== undefined;
+  const initialBriefAvailable = Boolean(initialBriefId && briefsQ.data?.some((brief) => brief.id === initialBriefId));
   const hasBlockingQueryError =
     (briefsQ.isError || requestsQ.isError || postsQ.isError) &&
     briefs.length === 0 &&
     clientRequests.length === 0 &&
     posts.length === 0;
 
+  useEffect(() => {
+    if (initialBriefId === undefined || !initialBriefListLoaded) return;
+    setExpanded(initialBriefAvailable ? initialBriefId : null);
+  }, [initialBriefAvailable, initialBriefId, initialBriefListLoaded]);
+
   const fixContextRef = useRef<BriefWorkflowFixContext | null | undefined>(null);
   const fixConsumed = useRef(false);
   const autoGenTriggered = useRef(false);
   const pendingDeleteRef = useRef<(BriefDeleteTarget & { timerId: number }) | null>(null);
+  const briefFieldSaveQueueRef = useRef<{
+    workspaceId: string;
+    queue: ReturnType<typeof createBriefFieldSaveQueue>;
+  } | null>(null);
+
+  if (!briefFieldSaveQueueRef.current || briefFieldSaveQueueRef.current.workspaceId !== workspaceId) {
+    const briefQueryKey = queryKeys.admin.briefs(workspaceId);
+    briefFieldSaveQueueRef.current = {
+      workspaceId,
+      queue: createBriefFieldSaveQueue({
+        readCurrent: briefId => queryClient
+          .getQueryData<ContentBrief[]>(briefQueryKey)
+          ?.find(brief => brief.id === briefId),
+        persist: (briefId, updates, expectedRevision) => patch<ContentBrief>(
+          `/api/content-briefs/${workspaceId}/${briefId}`,
+          { ...updates, expectedRevision },
+        ),
+        commit: (updated, expectedRevision) => {
+          let committed = false;
+          queryClient.setQueryData<ContentBrief[]>(briefQueryKey, old => {
+            const current = old ?? [];
+            const currentBrief = current.find(brief => brief.id === updated.id);
+            if (!currentBrief || (currentBrief.generationRevision ?? 0) !== expectedRevision) {
+              return current;
+            }
+            committed = true;
+            return current.map(brief => brief.id === updated.id ? updated : brief);
+          });
+          if (!committed) return undefined;
+          return queryClient
+            .getQueryData<ContentBrief[]>(briefQueryKey)
+            ?.find(brief => brief.id === updated.id);
+        },
+        onStale: () => {
+          toast('This brief changed while you were editing. Review the latest version and try again.', 'error');
+        },
+        onError: err => {
+          console.error('ContentBriefs operation failed:', err);
+          toast(err instanceof Error ? err.message : 'Failed to save brief edit', 'error');
+        },
+      }),
+    };
+  }
 
   const startBriefGenerationJob = async (params: Record<string, unknown>): Promise<string | null> => {
     try {
@@ -178,7 +338,7 @@ export function useAdminBriefWorkflow({
       return data.jobId;
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        toast('A content brief is already being generated for this workspace.', 'error');
+        toast('Generation is already running for this content item.', 'error');
         return null;
       }
       throw err;
@@ -242,11 +402,28 @@ export function useAdminBriefWorkflow({
     }
   };
 
-  const regenerateOutline = async (briefId: string, feedback?: string) => {
+  const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
+
+  const resolveCurrentBriefAuthority = (briefId: string, expectedRevision?: number): number | null => {
+    const currentBrief = getBriefById(briefId);
+    const resolvedExpectedRevision = expectedRevision ?? currentBrief?.generationRevision ?? 0;
+    if (!currentBrief || (currentBrief.generationRevision ?? 0) !== resolvedExpectedRevision) {
+      toast('This brief changed while the form was open. Review the latest version and try again.', 'error');
+      return null;
+    }
+    return resolvedExpectedRevision;
+  };
+
+  const regenerateOutline = async (briefId: string, feedback?: string, expectedRevision?: number) => {
+    const authorizedRevision = resolveCurrentBriefAuthority(briefId, expectedRevision);
+    if (authorizedRevision === null) return;
     setRegeneratingOutline(briefId);
     try {
       const res = await post<{ jobId: string }>(
-        `/api/content-briefs/${workspaceId}/${briefId}/regenerate-outline`, { feedback }
+        `/api/content-briefs/${workspaceId}/${briefId}/regenerate-outline`, {
+          feedback,
+          expectedRevision: authorizedRevision,
+        },
       );
       trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
       setRegenOutlineJobId({ jobId: res.jobId, briefId });
@@ -258,11 +435,21 @@ export function useAdminBriefWorkflow({
     }
   };
 
-  const regenerateBrief = async (briefId: string, feedback: string, requestId?: string) => {
+  const regenerateBrief = async (
+    briefId: string,
+    feedback: string,
+    expectedRevision?: number,
+    requestId?: string,
+  ) => {
+    const authorizedRevision = resolveCurrentBriefAuthority(briefId, expectedRevision);
+    if (authorizedRevision === null) return;
     setRegeneratingBrief(briefId);
     try {
       const res = await post<{ jobId: string }>(
-        `/api/content-briefs/${workspaceId}/${briefId}/regenerate`, { feedback }
+        `/api/content-briefs/${workspaceId}/${briefId}/regenerate`, {
+          feedback,
+          expectedRevision: authorizedRevision,
+        },
       );
       trackJob(BACKGROUND_JOB_TYPES.CONTENT_BRIEF_REGENERATE, res.jobId, { workspaceId, briefId });
       setRegenBriefJobId({ jobId: res.jobId, briefId, requestId });
@@ -274,16 +461,13 @@ export function useAdminBriefWorkflow({
     }
   };
 
-  const saveBriefField = async (briefId: string, updates: Partial<ContentBrief>) => {
-    try {
-      const updated = await patch<ContentBrief>(`/api/content-briefs/${workspaceId}/${briefId}`, updates);
-      queryClient.setQueryData<ContentBrief[]>(queryKeys.admin.briefs(workspaceId), old => (old ?? []).map(b => b.id === briefId ? updated : b));
-    } catch (err) {
-      console.error('ContentBriefs operation failed:', err);
-    }
+  const saveBriefField = async (
+    briefId: string,
+    updates: Partial<ContentBrief>,
+    expectedRevision?: number,
+  ): Promise<boolean> => {
+    return briefFieldSaveQueueRef.current!.queue.enqueue(briefId, updates, expectedRevision);
   };
-
-  const getBriefById = (briefId: string) => briefs.find(b => b.id === briefId);
 
   const toggleRequestBrief = async (reqId: string, briefId: string) => {
     if (expandedRequest === reqId) { setExpandedRequest(null); setBriefError(null); return; }
@@ -340,10 +524,18 @@ export function useAdminBriefWorkflow({
       .catch(() => { w.location.href = `/api/content-briefs/${workspaceId}/${b.id}/export`; });
   };
 
-  const sendToClient = async (b: ContentBrief, note?: string) => {
+  const sendToClient = async (b: ContentBrief, note?: string, expectedRevision?: number) => {
+    const authorizedRevision = resolveCurrentBriefAuthority(
+      b.id,
+      expectedRevision ?? b.generationRevision ?? 0,
+    );
+    if (authorizedRevision === null) return;
     setSendingToClient(b.id);
     try {
-      const result = await post<{ ok: boolean; requestId: string }>(`/api/content-briefs/${workspaceId}/${b.id}/send-to-client`, note ? { note } : {});
+      const result = await post<{ ok: boolean; requestId: string }>(
+        `/api/content-briefs/${workspaceId}/${b.id}/send-to-client`,
+        { expectedRevision: authorizedRevision, ...(note ? { note } : {}) },
+      );
       if (result.ok) {
         queryClient.invalidateQueries({ queryKey: queryKeys.admin.requests(workspaceId) });
         toast('Brief sent to client');
@@ -361,6 +553,7 @@ export function useAdminBriefWorkflow({
       const jobId = await startBriefGenerationJob({
         workspaceId,
         requestId: req.id,
+        expectedRequestUpdatedAt: req.updatedAt,
         generationStyle: selectedGenerationStyle ?? generationStyle,
       });
       if (jobId) {
@@ -375,11 +568,18 @@ export function useAdminBriefWorkflow({
     }
   };
 
-  const generatePost = async (briefId: string, selectedGenerationStyle?: ContentGenerationStyle): Promise<boolean> => {
+  const generatePost = async (
+    briefId: string,
+    selectedGenerationStyle?: ContentGenerationStyle,
+    expectedBriefRevision?: number,
+  ): Promise<boolean> => {
+    const authorizedRevision = resolveCurrentBriefAuthority(briefId, expectedBriefRevision);
+    if (authorizedRevision === null) return false;
     setGeneratingPostFor(briefId);
     try {
       const skeleton = await post<PostSummary & { jobId?: string }>(`/api/content-posts/${workspaceId}/generate`, {
         briefId,
+        expectedBriefRevision: authorizedRevision,
         generationStyle: selectedGenerationStyle,
       });
       if (skeleton.jobId) {
@@ -397,8 +597,8 @@ export function useAdminBriefWorkflow({
     }
   };
 
-  const deleteBrief = async (briefId: string) => {
-    await del(`/api/content-briefs/${workspaceId}/${briefId}`);
+  const deleteBrief = async (briefId: string, expectedRevision: number) => {
+    await del(`/api/content-briefs/${workspaceId}/${briefId}`, { expectedRevision });
   };
 
   const confirmDeleteBrief = (brief: ContentBrief) => {
@@ -459,7 +659,7 @@ export function useAdminBriefWorkflow({
   const commitDelete = async (target: BriefDeleteTarget) => {
     try {
       if (target.type === 'brief') {
-        await deleteBrief(target.id);
+        await deleteBrief(target.id, target.item.generationRevision ?? 0);
       } else {
         await deleteRequest(target.id);
       }

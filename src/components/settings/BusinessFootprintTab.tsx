@@ -98,14 +98,12 @@ export function BusinessFootprintTab({
         />
       </div>
 
-      <FeatureFlag flag="geo-targeting">
-        <TargetGeoEditor
-          workspaceId={workspaceId}
-          targetGeo={targetGeo}
-          toast={toast}
-          onSave={onBusinessProfileSave}
-        />
-      </FeatureFlag>
+      <TargetGeoEditor
+        workspaceId={workspaceId}
+        targetGeo={targetGeo}
+        toast={toast}
+        onSave={onBusinessProfileSave}
+      />
 
       <div
         ref={locationsRef}

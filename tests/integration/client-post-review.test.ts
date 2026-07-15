@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
-import { savePost, getPost, listPostVersions } from '../../server/content-posts-db.js';
+import { savePost, getPost, listPosts, listPostVersions, updatePostField } from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
 
@@ -108,7 +108,21 @@ async function createRequestWithPostForWorkspace(
 }
 
 async function setStatus(reqId: string, status: string): Promise<Response> {
-  return patchJson(`/api/content-requests/${testWsId}/${reqId}`, { status });
+  if (status !== 'post_review') {
+    return patchJson(`/api/content-requests/${testWsId}/${reqId}`, { status });
+  }
+
+  const request = getContentRequest(testWsId, reqId);
+  const post = request?.postId
+    ? getPost(testWsId, request.postId)
+    : listPosts(testWsId).find(candidate => candidate.briefId === request?.briefId);
+
+  return patchJson(`/api/content-requests/${testWsId}/${reqId}`, {
+    status,
+    // A missing post still reaches the route's domain guard instead of failing
+    // request-shape validation, which keeps the invalid-transition assertions meaningful.
+    expectedPostRevision: post?.generationRevision ?? 0,
+  });
 }
 
 function countActivitiesForRequest(workspaceId: string, requestId: string, type: string): number {
@@ -267,7 +281,7 @@ describe('GET /api/public/content-requests/:wsId — postId serialization', () =
     const post = makeStubPost(testWsId, briefId);
     savePost(testWsId, post);
     await patchJson(`/api/content-requests/${testWsId}/${ready.id}`, { status: 'in_progress' });
-    await patchJson(`/api/content-requests/${testWsId}/${ready.id}`, { status: 'post_review' });
+    await setStatus(ready.id, 'post_review');
 
     // Setup: requested-status request with no post
     const earlyReq = await createRequest('GET Test Early', `get-early-${Date.now()}`);
@@ -313,6 +327,13 @@ describe('GET /api/public/content-posts/:wsId/:postId', () => {
     });
     updateContentRequest(testWsId, req.id, { briefId });
     const linkedPost = makeStubPost(testWsId, briefId);
+    linkedPost.generationDiagnostics = [{
+      stage: 'section',
+      code: 'provider_error',
+      message: 'internal provider detail',
+      sectionIndex: 0,
+      occurredAt: new Date().toISOString(),
+    }];
     const siblingPost = {
       ...makeStubPost(testWsId, briefId),
       id: `post_sibling_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -325,6 +346,9 @@ describe('GET /api/public/content-posts/:wsId/:postId', () => {
 
     const linkedRes = await api(`/api/public/content-posts/${testWsId}/${linkedPost.id}`);
     expect(linkedRes.status).toBe(200);
+    const linkedBody = await linkedRes.json() as Record<string, unknown>;
+    expect(linkedBody).not.toHaveProperty('generationDiagnostics');
+    expect(linkedBody).not.toHaveProperty('aiReview');
 
     const siblingRes = await api(`/api/public/content-posts/${testWsId}/${siblingPost.id}`);
     expect(siblingRes.status).toBe(403);
@@ -350,7 +374,7 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     // (admin PATCH auto-populates postId when transitioning to post_review)
     const toInProgress = await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'in_progress' });
     expect(toInProgress.status).toBe(200);
-    const toReview = await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
+    const toReview = await setStatus(req.id, 'post_review');
     expect(toReview.status).toBe(200);
 
     // Client edits via public route — content is rich text now (TipTap output);
@@ -361,6 +385,7 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        expectedUpdatedAt: getPost(testWsId, post.id)!.updatedAt,
         sections: [
           { index: 0, heading: 'Section One', content: '<p>Updated section content by client.</p>', wordCount: 5 },
         ],
@@ -394,12 +419,13 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     savePost(testWsId, post);
 
     await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'in_progress' });
-    await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
+    await setStatus(req.id, 'post_review');
 
     const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        expectedUpdatedAt: getPost(testWsId, post.id)!.updatedAt,
         title: '<strong>Plain title</strong>',
         sections: [
           {
@@ -431,16 +457,23 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     savePost(testWsId, post);
 
     await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'in_progress' });
-    await patchJson(`/api/content-requests/${testWsId}/${req.id}`, { status: 'post_review' });
+    await setStatus(req.id, 'post_review');
 
-    const edit = async (content: string) =>
-      api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
+    let expectedUpdatedAt = getPost(testWsId, post.id)!.updatedAt;
+    const edit = async (content: string) => {
+      const response = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          expectedUpdatedAt,
           sections: [{ index: 0, heading: 'Section One', content, wordCount: 4 }],
         }),
       });
+      if (response.ok) {
+        expectedUpdatedAt = (await response.clone().json() as { updatedAt: string }).updatedAt;
+      }
+      return response;
+    };
 
     // First edit — should create a snapshot
     const r1 = await edit('First edit by client.');
@@ -458,6 +491,40 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     expect(clientEditVersions).toHaveLength(1);
   });
 
+  it('rejects a stale client token without snapshotting or overwriting the winner', async () => {
+    const briefId = `brief_stale_client_${Date.now()}`;
+    const req = createContentRequest(testWsId, {
+      topic: 'Stale Client Edit', targetKeyword: `stale-client-${Date.now()}`,
+      intent: 'informational', priority: 'medium', rationale: '', serviceType: 'full_post',
+    });
+    updateContentRequest(testWsId, req.id, { briefId });
+    const post = makeStubPost(testWsId, briefId);
+    savePost(testWsId, post);
+    updateContentRequest(testWsId, req.id, { status: 'in_progress' });
+    updateContentRequest(testWsId, req.id, { status: 'post_review', postId: post.id });
+
+    const observed = getPost(testWsId, post.id)!;
+    const winner = updatePostField(
+      testWsId,
+      post.id,
+      { title: 'Newer operator title' },
+      observed.generationRevision,
+    )!;
+
+    const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedUpdatedAt: observed.updatedAt,
+        title: 'Stale client title',
+      }),
+    });
+
+    expect(editRes.status).toBe(409);
+    expect(getPost(testWsId, post.id)?.title).toBe(winner.title);
+    expect(listPostVersions(testWsId, post.id)).toHaveLength(0);
+  });
+
   it('rejects edit when request is not in post_review', async () => {
     const briefId = `brief_guard_${Date.now()}`;
     const req = createContentRequest(testWsId, {
@@ -472,7 +539,10 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
     const editRes = await api(`/api/public/content-posts/${testWsId}/${post.id}/client-edit`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sections: [{ index: 0, heading: 'H', content: '<p>No.</p>', wordCount: 1 }] }),
+      body: JSON.stringify({
+        expectedUpdatedAt: getPost(testWsId, post.id)!.updatedAt,
+        sections: [{ index: 0, heading: 'H', content: '<p>No.</p>', wordCount: 1 }],
+      }),
     });
     expect(editRes.status).toBe(403);
   });
@@ -504,6 +574,7 @@ describe('PATCH /api/public/content-posts/:wsId/:postId/client-edit', () => {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        expectedUpdatedAt: getPost(testWsId, siblingPost.id)!.updatedAt,
         sections: [
           { index: 0, heading: 'Changed', content: '<p>Changed sibling content.</p>', wordCount: 3 },
         ],

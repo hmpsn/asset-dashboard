@@ -1,6 +1,10 @@
 import { get, patch, post } from './client';
 import type { ClientDeliverable } from '../../shared/types/client-deliverable';
 import type { AdminDeliverablesResponse } from '../../shared/types/admin-deliverable-view';
+import type {
+  BrandReviewClientDecisionRequest,
+  ClientBrandReviewDecisionReceipt,
+} from '../../shared/types/brand-generation';
 
 /** The client response decision verbs (mirrors the /respond route's Zod enum). */
 export type DeliverableResponseDecision = 'approved' | 'changes_requested' | 'declined';
@@ -19,8 +23,8 @@ interface UnifiedInboxResponse {
  * No raw fetch in components (CLAUDE.md).
  */
 export const publicDeliverables = {
-  list: (wsId: string) =>
-    get<UnifiedInboxResponse>(`/api/public/deliverables/${wsId}`),
+  list: (wsId: string, signal?: AbortSignal) =>
+    get<UnifiedInboxResponse>(`/api/public/deliverables/${wsId}`, signal),
 
   respond: (
     wsId: string,
@@ -48,6 +52,23 @@ export const publicDeliverables = {
     patch<ClientDeliverable>(
       `/api/public/deliverables/${wsId}/${deliverableId}/respond`,
       body,
+    ),
+
+  /**
+   * Brand-generation review is deliberately item-scoped. It shares the canonical deliverable
+   * respond URL, but its discriminated request can never express a generic whole-bundle decision.
+   * The server commits the frozen brand source, generation item, and mirror child atomically.
+   */
+  respondToBrandReview: (
+    wsId: string,
+    deliverableId: string,
+    body: BrandReviewClientDecisionRequest,
+    signal?: AbortSignal,
+  ) =>
+    patch<ClientBrandReviewDecisionReceipt>(
+      `/api/public/deliverables/${wsId}/${deliverableId}/respond`,
+      body,
+      signal,
     ),
 
   /**

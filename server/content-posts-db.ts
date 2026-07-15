@@ -4,15 +4,43 @@
  */
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
-import type { PostSection, GeneratedPost } from '../shared/types/content.ts';
+import type {
+  GeneratedPost,
+  PersistedGeneratedPost,
+  PostSection,
+} from '../shared/types/content.ts';
+import type { GenerationProvenance } from '../shared/types/ai-execution.js';
+import { JOB_RESOURCE_TYPES } from '../shared/types/background-jobs.js';
+import { isDeepStrictEqual } from 'node:util';
 import { createLogger } from './logger.js';
 import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
-import { postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from './schemas/content-schemas.js';
+import { contentPostGenerationDiagnosticSchema, postSectionSchema, reviewChecklistSchema, storedAiReviewSchema } from './schemas/content-schemas.js';
 import { validateTransition, POST_STATUS_TRANSITIONS } from './state-machines.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
 import { getScoredOutcomeReadbacks } from './outcome-tracking.js';
+import { normalizePageUrl, pageAddressSlug } from './utils/page-address.js';
+import { IncompleteContentPostError, isCompleteGeneratedPost } from './domains/content/generation-integrity.js';
+import {
+  GenerationRevisionConflictError,
+} from './generation-provenance.js';
+import {
+  canonicalGenerationProvenanceSchema,
+  generationProvenanceSchema,
+} from './schemas/generation-provenance.js';
+import { assertNoUnresolvedContentPublishReconciliation } from './content-publish-reconciliation.js';
+import { ActiveJobResourceConflict, getActiveJobForResource } from './jobs.js';
 
 const log = createLogger('content-posts-db');
+
+function nextPostUpdatedAt(previous: string, requested?: string): string {
+  const previousMs = Date.parse(previous);
+  const requestedMs = requested ? Date.parse(requested) : Number.NaN;
+  return new Date(Math.max(
+    Date.now(),
+    Number.isFinite(previousMs) ? previousMs + 1 : 0,
+    Number.isFinite(requestedMs) ? requestedMs : 0,
+  )).toISOString();
+}
 
 // ── SQLite row shape ──
 
@@ -31,6 +59,7 @@ interface PostRow {
   total_word_count: number;
   target_word_count: number;
   status: string;
+  generation_diagnostics: string | null;
   unification_status: string | null;
   unification_note: string | null;
   webflow_item_id: string | null;
@@ -43,6 +72,8 @@ interface PostRow {
   voice_score: number | null;
   voice_feedback: string | null;
   generation_style: string | null;
+  generation_revision: number;
+  generation_provenance: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,6 +81,10 @@ interface PostRow {
 interface PublishedMonthCountRow {
   month: string;
   cnt: number;
+}
+
+interface PublishedPathRow {
+  published_slug: string | null;
 }
 
 export interface PublishedMonthCount {
@@ -82,6 +117,7 @@ export interface PostVersion {
   seoTitle?: string;
   seoMetaDescription?: string;
   totalWordCount: number;
+  generationProvenance: GenerationProvenance | null;
   createdAt: string;
 }
 
@@ -100,6 +136,7 @@ interface VersionRow {
   seo_title: string | null;
   seo_meta_description: string | null;
   total_word_count: number;
+  generation_provenance: string | null;
   created_at: string;
 }
 
@@ -108,11 +145,13 @@ const vStmts = createStmtCache(() => ({
     `INSERT INTO content_post_versions
            (id, post_id, workspace_id, version_number, trigger, trigger_detail,
             title, meta_description, introduction, sections, conclusion,
-            seo_title, seo_meta_description, total_word_count, created_at)
+            seo_title, seo_meta_description, total_word_count,
+            generation_provenance, created_at)
          VALUES
            (@id, @post_id, @workspace_id, @version_number, @trigger, @trigger_detail,
             @title, @meta_description, @introduction, @sections, @conclusion,
-            @seo_title, @seo_meta_description, @total_word_count, @created_at)`,
+            @seo_title, @seo_meta_description, @total_word_count,
+            @generation_provenance, @created_at)`,
   ),
   listByPost: db.prepare(
     `SELECT * FROM content_post_versions WHERE post_id = ? AND workspace_id = ? ORDER BY version_number DESC`,
@@ -148,6 +187,18 @@ function rowToVersion(row: VersionRow): PostVersion {
     seoTitle: row.seo_title ?? undefined,
     seoMetaDescription: row.seo_meta_description ?? undefined,
     totalWordCount: row.total_word_count,
+    generationProvenance: row.generation_provenance
+      ? parseJsonSafe(
+          row.generation_provenance,
+          generationProvenanceSchema,
+          null,
+          {
+            workspaceId: row.workspace_id,
+            field: 'generation_provenance',
+            table: 'content_post_versions',
+          },
+        )
+      : null,
     createdAt: row.created_at,
   };
 }
@@ -158,19 +209,21 @@ const stmts = createStmtCache(() => ({
            (id, workspace_id, brief_id, target_keyword, title, meta_description,
             introduction, sections, conclusion, seo_title, seo_meta_description,
             total_word_count, target_word_count, status, unification_status,
-            unification_note, review_checklist, ai_review,
+            unification_note, generation_diagnostics, review_checklist, ai_review,
             webflow_item_id, webflow_collection_id, published_at, published_slug,
             planned_publish_at,
             voice_score, voice_feedback, generation_style,
+            generation_revision, generation_provenance,
             created_at, updated_at)
          VALUES
            (@id, @workspace_id, @brief_id, @target_keyword, @title, @meta_description,
             @introduction, @sections, @conclusion, @seo_title, @seo_meta_description,
             @total_word_count, @target_word_count, @status, @unification_status,
-            @unification_note, @review_checklist, @ai_review,
+            @unification_note, @generation_diagnostics, @review_checklist, @ai_review,
             @webflow_item_id, @webflow_collection_id, @published_at, @published_slug,
             @planned_publish_at,
             @voice_score, @voice_feedback, @generation_style,
+            @generation_revision, @generation_provenance,
             @created_at, @updated_at)`,
   ),
   selectByWorkspace: db.prepare(
@@ -179,25 +232,48 @@ const stmts = createStmtCache(() => ({
   selectById: db.prepare(
     `SELECT * FROM content_posts WHERE id = ? AND workspace_id = ?`,
   ),
-  update: db.prepare(
+  selectBriefRevision: db.prepare(
+    `SELECT generation_revision FROM content_briefs
+      WHERE id = ? AND workspace_id = ?`,
+  ),
+  updateAtRevision: db.prepare(
     `UPDATE content_posts SET
            title = @title, meta_description = @meta_description,
            introduction = @introduction, sections = @sections, conclusion = @conclusion,
            seo_title = @seo_title, seo_meta_description = @seo_meta_description,
            total_word_count = @total_word_count, target_word_count = @target_word_count,
            status = @status, unification_status = @unification_status,
-           unification_note = @unification_note, review_checklist = @review_checklist,
+           unification_note = @unification_note, generation_diagnostics = @generation_diagnostics, review_checklist = @review_checklist,
            ai_review = @ai_review,
            webflow_item_id = @webflow_item_id, webflow_collection_id = @webflow_collection_id,
            published_at = @published_at, published_slug = @published_slug,
            planned_publish_at = @planned_publish_at,
            voice_score = @voice_score, voice_feedback = @voice_feedback,
            generation_style = @generation_style,
+           generation_revision = generation_revision + 1,
+           generation_provenance = @generation_provenance,
            updated_at = @updated_at
-         WHERE id = @id AND workspace_id = @workspace_id`,
+         WHERE id = @id AND workspace_id = @workspace_id
+           AND generation_revision = @expected_generation_revision`,
+  ),
+  assertRevision: db.prepare(
+    `SELECT generation_revision FROM content_posts
+      WHERE id = ? AND workspace_id = ?`,
+  ),
+  bumpAtRevision: db.prepare(
+    `UPDATE content_posts
+        SET generation_revision = generation_revision + 1,
+            updated_at = @updated_at
+      WHERE id = @id AND workspace_id = @workspace_id
+        AND generation_revision = @expected_generation_revision`,
   ),
   deleteById: db.prepare(
     `DELETE FROM content_posts WHERE id = ? AND workspace_id = ?`,
+  ),
+  deleteAtRevision: db.prepare(
+    `DELETE FROM content_posts
+      WHERE id = @id AND workspace_id = @workspace_id
+        AND generation_revision = @expected_generation_revision`,
   ),
   selectPublishedByMonth: db.prepare<[workspaceId: string, startMonth: string]>(
     `SELECT substr(published_at, 1, 7) AS month, COUNT(*) AS cnt
@@ -208,9 +284,15 @@ const stmts = createStmtCache(() => ({
       GROUP BY substr(published_at, 1, 7)
       ORDER BY month ASC`,
   ),
+  selectPublishedPaths: db.prepare(
+    `SELECT published_slug
+       FROM content_posts
+      WHERE workspace_id = ?
+        AND (published_at IS NOT NULL OR webflow_item_id IS NOT NULL)`,
+  ),
 }));
 
-function rowToPost(row: PostRow): GeneratedPost {
+function rowToPost(row: PostRow): PersistedGeneratedPost {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -226,6 +308,13 @@ function rowToPost(row: PostRow): GeneratedPost {
     totalWordCount: row.total_word_count,
     targetWordCount: row.target_word_count,
     status: row.status as GeneratedPost['status'],
+    generationDiagnostics: row.generation_diagnostics
+      ? parseJsonSafeArray(row.generation_diagnostics, contentPostGenerationDiagnosticSchema, {
+          workspaceId: row.workspace_id,
+          field: 'generation_diagnostics',
+          table: 'content_posts',
+        })
+      : undefined,
     unificationStatus: row.unification_status as GeneratedPost['unificationStatus'] ?? undefined,
     unificationNote: row.unification_note ?? undefined,
     webflowItemId: row.webflow_item_id ?? undefined,
@@ -245,12 +334,35 @@ function rowToPost(row: PostRow): GeneratedPost {
     voiceScore: row.voice_score ?? undefined,
     voiceFeedback: row.voice_feedback ?? undefined,
     generationStyle: resolveContentGenerationStyle(row.generation_style),
+    generationRevision: row.generation_revision,
+    generationProvenance: row.generation_provenance
+      ? parseJsonSafe(
+          row.generation_provenance,
+          generationProvenanceSchema,
+          null,
+          {
+            workspaceId: row.workspace_id,
+            field: 'generation_provenance',
+            table: 'content_posts',
+          },
+        )
+      : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-function postToParams(post: GeneratedPost): Record<string, unknown> {
+function postToParams(
+  post: GeneratedPost,
+  options: {
+    generationRevision?: number;
+    generationProvenance?: GenerationProvenance | null;
+    expectedGenerationRevision?: number;
+  } = {},
+): Record<string, unknown> {
+  const generationProvenance = options.generationProvenance !== undefined
+    ? options.generationProvenance
+    : post.generationProvenance ?? null;
   return {
     id: post.id,
     workspace_id: post.workspaceId,
@@ -266,6 +378,7 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     total_word_count: post.totalWordCount,
     target_word_count: post.targetWordCount,
     status: post.status,
+    generation_diagnostics: post.generationDiagnostics ? JSON.stringify(post.generationDiagnostics) : null,
     unification_status: post.unificationStatus ?? null,
     unification_note: post.unificationNote ?? null,
     webflow_item_id: post.webflowItemId ?? null,
@@ -278,14 +391,76 @@ function postToParams(post: GeneratedPost): Record<string, unknown> {
     voice_score: post.voiceScore ?? null,
     voice_feedback: post.voiceFeedback ?? null,
     generation_style: resolveContentGenerationStyle(post.generationStyle),
+    generation_revision: options.generationRevision ?? post.generationRevision ?? 0,
+    generation_provenance: generationProvenance
+      ? JSON.stringify(generationProvenanceSchema.parse(generationProvenance))
+      : null,
+    expected_generation_revision: options.expectedGenerationRevision
+      ?? post.generationRevision
+      ?? 0,
     created_at: post.createdAt,
     updated_at: post.updatedAt,
   };
 }
 
-export function listPosts(workspaceId: string): GeneratedPost[] {
+export function listPosts(workspaceId: string): PersistedGeneratedPost[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as PostRow[];
   return rows.map(rowToPost);
+}
+
+export interface PublishedPostPagePathCensus {
+  paths: Set<string>;
+  unresolvedSlugs: Set<string>;
+  totalCount: number;
+  validCount: number;
+  complete: boolean;
+}
+
+function publishedPageIdentity(raw: string | null): { path?: string; slug?: string } | null {
+  if (typeof raw !== 'string' || raw.trim().length === 0) return null;
+  const value = raw.trim();
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      return parsed.username || parsed.password
+        ? null
+        : { path: normalizePageUrl(parsed.pathname) };
+    } catch { // catch-ok: malformed durable page identity makes the census incomplete.
+      return null;
+    }
+  }
+  if (value.startsWith('/') || value.includes('/')) {
+    return { path: normalizePageUrl(value.startsWith('/') ? value : `/${value}`) };
+  }
+  const slug = pageAddressSlug(value);
+  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(slug) ? { slug } : null;
+}
+
+export function getPublishedPostPagePathCensus(
+  workspaceId: string,
+): PublishedPostPagePathCensus {
+  const rows = stmts().selectPublishedPaths.all(workspaceId) as PublishedPathRow[];
+  const normalized = rows.map(row => publishedPageIdentity(row.published_slug));
+  const valid = normalized.filter((identity): identity is { path?: string; slug?: string } => (
+    identity !== null
+  ));
+  const paths = valid.flatMap(identity => identity.path ? [identity.path] : []);
+  const unresolvedSlugs = valid.flatMap(identity => identity.slug ? [identity.slug] : []);
+  return {
+    paths: new Set(paths),
+    unresolvedSlugs: new Set(unresolvedSlugs),
+    totalCount: rows.length,
+    validCount: valid.length,
+    complete: valid.length === rows.length && unresolvedSlugs.length === 0,
+  };
+}
+
+export function listPublishedPostPagePaths(workspaceId: string): Set<string> {
+  const census = getPublishedPostPagePathCensus(workspaceId);
+  return new Set([
+    ...[...census.paths].map(pageAddressSlug).filter(Boolean),
+    ...census.unresolvedSlugs,
+  ]);
 }
 
 /**
@@ -368,39 +543,316 @@ export function getContentVelocityTrend(
   };
 }
 
-export function getPost(workspaceId: string, postId: string): GeneratedPost | undefined {
+export function getPost(workspaceId: string, postId: string): PersistedGeneratedPost | undefined {
   const row = stmts().selectById.get(postId, workspaceId) as PostRow | undefined;
   return row ? rowToPost(row) : undefined;
 }
 
-export function savePost(workspaceId: string, post: GeneratedPost): void {
-  const existing = stmts().selectById.get(post.id, workspaceId) as PostRow | undefined;
-  if (existing) {
-    stmts().update.run(postToParams(post));
-  } else {
-    stmts().insert.run(postToParams(post));
+/** Insert-only persistence for a new post or generation skeleton. */
+export function createPost(
+  workspaceId: string,
+  post: GeneratedPost,
+): PersistedGeneratedPost {
+  if (post.workspaceId !== workspaceId) {
+    throw new Error('Content post workspace does not match the persistence scope');
   }
+  const created: PersistedGeneratedPost = {
+    ...post,
+    generationRevision: post.generationRevision ?? 0,
+    generationProvenance: post.generationProvenance ?? null,
+  };
+  stmts().insert.run(postToParams(created));
+  return created;
 }
 
-export function updatePostField(workspaceId: string, postId: string, updates: Partial<Omit<GeneratedPost, 'id' | 'workspaceId' | 'createdAt'>>): GeneratedPost | null {
-  const post = getPost(workspaceId, postId);
-  if (!post) return null;
+/** Persist a complete generated candidate exactly once at revision 1. */
+export function persistGeneratedPost(
+  workspaceId: string,
+  post: GeneratedPost,
+): PersistedGeneratedPost {
+  if (!post.generationProvenance) {
+    throw new Error('Generated content post persistence requires provenance');
+  }
+  if (post.status !== 'draft' || !isCompleteGeneratedPost(post, post.sections.length)) {
+    throw new IncompleteContentPostError();
+  }
+  return createPost(workspaceId, {
+    ...post,
+    generationRevision: 1,
+    generationProvenance: canonicalGenerationProvenanceSchema.parse(post.generationProvenance),
+  });
+}
 
-  // Validate status transition if status is being changed
+/**
+ * Backward-compatible manual/import save. New generation code must use
+ * `commitPostGeneration`; existing rows are updated with a revision CAS and the
+ * prior provenance is retained when the caller does not supply it.
+ */
+export function savePost(
+  workspaceId: string,
+  post: GeneratedPost,
+): PersistedGeneratedPost {
+  const existing = stmts().selectById.get(post.id, workspaceId) as PostRow | undefined;
+  if (existing) {
+    const persisted = rowToPost(existing);
+    const expectedRevision = post.generationRevision ?? persisted.generationRevision;
+    const next: GeneratedPost = {
+      ...persisted,
+      ...post,
+      generationProvenance: post.generationProvenance === undefined
+        ? persisted.generationProvenance
+        : post.generationProvenance,
+    };
+    return updatePostAtRevision(
+      workspaceId,
+      next,
+      expectedRevision,
+      next.generationProvenance ?? null,
+    );
+  }
+  return createPost(workspaceId, post);
+}
+
+function updatePostAtRevision(
+  workspaceId: string,
+  post: GeneratedPost,
+  expectedRevision: number,
+  provenance: GenerationProvenance | null,
+): PersistedGeneratedPost {
+  const current = getPost(workspaceId, post.id);
+  if (!current || current.generationRevision !== expectedRevision) {
+    throw new GenerationRevisionConflictError('content_post', post.id, expectedRevision);
+  }
+  const next = {
+    ...post,
+    updatedAt: nextPostUpdatedAt(current.updatedAt, post.updatedAt),
+  };
+  const info = stmts().updateAtRevision.run(postToParams(next, {
+    expectedGenerationRevision: expectedRevision,
+    generationProvenance: provenance,
+  }));
+  if (info.changes !== 1) {
+    throw new GenerationRevisionConflictError('content_post', post.id, expectedRevision);
+  }
+  const updated = getPost(workspaceId, post.id);
+  if (!updated) {
+    throw new GenerationRevisionConflictError('content_post', post.id, expectedRevision);
+  }
+  return updated;
+}
+
+export type ContentPostFieldUpdates = Partial<Omit<
+  GeneratedPost,
+  'id' | 'workspaceId' | 'createdAt' | 'generationRevision' | 'generationProvenance'
+>>;
+
+function applyPostFieldUpdates(
+  post: PersistedGeneratedPost,
+  updates: ContentPostFieldUpdates,
+): PersistedGeneratedPost | null {
   if (updates.status !== undefined && updates.status !== post.status) {
     validateTransition('post', POST_STATUS_TRANSITIONS, post.status, updates.status);
   }
 
-  Object.assign(post, updates, { updatedAt: new Date().toISOString() });
-  stmts().update.run(postToParams(post));
-  return post;
+  const suppliedUpdates = Object.entries(updates) as Array<
+    [keyof ContentPostFieldUpdates, ContentPostFieldUpdates[keyof ContentPostFieldUpdates]]
+  >;
+  const hasChanges = suppliedUpdates.some(([key, value]) => (
+    !isDeepStrictEqual(post[key], value)
+  ));
+  if (!hasChanges) return null;
+
+  const updated: PersistedGeneratedPost = {
+    ...post,
+    ...updates,
+    updatedAt: nextPostUpdatedAt(post.updatedAt),
+  };
+  if (['draft', 'review', 'approved'].includes(updated.status)
+    && !isCompleteGeneratedPost(updated, updated.sections.length)) {
+    throw new IncompleteContentPostError();
+  }
+  return updated;
 }
 
+/** Operator/lifecycle mutation: preserve provenance and increment revision once. */
+export function updatePostField(
+  workspaceId: string,
+  postId: string,
+  updates: ContentPostFieldUpdates,
+  expectedRevision?: number,
+): PersistedGeneratedPost | null {
+  const post = getPost(workspaceId, postId);
+  if (!post) return null;
+  const revision = expectedRevision ?? post.generationRevision;
+  if (post.generationRevision !== revision) {
+    throw new GenerationRevisionConflictError('content_post', postId, revision);
+  }
+  const updated = applyPostFieldUpdates(post, updates);
+  if (!updated) return post;
+  return updatePostAtRevision(workspaceId, updated, revision, post.generationProvenance);
+}
+
+export interface ContentPostSnapshotOptions {
+  trigger: PostVersion['trigger'];
+  triggerDetail?: string;
+}
+
+/**
+ * Operator/client edit that snapshots and conditionally writes in one immediate
+ * transaction. Invalid and semantic no-op edits create neither a revision nor a
+ * version row.
+ */
+export function updatePostFieldWithSnapshot(
+  workspaceId: string,
+  postId: string,
+  updates: ContentPostFieldUpdates,
+  expectedRevision: number,
+  snapshot: ContentPostSnapshotOptions,
+): PersistedGeneratedPost | null {
+  return db.transaction(() => {
+    const post = getPost(workspaceId, postId);
+    if (!post) return null;
+    if (post.generationRevision !== expectedRevision) {
+      throw new GenerationRevisionConflictError('content_post', postId, expectedRevision);
+    }
+    const updated = applyPostFieldUpdates(post, updates);
+    if (!updated) return post;
+    snapshotPostVersion(post, snapshot.trigger, snapshot.triggerDetail);
+    return updatePostAtRevision(
+      workspaceId,
+      updated,
+      expectedRevision,
+      post.generationProvenance,
+    );
+  }).immediate();
+}
+
+/** Fail fast before another paid generation stage when the source revision moved. */
+export function assertPostGenerationRevision(
+  workspaceId: string,
+  postId: string,
+  expectedRevision: number,
+): void {
+  const row = stmts().assertRevision.get(postId, workspaceId) as { generation_revision: number } | undefined;
+  if (!row || row.generation_revision !== expectedRevision) {
+    throw new GenerationRevisionConflictError('content_post', postId, expectedRevision);
+  }
+}
+
+export interface ContentPostSourceBriefAuthority {
+  briefId: string;
+  expectedRevision: number;
+}
+
+/** Fail fast when the exact brief snapshot that authorized generation moved. */
+export function assertBriefGenerationRevision(
+  workspaceId: string,
+  briefId: string,
+  expectedRevision: number,
+): void {
+  const row = stmts().selectBriefRevision.get(briefId, workspaceId) as
+    | { generation_revision: number }
+    | undefined;
+  if (!row || row.generation_revision !== expectedRevision) {
+    throw new GenerationRevisionConflictError('content_brief', briefId, expectedRevision);
+  }
+}
+
+/** Revision-only authority invalidation for linked request/client decisions. */
+export function bumpPostGenerationRevision(
+  workspaceId: string,
+  postId: string,
+  expectedRevision: number,
+): PersistedGeneratedPost {
+  const current = getPost(workspaceId, postId);
+  if (!current || current.generationRevision !== expectedRevision) {
+    throw new GenerationRevisionConflictError('content_post', postId, expectedRevision);
+  }
+  const info = stmts().bumpAtRevision.run({
+    id: postId,
+    workspace_id: workspaceId,
+    expected_generation_revision: expectedRevision,
+    updated_at: nextPostUpdatedAt(current.updatedAt),
+  });
+  if (info.changes !== 1) {
+    throw new GenerationRevisionConflictError('content_post', postId, expectedRevision);
+  }
+  const updated = getPost(workspaceId, postId);
+  if (!updated) throw new GenerationRevisionConflictError('content_post', postId, expectedRevision);
+  return updated;
+}
+
+/**
+ * Conditional whole-artifact generation commit. The accepted provenance and
+ * content/status update are one atomic row write.
+ */
+export function commitPostGeneration(
+  workspaceId: string,
+  post: GeneratedPost,
+  expectedRevision: number,
+  provenance: GenerationProvenance | null,
+  sourceBriefAuthority?: ContentPostSourceBriefAuthority,
+): PersistedGeneratedPost {
+  const canonicalProvenance = provenance
+    ? canonicalGenerationProvenanceSchema.parse(provenance) as GenerationProvenance
+    : null;
+  const commit = () => {
+    if (sourceBriefAuthority) {
+      assertBriefGenerationRevision(
+        workspaceId,
+        sourceBriefAuthority.briefId,
+        sourceBriefAuthority.expectedRevision,
+      );
+    }
+    return updatePostAtRevision(workspaceId, post, expectedRevision, canonicalProvenance);
+  };
+  return sourceBriefAuthority ? db.transaction(commit).immediate() : commit();
+}
+
+export function deletePostAtRevision(
+  workspaceId: string,
+  postId: string,
+  expectedRevision: number,
+): boolean {
+  return db.transaction(() => {
+    const current = getPost(workspaceId, postId);
+    if (!current) return false;
+    if (current.generationRevision !== expectedRevision) {
+      throw new GenerationRevisionConflictError('content_post', postId, expectedRevision);
+    }
+    const postResource = {
+      resourceType: JOB_RESOURCE_TYPES.CONTENT_POST,
+      resourceId: postId,
+    } as const;
+    const activeOwner = getActiveJobForResource(workspaceId, postResource);
+    if (activeOwner) {
+      throw new ActiveJobResourceConflict([{
+        jobId: activeOwner.id,
+        resource: postResource,
+      }]);
+    }
+    assertNoUnresolvedContentPublishReconciliation(workspaceId, postId);
+
+    // Delete version history and the source row together. If the conditional
+    // source delete loses a race, the transaction rolls the version delete back.
+    vStmts().deleteByPost.run(postId, workspaceId);
+    const info = stmts().deleteAtRevision.run({
+      id: postId,
+      workspace_id: workspaceId,
+      expected_generation_revision: expectedRevision,
+    });
+    if (info.changes !== 1) {
+      throw new GenerationRevisionConflictError('content_post', postId, expectedRevision);
+    }
+    return true;
+  }).immediate();
+}
+
+/** Backward-compatible delete; revision-aware callers should use deletePostAtRevision. */
 export function deletePost(workspaceId: string, postId: string): boolean {
-  // Also delete version history
-  vStmts().deleteByPost.run(postId, workspaceId);
-  const info = stmts().deleteById.run(postId, workspaceId);
-  return info.changes > 0;
+  const current = getPost(workspaceId, postId);
+  if (!current) return false;
+  return deletePostAtRevision(workspaceId, postId, current.generationRevision);
 }
 
 // ── Version history API ──
@@ -427,6 +879,7 @@ export function snapshotPostVersion(
     seoTitle: post.seoTitle,
     seoMetaDescription: post.seoMetaDescription,
     totalWordCount: post.totalWordCount,
+    generationProvenance: post.generationProvenance ?? null,
     createdAt: new Date().toISOString(),
   };
   vStmts().insert.run({
@@ -444,10 +897,49 @@ export function snapshotPostVersion(
     seo_title: version.seoTitle ?? null,
     seo_meta_description: version.seoMetaDescription ?? null,
     total_word_count: version.totalWordCount,
+    generation_provenance: version.generationProvenance
+      ? JSON.stringify(generationProvenanceSchema.parse(version.generationProvenance))
+      : null,
     created_at: version.createdAt,
   });
   log.info(`Snapshot v${version.versionNumber} for post ${post.id} (trigger: ${trigger}${triggerDetail ? `, ${triggerDetail}` : ''})`);
   return version;
+}
+
+/**
+ * Snapshot the winning source row and replace it only when its generation
+ * revision is unchanged. A stale replacement rolls the snapshot back too.
+ */
+export function replacePostWithSnapshot(
+  workspaceId: string,
+  replacement: GeneratedPost,
+  expectedRevision: number,
+  trigger: PostVersion['trigger'],
+  triggerDetail?: string,
+  provenance?: GenerationProvenance | null,
+  sourceBriefAuthority?: ContentPostSourceBriefAuthority,
+): PersistedGeneratedPost {
+  const replace = () => {
+    const current = getPost(workspaceId, replacement.id);
+    if (!current || current.generationRevision !== expectedRevision) {
+      throw new GenerationRevisionConflictError('content_post', replacement.id, expectedRevision);
+    }
+    if (sourceBriefAuthority) {
+      assertBriefGenerationRevision(
+        workspaceId,
+        sourceBriefAuthority.briefId,
+        sourceBriefAuthority.expectedRevision,
+      );
+    }
+    snapshotPostVersion(current, trigger, triggerDetail);
+    return updatePostAtRevision(
+      workspaceId,
+      replacement,
+      expectedRevision,
+      provenance === undefined ? current.generationProvenance : provenance,
+    );
+  };
+  return db.inTransaction ? replace() : db.transaction(replace).immediate();
 }
 
 /** List all versions for a post (newest first). */
@@ -479,26 +971,43 @@ export function getPostVersion(workspaceId: string, versionId: string): PostVers
 }
 
 /** Revert a post to a previous version (snapshots current state first). */
-export function revertToVersion(workspaceId: string, postId: string, versionId: string): GeneratedPost | null {
-  const post = getPost(workspaceId, postId);
-  if (!post) return null;
-  const version = getPostVersion(workspaceId, versionId);
-  if (!version || version.postId !== postId) return null;
+export function revertToVersion(
+  workspaceId: string,
+  postId: string,
+  versionId: string,
+  expectedRevision?: number,
+): PersistedGeneratedPost | null {
+  return db.transaction(() => {
+    const post = getPost(workspaceId, postId);
+    if (!post) return null;
+    const revision = expectedRevision ?? post.generationRevision;
+    if (post.generationRevision !== revision) {
+      throw new GenerationRevisionConflictError('content_post', postId, revision);
+    }
+    const version = getPostVersion(workspaceId, versionId);
+    if (!version || version.postId !== postId) return null;
 
-  // Snapshot current state before reverting
-  snapshotPostVersion(post, 'manual_edit', `revert_to_v${version.versionNumber}`);
+    snapshotPostVersion(post, 'manual_edit', `revert_to_v${version.versionNumber}`);
 
-  // Apply version data
-  post.title = version.title;
-  post.metaDescription = version.metaDescription;
-  post.introduction = version.introduction;
-  post.sections = version.sections;
-  post.conclusion = version.conclusion;
-  post.seoTitle = version.seoTitle;
-  post.seoMetaDescription = version.seoMetaDescription;
-  post.totalWordCount = version.totalWordCount;
-  post.updatedAt = new Date().toISOString();
-  stmts().update.run(postToParams(post));
-  log.info(`Reverted post ${postId} to version ${version.versionNumber}`);
-  return post;
+    const reverted: GeneratedPost = {
+      ...post,
+      title: version.title,
+      metaDescription: version.metaDescription,
+      introduction: version.introduction,
+      sections: version.sections,
+      conclusion: version.conclusion,
+      seoTitle: version.seoTitle,
+      seoMetaDescription: version.seoMetaDescription,
+      totalWordCount: version.totalWordCount,
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = updatePostAtRevision(
+      workspaceId,
+      reverted,
+      revision,
+      version.generationProvenance,
+    );
+    log.info(`Reverted post ${postId} to version ${version.versionNumber}`);
+    return updated;
+  }).immediate();
 }

@@ -45,6 +45,9 @@ export function buildClientIntelligenceView(
   intel: WorkspaceIntelligence,
   tier: ClientIntelligenceTier,
 ): ClientIntelligence {
+  // Public consumers fail closed when an older/custom assembler did not provide
+  // the explicit client projection. Never fall back to the admin learnings slice.
+  const clientLearnings = intel.learnings?.clientProjection ?? null;
   return {
     workspaceId: intel.workspaceId,
     assembledAt: intel.assembledAt,
@@ -52,13 +55,17 @@ export function buildClientIntelligenceView(
     insightsSummary: intel.insights ? summarizeInsightsForClient(intel.insights) : null,
     pipelineStatus: intel.contentPipeline ? formatPipelineForClient(intel.contentPipeline) : null,
     ...(tier !== 'free' && {
-      learningHighlights: intel.learnings?.availability === 'ready' ? formatLearningsForClient(intel.learnings) : null,
+      learningHighlights: clientLearnings?.availability === 'ready'
+        ? formatLearningsForClient(clientLearnings)
+        : null,
       rankTrackingSummary: intel.seoContext ? formatRankTrackingForClient(intel.seoContext) : null,
       serpOpportunities: intel.seoContext ? countSerpOpportunities(intel.seoContext) : null,
       compositeHealthScore: intel.clientSignals?.compositeHealthScore ?? null,
       compositeHealthBreakdown: intel.clientSignals?.compositeHealthBreakdown ?? null,
       keywordFeedbackSummary: formatKeywordFeedbackForClient(intel.clientSignals),
-      weCalledIt: intel.learnings?.availability === 'ready' ? (intel.learnings.weCalledIt ?? []) : [],
+      weCalledIt: clientLearnings?.availability === 'ready'
+        ? (clientLearnings.weCalledIt ?? [])
+        : [],
       copyPipelineStatus: intel.contentPipeline
         ? formatCopyPipelineForClient(intel.contentPipeline)
         : null,
@@ -98,7 +105,9 @@ function summarizeInsightsForClient(insights: InsightsSlice): ClientInsightsSumm
 
 function formatPipelineForClient(pipeline: ContentPipelineSlice): ClientPipelineStatus {
   const inProgressBriefStatuses = ['in_review', 'ai_generated', 'draft'];
-  const inProgressPostStatuses = ['draft', 'in_review', 'scheduled'];
+  // GeneratedPost has never used the stale `in_review` / `scheduled` literals.
+  // Scheduling is represented by plannedPublishAt; lifecycle review is `review`.
+  const inProgressPostStatuses = ['generating', 'needs_attention', 'draft', 'review'];
   return {
     briefs: {
       total: pipeline.briefs.total,

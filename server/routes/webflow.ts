@@ -22,17 +22,62 @@ import { resolveRecommendationsForChange } from '../domains/recommendations/reso
 import { getWorkspacePages } from '../workspace-data.js';
 import { createLogger } from '../logger.js';
 import { normalizePageUrl } from '../utils/page-address.js';
+import { listPageKeywordsPaged } from '../page-keywords.js';
+import { getGA4PageOrganicTrafficMap } from '../google-analytics.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
-
-const log = createLogger('webflow');
-
+import type { PageKeywordMap, PageKeywordProjection } from '../../shared/types/workspace.ts';
 import { requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { verifyAdminToken } from '../middleware.js';
 import { requireAdminAuth } from '../middleware/admin-auth.js';
 import { isProgrammingError } from '../errors.js';
 import { resolveBaseUrl } from '../url-helpers.js';
+
+const log = createLogger('webflow');
+
+const PAGE_KEYWORD_PROJECTION_LIMIT = 10_000;
+const PAGE_TRAFFIC_PROJECTION_DAYS = 28;
+const PAGE_TRAFFIC_PROJECTION_LIMIT = 500;
+
+function pageProjectionFrom(
+  keyword: PageKeywordMap | undefined,
+  monthlyTraffic: number | undefined,
+): PageKeywordProjection {
+  const projection: PageKeywordProjection = {};
+  if (keyword) {
+    if (keyword.primaryKeyword) projection.primaryKeyword = keyword.primaryKeyword;
+    projection.rank = keyword.currentPosition ?? null;
+    if (keyword.optimizationScore != null) projection.optimizationScore = keyword.optimizationScore;
+  }
+  if (monthlyTraffic != null) projection.monthlyTraffic = monthlyTraffic;
+  return projection;
+}
+
+function buildKeywordProjectionMap(workspaceId: string): Map<string, PageKeywordMap> {
+  const { items } = listPageKeywordsPaged(workspaceId, PAGE_KEYWORD_PROJECTION_LIMIT, 0);
+  const byPath = new Map<string, PageKeywordMap>();
+  for (const item of items) {
+    byPath.set(normalizePageUrl(item.pagePath).toLowerCase(), item);
+  }
+  return byPath;
+}
+
+async function loadOrganicTrafficProjectionMap(
+  workspace: { id: string; ga4PropertyId?: string },
+): Promise<Map<string, number>> {
+  if (!workspace.ga4PropertyId) return new Map();
+  try {
+    return await getGA4PageOrganicTrafficMap(
+      workspace.ga4PropertyId,
+      PAGE_TRAFFIC_PROJECTION_DAYS,
+      PAGE_TRAFFIC_PROJECTION_LIMIT,
+    );
+  } catch (err) {
+    log.warn({ err, workspaceId: workspace.id }, 'GA4 organic page traffic unavailable for all-pages projection');
+    return new Map();
+  }
+}
 const router = Router();
 
 // Processing queue
@@ -149,7 +194,15 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceSiteAccessFromQuery
     const published = ws ? await getWorkspacePages(ws.id, siteId) : [];
 
     // Build result from static pages
-    const result: Array<{ id: string; title: string; slug: string; publishedPath?: string | null; seo?: { title?: string; description?: string }; source: 'static' | 'cms'; collectionId?: string }> = published.map(p => ({
+    const result: Array<{
+      id: string;
+      title: string;
+      slug: string;
+      publishedPath?: string | null;
+      seo?: { title?: string; description?: string };
+      source: 'static' | 'cms';
+      collectionId?: string;
+    } & PageKeywordProjection> = published.map(p => ({
       id: p.id,
       title: p.title,
       slug: p.slug || '',
@@ -180,6 +233,18 @@ router.get('/api/webflow/all-pages/:siteId', requireWorkspaceSiteAccessFromQuery
       }
     } catch (err) {
       log.warn({ err }, 'CMS page discovery failed — returning static pages only');
+    }
+
+    if (ws) {
+      const keywordByPath = buildKeywordProjectionMap(ws.id);
+      const trafficByPath = await loadOrganicTrafficProjectionMap(ws);
+      for (const row of result) {
+        const normalizedPath = normalizePageUrl(row.publishedPath || row.slug).toLowerCase();
+        Object.assign(
+          row,
+          pageProjectionFrom(keywordByPath.get(normalizedPath), trafficByPath.get(normalizedPath)),
+        );
+      }
     }
 
     res.json(result);

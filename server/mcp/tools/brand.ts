@@ -6,10 +6,13 @@ import {
 import { getWorkspace } from '../../workspaces.js';
 import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { listDeliverables, getDeliverable } from '../../brand-deliverable-read-model.js';
-import { updateDeliverableContent } from '../../brand-identity.js';
+import {
+  BrandDeliverableVersionConflictError,
+  updateDeliverableContent,
+} from '../../brand-identity.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { WS_EVENTS } from '../../ws-events.js';
+import { BRAND_IDENTITY_UPDATED_PAYLOAD, WS_EVENTS } from '../../ws-events.js';
 import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
@@ -100,16 +103,25 @@ async function handleUpdateBrandDeliverable(args: Record<string, unknown>): Prom
     const ws = getWorkspace(workspaceId);
     if (!ws) return err(`Workspace not found: ${workspaceId}`);
 
+    if (expectedVersion === undefined) {
+      log.warn({
+        tool: 'update_brand_deliverable',
+        workspaceId,
+        deliverableId,
+        omittedField: 'expectedVersion',
+        deprecation: 'legacy_missing_expected_version',
+      }, 'Deprecated MCP brand-deliverable update omitted its concurrency guard');
+    }
+
     const existing = getDeliverable(workspaceId, deliverableId);
     if (!existing) return err(`Brand deliverable not found: ${deliverableId}`);
 
-    if (expectedVersion !== undefined && existing.version !== expectedVersion) {
-      return err(
-        `Version conflict. Current version: ${existing.version}. Re-fetch via get_brand_identity (includeDeliverables:true) before retrying.`,
-      );
-    }
-
-    const updated = updateDeliverableContent(workspaceId, deliverableId, content);
+    const updated = updateDeliverableContent(
+      workspaceId,
+      deliverableId,
+      content,
+      expectedVersion,
+    );
     // The getDeliverable guard above already handled "never existed", so the only
     // way updateDeliverableContent returns null here is a delete that raced in
     // between that read and this write.
@@ -127,10 +139,11 @@ async function handleUpdateBrandDeliverable(args: Record<string, unknown>): Prom
         undefined,
         { source: 'mcp-chat', deliverableId, action: 'mcp_brand_deliverable_updated' },
       );
-      broadcastToWorkspace(workspaceId, WS_EVENTS.BRAND_IDENTITY_UPDATED, {
-        deliverableId,
-        contentUpdated: true,
-      });
+      broadcastToWorkspace(
+        workspaceId,
+        WS_EVENTS.BRAND_IDENTITY_UPDATED,
+        BRAND_IDENTITY_UPDATED_PAYLOAD,
+      );
       invalidateIntelligenceCache(workspaceId);
     }
 
@@ -146,6 +159,14 @@ async function handleUpdateBrandDeliverable(args: Record<string, unknown>): Prom
       changed,
     });
   } catch (e) {
+    if (e instanceof BrandDeliverableVersionConflictError) {
+      // This existing tool intentionally retains its legacy text contract.
+      // New B2 MCP tools use JSON-v1 envelopes; changing this payload would
+      // break compatibility for current update_brand_deliverable consumers.
+      return err(
+        `Version conflict. Current version: ${e.actualVersion}. Re-fetch via get_brand_identity (includeDeliverables:true) before retrying.`,
+      );
+    }
     log.error({ err: e, workspaceId }, 'MCP tool error');
     const message = e instanceof Error ? e.message : String(e);
     return err(`Tool error: ${message}`);

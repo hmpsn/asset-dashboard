@@ -110,7 +110,7 @@ export function buildCategoryStats(detail: AuditDetail | null): Record<string, C
   const categories: Record<string, CategoryStats> = {};
   detail.audit.pages.forEach((page) =>
     page.issues.forEach((issue) => {
-      const category = issue.category || 'other';
+      const category = issue.displayCategory || issue.category || 'other';
       if (!categories[category]) categories[category] = { errors: 0, warnings: 0, infos: 0 };
 
       if (issue.severity === 'error') categories[category].errors += 1;
@@ -143,8 +143,9 @@ export function buildFixTypeGroups(
 
       const key = issue.check || 'other';
       if (!groups.has(key)) {
-        const fallbackLabel = issue.category
-          ? `${CAT_LABELS[issue.category]?.label || issue.category}: ${key}`
+        const category = issue.displayCategory || issue.category;
+        const fallbackLabel = category
+          ? `${CAT_LABELS[category]?.label || category}: ${key}`
           : key;
         groups.set(key, {
           check: key,

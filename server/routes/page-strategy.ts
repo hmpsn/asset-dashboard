@@ -5,6 +5,7 @@ import { getWorkspace } from '../workspaces.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
+import { InvalidTransitionError } from '../state-machines.js';
 import { createLogger } from '../logger.js';
 import {
   mutationError,
@@ -31,9 +32,31 @@ import { createJob } from '../jobs.js';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { runBlueprintGenerationJob } from '../blueprint-generation-job.js';
 import type { BlueprintGenerationInput } from '../../shared/types/page-strategy.js';
+import {
+  MATRIX_GENERATION_SOURCE_LIMITS,
+  matrixGenerationUtf8Bytes,
+} from '../../shared/types/matrix-generation.js';
+import {
+  createMatrixFromPseoPlan,
+  PseoMatrixBridgeError,
+} from '../domains/content/matrix-generation/pseo-bridge.js';
+import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
 
 const router = Router();
 const log = createLogger('page-strategy-routes');
+
+function runPseoRoutePostCommitEffect(
+  workspaceId: string,
+  entryId: string,
+  effect: string,
+  callback: () => void,
+): void {
+  try {
+    callback();
+  } catch (err) {
+    log.warn({ err, workspaceId, entryId, effect }, 'pSEO matrix post-commit effect failed');
+  }
+}
 
 // ── Zod schemas ──────────────────────────────────────────────────────────────
 
@@ -114,6 +137,44 @@ const reorderEntriesSchema = z.object({
 
 const createVersionSchema = z.object({
   changeNotes: z.string().optional(),
+});
+
+const pseoMatrixDimensionSchema = z.object({
+  variableName: z.string().trim().min(1).refine(
+    value => matrixGenerationUtf8Bytes(value)
+      <= MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensionNameBytes,
+    'variableName exceeds the matrix source limit',
+  ),
+  values: z.array(z.string().trim().min(1).refine(
+    value => matrixGenerationUtf8Bytes(value)
+      <= MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensionValueBytes,
+    'dimension value exceeds the matrix source limit',
+  )).min(1).max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxValuesPerDimension),
+}).strict();
+
+const createPseoMatrixSchema = z.object({
+  expectedSourceRevision: z.object({
+    entryUpdatedAt: z.string().datetime({ offset: true }),
+    templateId: z.string().trim().min(1)
+      .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes),
+    templateRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  }).strict(),
+  dimensions: z.array(pseoMatrixDimensionSchema)
+    .min(1)
+    .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensions),
+}).strict().superRefine((value, ctx) => {
+  let cellCount = 1;
+  for (const dimension of value.dimensions) {
+    cellCount *= dimension.values.length;
+    if (cellCount > MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxGeneratedCells) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dimensions'],
+        message: `Dimensions generate more than ${MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxGeneratedCells} cells`,
+      });
+      return;
+    }
+  }
 });
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -217,6 +278,10 @@ router.put(
       const blueprint = runWorkspaceMutation({
         workspaceId,
         defaultErrorMessage: 'Failed to update blueprint',
+        // An illegal blueprint status transition (draft/active/archived) surfaces as
+        // a 409 instead of a generic 500.
+        mapError: (err) =>
+          err instanceof InvalidTransitionError ? { status: 409, error: err.message } : null,
         mutate: () => {
           const next = updateBlueprint(workspaceId, blueprintId, req.body);
           if (!next) throw mutationError(404, 'Not found');
@@ -279,6 +344,81 @@ router.delete(
 );
 
 // ── Entries ──────────────────────────────────────────────────────────────────
+
+// POST .../entries/:entryId/content-matrix — materialize one collection entry
+router.post(
+  '/api/page-strategy/:workspaceId/:blueprintId/entries/:entryId/content-matrix',
+  requireWorkspaceAccess('workspaceId'),
+  validate(createPseoMatrixSchema),
+  async (req, res) => {
+    const { workspaceId, blueprintId, entryId } = req.params;
+    try {
+      const result = await createMatrixFromPseoPlan({
+        workspaceId,
+        blueprintId,
+        entryId,
+        expectedSourceRevision: req.body.expectedSourceRevision,
+        dimensions: req.body.dimensions,
+      });
+      if (!result.replayed) {
+        runPseoRoutePostCommitEffect(
+          workspaceId,
+          entryId,
+          'invalidate-content-pipeline-intelligence',
+          () => invalidateContentPipelineIntelligence(workspaceId),
+        );
+        runPseoRoutePostCommitEffect(
+          workspaceId,
+          entryId,
+          'broadcast-content-updated',
+          () => broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, {
+            domain: 'content-plan',
+            matrixId: result.matrix.id,
+            blueprintId,
+            entryId,
+            action: 'pseo_matrix_created',
+          }),
+        );
+        runPseoRoutePostCommitEffect(
+          workspaceId,
+          entryId,
+          'broadcast-blueprint-updated',
+          () => broadcastToWorkspace(workspaceId, WS_EVENTS.BLUEPRINT_UPDATED, {
+            blueprintId,
+            entryId,
+            matrixId: result.matrix.id,
+            action: 'entries_updated',
+          }),
+        );
+        runPseoRoutePostCommitEffect(
+          workspaceId,
+          entryId,
+          'record-activity',
+          () => addActivity(
+            workspaceId,
+            'content_updated',
+            `Created content matrix "${result.matrix.name}" from the page blueprint`,
+            `${result.matrix.cellCount} planned page${result.matrix.cellCount === 1 ? '' : 's'}`,
+            {
+              blueprintId,
+              entryId,
+              matrixId: result.matrix.id,
+              action: 'pseo_matrix_created',
+            },
+          ),
+        );
+      }
+      res.status(result.replayed ? 200 : 201).json(result);
+    } catch (err) {
+      if (err instanceof PseoMatrixBridgeError) {
+        const status = err.code === 'not_found' ? 404 : err.code === 'conflict' ? 409 : 422;
+        return res.status(status).json({ error: err.message });
+      }
+      log.error({ err, workspaceId, blueprintId, entryId }, 'Create pSEO content matrix failed');
+      res.status(500).json({ error: 'Failed to create content matrix from pSEO plan' });
+    }
+  },
+);
 
 // POST /api/page-strategy/:workspaceId/:blueprintId/entries — add entry
 router.post(

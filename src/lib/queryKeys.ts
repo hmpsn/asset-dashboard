@@ -18,6 +18,8 @@ import type { AnalyticsDateRange } from '../../shared/types/analytics-contract.j
 
 export type DateRange = AnalyticsDateRange;
 
+const adminContentPerformanceKey = (wsId: string) => ['admin-content-performance', wsId] as const;
+
 export const queryKeys = {
   // ── Admin ─────────────────────────────────────────────────────────
   admin: {
@@ -35,6 +37,7 @@ export const queryKeys = {
     // Content
     briefs: (wsId: string) => ['admin-briefs', wsId] as const,
     brief: (wsId: string, briefId: string) => ['admin-brief', wsId, briefId] as const,
+    briefsDetailAll: (wsId: string) => ['admin-brief', wsId] as const,
     briefingDrafts: (wsId: string) => ['admin-briefing-drafts', wsId] as const,
     briefingDraft: (wsId: string, draftId: string) => ['admin-briefing-draft', wsId, draftId] as const,
     requests: (wsId: string) => ['admin-requests', wsId] as const,
@@ -54,8 +57,16 @@ export const queryKeys = {
     publishTarget: (wsId: string) => ['publish-target', wsId] as const,
     contentCalendar: (wsId: string) => ['content-calendar', wsId] as const,
     contentPipeline: (wsId: string) => ['content-pipeline', wsId] as const,
+    contentPerformanceAll: adminContentPerformanceKey,
+    contentPerformance: (wsId: string, days: number) =>
+      [...adminContentPerformanceKey(wsId), 'read', days] as const,
+    contentPerformanceTrend: (wsId: string, itemId: string) =>
+      [...adminContentPerformanceKey(wsId), 'trend', itemId] as const,
     contentTemplates: (wsId: string) => ['content-templates', wsId] as const,
     contentMatrices: (wsId: string) => ['content-matrices', wsId] as const,
+    contentMatrixGenerationAll: (wsId: string) => ['content-matrix-generation', wsId] as const,
+    contentMatrixGeneration: (wsId: string, runId: string) =>
+      ['content-matrix-generation', wsId, runId] as const,
     roi: (wsId: string) => ['admin-roi', wsId] as const,
     // The Issue (Client) P1a — admin conversion-tracking verification readout (pinned/typed/
     // forms-connected/last-lead). Invalidated by form capture + form-source config broadcasts.
@@ -105,7 +116,13 @@ export const queryKeys = {
     backlinkProfile: (wsId: string) => ['admin-backlink-profile', wsId] as const,
     keywordFeedback: (wsId: string) => ['admin-keyword-feedback', wsId] as const,
     keywordCommandCenter: (wsId: string) => ['admin-keyword-command-center', wsId] as const,
-    keywordCommandCenterInitial: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'initial', query] as const,
+    /** One-shot first-paint transport. Deliberately outside the canonical KCC prefix so
+     * mutations and workspace events refresh summary/rows/detail without replaying it. */
+    keywordCommandCenterInitial: (wsId: string, query: unknown) => ['admin-keyword-command-center-initial', wsId, query] as const,
+    /** In-flight /initial hydration guard. It deliberately lives under the canonical
+     * KCC prefix so any mutation/event invalidation marks the request stale without
+     * causing the isolated one-shot transport itself to replay. */
+    keywordCommandCenterInitialGuard: (wsId: string) => ['admin-keyword-command-center', wsId, 'initial-guard'] as const,
     keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,
@@ -137,7 +154,6 @@ export const queryKeys = {
     insightFeed: (wsId: string) => ['admin-insight-feed', wsId] as const,
     intelligenceSignals: (wsId: string) => ['admin-intelligence-signals', wsId] as const,
     aiSuggestedBriefs: (wsId: string) => ['admin-ai-suggested-briefs', wsId] as const,
-    meetingBrief: (wsId: string) => ['admin-meeting-brief', wsId] as const,
     strategyPov: (wsId: string) => ['admin-strategy-pov', wsId] as const,
     autoSendPolicy: (wsId: string) => ['admin-auto-send-policy', wsId] as const,
     issueLenses: (wsId: string) => ['admin-issue-lenses', wsId] as const,
@@ -152,8 +168,12 @@ export const queryKeys = {
     brandscriptTemplates: () => ['admin-brandscript-templates'] as const,
 
     // Brand Engine — Voice & Identity
+    brandIntake: (wsId: string) => ['admin-brand-intake', wsId] as const,
     voiceProfile: (wsId: string) => ['admin-voice-profile', wsId] as const,
     brandIdentity: (wsId: string) => ['admin-brand-identity', wsId] as const,
+    brandGenerationAll: (wsId: string) => ['admin-brand-generation', wsId] as const,
+    brandGeneration: (wsId: string, runId: string) =>
+      ['admin-brand-generation', wsId, runId] as const,
 
     // Brand Engine — Discovery
     discoverySources: (wsId: string) => ['admin-discovery-sources', wsId] as const,
@@ -205,6 +225,10 @@ export const queryKeys = {
     workspaceBadges: (wsId: string) => ['admin-workspace-badges', wsId] as const,
     workspaceHome: (wsId: string) => ['admin-workspace-home', wsId] as const,
     workspaceOverview: () => ['admin-workspace-overview'] as const,
+    globalOpsGoogleStatus: () => ['admin-global-ops-google-status'] as const,
+    globalOpsGscSites: () => ['admin-global-ops-gsc-sites'] as const,
+    globalOpsStorage: () => ['admin-global-ops-storage'] as const,
+    globalOpsStudioConfig: () => ['admin-global-ops-studio-config'] as const,
     health: () => ['admin-health'] as const,
     queue: () => ['admin-queue'] as const,
     outcomeActions: (wsId: string) => ['admin-outcome-actions', wsId] as const,
@@ -212,6 +236,9 @@ export const queryKeys = {
       ['admin-outcome-actions', wsId, type ?? '', score ?? ''] as const,
     outcomeAction: (wsId: string, actionId: string) => ['admin-outcome-actions', wsId, actionId] as const,
     outcomeScorecard: (wsId: string) => ['admin-outcome-scorecard', wsId] as const,
+    // R9 (B15): admin-only coverage funnel (tracked/measured/reconciled). Never consumed by a
+    // client-facing hook.
+    outcomeCoverage: (wsId: string) => ['admin-outcome-coverage', wsId] as const,
     outcomeTimeline: (wsId: string) => ['admin-outcome-timeline', wsId] as const,
     outcomeLearnings: (wsId: string) => ['admin-outcome-learnings', wsId] as const,
     outcomePlaybooks: (wsId: string) => ['admin-outcome-playbooks', wsId] as const,
@@ -281,6 +308,7 @@ export const queryKeys = {
     contentRequests: (wsId: string) => ['client-content-requests', wsId] as const,
     // Unified client inbox (PR-2a) — GET /api/public/deliverables/:workspaceId
     unifiedInbox: (wsId: string) => ['client-unified-inbox', wsId] as const,
+    brandSummary: (wsId: string) => ['client-brand-summary', wsId] as const,
     auditSummary: (wsId: string) => ['client-audit-summary', wsId] as const,
     auditDetail: (wsId: string) => ['client-audit-detail', wsId] as const,
     schemaPlan: (wsId: string) => ['client-schema-plan', wsId] as const,

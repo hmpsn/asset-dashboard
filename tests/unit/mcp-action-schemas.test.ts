@@ -104,6 +104,7 @@ describe('mcp-action-schemas', () => {
       expect(prepareBriefContextInputSchema.safeParse({
         workspace_id: 'ws-1',
         topic: 'Best CRM tools',
+        parent_request_id: 'creq-1',
         target_keyword: 'best crm for solopreneurs',
         target_page_path: '/blog/best-crm',
         layout: {
@@ -114,6 +115,15 @@ describe('mcp-action-schemas', () => {
     });
 
     it('rejects blank optional target fields when provided', () => {
+      expect(prepareBriefContextInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        topic: 'Best CRM tools',
+        parent_request_id: '',
+        layout: {
+          type: 'outline',
+          structure: { sections: [{ heading: { level: 1, text: 'H1' } }] },
+        },
+      }).success).toBe(false);
       expect(prepareBriefContextInputSchema.safeParse({
         workspace_id: 'ws-1',
         topic: 'Best CRM tools',
@@ -169,6 +179,57 @@ describe('mcp-action-schemas', () => {
     });
   });
 
+  describe('savePostInputSchema', () => {
+    const validHandle = `post-request_${'a'.repeat(8)}-${'b'.repeat(4)}-${'c'.repeat(4)}-${'d'.repeat(4)}-${'e'.repeat(12)}`;
+    const validContent = {
+      briefId: 'brief-1',
+      targetKeyword: 'local seo',
+      title: 'A complete post',
+      metaDescription: 'A useful summary.',
+      introduction: '<p>Introduction</p>',
+      sections: [{
+        index: 0,
+        heading: 'Section one',
+        content: '<p>Body</p>',
+        wordCount: 1,
+        targetWordCount: 100,
+        keywords: ['local seo'],
+        status: 'done' as const,
+      }],
+      conclusion: '<p>Conclusion</p>',
+      totalWordCount: 3,
+      targetWordCount: 1000,
+    };
+
+    it('accepts a complete post artifact', () => {
+      expect(savePostInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        post_request_handle: validHandle,
+        content: validContent,
+      }).success).toBe(true);
+    });
+
+    it.each([
+      { introduction: '' },
+      { introduction: '<p></p>' },
+      { introduction: '<p>&nbsp;</p>' },
+      { conclusion: '' },
+      { conclusion: '<span>&nbsp;</span>' },
+      { sections: [] },
+      { sections: [{ ...validContent.sections[0], content: '<div></div>' }] },
+      { sections: [{ ...validContent.sections[0], status: 'error' }] },
+      { sections: [validContent.sections[0], { ...validContent.sections[0] }] },
+      { sections: [{ ...validContent.sections[0], index: 1 }] },
+      { sections: [validContent.sections[0], { ...validContent.sections[0], index: 2 }] },
+    ])('rejects an incomplete post artifact', (contentOverride) => {
+      expect(savePostInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        post_request_handle: validHandle,
+        content: { ...validContent, ...contentOverride },
+      }).success).toBe(false);
+    });
+  });
+
   describe('sendToClientInputSchema', () => {
     const validBriefHandle = `brief_${'a'.repeat(8)}-${'b'.repeat(4)}-${'c'.repeat(4)}-${'d'.repeat(4)}-${'e'.repeat(12)}`;
     const validPostHandle = `post_${'a'.repeat(8)}-${'b'.repeat(4)}-${'c'.repeat(4)}-${'d'.repeat(4)}-${'e'.repeat(12)}`;
@@ -179,8 +240,34 @@ describe('mcp-action-schemas', () => {
     it('accepts post_handle with note', () => {
       expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', post_handle: validPostHandle, note: 'ready' }).success).toBe(true);
     });
-    it('accepts brief_id', () => {
-      expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', brief_id: 'brief_1' }).success).toBe(true);
+    it('accepts brief_id with revision authority', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        brief_id: 'brief_1',
+        expected_revision: 0,
+      }).success).toBe(true);
+    });
+    it('rejects brief_id without revision authority', () => {
+      expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', brief_id: 'brief_1' }).success).toBe(false);
+    });
+    it('accepts an exact brand-generation review target', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        brand_generation: {
+          run_id: 'brand-run-1',
+          expected_run_revision: 4,
+          review_kind: 'brand_suite',
+        },
+      }).success).toBe(true);
+    });
+    it('rejects a brand-generation target without revision authority', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        brand_generation: {
+          run_id: 'brand-run-1',
+          review_kind: 'voice_foundation',
+        },
+      }).success).toBe(false);
     });
     it('rejects providing both brief_handle and post_handle', () => {
       expect(sendToClientInputSchema.safeParse({
@@ -194,6 +281,17 @@ describe('mcp-action-schemas', () => {
         workspace_id: 'ws-1',
         brief_handle: validBriefHandle,
         brief_id: 'brief_1',
+      }).success).toBe(false);
+    });
+    it('rejects mixing content and brand-generation targets', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        post_id: 'post_1',
+        brand_generation: {
+          run_id: 'brand-run-1',
+          expected_run_revision: 2,
+          review_kind: 'brand_suite',
+        },
       }).success).toBe(false);
     });
   });

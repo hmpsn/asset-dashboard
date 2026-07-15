@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { keywordFeedback as kwFeedbackApi } from '../../../api';
-import { keywordComparisonKey } from '../../../../shared/keyword-normalization';
+import { keywordIdentityKeyV2 } from '../../../../shared/keyword-normalization';
 import { queryKeys } from '../../../lib/queryKeys';
 
 export type KeywordFeedbackStatus = 'approved' | 'declined' | 'requested';
@@ -17,6 +17,16 @@ interface FeedbackMutationOptions {
   clearOnError?: boolean;
 }
 
+interface FeedbackCache {
+  statuses: Map<string, KeywordFeedbackStatus>;
+  rawKeywords: Map<string, string>;
+}
+
+const EMPTY_FEEDBACK_CACHE: FeedbackCache = {
+  statuses: new Map(),
+  rawKeywords: new Map(),
+};
+
 export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrategyKeywordFeedbackOptions) {
   const queryClient = useQueryClient();
   const [feedbackLoading, setFeedbackLoading] = useState<Set<string>>(new Set());
@@ -25,15 +35,22 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     queryKey: queryKeys.client.keywordFeedback(workspaceId ?? ''),
     queryFn: async () => {
       const items = await kwFeedbackApi.get(workspaceId!);
-      const map = new Map<string, KeywordFeedbackStatus>();
-      for (const item of items) map.set(keywordComparisonKey(item.keyword), item.status);
-      return map;
+      const statuses = new Map<string, KeywordFeedbackStatus>();
+      const rawKeywords = new Map<string, string>();
+      for (const item of items) {
+        const key = keywordIdentityKeyV2(item.keyword);
+        if (!key) continue;
+        statuses.set(key, item.status);
+        rawKeywords.set(key, item.keyword);
+      }
+      return { statuses, rawKeywords };
     },
     enabled: !!workspaceId,
     staleTime: 5 * 60 * 1000,
   });
 
-  const feedbackMap = keywordFeedback ?? new Map<string, KeywordFeedbackStatus>();
+  const feedbackCache = keywordFeedback ?? EMPTY_FEEDBACK_CACHE;
+  const feedbackMap = feedbackCache.statuses;
 
   const loadFeedback = useCallback(() => { if (workspaceId) void refetch(); }, [refetch, workspaceId]);
   // STRATEGY_UPDATED invalidation is handled centrally in useWsInvalidation.ts
@@ -46,16 +63,19 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     options?: FeedbackMutationOptions,
   ) => {
     if (!workspaceId) return;
-    const kw = keywordComparisonKey(keyword);
+    const rawKeyword = keyword.trim();
+    const kw = keywordIdentityKeyV2(rawKeyword);
     setFeedbackLoading(prev => new Set(prev).add(kw));
     try {
-      await kwFeedbackApi.submit(workspaceId, { keyword: keyword.trim(), status, source, reason });
+      await kwFeedbackApi.submit(workspaceId, { keyword: rawKeyword, status, source, reason });
       queryClient.setQueryData(
         queryKeys.client.keywordFeedback(workspaceId),
-        (old: Map<string, KeywordFeedbackStatus> | undefined) => {
-          const next = new Map(old ?? []);
-          next.set(kw, status);
-          return next;
+        (old: FeedbackCache | undefined) => {
+          const statuses = new Map(old?.statuses ?? []);
+          const rawKeywords = new Map(old?.rawKeywords ?? []);
+          statuses.set(kw, status);
+          rawKeywords.set(kw, rawKeyword);
+          return { statuses, rawKeywords };
         },
       );
       if (options?.toast !== false) {
@@ -71,16 +91,19 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
 
   const removeFeedback = useCallback(async (keyword: string, options?: FeedbackMutationOptions) => {
     if (!workspaceId) return;
-    const kw = keywordComparisonKey(keyword);
+    const rawKeyword = keyword.trim();
+    const kw = keywordIdentityKeyV2(rawKeyword);
     setFeedbackLoading(prev => new Set(prev).add(kw));
     try {
-      await kwFeedbackApi.remove(workspaceId, kw);
+      await kwFeedbackApi.remove(workspaceId, rawKeyword);
       queryClient.setQueryData(
         queryKeys.client.keywordFeedback(workspaceId),
-        (old: Map<string, KeywordFeedbackStatus> | undefined) => {
-          const next = new Map(old ?? []);
-          next.delete(kw);
-          return next;
+        (old: FeedbackCache | undefined) => {
+          const statuses = new Map(old?.statuses ?? []);
+          const rawKeywords = new Map(old?.rawKeywords ?? []);
+          statuses.delete(kw);
+          rawKeywords.delete(kw);
+          return { statuses, rawKeywords };
         },
       );
       if (options?.toast !== false) setToast?.(`"${keyword}" restored - it can appear in future strategies`);
@@ -88,10 +111,12 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
       if (options?.clearOnError) {
         queryClient.setQueryData(
           queryKeys.client.keywordFeedback(workspaceId),
-          (old: Map<string, KeywordFeedbackStatus> | undefined) => {
-            const next = new Map(old ?? []);
-            next.delete(kw);
-            return next;
+          (old: FeedbackCache | undefined) => {
+            const statuses = new Map(old?.statuses ?? []);
+            const rawKeywords = new Map(old?.rawKeywords ?? []);
+            statuses.delete(kw);
+            rawKeywords.delete(kw);
+            return { statuses, rawKeywords };
           },
         );
       }
@@ -103,18 +128,27 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
   }, [workspaceId, setToast, queryClient]);
 
   const getFeedbackStatus = useCallback(
-    (keyword: string) => feedbackMap.get(keywordComparisonKey(keyword)),
+    (keyword: string) => feedbackMap.get(keywordIdentityKeyV2(keyword)),
     [feedbackMap],
   );
 
   const isLoadingFeedback = useCallback(
-    (keyword: string) => feedbackLoading.has(keywordComparisonKey(keyword)),
+    (keyword: string) => feedbackLoading.has(keywordIdentityKeyV2(keyword)),
     [feedbackLoading],
   );
 
   const requestedKeywords = useMemo(
-    () => [...feedbackMap.entries()].filter(([, s]) => s === 'requested').map(([k]) => k),
-    [feedbackMap],
+    () => [...feedbackMap.entries()]
+      .filter(([, status]) => status === 'requested')
+      .map(([key]) => feedbackCache.rawKeywords.get(key) ?? key),
+    [feedbackCache.rawKeywords, feedbackMap],
+  );
+
+  const declinedKeywords = useMemo(
+    () => [...feedbackMap.entries()]
+      .filter(([, status]) => status === 'declined')
+      .map(([key]) => feedbackCache.rawKeywords.get(key) ?? key),
+    [feedbackCache.rawKeywords, feedbackMap],
   );
 
   return {
@@ -127,5 +161,6 @@ export function useStrategyKeywordFeedback({ workspaceId, setToast }: UseStrateg
     getFeedbackStatus,
     isLoadingFeedback,
     requestedKeywords,
+    declinedKeywords,
   };
 }

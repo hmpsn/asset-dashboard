@@ -76,6 +76,23 @@ function isVoiceProfileAuthoritative(profile: VoiceProfile | null, voiceProfileB
   return hasExplicitConfig && voiceProfileBlock.length > 0; // voice-authority-ok — helper body is the canonical authority site
 }
 
+function resolveWorkspaceVoiceProfileAuthority(workspaceId: string): {
+  authoritative: boolean;
+  voiceProfileBlock: string;
+} {
+  const profile = safeBrandEngineRead(
+    'resolveWorkspaceVoiceProfileAuthority.getVoiceProfile',
+    workspaceId,
+    () => getVoiceProfile(workspaceId), // safe-read-ok — guarded by safeBrandEngineRead
+    null,
+  );
+  const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
+  return {
+    authoritative: isVoiceProfileAuthoritative(profile, voiceProfileBlock),
+    voiceProfileBlock,
+  };
+}
+
 function buildVoiceProfileContext(
   workspaceId: string,
   emphasis: ContextEmphasis = 'full',
@@ -120,7 +137,14 @@ function buildVoiceProfileContext(
 
 export function buildEffectiveBrandVoiceBlock(workspaceId: string): string {
   const legacyBrandVoiceBlock = buildLegacyBrandVoiceBlock(workspaceId);
-  const profile = safeBrandEngineRead('buildEffectiveBrandVoiceBlock.getVoiceProfile', workspaceId, () => getVoiceProfile(workspaceId), null);
-  const voiceProfileBlock = buildVoiceProfileContext(workspaceId, 'full', profile);
-  return isVoiceProfileAuthoritative(profile, voiceProfileBlock) ? voiceProfileBlock : legacyBrandVoiceBlock;
+  const authority = resolveWorkspaceVoiceProfileAuthority(workspaceId);
+  return authority.authoritative ? authority.voiceProfileBlock : legacyBrandVoiceBlock;
+}
+
+/**
+ * Canonical workspace-level authority predicate for compatibility writers.
+ * Callers must not reproduce status/DNA/guardrail checks outside this module.
+ */
+export function isWorkspaceVoiceProfileAuthoritative(workspaceId: string): boolean {
+  return resolveWorkspaceVoiceProfileAuthority(workspaceId).authoritative;
 }

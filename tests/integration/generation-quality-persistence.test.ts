@@ -90,6 +90,7 @@ vi.mock('../../server/keyword-strategy-ai-synthesis.js', async importOriginal =>
       businessSection: 'GenQuality — analytics platform.',
       keywordEvaluationContext: {},
       suppressedCount: 2,
+      executions: [],
     })),
   };
 });

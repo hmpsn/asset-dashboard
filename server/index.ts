@@ -6,22 +6,11 @@ import fs from 'fs';
 import { WebSocket } from 'ws';
 import { runMigrations } from './db/index.js';
 import db from './db/index.js';
+import { assertKnownArchiveTwinsAtBoot } from './db/archive-twin.js';
 import { createApp } from './app.js';
 import { initWebSocket } from './websocket.js';
 import { startSchedulers } from './startup.js';
-import { stopDataRetentionCrons } from './data-retention.js';
-import { stopIntelligenceCrons, stopCompetitorMonitoringCron } from './intelligence-crons.js';
-import { stopInsightRecomputeCron } from './insight-recompute-cron.js';
-import { stopScheduler } from './scheduled-audits.js';
-import { stopApprovalReminders } from './approval-reminders.js';
-import { stopTrialReminders } from './trial-reminders.js';
-import { stopChurnSignalScheduler } from './churn-signals.js';
-import { stopAnomalyDetection } from './anomaly-detection.js';
-import { stopOutcomeCrons } from './outcome-crons.js';
-import { stopRankTrackingScheduler } from './rank-tracking-scheduler.js';
-import { stopMonthlyReports } from './monthly-report.js';
-import { stopBriefingCron } from './briefing-cron.js';
-import { stopThrottleCleanup } from './email-throttle.js';
+import { stopAllRegisteredCrons } from './cron-registry.js';
 import { listWorkspaces } from './workspaces.js';
 import { isStripeConfigured } from './stripe.js';
 import { DATA_BASE } from './data-dir.js';
@@ -41,6 +30,12 @@ initSentry();
 
 // Run pending SQLite migrations before anything touches the database
 runMigrations();
+
+// R11-T7: fail loudly at boot if the tracked_actions/action_outcomes archive
+// twins have drifted from their live tables. An archive sweep against a
+// drifted twin silently corrupts data (see server/db/archive-twin.ts header) —
+// refusing to boot is safer than booting into a corruption-capable state.
+assertKnownArchiveTwinsAtBoot();
 
 // Migrate pageMap data from workspace JSON blobs into the page_keywords table (idempotent)
 import { migrateFromJsonBlob } from './page-keywords.js';
@@ -92,9 +87,13 @@ migrateTrackedKeywordsFromConfigBlob(inferTrackedKeywordSourcesForWorkspace);
 // any workspace whose recommendation_items already has rows is skipped (count>0 guard) and
 // its blob is never re-read, so post-158 regens are never clobbered. Malformed recs are
 // dropped-with-reason (never silently), and a per-workspace transaction failure never aborts
-// the sweep. Readers are unaffected — the items-win fallback still serves blob data for any
-// workspace that fails backfill. MUST run BEFORE runOutcomeRemediation so remediation sees
-// materialized rows. Retire once the blob column is dropped in a later Reconcile PR.
+// the sweep. Post the R7-PR2 cutover this sweep is LOAD-BEARING, not just additive: readers
+// see rows ONLY (the items-win fallback is deleted), so a workspace that fails backfill yields
+// an empty set + a loud warn from loadRecommendationSet, never its blob. Runs AFTER
+// runMigrations() (line 32) — migration 166 blanks materialized blobs but its guard leaves an
+// un-backfilled (blob-present, zero-row) workspace intact, so this sweep still materializes it
+// here. MUST also run BEFORE runOutcomeRemediation so remediation sees materialized rows.
+// Retire once the blob column is dropped in a later Reconcile PR.
 import { materializeAllRecommendationItems } from './domains/recommendations/storage.js';
 const recBackfill = materializeAllRecommendationItems();
 log.info(
@@ -144,21 +143,13 @@ function gracefulShutdown(signal: string) {
   // 1. Mark health endpoint as 503 so load balancer stops routing traffic
   setShuttingDown();
 
-  // 1a. Cancel background cron timers so they cannot fire after db.close()
-  stopDataRetentionCrons();
-  stopIntelligenceCrons();
-  stopCompetitorMonitoringCron();
-  stopInsightRecomputeCron();
-  stopScheduler();
-  stopApprovalReminders();
-  stopTrialReminders();
-  stopChurnSignalScheduler();
-  stopAnomalyDetection();
-  stopOutcomeCrons();
-  stopRankTrackingScheduler();
-  stopMonthlyReports();
-  stopBriefingCron();
-  stopThrottleCleanup();
+  // 1a. Cancel background cron timers so they cannot fire after db.close().
+  // Registry-driven: stops every CRON_METADATA entry with stopHook:true (see
+  // server/cron-registry.ts). This closes the historical gap where backup,
+  // ga4-conversion-snapshot, webflow-form-poller, strategy-issue, and
+  // return-hook crons had (or were missing) a stop() export that was never
+  // wired into this shutdown path.
+  stopAllRegisteredCrons();
 
   // 2. Mark any in-progress jobs as interrupted in SQLite before shutdown
   const activeJobs = listJobs().filter(j => j.status === 'pending' || j.status === 'running');

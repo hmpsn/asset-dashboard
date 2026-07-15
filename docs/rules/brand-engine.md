@@ -16,7 +16,7 @@ The brand engine has three phases:
 
 Data flow: raw source material (transcripts, docs) is ingested and extracted into voice patterns and story elements. Those feed a `VoiceProfile` (DNA + guardrails + samples) and a `Brandscript`. Brand Identity deliverables are generated from both. Approved deliverables and approved copy sections feed back as voice samples for the next calibration cycle.
 
-Workspace intelligence assembles the SEO context in `server/intelligence/seo-context-slice.ts`. Raw brand/knowledge reads and voice-profile authority live in `server/intelligence/seo-context-source.ts`. Prompt layer injection lives in `server/prompt-assembly.ts`. State machine enforcement lives in `server/voice-calibration.ts`.
+Workspace intelligence assembles the SEO context in `server/intelligence/seo-context-slice.ts`. Raw brand/knowledge reads and voice-profile authority live in `server/intelligence/seo-context-source.ts`. Prompt layer injection lives in `server/prompt-assembly.ts`. Mutable-profile state enforcement lives in `server/voice-calibration.ts`; durable generation readiness and finalization history live in `server/domains/brand/voice-finalization.ts`.
 
 ---
 
@@ -170,7 +170,7 @@ This helper is the only correct way to build voice context for user prompts. Pha
 
 ## Voice Profile Authority Rule
 
-**Where it lives:** `isVoiceProfileAuthoritative()` in `server/intelligence/seo-context-source.ts` (not exported — internal to that module)
+**Where it lives:** `isVoiceProfileAuthoritative()` in `server/intelligence/seo-context-source.ts` (internal profile/block predicate) plus exported `isWorkspaceVoiceProfileAuthoritative(workspaceId)` for compatibility writers that need the same resolved decision.
 
 **Rule:** the modern voice profile replaces the legacy `workspace.brandVoice` + brand-docs block only when one of two conditions is met:
 
@@ -215,7 +215,7 @@ Controls how much voice profile context is emitted. Defaults to `'full'`. Token-
 
 ## VoiceProfile State Machine
 
-**File:** `server/voice-calibration.ts`
+**Files:** `server/voice-calibration.ts`, `server/domains/brand/voice-finalization.ts`
 
 Status values: `'draft'` → `'calibrating'` → `'calibrated'`
 
@@ -227,11 +227,93 @@ Legal transitions:
 | `calibrating` | `calibrating`, `draft`, `calibrated` |
 | `calibrated` | `calibrated`, `draft`, `calibrating` |
 
-`draft → calibrated` is illegal. The only path to `calibrated` is through `calibrating`, which runs the calibration pipeline that populates `voiceDNA` and `guardrails`. Skipping to `calibrated` without running the pipeline would let `buildSystemPrompt` Layer 2 inject `null` DNA and guardrails into every system prompt.
+`draft → calibrated` remains an illegal direct edge. The finalization service may
+validate and commit the legal `draft → calibrating → calibrated` path inside one
+transaction, but only after validating non-empty DNA, substantive guardrails,
+and at least one durable authentic anchor. Generic profile PATCH may never set
+`calibrated`.
 
 Illegal transitions throw `VoiceProfileStateTransitionError` (exported from `server/voice-calibration.ts`). Callers should catch this and return HTTP 400.
 
-The transition guard is enforced in `updateVoiceProfile()`, which is the only write path. All callers — route handlers, internal flows, test harnesses — flow through it.
+Every mutable profile has a monotonic `revision`. DNA, guardrail, modifier, and
+sample mutations use optimistic concurrency and increment it. Editing a
+calibrated profile reopens it to `calibrating`; the prior immutable snapshot
+remains readable but readiness becomes `stale` until an operator finalizes the
+new revision.
+
+## Durable Voice Finalization Authority
+
+**Files:** `shared/types/voice-finalization.ts`,
+`server/domains/brand/voice-finalization.ts`,
+`server/domains/brand/voice-finalization-effects.ts`, migration 186.
+
+A `status === 'calibrated'` profile remains prompt-compatible for historical
+workspaces, but status alone is not generation authority. B2/M1 generation must
+consume a strict snapshot-only authority reader and require the exact current
+immutable version; it must not use the operator-facing candidate enumeration as
+generation preflight. `getBrandVoiceAuthoritySummary()` is bounded metadata, not
+the frozen generation payload. Legacy calibrated rows have no fabricated
+operator or anchor history and return `missing` readiness until truthfully
+finalized.
+
+Each immutable voice version freezes:
+
+- exact profile revision, DNA, guardrails, and context modifiers;
+- selected authentic anchor content plus durable source identity;
+- calibration ratings/selections;
+- finalizing operator, separate execution actor, timestamp, and SHA-256
+  fingerprint.
+
+The storage codec is explicitly versioned. Migration 186 writes snapshot
+`schema_version = 1` and authorization `request_schema_version = 1`; readers
+dispatch through frozen V1 codecs and fail closed on unknown versions. Never
+tighten a shipped V1 required field in place. A breaking shape change requires
+a new version/parser while old versions remain readable and replayable.
+
+Only `manual` and `transcript_extraction` voice samples may anchor a final voice.
+An exact immutable `BrandIntakeAuthenticSample` may also anchor it. Generated
+calibration-loop, identity-approved, and copy-approved samples can inform a
+draft but cannot establish authenticity.
+
+Every mutable write is bounded before persistence and every authority read
+revalidates the raw stored shape. DNA, guardrails, and context-modifier JSON are
+limited to 128 KiB each with bounded item counts/text. Manual voice samples are
+trimmed, non-empty, at most 10,000 characters and 10,000 UTF-8 bytes. Raw legacy
+or corrupt samples that fail the same contract are neither counted nor returned
+as eligible anchors and cannot be finalized by addressing their IDs directly.
+
+External readiness reads are paged through `getBrandVoicePage()`: default 25,
+maximum 100 eligible anchors. The opaque cursor is authenticated and bound to
+workspace, profile ID/revision, intake revision, and offset. Callers follow
+`nextCursor` while `hasMore` is true; a revision conflict restarts at page one.
+The default response returns only a bounded latest-finalization summary, never
+frozen anchor/calibration content. Internally the summary reader still strictly
+parses and fingerprints the bounded full snapshot before claiming authority;
+this intentional integrity check prevents corrupt JSON from masquerading as a
+valid scalar summary.
+
+An authenticated HTTP operator may finalize directly. MCP keys are execution
+identities, not people: `finalize_brand_voice` must consume a short-lived,
+one-time bearer authorization created at the operator boundary and bound to the
+complete command and expected revision. Persist only the token digest; never
+accept a caller-authored operator identity or reinterpret a key as a human.
+Exact idempotent replay returns the existing version without activity/event
+duplication. Only a newly committed finalization may record `voice_calibrated`.
+The consumed authorization row is immutable audit proof: consumed timestamp,
+linked finalization, and MCP execution actor are filled atomically. Authoritative
+MCP snapshots must link back to the matching consumed operator command, exact
+profile revision/fingerprint/finalizer, and original MCP executor. A later exact
+authorization may link to an already-existing direct/other-MCP artifact as
+redundant proof without rewriting that artifact's frozen executor.
+HTTP and MCP must both delegate post-commit work to
+`applyVoiceFinalizationPostCommitEffects()`: it owns the activity, truthful
+outcome action, redacted workspace events, workspace-intelligence invalidation,
+and monthly-digest invalidation. Transport-local copies of those effects are
+forbidden because they drift on replay and privacy semantics.
+
+Approved `voice_guidelines` and `tone_examples` are legacy draft/evidence inputs.
+When a calibrated profile already owns the voice layer, copy generation excludes
+those deliverables from the identity block so they cannot compete with Layer 2.
 
 ---
 
@@ -333,3 +415,66 @@ The `copy_approved` value is forward-declared in Phase 1's shared types so Phase
 Every `UPDATE`, `DELETE`, and non-PK `SELECT` on a brand-engine table must include `AND workspace_id = ?`. Tables without a direct `workspace_id` column (e.g. `voice_samples` which scopes through `voice_profile_id`) must JOIN through to the workspace or derive the profile ID from a workspace-scoped read.
 
 Brand-engine tables: `brandscripts`, `brandscript_sections`, `discovery_sources`, `discovery_extractions`, `voice_profiles`, `voice_samples`, `voice_calibration_sessions`, `brand_identity_deliverables`, `brand_identity_versions`, `site_blueprints`, `blueprint_entries`, `copy_sections`.
+
+---
+
+## Grounded Brand Deliverable Generation
+
+**Files:** `shared/types/brand-generation.ts`, migrations 187–188,
+`server/domains/brand/generation/`, `server/routes/brand-generation.ts`, and
+`server/mcp/{paid-call-counter,tools/brand-generation-actions}.ts`.
+
+B2 is the only first-class paid brand-suite generation path. It consumes an
+exact immutable intake revision and, for every durable target, an exact current
+operator-finalized voice snapshot. `full_brand_system` is deliberately two
+commands: foundation-only start, then a finalized-voice resume after the human
+gate. The provisional foundation is structured item/attempt state and never a
+`BrandDeliverable` or generation authority.
+
+The run, item, command, and attempt ledgers own idempotency, budgets, stage
+checkpoints, sanitized errors, evidence, audit lineage, and restart truth. Every
+provider dispatch reserves a prompt-derived pessimistic hold first. Attempts
+separate the shared frozen-source fingerprint from the exact final
+provider-rendered instruction fingerprint (including creative JSON/research
+wrappers, provider-specific message placement, and structured response mode),
+and successful provider provenance must match the successful reservation.
+Acceptance proves the complete required-stage provider closure before creating
+the durable command; resume/revision also prove their full estimate fits the
+run's remaining budget inside the acceptance transaction. The provider
+instruction ceiling is 40 KiB, with a 512-byte acceptance safety margin. Base
+generation is capped at 24 KiB; the raw candidate core and compact refine/audit
+prompt projection are capped at 4 KiB; the resolved durable candidate is capped
+at 256 KiB; and the whole related-candidate audit digest is capped at 3 KiB so
+full-suite review cannot grow quadratically. Automatic audit-derived revision
+direction is capped at 512 bytes, and the full-run input ceiling is 5,000,000
+tokens.
+
+A missing authentic sample does not invite invented voice evidence: the
+provisional foundation remains `needs_attention` at the human finalization gate
+until an operator supplies/selects authentic anchors and creates a later
+immutable voice version. Every rendered factual or inferred claim requires at
+least one fact-capable, non-structural accepted evidence key/source. Factual
+accuracy remains human-required for either classification, and every generated
+candidate keeps no-hallucination review human-required because its AI-authored
+claim ledger cannot prove completeness. Every legacy deliverable write is a final,
+version-conditional commit after deterministic plus model review; attention or
+missing-evidence output stays in the generation ledger. Approved deliverables
+block replacement until a human returns them to draft. Revision cancellation,
+restart, or ordinary stage failure preserves content but returns the item to
+retryable `changes_requested` because its prior audit lineage was invalidated.
+Generated output stops at
+`ready_for_human_review`; B2 never approves, sends, publishes, pre-seeds a client
+surface, or treats an MCP key as a human reviewer.
+
+Hydration recomputes the immutable frozen input's canonical self-hash and
+verifies every approved-input fingerprint before paid dispatch.
+Accepted-command repair is current-command scoped. It may recreate a missing
+job or the exact server-restart tombstone only before that command has an
+attempt; recovery keyset-pages beyond 100 active/terminal rows and reconciles a
+terminal durable run back into its bounded generic-job result without touching
+artifacts. HTTP and MCP share the same two-segment signed item cursor. MCP paid
+effects use a transactional outbox with `command_accepted`,
+`artifact_committed`, and `command_completed` events. Deterministic effect keys
+make activity writes and MCP paid-call metering exactly-once; workspace
+broadcasts and intelligence-cache invalidation are intentionally at-least-once
+under retry.

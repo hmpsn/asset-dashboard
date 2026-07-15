@@ -1,5 +1,5 @@
 // ── Workspace domain types ──────────────────────────────────────
-import type { MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
+import type { KeywordSearchIntent, MetricsSource, PageOptimizationScoreSnapshot, UrlLevelKeyword } from './keywords.ts';
 import type { EeatAssetRecommendation, MissingTrustSignal } from './eeat-assets.ts';
 import type { ImpactBand } from './impact-band.ts';
 import type { OutcomeType } from './the-issue.ts';
@@ -78,7 +78,8 @@ export interface PageKeywordMap {
   pageTitle: string;
   primaryKeyword: string;
   secondaryKeywords: string[];
-  searchIntent?: string;
+  searchIntent?: KeywordSearchIntent;
+  intentSource?: string;
   currentPosition?: number;
   previousPosition?: number;
   impressions?: number;
@@ -89,6 +90,7 @@ export interface PageKeywordMap {
   volume?: number;
   difficulty?: number;
   cpc?: number;
+  cpcSource?: string;
   secondaryMetrics?: { keyword: string; volume: number; difficulty: number }[];
   metricsSource?: MetricsSource;
   validated?: boolean;
@@ -120,6 +122,29 @@ export interface PageKeywordMap {
   serpFeatures?: string[];
 }
 
+/**
+ * SB-005 (UI-rebuild W1.3) — additive per-page projection spread onto page-row payloads
+ * (all-pages / seo-editor / rewrite load-page). Sourced from the `page_keywords` table via the
+ * side-effect-free `listPageKeywords*` reads — NO N-per-row API fan-out. Every field is optional:
+ * a page with no keyword row, or one outside the batched GA4 set, renders honest absence, never a
+ * fabricated value (BUILD_CONVENTIONS §6). primaryKeyword/rank/optimizationScore are cheap column
+ * reads; monthlyTraffic is the one join (batched, see below).
+ */
+export interface PageKeywordProjection {
+  /** page_keywords.primary_keyword — the page's primary keyword assignment. */
+  primaryKeyword?: string;
+  /** page_keywords.current_position — current GSC rank; lower is better; null when unranked. */
+  rank?: number | null;
+  /** page_keywords.optimization_score — persisted 0–100 on-page score. */
+  optimizationScore?: number;
+  /**
+   * Monthly organic sessions for this page from a SINGLE batched GA4 landing-pages read
+   * (getGA4LandingPages, organicOnly), joined by pagePath. undefined when the page falls outside
+   * the batched top-N set — honest absence, never fabricated, never an N-per-row fetch.
+   */
+  monthlyTraffic?: number;
+}
+
 export interface KeywordGapItem {
   keyword: string;
   volume: number;
@@ -131,7 +156,8 @@ export interface KeywordGapItem {
 export interface ContentGap {
   topic: string;           // suggested content topic
   targetKeyword: string;   // primary keyword to target
-  intent: 'informational' | 'commercial' | 'transactional' | 'navigational';
+  intent: KeywordSearchIntent;
+  intentSource?: string;
   priority: 'high' | 'medium' | 'low';
   rationale: string;       // why this content should be created
   suggestedPageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource';
@@ -150,6 +176,7 @@ export interface ContentGap {
   serpTargeting?: string[];
   // Cost-per-click from SEO provider (feeds commercialValue in the value scorer)
   cpc?: number;
+  cpcSource?: string;
   // Composite opportunity score (0–100): volume × ease × GSC signal × trend
   opportunityScore?: number;
   /**
@@ -241,6 +268,8 @@ export interface KeywordStrategy {
     keyword: string;
     volume: number;
     difficulty: number;
+    /** Provider CPC retained for incremental/cached keyword-universe rebuilds. */
+    cpc?: number | null;
     domain: string;
     position: number;
     serpFeatures?: string;
@@ -473,6 +502,8 @@ export interface Workspace {
   lastIssuePushedWeekOf?: string | null;
   /** ISO-week marker (YYYY-MM-DD) of last weekly email return-hook send (The Issue, P1c) — prevents duplicate weekly sends */
   lastReturnHookSentWeekOf?: string | null;
+  /** Soft-archive timestamp. Archived workspaces are excluded from default admin lists. */
+  archivedAt?: string | null;
   folder: string;
   createdAt: string;
 }
@@ -534,6 +565,7 @@ export interface AdminWorkspaceView {
   autoPublishAfterHours?: number;
   lastBriefingRunWeekOf?: string | null;
   lastIssuePushedWeekOf?: string | null;
+  archivedAt?: string | null;
   folder: string;
   createdAt: string;
   // Computed fields (not on Workspace row)

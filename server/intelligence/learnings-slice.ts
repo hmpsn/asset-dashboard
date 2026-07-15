@@ -1,5 +1,17 @@
-import type { IntelligenceOptions, LearningsSlice, ROIAttribution, WeCalledItEntry } from '../../shared/types/intelligence.js';
-import type { ActionOutcome, TopWin } from '../../shared/types/outcome-tracking.js';
+import type {
+  ClientSafeLearningsProjection,
+  IntelligenceOptions,
+  LearningsSlice,
+  ROIAttribution,
+  WeCalledItEntry,
+} from '../../shared/types/intelligence.js';
+import type {
+  ActionOutcome,
+  TopWin,
+  TrackedAction,
+  WorkspaceLearnings,
+} from '../../shared/types/outcome-tracking.js';
+import { isClientVisibleOutcomeAction } from '../../shared/types/action-catalog.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 
@@ -77,6 +89,54 @@ function formatOutcomeNarrative(actionType: string, outcome: ActionOutcome): str
   return `${formatActionPhrase(actionType)} was recorded as a ${formatScoreLabel(outcome.score)}.`;
 }
 
+function buildOutcomeNarrativeSurfaces(
+  actions: TrackedAction[],
+  getOutcomes: (actionId: string) => ActionOutcome[],
+): { roiAttribution: ROIAttribution[]; weCalledIt: WeCalledItEntry[] } {
+  const roiAttribution: ROIAttribution[] = [];
+  const weCalledIt: WeCalledItEntry[] = [];
+
+  // Build ROI attribution from live outcome data (replaces the dead
+  // roi_attributions read). Cap matches the former store contract.
+  for (const action of actions.slice(0, 50)) {
+    if (roiAttribution.length >= 10) break;
+    const outcomes = getOutcomes(action.id);
+    const winOutcome = outcomes
+      .filter(o => o.score === 'strong_win' || o.score === 'win')
+      .sort((a, b) => b.checkpointDays - a.checkpointDays)[0];
+    if (winOutcome) {
+      const clicksBefore = action.baselineSnapshot.clicks ?? 0;
+      const clicksAfter = winOutcome.metricsSnapshot.clicks ?? 0;
+      roiAttribution.push({
+        actionId: action.id,
+        pageUrl: action.pageUrl ?? '',
+        actionType: action.actionType,
+        clicksBefore,
+        clicksAfter,
+        clickGain: clicksAfter - clicksBefore,
+        measuredAt: winOutcome.measuredAt ?? '',
+      });
+    }
+  }
+
+  for (const action of actions.slice(0, 50)) {
+    if (weCalledIt.length >= 5) break;
+    const strongWin = getOutcomes(action.id).find(o => o.score === 'strong_win');
+    if (strongWin) {
+      weCalledIt.push({
+        actionId: action.id,
+        prediction: `${formatActionPhrase(action.actionType)} on ${action.pageUrl ?? 'site'}`,
+        outcome: formatOutcomeNarrative(action.actionType, strongWin),
+        score: 'strong_win',
+        pageUrl: action.pageUrl ?? '',
+        measuredAt: strongWin.measuredAt ?? '',
+      });
+    }
+  }
+
+  return { roiAttribution, weCalledIt };
+}
+
 export async function assembleLearnings(
   workspaceId: string,
   opts?: IntelligenceOptions,
@@ -105,6 +165,7 @@ export async function assembleLearnings(
         weCalledIt: [],
         winRateByActionType: {},
         scoringConfig: undefined,
+        clientProjection: null,
       };
     }
   } catch (err) {
@@ -132,6 +193,10 @@ export async function assembleLearnings(
   let roiAttribution: ROIAttribution[] = [];
   let weCalledIt: WeCalledItEntry[] = [];
   let topWins: TopWin[] = [];
+  let clientSummary: WorkspaceLearnings | null = null;
+  let clientRoiAttribution: ROIAttribution[] = [];
+  let clientWeCalledIt: WeCalledItEntry[] = [];
+  let clientTopWins: TopWin[] = [];
   try {
     const { getActionsByWorkspace, getOutcomesForAction, getTopWinsFromActions } = await import('../outcome-tracking.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
     // A1: exclude `not_acted_on` actions before building ANY win surface. These are
@@ -150,45 +215,36 @@ export async function assembleLearnings(
       return outcomesCache.get(actionId)!;
     };
     topWins = getTopWinsFromActions(actions, 5, cachedGetOutcomes);
+    ({ roiAttribution, weCalledIt } = buildOutcomeNarrativeSurfaces(actions, cachedGetOutcomes));
 
-    // Build roiAttribution from live outcome data (replaces dead roi_attributions read).
-    // clicksBefore / clicksAfter come from baseline_snapshot and metrics_snapshot respectively.
-    // We cap at 10 to match the former roi_attributions limit.
-    for (const action of actions.slice(0, 50)) {
-      if (roiAttribution.length >= 10) break;
-      const outcomes = cachedGetOutcomes(action.id);
-      // Use the most-recent win outcome per action (highest checkpoint_days = most complete).
-      const winOutcome = outcomes
-        .filter(o => o.score === 'strong_win' || o.score === 'win')
-        .sort((a, b) => b.checkpointDays - a.checkpointDays)[0];
-      if (winOutcome) {
-        const clicksBefore = action.baselineSnapshot.clicks ?? 0;
-        const clicksAfter = winOutcome.metricsSnapshot.clicks ?? 0;
-        roiAttribution.push({
-          actionId: action.id,
-          pageUrl: action.pageUrl ?? '',
-          actionType: action.actionType,
-          clicksBefore,
-          clicksAfter,
-          clickGain: clicksAfter - clicksBefore,
-          measuredAt: winOutcome.measuredAt ?? '',
-        });
-      }
-    }
+    // Public/client consumers receive a separately-derived projection. Filter
+    // before every cap so hidden workflow rows cannot displace legitimate client
+    // outcomes, while the normal/admin slice above remains unchanged.
+    const clientActions = actions.filter(action => isClientVisibleOutcomeAction(action.actionType));
+    clientTopWins = getTopWinsFromActions(clientActions, 5, cachedGetOutcomes);
+    ({
+      roiAttribution: clientRoiAttribution,
+      weCalledIt: clientWeCalledIt,
+    } = buildOutcomeNarrativeSurfaces(clientActions, cachedGetOutcomes));
 
-    for (const action of actions.slice(0, 50)) {
-      if (weCalledIt.length >= 5) break;
-      const outcomes = cachedGetOutcomes(action.id);
-      const strongWin = outcomes.find(o => o.score === 'strong_win');
-      if (strongWin) {
-        weCalledIt.push({
-          actionId: action.id,
-          prediction: `${formatActionPhrase(action.actionType)} on ${action.pageUrl ?? 'site'}`,
-          outcome: formatOutcomeNarrative(action.actionType, strongWin),
-          score: 'strong_win',
-          pageUrl: action.pageUrl ?? '',
-          measuredAt: strongWin.measuredAt ?? '',
-        });
+    const clientScored = clientActions.flatMap(action => {
+      const validOutcomes = cachedGetOutcomes(action.id).filter(outcome => (
+        (outcome.checkpointDays === 30 || outcome.checkpointDays === 60 || outcome.checkpointDays === 90)
+        && outcome.score != null
+        && outcome.score !== 'insufficient_data'
+        && outcome.score !== 'inconclusive'
+      ));
+      const outcome = validOutcomes[validOutcomes.length - 1];
+      return outcome ? [{ action, outcome }] : [];
+    });
+    if (clientScored.length > 0) {
+      try {
+        const { computeWorkspaceLearningsFromScored } = await import('../workspace-learnings.js'); // dynamic-import-ok - client projection reuses canonical learnings math without creating a facade cycle
+        clientSummary = computeWorkspaceLearningsFromScored(workspaceId, clientScored);
+      } catch (err) {
+        // Client projection failure must fail closed without erasing the intact
+        // admin outcome surfaces assembled above.
+        log.warn({ err, workspaceId }, 'assembleLearnings: client projection unavailable');
       }
     }
   } catch (err) {
@@ -207,6 +263,33 @@ export async function assembleLearnings(
   } catch (err) {
     log.debug({ err, workspaceId }, 'assembleLearnings: scoringConfig optional, degrading gracefully');
   }
+
+  const clientProjection: ClientSafeLearningsProjection | null = clientSummary
+    ? {
+        availability: 'ready',
+        summary: clientSummary,
+        confidence: clientSummary.confidence,
+        topActionTypes: clientSummary.overall.topActionTypes.slice(0, 5),
+        overallWinRate: clientSummary.overall.totalWinRate,
+        recentTrend: clientSummary.overall.recentTrend,
+        playbooks: playbooks.filter(playbook => (
+          playbook.actionSequence.every(step => isClientVisibleOutcomeAction(step.actionType))
+        )),
+        topWins: clientTopWins,
+        winRateByActionType: Object.fromEntries(
+          clientSummary.overall.topActionTypes.map(entry => [entry.type, entry.winRate]),
+        ),
+        roiAttribution: clientRoiAttribution,
+        weCalledIt: clientWeCalledIt,
+        scoringConfig: scoringConfig
+          ? Object.fromEntries(
+              Object.entries(scoringConfig).filter(([actionType]) => (
+                isClientVisibleOutcomeAction(actionType)
+              )),
+            )
+          : undefined,
+      }
+    : null;
 
   // A6 (audit #22): cross-workspace platform priors as the FALLBACK tier. Only populated
   // when this workspace's OWN availability is no_data/degraded — `ready` keeps its own
@@ -240,5 +323,6 @@ export async function assembleLearnings(
     ),
     platformPriors,
     scoringConfig,
+    clientProjection,
   };
 }

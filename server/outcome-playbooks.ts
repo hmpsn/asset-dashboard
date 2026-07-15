@@ -12,6 +12,8 @@ import { WS_EVENTS } from './ws-events.js';
 import { rowToActionPlaybook } from './db/outcome-mappers.js';
 import type { ActionPlaybookRow } from './db/outcome-mappers.js';
 import type { ActionPlaybook } from '../shared/types/outcome-tracking.js';
+import { invalidateMonthlyDigestCache } from './monthly-digest-cache.js';
+import { clearIntelligenceCache } from './intelligence/cache-clear.js';
 
 const log = createLogger('outcome-playbooks');
 
@@ -133,7 +135,12 @@ export async function detectAllWorkspacePlaybooks(): Promise<void> {
     const { discovered } = detectPlaybookPatterns(ws.id);
     totalDiscovered += discovered;
     if (discovered > 0) {
-      broadcastToWorkspace(ws.id, WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED, { discovered });
+      invalidateMonthlyDigestCache(ws.id);
+      clearIntelligenceCache(ws.id);
+      // Detected playbooks can include client-hidden action sequences. The
+      // shared channel carries only an invalidation signal; readers refetch the
+      // appropriate admin or client-safe projection.
+      broadcastToWorkspace(ws.id, WS_EVENTS.OUTCOME_PLAYBOOK_DISCOVERED, {});
     }
   }
   log.info({ workspaceCount: workspaces.length, totalDiscovered }, 'Playbook detection ran across all workspaces');

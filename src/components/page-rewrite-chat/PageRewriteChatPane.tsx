@@ -1,7 +1,7 @@
 import { Check, Copy, Loader2, Send, Sparkles } from 'lucide-react';
 import type { KeyboardEvent, RefObject } from 'react';
 import { extractRewriteOnly } from '../../lib/rewriteResponse';
-import { RenderMarkdown } from '../client/helpers';
+import { RenderMarkdown } from '../client/RenderMarkdown';
 import { Icon, Button, FormTextarea, IconButton } from '../ui';
 import { QUICK_PROMPTS, type ChatMessage, type PageData } from './pageRewriteChatModel';
 

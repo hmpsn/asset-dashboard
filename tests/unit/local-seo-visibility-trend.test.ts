@@ -15,14 +15,15 @@ import {
   LOCAL_BUSINESS_MATCH_CONFIDENCE,
   LOCAL_VISIBILITY_STATUS,
 } from '../../shared/types/local-seo.js';
+import { keywordIdentityKeyV2 } from '../../shared/keyword-normalization.js';
 
 const insertSnapshot = db.prepare(`
   INSERT INTO local_visibility_snapshots (
-    id, workspace_id, keyword, normalized_keyword, market_id, market_label, captured_at,
+    id, workspace_id, keyword, normalized_keyword, normalized_keyword_v2, market_id, market_label, captured_at,
     local_pack_present, business_found, business_match_confidence, business_match_reason,
     local_rank, top_competitors, source_endpoint, provider, device, language_code, status, degraded_reason
   ) VALUES (
-    @id, @workspace_id, @keyword, @normalized_keyword, @market_id, @market_label, @captured_at,
+    @id, @workspace_id, @keyword, @normalized_keyword, @normalized_keyword_v2, @market_id, @market_label, @captured_at,
     @local_pack_present, @business_found, @business_match_confidence, @business_match_reason,
     @local_rank, @top_competitors, @source_endpoint, @provider, @device, @language_code, @status, @degraded_reason
   )
@@ -40,12 +41,14 @@ function seed(opts: {
   status?: string;
   device?: string;
   language?: string;
+  legacyIdentity?: boolean;
 }): void {
   insertSnapshot.run({
     id: `trend-snap-${seq++}`,
     workspace_id: opts.workspaceId,
     keyword: opts.keyword,
     normalized_keyword: opts.keyword.toLowerCase(),
+    normalized_keyword_v2: opts.legacyIdentity ? null : keywordIdentityKeyV2(opts.keyword),
     market_id: opts.marketId,
     market_label: opts.marketLabel,
     captured_at: opts.capturedAt,
@@ -117,6 +120,63 @@ describe('getLocalSeoVisibilityTrend', () => {
 
     const series = getLocalSeoVisibilityTrend(id);
     expect(series[0].points[0]).toEqual({ date: '2026-06-01', visibleCount: 1, checkedCount: 1 });
+  });
+
+  it('counts C and C# separately under the v2 identity namespace', () => {
+    const id = ws('Trend Unicode Identity');
+    seed({ workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: 'C', capturedAt: '2026-07-01T08:00:00.000Z', visible: true });
+    seed({ workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: 'C#', capturedAt: '2026-07-01T09:00:00.000Z', visible: false });
+
+    expect(getLocalSeoVisibilityTrend(id)[0].points[0]).toEqual({
+      date: '2026-07-01', visibleCount: 1, checkedCount: 2,
+    });
+  });
+
+  it.each([
+    ['Café', 'Cafe\u0301'],
+    ['Cafe\u0301', 'Café'],
+  ])('counts legacy canonical-equivalent spellings once regardless of insertion order (%s first)', (first, second) => {
+    const id = ws('Trend Legacy Unicode Identity');
+    seed({
+      workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: first,
+      capturedAt: '2026-07-01T08:00:00.000Z', visible: true, legacyIdentity: true,
+    });
+    seed({
+      workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: second,
+      capturedAt: '2026-07-01T09:00:00.000Z', visible: false, legacyIdentity: true,
+    });
+
+    expect(getLocalSeoVisibilityTrend(id)[0].points[0]).toEqual({
+      date: '2026-07-01', visibleCount: 1, checkedCount: 1,
+    });
+  });
+
+  it.each([
+    ['Café', 'Cafe\u0301'],
+    ['Cafe\u0301', 'Café'],
+  ])('merges populated and legacy identities across a high-cardinality legacy page boundary (%s populated)', (populated, legacy) => {
+    const id = ws('Trend High Cardinality Compatibility');
+    const day = new Date().toISOString().slice(0, 10);
+    seed({
+      workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: populated,
+      capturedAt: `${day}T01:00:00.000Z`, visible: true,
+    });
+    for (let i = 0; i < 225; i++) {
+      seed({
+        workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: `legacy filler ${i}`,
+        capturedAt: `${day}T12:00:00.000Z`, visible: false, legacyIdentity: true,
+      });
+    }
+    seed({
+      workspaceId: id, marketId: 'm1', marketLabel: 'Austin, TX', keyword: legacy,
+      capturedAt: `${day}T23:00:00.000Z`, visible: false, legacyIdentity: true,
+    });
+
+    expect(getLocalSeoVisibilityTrend(id)[0].points[0]).toEqual({
+      date: day,
+      visibleCount: 1,
+      checkedCount: 226,
+    });
   });
 
   it('returns separate series per market, ordered by most-recent activity first', () => {

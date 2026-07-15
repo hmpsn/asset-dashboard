@@ -28,19 +28,21 @@ export type {
 import type { EventDisplayConfig, EventGroup, ResolvedSegmentProfile } from '../../../shared/types/workspace.ts';
 import type { MetricsSource } from '../../../shared/types/keywords.js';
 import type { KeywordStrategyUxPayload } from '../../../shared/types/keyword-strategy-ux.js';
+import type { AuditCategoryScore, AuditDisplayCategory } from '../../../shared/types/seo-audit.js';
+import type { PublicContentTopicRequest } from '../../../shared/types/content.js';
 
 export interface ContentPricing { briefPrice: number; fullPostPrice: number; currency: string; briefLabel?: string; fullPostLabel?: string; briefDescription?: string; fullPostDescription?: string; }
 export interface BusinessProfile { phone?: string; email?: string; address?: { street?: string; city?: string; state?: string; zip?: string; country?: string }; socialProfiles?: string[]; openingHours?: string; foundedDate?: string; numberOfEmployees?: string; }
 export interface WorkspaceInfo { id: string; name: string; webflowSiteId?: string; webflowSiteName?: string; gscPropertyUrl?: string; ga4PropertyId?: string; liveDomain?: string; eventConfig?: EventDisplayConfig[]; eventGroups?: EventGroup[]; requiresPassword?: boolean; clientPortalEnabled?: boolean; seoClientView?: boolean; analyticsClientView?: boolean; siteIntelligenceClientView?: boolean; contentPricing?: ContentPricing | null; tier?: 'free' | 'growth' | 'premium'; baseTier?: 'free' | 'growth' | 'premium'; isTrial?: boolean; trialDaysRemaining?: number; trialEndsAt?: string | null; stripeEnabled?: boolean; billingMode?: 'platform' | 'external'; onboardingEnabled?: boolean; onboardingCompleted?: boolean; brandLogoUrl?: string; brandAccentColor?: string; bookingUrl?: string | null; businessProfile?: BusinessProfile | null; segmentProfile?: ResolvedSegmentProfile; }
-export interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; }
-export interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; message: string; recommendation: string; value?: string; affectedPages?: string[]; }
+export interface AuditSummary { id: string; createdAt: string; siteScore: number; totalPages: number; errors: number; warnings: number; previousScore?: number; categoryScoreVersion?: 1; categoryScores?: AuditCategoryScore[]; }
+export interface SeoIssue { check: string; severity: 'error' | 'warning' | 'info'; category?: string; displayCategory?: AuditDisplayCategory; message: string; recommendation: string; value?: string; affectedPages?: string[]; }
 export interface PageAuditResult { pageId: string; page: string; slug: string; url: string; score: number; issues: SeoIssue[]; noindex?: boolean; }
 export interface CwvMetricSummary { value: number | null; rating: 'good' | 'needs-improvement' | 'poor' | null; }
 export interface CwvStrategyResult { assessment: 'good' | 'needs-improvement' | 'poor' | 'no-data'; fieldDataAvailable: boolean; lighthouseScore: number; metrics: { LCP: CwvMetricSummary; INP: CwvMetricSummary; CLS: CwvMetricSummary; }; }
 export interface CwvSummary { mobile?: CwvStrategyResult; desktop?: CwvStrategyResult; }
 export interface AuditDetail {
   id: string; createdAt: string; siteName: string; logoUrl?: string; previousScore?: number;
-  audit: { siteScore: number; totalPages: number; errors: number; warnings: number; infos: number; pages: PageAuditResult[]; siteWideIssues: SeoIssue[]; cwvSummary?: CwvSummary; };
+  audit: { siteScore: number; totalPages: number; errors: number; warnings: number; infos: number; pages: PageAuditResult[]; siteWideIssues: SeoIssue[]; cwvSummary?: CwvSummary; categoryScoreVersion?: 1; categoryScores?: AuditCategoryScore[]; };
   scoreHistory: Array<{ id: string; createdAt: string; siteScore: number }>;
   auditDiff?: { resolved: number; newIssues: number };
 }
@@ -73,15 +75,8 @@ export interface ContentPlanReviewCell {
 
 export type ApprovalPageKeyword = { pagePath: string; primaryKeyword: string; secondaryKeywords?: string[] };
 
-export interface ClientContentRequest {
-  id: string; topic: string; targetKeyword: string; intent: string; priority: string;
-  status: 'pending_payment' | 'requested' | 'brief_generated' | 'client_review' | 'approved' | 'changes_requested' | 'in_progress' | 'post_review' | 'delivered' | 'published' | 'declined';
-  source?: 'strategy' | 'client'; briefId?: string; postId?: string;
-  serviceType?: 'brief_only' | 'full_post'; pageType?: 'blog' | 'landing' | 'service' | 'location' | 'product' | 'pillar' | 'resource'; upgradedAt?: string;
-  deliveryUrl?: string; deliveryNotes?: string; clientFeedback?: string;
-  comments?: { id: string; author: 'client' | 'team'; content: string; createdAt: string }[];
-  requestedAt: string; updatedAt: string;
-}
+/** Client-facing alias for the shared public content-request boundary. */
+export type ClientContentRequest = PublicContentTopicRequest;
 
 /**
  * Disambiguates the dual-purpose `changes_requested` status for progress-bar display.
@@ -168,6 +163,12 @@ export const CAT_LABELS: Record<string, { label: string; color: string }> = {
   content: { label: 'Content', color: '#60a5fa' }, technical: { label: 'Technical', color: '#2dd4bf' },
   social: { label: 'Social', color: '#fb923c' }, performance: { label: 'Performance', color: '#fbbf24' },
   accessibility: { label: 'Accessibility', color: '#34d399' },
+  index: { label: 'Indexing', color: 'var(--teal)' },
+  onpage: { label: 'On-page', color: 'var(--blue)' },
+  schema: { label: 'Schema', color: 'var(--emerald)' },
+  links: { label: 'Links', color: 'var(--teal)' },
+  perf: { label: 'Performance', color: 'var(--amber)' },
+  mobile: { label: 'Mobile UX', color: 'var(--blue)' },
 };
 
 export const QUICK_QUESTIONS = [

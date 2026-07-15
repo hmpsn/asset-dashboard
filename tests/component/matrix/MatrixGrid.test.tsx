@@ -151,6 +151,26 @@ describe('MatrixGrid', () => {
     }
   });
 
+  it('hides paid generation while the feature flag is off', () => {
+    renderGrid({ generationEnabled: false });
+    const cell = document.querySelector('td.cursor-pointer');
+    expect(cell).toBeInTheDocument();
+    fireEvent.click(cell!);
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    expect(screen.queryByText('Generate Pages')).not.toBeInTheDocument();
+  });
+
+  it('runs the repaired bulk generation action when enabled', () => {
+    const onBulkAction = vi.fn();
+    renderGrid({ generationEnabled: true, onBulkAction });
+    const cell = document.querySelector('td.cursor-pointer');
+    expect(cell).toBeInTheDocument();
+    fireEvent.click(cell!);
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    fireEvent.click(screen.getByText('Generate Pages'));
+    expect(onBulkAction).toHaveBeenCalledWith('generate_briefs', [expect.any(String)]);
+  });
+
   it('renders a 1-dimension matrix as a list', () => {
     const oneDimMatrix: ContentMatrix = {
       ...MOCK_MATRIX,

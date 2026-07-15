@@ -16,6 +16,8 @@ import type * as OpportunityDetectors from './scoring/opportunity-detectors.js';
 import type * as OutcomeEmvCalibration from './outcome-emv-calibration.js';
 import type * as PlatformLearningsPriors from './platform-learnings-priors.js';
 import type * as RecommendationStaleness from './recommendation-staleness.js';
+import type * as DeliverableDivergenceSweep from './deliverable-divergence-sweep.js';
+import type * as OutcomeSourceIntegritySweepJob from './outcome-source-integrity-sweep-job.js';
 
 const log = createLogger('outcome-crons');
 
@@ -36,6 +38,8 @@ let rankDeclineScanInterval: ReturnType<typeof setInterval> | null = null;
 let emvCalibrationInterval: ReturnType<typeof setInterval> | null = null;
 let platformPriorsInterval: ReturnType<typeof setInterval> | null = null;
 let stalenessScanInterval: ReturnType<typeof setInterval> | null = null;
+let divergenceSweepInterval: ReturnType<typeof setInterval> | null = null;
+let integritySweepInterval: ReturnType<typeof setInterval> | null = null;
 
 // Startup timeout handles — stored so stopOutcomeCrons() can cancel them
 // if shutdown is called during the startup warmup window (currently up to ~60s).
@@ -289,9 +293,9 @@ export function startOutcomeCrons() {
   // ── Strategy v3 P3 — sent-rec staleness scan (24h). ──
   // Thin cron wrapper around runSentRecStalenessScan: derives stale_sent / superseded nudges
   // from the persisted rec sets (no crawl, no AI) and writes deduplicated admin-only activity.
-  // Per-workspace flag-gated INSIDE the scan ('strategy-staleness-scan') — flag OFF = no-op for
-  // that workspace. Loaded via dynamic import so the cron module doesn't pull recommendation
-  // transitive deps at startup.
+  // Runs unconditionally for every workspace (flag-sunset W2a — 'strategy-staleness-scan'
+  // retired, was globally ON in prod). Loaded via dynamic import so the cron module doesn't
+  // pull recommendation transitive deps at startup.
   const runStalenessScanJob = async () => {
     try {
       const { runSentRecStalenessScan }: typeof RecommendationStaleness = await import('./recommendation-staleness.js'); // dynamic-import-ok
@@ -302,6 +306,39 @@ export function startOutcomeCrons() {
       );
     } catch (err) {
       log.error({ err }, 'Sent-rec staleness scan cron failed');
+    }
+  };
+
+  // ── Reconcile R4-PR1 — rec↔deliverable divergence sweep (24h). ──
+  // READ-ONLY: compares each sent/decided rec's clientStatus against its recommendation:<id>
+  // deliverable mirror and reports the pairs that disagree. Mutates NOTHING (no repair, no
+  // broadcast, no activity) — repair is the R4-PR2 trigger + backfill PR. Per-workspace flag-gated
+  // INSIDE the sweep ('strategy-divergence-sweep') — flag OFF = no-op for that workspace. Dynamic
+  // import so the cron module doesn't pull recommendation transitive deps at startup.
+  const runDivergenceSweepJob = async () => {
+    try {
+      const { runDeliverableDivergenceSweep }: typeof DeliverableDivergenceSweep = await import('./deliverable-divergence-sweep.js'); // dynamic-import-ok
+      const result = runDeliverableDivergenceSweep();
+      log.info(
+        { workspacesScanned: result.workspacesScanned, pairsChecked: result.pairsChecked, divergentPairs: result.divergentPairs.length },
+        'Deliverable divergence sweep cron complete',
+      );
+    } catch (err) {
+      log.error({ err }, 'Deliverable divergence sweep cron failed');
+    }
+  };
+
+  // ── B12 — outcome-source integrity sweep (24h). ──
+  // READ-ONLY, FLEET-WIDE diagnostic: sweeps every workspace's tracked_actions for dangling
+  // source refs and writes the report to job.result. No per-workspace arg — a single sweep
+  // covers all workspaces. Mutates NOTHING (no repair, no broadcast, no activity). Dynamic
+  // import so the cron module doesn't pull the sweep job's transitive deps at startup.
+  const runIntegritySweepJob = async () => {
+    try {
+      const { enqueueOutcomeSourceIntegritySweep }: typeof OutcomeSourceIntegritySweepJob = await import('./outcome-source-integrity-sweep-job.js'); // dynamic-import-ok
+      enqueueOutcomeSourceIntegritySweep();
+    } catch (err) {
+      log.error({ err }, 'Outcome source integrity sweep cron failed');
     }
   };
 
@@ -319,6 +356,8 @@ export function startOutcomeCrons() {
     setTimeout(() => void runEmvCalibrationJob(), 55_000),
     setTimeout(() => void runPlatformPriorsJob(), 60_000),
     setTimeout(() => void runStalenessScanJob(), 65_000),
+    setTimeout(() => void runDivergenceSweepJob(), 70_000),
+    setTimeout(() => void runIntegritySweepJob(), 75_000),
   ];
 
   measureInterval = setInterval(() => void runMeasure(), DAILY_MS);
@@ -331,6 +370,8 @@ export function startOutcomeCrons() {
   emvCalibrationInterval = setInterval(() => void runEmvCalibrationJob(), WEEKLY_MS);
   platformPriorsInterval = setInterval(() => void runPlatformPriorsJob(), WEEKLY_MS);
   stalenessScanInterval = setInterval(() => void runStalenessScanJob(), DAILY_MS);
+  divergenceSweepInterval = setInterval(() => void runDivergenceSweepJob(), DAILY_MS);
+  integritySweepInterval = setInterval(() => void runIntegritySweepJob(), DAILY_MS);
 
   playbooksInterval = setInterval(() => void runPlaybooks(), 7 * DAILY_MS);
 
@@ -351,6 +392,8 @@ export function stopOutcomeCrons() {
   if (emvCalibrationInterval) clearInterval(emvCalibrationInterval);
   if (platformPriorsInterval) clearInterval(platformPriorsInterval);
   if (stalenessScanInterval) clearInterval(stalenessScanInterval);
+  if (divergenceSweepInterval) clearInterval(divergenceSweepInterval);
+  if (integritySweepInterval) clearInterval(integritySweepInterval);
   measureInterval = null;
   learningsInterval = null;
   detectionInterval = null;
@@ -362,5 +405,7 @@ export function stopOutcomeCrons() {
   emvCalibrationInterval = null;
   platformPriorsInterval = null;
   stalenessScanInterval = null;
+  divergenceSweepInterval = null;
+  integritySweepInterval = null;
   log.info('Outcome crons stopped');
 }

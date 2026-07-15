@@ -9,17 +9,11 @@ import { CHART_SERIES_COLORS, positionColor } from './ui/constants';
 import { contentPerformance } from '../api/seo';
 import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { capitalize } from '../utils/strings';
-import type { ContentPerformanceItem, ContentTermCoverageStatus } from '../../shared/types/content';
+import type { ContentPerformanceItem, ContentPerformanceTrendPoint, ContentTermCoverageStatus } from '../../shared/types/content';
 
 type ContentItem = ContentPerformanceItem;
 
-interface TrendPoint {
-  date: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-  position: number;
-}
+type TrendPoint = ContentPerformanceTrendPoint;
 
 interface Props {
   workspaceId: string;
@@ -136,7 +130,7 @@ export function ContentPerformance({ workspaceId }: Props) {
       setTrendLoading(requestId);
       try {
         const data = await contentPerformance.trend(workspaceId, requestId);
-        setTrendData(prev => ({ ...prev, [requestId]: (data as { trend?: TrendPoint[] }).trend || [] }));
+        setTrendData(prev => ({ ...prev, [requestId]: data.trend }));
       } catch (err) { console.error('ContentPerformance operation failed:', err); }
       setTrendLoading(null);
     }

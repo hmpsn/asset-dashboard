@@ -250,6 +250,105 @@ describe('BackingMovesQueue', () => {
     expect(onCut).toHaveBeenCalledWith('r1');
   });
 
+  it('opens an optional detail workflow from the canonical backing-move row', () => {
+    const onOpenDetails = vi.fn();
+    wrap(
+      <BackingMovesQueue
+        workspaceId="ws1"
+        recs={[makeRec('r1', 'content', 'Inspect this move')]}
+        actions={makeActions()}
+        onCut={vi.fn()}
+        onOpenDetails={onOpenDetails}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'View details for Inspect this move' }));
+    expect(onOpenDetails).toHaveBeenCalledTimes(1);
+    expect(onOpenDetails).toHaveBeenCalledWith('r1');
+  });
+
+  it('does not offer staging for a move outside the orchestrator sendable set', () => {
+    const sent = {
+      ...makeRec('sent', 'content', 'Already sent move'),
+      clientStatus: 'sent' as const,
+    };
+    wrap(
+      <BackingMovesQueue
+        workspaceId="ws1"
+        recs={[sent]}
+        actions={makeActions()}
+        onCut={vi.fn()}
+        stagedRecIds={new Set()}
+        stageableRecIds={new Set()}
+        onStage={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Stage for issue' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send to client' })).not.toBeInTheDocument();
+  });
+
+  it('stages only sendable rows from a mixed bulk selection', () => {
+    const onStageMany = vi.fn();
+    const sendable = makeRec('sendable', 'content', 'Sendable move');
+    const sent = {
+      ...makeRec('sent', 'content', 'Already sent move'),
+      clientStatus: 'sent' as const,
+    };
+    wrap(
+      <BackingMovesQueue
+        workspaceId="ws1"
+        recs={[sendable, sent]}
+        actions={makeActions()}
+        onCut={vi.fn()}
+        stagedRecIds={new Set()}
+        stageableRecIds={new Set(['sendable'])}
+        onStage={vi.fn()}
+        onStageMany={onStageMany}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select: Sendable move' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select: Already sent move' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stage 1' }));
+
+    expect(onStageMany).toHaveBeenCalledWith(['sendable']);
+  });
+
+  it('uses the compact Engine-spine composition while preserving every move control', () => {
+    wrap(
+      <BackingMovesQueue
+        workspaceId="ws1"
+        recs={[makeRec('compact', 'content', 'Compact engine move')]}
+        actions={makeActions()}
+        onCut={vi.fn()}
+        onEditWording={vi.fn()}
+        stagedRecIds={new Set()}
+        stageableRecIds={new Set(['compact'])}
+        onStage={vi.fn()}
+        onAddRec={vi.fn()}
+        onOpenDetails={vi.fn()}
+        presentation="engine-spine"
+      />,
+    );
+
+    expect(screen.getByTestId('backing-moves-groups')).toHaveClass('space-y-4');
+    expect(screen.getByTestId('backing-move-group')).toHaveClass('space-y-1.5');
+    expect(screen.getByText(ARCHETYPE_LABELS.authority_bet).closest('h3')).toHaveClass('t-label', 'uppercase');
+    expect(document.querySelector('.fa-bolt')).toBeInTheDocument();
+    expect(screen.getByTestId('cockpit-row-primary').parentElement).toHaveAttribute('data-density', 'compact');
+    expect(screen.getByRole('button', { name: 'View details for Compact engine move' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stage for issue' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Edit wording' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for Compact engine move' }));
+
+    expect(screen.getByRole('menuitem', { name: 'Edit wording' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Fix' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Park' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add a recommendation' })).toBeInTheDocument();
+  });
+
   it('renders an empty state when recs array is empty', () => {
     wrap(
       <BackingMovesQueue

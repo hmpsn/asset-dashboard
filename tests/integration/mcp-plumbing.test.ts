@@ -12,6 +12,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createMcpApiKey, revokeMcpApiKey } from '../../server/mcp/api-keys.js';
+import { createTemplate } from '../../server/content-templates.js';
+import { createMatrix } from '../../server/content-matrices.js';
 
 const MASTER_KEY = 'plumbing-master-key-xyz';
 const ctx = createEphemeralTestContext(import.meta.url);
@@ -20,21 +22,40 @@ let wsA: ReturnType<typeof seedWorkspace>;
 let wsB: ReturnType<typeof seedWorkspace>;
 let perWsKey: string;
 let perWsKeyId: string;
+let matrixId: string;
 
 beforeAll(async () => {
   process.env.MCP_API_KEY = MASTER_KEY;
   await ctx.startServer();
   wsA = seedWorkspace();
   wsB = seedWorkspace();
+  const template = createTemplate(wsA.workspaceId, {
+    name: 'MCP matrix plumbing template',
+    pageType: 'service',
+    variables: [{ name: 'service', label: 'Service' }],
+    sections: [],
+    urlPattern: '/services/{service}',
+    keywordPattern: '{service}',
+    titlePattern: '{service}',
+    metaDescPattern: 'Learn about {service}.',
+  });
+  const matrix = createMatrix(wsA.workspaceId, {
+    name: 'MCP matrix plumbing matrix',
+    templateId: template.id,
+    dimensions: [{ variableName: 'service', values: ['Consulting'] }],
+    urlPattern: template.urlPattern,
+    keywordPattern: template.keywordPattern,
+  });
+  matrixId = matrix.id;
   const created = createMcpApiKey(wsA.workspaceId, 'plumbing-test-key');
   perWsKey = created.plaintextKeyOnceShown;
   perWsKeyId = created.id;
-});
+}, 30_000);
 
 afterAll(async () => {
-  revokeMcpApiKey(perWsKeyId);
-  wsA.cleanup();
-  wsB.cleanup();
+  if (perWsKeyId) revokeMcpApiKey(perWsKeyId);
+  wsA?.cleanup();
+  wsB?.cleanup();
   await ctx.stopServer();
   delete process.env.MCP_API_KEY;
 });
@@ -94,6 +115,18 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       'generate_schema', 'validate_schema', 'publish_schema',
       'start_brief_generation', 'start_post_generation',
       'get_search_performance',
+      // M0 matrix structural planning
+      'list_content_matrices', 'get_content_matrix',
+      'resolve_content_matrix_cells', 'accept_content_template_generation_upgrade',
+      'preview_content_matrix_generation', 'resolve_content_matrix_evidence',
+      'get_pseo_matrix_plan', 'create_content_matrix_from_pseo_plan',
+      // B0 durable brand intake
+      'get_brand_intake', 'resolve_brand_intake_evidence',
+      // B1 operator-authorized brand voice
+      'get_brand_voice', 'finalize_brand_voice',
+      // B2 grounded brand deliverable generation
+      'start_brand_deliverable_generation', 'get_brand_generation',
+      'resume_brand_deliverable_generation', 'start_brand_deliverable_revision',
     ];
     for (const t of expected) {
       expect(names, `tools/list is missing ${t}`).toContain(t);
@@ -114,6 +147,84 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     const body = await callTool('get_search_performance', { workspace_id: wsA.workspaceId }, MASTER_KEY);
     expect(body.result?.isError).toBe(true);
     expect(body.result!.content[0].text).toMatch(/Google Search Console|Google is not connected/i);
+  });
+
+  it('lists and reads content matrices through the registered json_v1 family', async () => {
+    const listed = await callTool(
+      'list_content_matrices',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(listed.result?.isError).toBeFalsy();
+    const listPayload = JSON.parse(listed.result!.content[0].text) as {
+      items: Array<{ id: string }>;
+    };
+    expect(listPayload.items.some(item => item.id === matrixId)).toBe(true);
+
+    const detail = await callTool(
+      'get_content_matrix',
+      { workspace_id: wsA.workspaceId, matrix_id: matrixId },
+      MASTER_KEY,
+    );
+    expect(detail.result?.isError).toBeFalsy();
+    const detailPayload = JSON.parse(detail.result!.content[0].text) as {
+      matrix: { id: string };
+      cells: { items: Array<{ id: string }> };
+    };
+    expect(detailPayload.matrix.id).toBe(matrixId);
+    expect(detailPayload.cells.items).toHaveLength(1);
+  });
+
+  it('reads an empty durable brand intake through the registered json_v1 family', async () => {
+    const body = await callTool(
+      'get_brand_intake',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(body.result?.isError).toBeFalsy();
+    const payload = JSON.parse(body.result!.content[0].text) as {
+      revision: unknown;
+      field_evidence: unknown[];
+    };
+    expect(payload.revision).toBeNull();
+    expect(payload.field_evidence).toEqual([]);
+  });
+
+  it('reads missing brand-voice readiness without exposing raw intake', async () => {
+    const body = await callTool(
+      'get_brand_voice',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(body.result?.isError).toBeFalsy();
+    const payload = JSON.parse(body.result!.content[0].text) as {
+      profile: unknown;
+      readiness: { state: string };
+      eligible_anchors: { items: unknown[]; next_cursor: string | null; has_more: boolean };
+      latest_snapshot: unknown;
+    };
+    expect(payload).toMatchObject({
+      profile: null,
+      readiness: { state: 'missing' },
+      eligible_anchors: { items: [], next_cursor: null, has_more: false },
+      latest_snapshot: null,
+    });
+    expect(JSON.stringify(payload)).not.toContain('raw_intake');
+    expect(JSON.stringify(payload)).not.toContain('authorization_token');
+  });
+
+  it('dispatches brand-generation reads through the registered json_v1 family', async () => {
+    const body = await callTool(
+      'get_brand_generation',
+      { workspace_id: wsA.workspaceId, run_id: 'missing-brand-run' },
+      MASTER_KEY,
+    );
+    expect(body.result?.isError).toBe(true);
+    const payload = JSON.parse(body.result!.content[0].text) as {
+      code: string;
+      retryable: boolean;
+    };
+    expect(payload).toMatchObject({ code: 'not_found', retryable: false });
   });
 });
 

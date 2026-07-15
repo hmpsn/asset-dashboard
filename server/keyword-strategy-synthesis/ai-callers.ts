@@ -1,12 +1,20 @@
 import { callAI } from '../ai.js';
 import type { AIOperationId } from '../ai-operation-registry.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
+import { createHash } from 'crypto';
+import type { AIExecutionMetadata } from '../../shared/types/ai-execution.js';
+
+export interface KeywordStrategyAIExecution { execution: AIExecutionMetadata; inputFingerprint: string }
+function fingerprint(system: string | undefined, messages: Array<{ role: string; content: string }>): string {
+  return createHash('sha256').update(JSON.stringify({ system: system ?? null, messages })).digest('hex');
+}
 
 export async function callKeywordStrategyAI(
   workspaceId: string,
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
   _label?: string,
+  onExecution?: (result: KeywordStrategyAIExecution) => void,
 ): Promise<string> {
   void _label;
   const wrappedMessages = messages.map((m, i) =>
@@ -29,6 +37,7 @@ export async function callKeywordStrategyAI(
     maxRetries: 3,
     timeoutMs: 90_000,
   });
+  onExecution?.({ execution: result.execution, inputFingerprint: fingerprint(system, aiMessages) });
   return stripCodeFences(result.text);
 }
 
@@ -37,6 +46,7 @@ export async function callNamedStrategyAI(
   operation: Extract<AIOperationId, 'keyword-page-assignment' | 'keyword-site-synthesis' | 'keyword-topic-clusters'>,
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
+  onExecution?: (result: KeywordStrategyAIExecution) => void,
 ): Promise<string> {
   const wrappedMessages = messages.map((m, i) =>
     i === 0 && m.role === 'system'
@@ -55,6 +65,7 @@ export async function callNamedStrategyAI(
     temperature: 0.3,
     workspaceId,
   });
+  onExecution?.({ execution: result.execution, inputFingerprint: fingerprint(system, aiMessages) });
   return stripCodeFences(result.text);
 }
 

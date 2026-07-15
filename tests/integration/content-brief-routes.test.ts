@@ -184,7 +184,9 @@ function seedRouteBrief(suffix: string): ContentBrief {
 
 describe('Content Briefs — update route validation', () => {
   it('PATCH updates editable fields while ignoring immutable identity fields', async () => {
+    const expectedRevision = getBrief(testWsId, briefId)!.generationRevision;
     const res = await patchJson(`/api/content-briefs/${testWsId}/${briefId}`, {
+      expectedRevision,
       id: 'brief_spoofed',
       workspaceId: 'ws_spoofed',
       createdAt: '1999-01-01T00:00:00.000Z',
@@ -212,6 +214,7 @@ describe('Content Briefs — update route validation', () => {
     const before = getBrief(testWsId, briefId);
 
     const res = await patchJson(`/api/content-briefs/${testWsId}/${briefId}`, {
+      expectedRevision: before!.generationRevision,
       outline: 'replace outline with a string',
       secondaryKeywords: 'not an array',
       pageType: 'press-release',
@@ -310,7 +313,11 @@ describe('Content Briefs — DELETE of a superseding brief (FK ON DELETE SET NUL
     expect(getBrief(testWsId, briefA.id)?.supersededBy).toBe(briefB.id);
 
     // Delete the SUPERSEDING brief B via the HTTP route (server has FK ON).
-    const res = await api(`/api/content-briefs/${testWsId}/${briefB.id}`, { method: 'DELETE' });
+    const res = await api(`/api/content-briefs/${testWsId}/${briefB.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedRevision: getBrief(testWsId, briefB.id)!.generationRevision }),
+    });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });
 
@@ -332,7 +339,7 @@ describe('Content Briefs — send-to-client dedupe (HTTP route)', () => {
     return api(`/api/content-briefs/${testWsId}/${briefId}/send-to-client`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ expectedRevision: getBrief(testWsId, briefId)!.generationRevision }),
     });
   }
 

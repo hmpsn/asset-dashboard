@@ -79,6 +79,7 @@ const stmts = createStmtCache(() => ({
       `),
   update: db.prepare(`
         UPDATE requests SET title = @title, description = @description, category = @category,
+          -- status-ok: REQUEST_TRANSITIONS guard runs before this write (server/requests.ts updateRequest / routes/requests.ts PATCH validate the transition; this is a general upsert that carries status through)
           priority = @priority, status = @status, submitted_by = @submitted_by,
           page_url = @page_url, page_id = @page_id, attachments = @attachments,
           notes = @notes, updated_at = @updated_at

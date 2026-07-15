@@ -54,9 +54,10 @@ real money, until P6 threads GA4 `estimatedRevenue` — its JSDoc must say so. I
   `routes/recommendations.ts` and `outcome-backfill.ts`, SELECTed in `getCalibrationOutcomes`).
   The regenerable rec row is NOT a safe home: P5 regenerates after every scheduled audit and
   `buildMergeKey` does not preserve the old `opportunity`.
-- Client renderers (must never receive raw `$/wk`): `src/components/client/FixRecommendations.tsx`,
-  `src/components/client/Briefing/RecommendedForYou.tsx`,
+- Client renderers (must never receive raw `$/wk`): `src/components/client/Briefing/RecommendedForYou.tsx`,
   `src/components/client/strategy/StrategyContentOpportunitiesSection.tsx`.
+  (`FixRecommendations.tsx` was deleted as verified-dead in the H1 sweep — see the R5
+  action-catalog checklist below for the current stale-reference note.)
 
 ## Contract 2 — the priority-tier source
 
@@ -75,9 +76,10 @@ reserved for genuine `CRITICAL_CHECKS`).
   `impactScore`, keeping the legacy tier, so the canary is **blind to cross-tier reorder**.
   P4 must make `ovClone` apply the OV-derived tier too (G1).
 - `src/components/admin/OvDivergencePanel.tsx` — must surface tier-level divergence.
-- `server/meeting-brief-generator.ts` — the brief cache hash keys on top-10 insights +
-  first-5 site keywords, **no rec/tier signal** → serves a stale "#1" after re-tiering (G8).
-  P4 must add a rec/tier/gap signal to the cache hash.
+- ~~`server/meeting-brief-generator.ts`~~ — RETIRED (2026-07): the Meeting Brief surface and
+  its generator/cache were removed with the feature. The G8 cache-hash fix shipped and lived
+  in it until retirement; the strategy POV's equivalent contract is `buildStrategyPovHash`
+  (`server/strategy-pov-generator.ts`).
 - Client #1 card + `topRecommendationId` consumers (Health tab ordering).
 
 ## Contract 3 — the `estimatedGain` string
@@ -96,9 +98,7 @@ it to the public strip (no dollarized string may reach a client).
 - `server/recommendations.ts` — `estimatedGain` assignment + `computeRecommendationSummary`.
 - `server/briefing-candidates.ts` — brief-candidate ranking; `server/content-gaps.ts`
   ordering (`opportunity_score`).
-- Gain renderers: `src/components/client/FixRecommendations.tsx` (switch its hand-duplicated
-  `ServerRecommendation` to the shared `Recommendation` type),
-  `src/components/client/InsightsEngine.tsx`, `src/components/client/strategy/*`,
+- Gain renderers: `src/components/client/InsightsEngine.tsx`, `src/components/client/strategy/*`,
   `src/components/client/Briefing/RecommendedForYou.tsx` (its independent `volume × 0.103`
   clicks estimate + the legacy `/100` badge are **flag-gated**, not unconditionally removed —
   see the client-gate contract below).
@@ -258,13 +258,12 @@ gives briefing-candidates, the upsell badge, and the rec layer ONE basis while k
 valid and the column in range. Recomputed in `keyword-strategy-enrichment.ts` when `relaxConservatism`
 (the same `seo-generation-quality` flag); flag-OFF keeps `computeOpportunityScore`.
 
-**Part F — brief cache (G8): HASH-FIX ONLY (decision).** `buildPromptHash`
-(`server/meeting-brief-generator.ts`) now keys on a tier-aware `BriefRecSignal`
-(`topRecommendationId` + `topTier`) read from the CACHED rec set, so a re-tier busts the brief
-cache. We deliberately did NOT surface the engine's `topRecommendationId`/title into the brief
-prompt: the brief is a **distinct, insight-sourced narrative surface** (it does not read the rec
-set), and threading the rec set into its prompt would be disproportionate. The §5.2 "#1 brief == #1
-client" invariant is therefore scoped to the rec/client surfaces, not the brief narrative.
+**Part F — brief cache (G8): RETIRED with the Meeting Brief (2026-07).** The hash-fix decision
+(key `buildPromptHash` on a tier-aware `BriefRecSignal` read from the CACHED rec set) shipped
+and held until the Meeting Brief surface was retired and its generator deleted. The analogous
+live contract is the strategy POV's `buildStrategyPovHash` (`server/strategy-pov-generator.ts`),
+which keys on rec content + order + variant + regenerate-nonce. The §5.2 "#1 brief == #1
+client" invariant remains scoped to the rec/client surfaces.
 
 **§5.2 one-liner.** The client #1 card AND AdminChat both read `summary.topRecommendationId`
 (shared basis ✅). `mcp/tools/clients.ts get_pending_work` is intentionally OUT-OF-SCOPE of the #1
@@ -290,7 +289,11 @@ non-exhaustive maps (G2 — silent mislabel + distorted calibration + false auto
   a `RecType` to the union is a **compile error** until it gets an explicit outcome case.
 - Frontend label maps: `src/components/admin/outcomes/outcomeConstants.ts`,
   `src/components/client/OutcomeSummary.tsx`, `src/components/client/Briefing/WinsSurface.tsx`.
-- `FixRecommendations.tsx` `typeConfig` (+ `REC_TYPE_TAB`/`TYPE_ICONS` for new `RecType`s).
+- `src/components/client/InsightsEngine.tsx` `REC_TYPE_TAB` / `TYPE_ICONS` for new `RecType`s
+  (the `FixRecommendations.tsx` file this checklist previously pointed to no longer exists).
+- Add a catalog entry in `shared/types/action-catalog.ts` (`ACTION_CATALOG.recommendation`)
+  for the new `RecType` — the `satisfies Record<RecType, ActionCatalogEntry>` clause fails to
+  compile until you do. See `docs/rules/action-catalog.md`.
 - A named intelligence slice (`shared/types/intelligence.ts` field + `assemble*()` read +
   `buildWorkspaceIntelligence()` routing) so AdminChat is not blind (Data-Flow #6).
 

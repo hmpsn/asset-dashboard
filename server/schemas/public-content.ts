@@ -91,6 +91,10 @@ export const requestPostChangesSchema = z.object({
 // updates with the existing section data (preserving required DB fields) so that
 // parseJsonSafeArray(postSectionSchema) does not silently drop sections on read-back.
 export const clientPostEditSchema = z.object({
+  // Public clients never receive the internal numeric generation revision.
+  // They echo the already-visible updatedAt value; the route resolves it to
+  // the matching internal revision and the storage write remains a real CAS.
+  expectedUpdatedAt: z.string().datetime(),
   title: z.string().max(500).optional(),
   metaDescription: z.string().max(500).optional(),
   introduction: z.string().max(20000).optional(),

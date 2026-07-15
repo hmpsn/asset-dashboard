@@ -55,7 +55,14 @@ vi.mock('../../src/components/post-editor/ReviewChecklist', () => ({
 }));
 
 vi.mock('../../src/components/post-editor/FixDiffModal', () => ({
-  FixDiffModal: () => <div data-testid="fix-diff-modal" />,
+  FixDiffModal: ({ result, onApply }: {
+    result: { explanation: string } | null;
+    onApply: (result: unknown) => void;
+  }) => result ? (
+    <button type="button" onClick={() => onApply(result)}>
+      Apply reviewed AI fix
+    </button>
+  ) : null,
 }));
 
 // ── Hoisted mocks (referenced inside vi.mock factories) ──────────────────────
@@ -71,6 +78,7 @@ const mocks = vi.hoisted(() => ({
     revertVersion: vi.fn(),
     aiReview: vi.fn(),
     aifix: vi.fn(),
+    applyAiFix: vi.fn(),
   },
   contentBriefs: {
     getById: vi.fn(),
@@ -78,6 +86,8 @@ const mocks = vi.hoisted(() => ({
   useAdminPost: vi.fn(),
   useAdminPostVersions: vi.fn(),
   usePublishTarget: vi.fn(),
+  backgroundJobs: [] as Array<Record<string, unknown>>,
+  trackJob: vi.fn(),
 }));
 
 // ── API stubs ────────────────────────────────────────────────────────────────
@@ -99,6 +109,14 @@ vi.mock('../../src/hooks/admin', () => ({
   useAdminPost: (...args: unknown[]) => mocks.useAdminPost(...args),
   useAdminPostVersions: (...args: unknown[]) => mocks.useAdminPostVersions(...args),
   usePublishTarget: (...args: unknown[]) => mocks.usePublishTarget(...args),
+}));
+
+vi.mock('../../src/hooks/useBackgroundTasks', () => ({
+  useBackgroundTasks: () => ({
+    jobs: mocks.backgroundJobs,
+    trackJob: mocks.trackJob,
+  }),
+  isTerminalJobStatus: (status: string) => ['done', 'error', 'cancelled'].includes(status),
 }));
 
 vi.mock('../../src/hooks/useAutoSave', () => ({
@@ -146,6 +164,7 @@ const DRAFT_POST = {
   totalWordCount: 850,
   targetWordCount: 1200,
   status: 'draft' as const,
+  generationRevision: 3,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-05-01T00:00:00.000Z',
 };
@@ -179,7 +198,7 @@ function renderEditor(
 
   mocks.usePublishTarget.mockReturnValue({ data: hasPublishTarget });
 
-  return render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <PostEditor
@@ -189,8 +208,16 @@ function renderEditor(
           onDelete={onDelete}
         />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const rendered = render(tree());
+  return {
+    ...rendered,
+    rerenderPost: (nextPost: typeof DRAFT_POST) => {
+      mocks.useAdminPost.mockReturnValue({ data: nextPost, isLoading: false, error: null });
+      rendered.rerender(tree());
+    },
+  };
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -198,6 +225,7 @@ function renderEditor(
 describe('PostEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.backgroundJobs.length = 0;
   });
 
   // 1. Renders without crash with mocked post data
@@ -334,9 +362,43 @@ describe('PostEditor', () => {
       expect(mocks.contentPosts.update).toHaveBeenCalledWith(
         'ws-1',
         'post-1',
+        3,
         expect.objectContaining({ title: 'Updated SEO Guide' }),
       );
     });
+  });
+
+  it('keeps a rejected title edit open so the operator can retry it', async () => {
+    mocks.contentPosts.update.mockRejectedValue(new Error('This post changed before the title saved.'));
+    renderEditor();
+    fireEvent.click(screen.getByLabelText('Edit title'));
+    fireEvent.change(
+      screen.getByDisplayValue('The Complete Guide to SEO Best Practices'),
+      { target: { value: 'Operator-authored title' } },
+    );
+    fireEvent.click(screen.getByLabelText('Save title'));
+
+    await waitFor(() => {
+      expect(mocks.contentPosts.update).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByDisplayValue('Operator-authored title')).toBeInTheDocument();
+    expect(screen.getByLabelText('Save title')).toBeEnabled();
+  });
+
+  it('blocks close and destructive actions while an edit is unresolved', () => {
+    renderEditor();
+    fireEvent.click(screen.getByLabelText('Edit title'));
+    fireEvent.change(
+      screen.getByDisplayValue('The Complete Guide to SEO Best Practices'),
+      { target: { value: 'Unsaved operator title' } },
+    );
+
+    fireEvent.click(screen.getByLabelText('Close editor'));
+    fireEvent.click(screen.getByLabelText('Delete post'));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('Unsaved operator title')).toBeInTheDocument();
+    expect(screen.queryByText('Delete Post?')).not.toBeInTheDocument();
   });
 
   // 9c. Cancel title edit restores original title without calling update
@@ -374,7 +436,7 @@ describe('PostEditor', () => {
     const confirmDeleteBtn = screen.getByRole('button', { name: /^delete$/i });
     fireEvent.click(confirmDeleteBtn);
     await waitFor(() => {
-      expect(mocks.contentPosts.remove).toHaveBeenCalledWith('ws-1', 'post-1');
+      expect(mocks.contentPosts.remove).toHaveBeenCalledWith('ws-1', 'post-1', 3);
       expect(onDelete).toHaveBeenCalled();
       expect(onClose).toHaveBeenCalled();
     });
@@ -477,6 +539,7 @@ describe('PostEditor', () => {
       expect(mocks.contentPosts.aifix).toHaveBeenCalledWith(
         'ws-1',
         'post-1',
+        3,
         {
           mode: 'feedback',
           target: 'post',
@@ -513,6 +576,7 @@ describe('PostEditor', () => {
       expect(mocks.contentPosts.aifix).toHaveBeenCalledWith(
         'ws-1',
         'post-1',
+        3,
         {
           mode: 'feedback',
           target: 'meta',
@@ -520,6 +584,84 @@ describe('PostEditor', () => {
         },
       );
     });
+  });
+
+  it('blocks a paid feedback preview when the reviewed post revision changes while the form is open', () => {
+    const rendered = renderEditor();
+    fireEvent.click(screen.getByRole('button', { name: /generate full post with feedback/i }));
+    fireEvent.change(screen.getByPlaceholderText(/examples: make this more direct/i), {
+      target: { value: 'Keep this feedback pinned to the reviewed post.' },
+    });
+
+    rendered.rerenderPost({
+      ...DRAFT_POST,
+      title: 'Externally updated post',
+      generationRevision: 4,
+      updatedAt: '2026-05-01T00:00:01.000Z',
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/changed after you opened the feedback form/i);
+    const generateButton = screen.getByRole('button', { name: /generate preview/i });
+    expect(generateButton).toBeDisabled();
+    fireEvent.click(generateButton);
+    expect(mocks.contentPosts.aifix).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText(/examples: make this more direct/i)).toHaveValue(
+      'Keep this feedback pinned to the reviewed post.',
+    );
+  });
+
+  it('keeps the AI repair in preview until apply and then sends only its stored job id', async () => {
+    const jobId = 'job-ai-fix-1';
+    const suggestion = {
+      field: 'post',
+      originalText: JSON.stringify({
+        introduction: DRAFT_POST.introduction,
+        sections: DRAFT_POST.sections.map(section => ({ index: section.index, content: section.content })),
+        conclusion: DRAFT_POST.conclusion,
+      }),
+      suggestedText: JSON.stringify({
+        introduction: '<p>Rewritten introduction.</p>',
+        sections: DRAFT_POST.sections.map(section => ({
+          index: section.index,
+          content: `<p>Rewritten section ${section.index}.</p>`,
+        })),
+        conclusion: '<p>Rewritten conclusion.</p>',
+      }),
+      explanation: 'AI revised the post.',
+      sourceRevision: 3,
+      provenance: { executionChainId: jobId },
+    };
+    mocks.backgroundJobs.push({
+      id: jobId,
+      type: 'content-post-fix',
+      status: 'done',
+      result: suggestion,
+      createdAt: '2026-07-14T00:00:00.000Z',
+      updatedAt: '2026-07-14T00:00:01.000Z',
+      workspaceId: 'ws-1',
+    });
+    mocks.contentPosts.aifix.mockResolvedValue({ jobId });
+    mocks.contentPosts.applyAiFix.mockResolvedValue({
+      ...DRAFT_POST,
+      introduction: '<p>Rewritten introduction.</p>',
+      generationRevision: 4,
+    });
+
+    renderEditor();
+    fireEvent.click(screen.getByRole('button', { name: /generate full post with feedback/i }));
+    fireEvent.change(screen.getByPlaceholderText(/examples: make this more direct/i), {
+      target: { value: 'Please tighten the full post.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /generate preview/i }));
+
+    const applyButton = await screen.findByRole('button', { name: /apply reviewed ai fix/i });
+    expect(mocks.contentPosts.applyAiFix).not.toHaveBeenCalled();
+    fireEvent.click(applyButton);
+
+    await waitFor(() => {
+      expect(mocks.contentPosts.applyAiFix).toHaveBeenCalledWith('ws-1', 'post-1', jobId);
+    });
+    expect(mocks.contentPosts.update).not.toHaveBeenCalled();
   });
 
   // Target keyword and word count
@@ -567,7 +709,7 @@ describe('PostEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
     await waitFor(() => {
       expect(mocks.contentPosts.publishToWebflow).toHaveBeenCalledWith(
-        'ws-1', 'post-1', { generateImage: false },
+        'ws-1', 'post-1', 3, { generateImage: false },
       );
     });
   });

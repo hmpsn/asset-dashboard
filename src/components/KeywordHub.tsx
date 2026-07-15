@@ -25,7 +25,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Archive, Eye, MapPin, RefreshCw, Target, TrendingUp } from 'lucide-react'; // trend-icon-ok — TrendingUp is a summary-metric icon here, not a trend badge
 
-import { Badge, Button, ConfirmDialog, FormInput, PageHeader, SectionCard } from './ui';
+import { Badge, Button, ConfirmDialog, FormInput, FreshnessStamp, PageHeader, SectionCard } from './ui';
 import { KeywordBulkConfirmDialog } from './keyword-command-center/KeywordBulkConfirmDialog';
 import { KeywordDetailDrawer } from './keyword-command-center/KeywordDetailDrawer';
 import { SummaryMetric } from './keyword-command-center/SummaryMetric';
@@ -68,10 +68,26 @@ import type {
   KeywordCommandCenterCounts,
   KeywordCommandCenterNextAction,
   KeywordCommandCenterSort,
+  KeywordRankFreshness,
 } from '../../shared/types/keyword-command-center';
+import { KEYWORD_RANK_FRESHNESS_STATUS } from '../../shared/types/keyword-command-center';
 
 export interface KeywordHubProps {
   workspaceId: string;
+}
+
+function RankFreshness({ freshness }: { freshness: KeywordRankFreshness | undefined }) {
+  if (!freshness || freshness.status === KEYWORD_RANK_FRESHNESS_STATUS.MISSING) {
+    return <Badge tone="zinc" label="Rank data unavailable" />;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {freshness.status === KEYWORD_RANK_FRESHNESS_STATUS.STALE && (
+        <Badge tone="amber" label={`Rank data stale · ${freshness.ageDays ?? 0} days old`} />
+      )}
+      <FreshnessStamp value={freshness.snapshotDate} label="Ranks observed" />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -222,21 +238,22 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   const initialRowsQueryRef = useRef(rowsQuery);
   const initialView = useKeywordCommandCenterInitialView(workspaceId, initialRowsQueryRef.current);
   const viewingInitialRows = rowsQuerySignature(rowsQuery) === rowsQuerySignature(initialRowsQueryRef.current);
+  const initialTransportSettled = initialView.data != null || initialView.isError;
   const summary = useKeywordCommandCenterSummary(workspaceId, {
-    enabled: initialView.isError,
+    enabled: initialTransportSettled,
   });
   const rowsResult = useKeywordCommandCenterRows(workspaceId, rowsQuery, {
-    enabled: !viewingInitialRows || initialView.isError,
+    enabled: !viewingInitialRows || initialTransportSettled,
   });
-  const summaryData = initialView.data?.summary ?? summary.data;
-  const rowsData = viewingInitialRows ? initialView.data?.rows ?? rowsResult.data : rowsResult.data;
+  const summaryData = summary.data;
+  const rowsData = rowsResult.data;
   const rowsError = rowsData || rowsResult.isLoading
     ? null
-    : viewingInitialRows ? rowsResult.error ?? initialView.error : rowsResult.error;
+    : rowsResult.error ?? (viewingInitialRows ? initialView.error : null);
   const counts = summaryData?.counts;
   const filterMetas = summaryData?.filters ?? [];
-  const summaryLoading = initialView.isLoading || summary.isLoading;
-  const rowsLoading = viewingInitialRows ? initialView.isLoading || rowsResult.isLoading : rowsResult.isLoading;
+  const summaryLoading = !initialTransportSettled || summary.isLoading;
+  const rowsLoading = viewingInitialRows && !initialTransportSettled ? true : rowsResult.isLoading;
   const rows = rowsData?.rows ?? [];
   const pageInfo = rowsData?.pageInfo;
 
@@ -475,7 +492,7 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
   };
 
   const handleRetryRows = () => {
-    void (viewingInitialRows ? initialView.refetch() : rowsResult.refetch());
+    void rowsResult.refetch();
   };
 
   const handleFocusAddKeyword = () => {
@@ -605,6 +622,12 @@ export function KeywordHub({ workspaceId }: KeywordHubProps) {
               className="h-[88px] rounded-[var(--radius-xl)] border border-[var(--brand-border)] bg-[var(--surface-3)]/30 animate-pulse"
             />
           ))}
+        </div>
+      )}
+
+      {summaryData && (
+        <div aria-label="Rank data freshness">
+          <RankFreshness freshness={summaryData.rankFreshness} />
         </div>
       )}
 

@@ -31,6 +31,13 @@ import type {
 import type { KeywordStrategySearchData } from './keyword-strategy-search-data.js';
 import type { KeywordStrategyPageInfo } from './keyword-strategy-pages.js';
 import type { StrategyOutput } from './keyword-strategy-ai-synthesis.js';
+import type { GenerationProvenance } from '../shared/types/ai-execution.js';
+import { claimKeywordStrategyGenerationCommit } from './keyword-strategy-generation-store.js';
+import { getKeywordStrategyGenerationState } from './keyword-strategy-generation-store.js';
+
+export class KeywordStrategyRevisionConflictError extends Error {
+  constructor() { super('Keyword strategy changed while generation was in flight'); this.name = 'KeywordStrategyRevisionConflictError'; }
+}
 
 export interface PersistKeywordStrategyOptions {
   ws: Workspace;
@@ -50,6 +57,8 @@ export interface PersistKeywordStrategyOptions {
   maxPages?: number;
   seoDataStatus: SeoDataStatus;
   searchData: Pick<KeywordStrategySearchData, 'deviceBreakdown' | 'countryBreakdown' | 'periodComparison' | 'organicLandingPages' | 'organicOverview'>;
+  expectedRevision?: number;
+  provenance?: GenerationProvenance;
 }
 
 export interface PersistKeywordStrategyResult {
@@ -71,6 +80,8 @@ function mergeIncrementalPageKeyword(previous: PageKeywordMap | undefined, next:
     volume: next.volume ?? previous.volume,
     difficulty: next.difficulty ?? previous.difficulty,
     cpc: next.cpc ?? previous.cpc,
+    cpcSource: next.cpc != null ? next.cpcSource : previous.cpcSource,
+    intentSource: next.searchIntent != null ? next.intentSource : previous.intentSource,
     secondaryMetrics: next.secondaryMetrics ?? previous.secondaryMetrics,
     metricsSource: next.metricsSource ?? previous.metricsSource,
     validated: next.validated ?? previous.validated,
@@ -206,6 +217,10 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
   };
 
   const writeKeywordStrategy = db.transaction(() => {
+    const expectedRevision = options.expectedRevision ?? getKeywordStrategyGenerationState(ws.id).revision;
+    if (!claimKeywordStrategyGenerationCommit(ws.id, expectedRevision, options.provenance ?? null)) {
+      throw new KeywordStrategyRevisionConflictError();
+    }
     // Snapshot previous table-backed state before replacing it, so history can
     // represent the exact prior generation without reading live tables later.
     const prevPageMapForHistory = listPageKeywords(ws.id);
@@ -298,6 +313,9 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
       targetKeyword: null,
       baselineSnapshot: { captured_at: now },
       attribution: 'platform_executed',
+      // R6 (B11): no `source` — a strategy-regeneration event is a workspace SELF-ref
+      // with no single ephemeral titled producer. The generic label is honest here
+      // (FM-2). The per-keyword sites below DO snapshot their keyword identity.
     });
 
     // A3 (audit #14): per-keyword outcome actions for net-new pageMap primaries.
@@ -341,6 +359,12 @@ export function persistKeywordStrategy(options: PersistKeywordStrategyOptions): 
         },
         baselineConfidence: hasBaselineMetrics ? 'exact' : 'estimated',
         attribution: 'platform_executed',
+        // R6 (B11): identity of a per-keyword strategy action IS its primary keyword on
+        // its mapped page — snapshot both so the win title reads the keyword.
+        source: {
+          label: pm.primaryKeyword.trim(),
+          snapshot: { title: pm.primaryKeyword.trim(), type: STRATEGY_PAGE_KEYWORD_SOURCE_TYPE, page: normalizedPath },
+        },
       });
     }
   });

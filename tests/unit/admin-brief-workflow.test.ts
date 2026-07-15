@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ContentBrief } from '../../shared/types/content';
-import { extractGeneratedBriefResult, renderBriefMarkdown } from '../../src/hooks/admin/useAdminBriefWorkflow';
+import {
+  createBriefFieldSaveQueue,
+  extractGeneratedBriefResult,
+  renderBriefMarkdown,
+} from '../../src/hooks/admin/useAdminBriefWorkflow';
 
 function makeBrief(overrides: Partial<ContentBrief> = {}): ContentBrief {
   return {
@@ -64,5 +68,80 @@ describe('admin brief workflow helpers', () => {
     expect(markdown).toContain('- **Primary:** Book a technical audit');
     expect(markdown).toContain('- /services/seo');
     expect(markdown).toContain('- Content type: guide');
+  });
+
+  it('serializes rapid field commits and advances later edits only over its own local result', async () => {
+    let current = makeBrief({ generationRevision: 4 });
+    let resolveFirst!: (brief: ContentBrief) => void;
+    const firstPersist = new Promise<ContentBrief>(resolve => { resolveFirst = resolve; });
+    const persist = vi.fn(async (
+      _briefId: string,
+      updates: Partial<ContentBrief>,
+      expectedRevision: number,
+    ) => {
+      if (persist.mock.calls.length === 1) return firstPersist;
+      return { ...current, ...updates, generationRevision: expectedRevision + 1 };
+    });
+    const queue = createBriefFieldSaveQueue({
+      readCurrent: () => current,
+      persist,
+      commit: updated => {
+        current = updated;
+        return current;
+      },
+      onStale: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    const titleSave = queue.enqueue('brief-1', { suggestedTitle: 'Pinned title draft' }, 4);
+    const summarySave = queue.enqueue('brief-1', { executiveSummary: 'Pinned summary draft' }, 4);
+    await Promise.resolve();
+
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenNthCalledWith(1, 'brief-1', { suggestedTitle: 'Pinned title draft' }, 4);
+
+    resolveFirst({ ...current, suggestedTitle: 'Pinned title draft', generationRevision: 5 });
+
+    await expect(titleSave).resolves.toBe(true);
+    await expect(summarySave).resolves.toBe(true);
+    expect(persist).toHaveBeenNthCalledWith(2, 'brief-1', { executiveSummary: 'Pinned summary draft' }, 5);
+    expect(current.suggestedTitle).toBe('Pinned title draft');
+    expect(current.executiveSummary).toBe('Pinned summary draft');
+    expect(current.generationRevision).toBe(6);
+  });
+
+  it('invalidates queued field drafts when an external refetch replaces the local authority chain', async () => {
+    let current = makeBrief({ generationRevision: 8 });
+    let resolveFirst!: (brief: ContentBrief) => void;
+    const firstPersist = new Promise<ContentBrief>(resolve => { resolveFirst = resolve; });
+    const persist = vi.fn(() => firstPersist);
+    const onStale = vi.fn();
+    const queue = createBriefFieldSaveQueue({
+      readCurrent: () => current,
+      persist,
+      commit: updated => {
+        const locallyCommitted = updated;
+        current = {
+          ...updated,
+          audience: 'Externally refreshed audience',
+          generationRevision: (updated.generationRevision ?? 0) + 1,
+        };
+        return locallyCommitted;
+      },
+      onStale,
+      onError: vi.fn(),
+    });
+
+    const titleSave = queue.enqueue('brief-1', { suggestedTitle: 'Local title' }, 8);
+    const summarySave = queue.enqueue('brief-1', { executiveSummary: 'Must remain buffered' }, 8);
+    await Promise.resolve();
+    resolveFirst({ ...current, suggestedTitle: 'Local title', generationRevision: 9 });
+
+    await expect(titleSave).resolves.toBe(true);
+    await expect(summarySave).resolves.toBe(false);
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(onStale).toHaveBeenCalledTimes(1);
+    expect(current.executiveSummary).not.toBe('Must remain buffered');
+    expect(current.generationRevision).toBe(10);
   });
 });

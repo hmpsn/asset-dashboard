@@ -7,19 +7,24 @@ import { getGA4LandingPages } from '../../google-analytics.js';
 import { normalizePageUrl } from '../../utils/page-address.js';
 import { stripHtmlToText } from '../../utils/text.js';
 import { createLogger } from '../../logger.js';
-import { getAllGscPages } from '../../search-console.js';
+import { getScoredOutcomeReadbacks, type OutcomeReadbacks } from '../../outcome-tracking.js';
+import { getAllGscPages, getPageTrend } from '../../search-console.js';
 import { getWorkspace } from '../../workspaces.js';
 import type {
   ContentBrief,
   ContentPerformanceItem,
   ContentPerformanceJoinback,
   ContentPerformanceResponse,
+  ContentPerformanceSummary,
+  ContentPerformanceTrendPoint,
+  ContentPerformanceTrendResponse,
   ContentTermCoverageGrade,
   GeneratedPost,
 } from '../../../shared/types/content.js';
 
 const log = createLogger('content-performance');
 const MAX_MISSING_TERMS = 8;
+const PUBLIC_CONTENT_PERFORMANCE_STATUSES = new Set(['delivered', 'published']);
 
 type Audience = 'admin' | 'public';
 interface CoverageTerm {
@@ -158,8 +163,30 @@ function buildJoinback(brief: ContentBrief | undefined, post: GeneratedPost | un
   };
 }
 
+function loadOutcomeReadbacks(workspaceId: string): OutcomeReadbacks | undefined {
+  try {
+    const readbacks = getScoredOutcomeReadbacks(workspaceId);
+    if (readbacks.bySource.size === 0 && readbacks.byKeyword.size === 0) return undefined;
+    return readbacks;
+  } catch (err) {
+    // catch-ok: outcome verdicts are read-side decoration; content performance still renders without them.
+    log.debug({ err, workspaceId }, 'Outcome read-back unavailable for content performance');
+    return undefined;
+  }
+}
+
+function lookupOutcome(
+  readbacks: OutcomeReadbacks | undefined,
+  postId: string | undefined,
+  targetKeyword: string | undefined,
+): ContentPerformanceItem['outcome'] {
+  if (!readbacks) return undefined;
+  return (postId ? readbacks.bySource.get(`post::${postId}`) : undefined)
+    ?? (targetKeyword ? readbacks.byKeyword.get(targetKeyword.trim().toLowerCase()) : undefined);
+}
+
 function scrubForPublic(item: ContentPerformanceItem): ContentPerformanceItem {
-  const { joinback: _joinback, coverage, ...rest } = item;
+  const { joinback: _joinback, outcome: _outcome, coverage, ...rest } = item;
   return {
     ...rest,
     coverage: {
@@ -172,6 +199,82 @@ function scrubForPublic(item: ContentPerformanceItem): ContentPerformanceItem {
       reason: coverage.status === 'unavailable' ? coverage.reason : undefined,
     },
   };
+}
+
+function buildSummary(items: readonly ContentPerformanceItem[]): ContentPerformanceSummary {
+  const positioned = items.filter(item => item.gsc !== null && Number.isFinite(item.gsc.position));
+  const positionGains = items.flatMap(item => {
+    const outcome = item.outcome;
+    if (!outcome || outcome.baselinePosition === null || outcome.currentPosition === null) return [];
+    return [outcome.baselinePosition - outcome.currentPosition];
+  });
+  return {
+    piecesTracked: items.length,
+    piecesPublished: items.filter(item => item.status === 'published').length,
+    piecesDelivered: items.filter(item => item.status === 'delivered').length,
+    totalClicks: items.reduce((sum, item) => sum + (item.gsc?.clicks ?? 0), 0),
+    totalImpressions: items.reduce((sum, item) => sum + (item.gsc?.impressions ?? 0), 0),
+    totalSessions: items.reduce((sum, item) => sum + (item.ga4?.sessions ?? 0), 0),
+    averagePosition: positioned.length > 0
+      ? positioned.reduce((sum, item) => sum + (item.gsc?.position ?? 0), 0) / positioned.length
+      : null,
+    measuredOutcomes: items.filter(item => item.outcome !== undefined).length,
+    wins: items.filter(item => item.outcome?.score === 'win' || item.outcome?.score === 'strong_win').length,
+    averagePositionGain: positionGains.length > 0
+      ? positionGains.reduce((sum, gain) => sum + gain, 0) / positionGains.length
+      : null,
+  };
+}
+
+export async function getContentPerformanceTrend(
+  workspaceId: string,
+  itemId: string,
+  options: { audience?: Audience } = {},
+): Promise<ContentPerformanceTrendResponse | null> {
+  const ws = getWorkspace(workspaceId);
+  if (!ws) return null;
+
+  const request = listContentRequests(workspaceId).find(item => item.id === itemId);
+  let targetPageSlug: string | undefined;
+  let publishedAt: string | undefined;
+
+  if (request) {
+    if (options.audience === 'public' && !PUBLIC_CONTENT_PERFORMANCE_STATUSES.has(request.status)) return null;
+    targetPageSlug = request.targetPageSlug;
+    publishedAt = request.updatedAt || request.requestedAt;
+  } else {
+    const matrixMatch = listMatrices(workspaceId)
+      .flatMap(matrix => matrix.cells.map(cell => ({ cell, matrix })))
+      .find(({ cell }) => cell.id === itemId && cell.status === 'published');
+    if (!matrixMatch) return null;
+    targetPageSlug = matrixMatch.cell.plannedUrl;
+    publishedAt = matrixMatch.matrix.updatedAt;
+  }
+
+  if (!ws.gscPropertyUrl || !ws.webflowSiteId) {
+    return { availability: 'gsc_not_configured', reason: 'Search Console is not configured for this workspace.', trend: [] };
+  }
+  if (!targetPageSlug) {
+    return { availability: 'page_unmapped', reason: 'This published item is not mapped to a page URL.', trend: [] };
+  }
+
+  let siteBase = ws.gscPropertyUrl.replace(/\/$/, '');
+  if (siteBase.startsWith('sc-domain:')) siteBase = `https://${siteBase.replace('sc-domain:', '')}`;
+  const pagePath = normalizePageUrl(targetPageSlug);
+  const pageUrl = `${siteBase}${pagePath === '/' ? '' : pagePath}`;
+  const startDate = (publishedAt ?? new Date(Date.now() - 90 * 86400000).toISOString()).split('T')[0];
+  const endDate = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
+  let trend: ContentPerformanceTrendPoint[];
+  try {
+    trend = await getPageTrend(ws.webflowSiteId, ws.gscPropertyUrl, pageUrl, 90, { startDate, endDate });
+  } catch (err) {
+    if (isProgrammingError(err)) throw err;
+    log.debug({ err, workspaceId, itemId }, 'content performance trend provider unavailable');
+    return { availability: 'provider_unavailable', reason: 'Search Console could not provide this page trend. Reconnect Google or try again later.', trend: [] };
+  }
+  return trend.length > 0
+    ? { availability: 'available', trend }
+    : { availability: 'insufficient_data', reason: 'Search Console has not reported daily data for this page yet.', trend: [] };
 }
 
 export async function getContentPerformance(
@@ -227,6 +330,7 @@ export async function getContentPerformance(
 
   const now = Date.now();
   const seenKeywords = new Set<string>();
+  const outcomeReadbacks = loadOutcomeReadbacks(workspaceId);
   const items: ContentPerformanceItem[] = published.map(request => {
     const slug = request.targetPageSlug;
     const path = slug ? normalizePageUrl(slug) : undefined;
@@ -235,8 +339,10 @@ export async function getContentPerformance(
     const post = request.postId ? postsById.get(request.postId) : (request.briefId ? postsByBriefId.get(request.briefId) : undefined);
     const publishDate = request.updatedAt || request.requestedAt;
     const coverage = gradeContentTermCoverage(brief, post);
+    const outcome = lookupOutcome(outcomeReadbacks, post?.id, request.targetKeyword);
 
     return {
+      itemId: request.id,
       requestId: request.id,
       topic: request.topic,
       targetKeyword: request.targetKeyword,
@@ -249,6 +355,7 @@ export async function getContentPerformance(
       ga4: path ? (ga4Pages.get(path) || null) : null,
       source: 'request',
       coverage,
+      ...(outcome ? { outcome } : {}),
       joinback: buildJoinback(brief, post),
     };
   });
@@ -263,8 +370,10 @@ export async function getContentPerformance(
 
         const slug = cell.plannedUrl;
         const path = slug ? normalizePageUrl(slug) : undefined;
+        const outcome = lookupOutcome(outcomeReadbacks, undefined, cell.targetKeyword);
 
         items.push({
+          itemId: cell.id,
           requestId: cell.id,
           topic: cell.variableValues ? Object.values(cell.variableValues).join(' × ') : cell.targetKeyword,
           targetKeyword: cell.targetKeyword,
@@ -277,6 +386,7 @@ export async function getContentPerformance(
           ga4: path ? (ga4Pages.get(path) || null) : null,
           source: 'matrix',
           coverage: unavailableCoverage('Matrix item has no linked brief or post'),
+          ...(outcome ? { outcome } : {}),
         });
       }
     }
@@ -286,9 +396,9 @@ export async function getContentPerformance(
 
   items.sort((a, b) => (b.gsc?.clicks || 0) - (a.gsc?.clicks || 0) || a.daysSincePublish - b.daysSincePublish);
 
-  return {
-    items: options.audience === 'public' ? items.map(scrubForPublic) : items,
-  };
+  const summary = buildSummary(items);
+  const visibleItems = options.audience === 'public' ? items.map(scrubForPublic) : items;
+  return { summary, items: visibleItems };
 }
 
 export function handleContentPerformance(workspaceId: string): Promise<ContentPerformanceResponse> {

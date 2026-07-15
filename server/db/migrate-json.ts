@@ -12,6 +12,22 @@ import { getDataDir, getUploadRoot } from '../data-dir.js';
 import db, { runMigrations } from './index.js';
 import { normalizeTrackedKeywords } from '../rank-tracking.js';
 import { replaceAllTrackedKeywordRows } from '../tracked-keywords-store.js';
+import { saveRecommendationSet } from '../domains/recommendations/storage.js';
+import { recommendationSchema } from '../schemas/workspace-schemas.js';
+import type { Recommendation, RecommendationSet } from '../../shared/types/recommendations.js';
+
+// R7 cutover: default summary for a legacy import whose JSON omits/partially fills `summary`.
+const emptyRecSummary: RecommendationSet['summary'] = {
+  fixNow: 0,
+  fixSoon: 0,
+  fixLater: 0,
+  ongoing: 0,
+  totalImpactScore: 0,
+  trafficAtRisk: 0,
+  totalOpportunityValue: 0,
+  actionableOpportunityValue: 0,
+  topRecommendationId: null,
+};
 
 // Ensure schema is up to date before migrating data
 runMigrations();
@@ -810,36 +826,146 @@ function migrateWorkOrders(): number {
 
 // ── Recommendations ──
 
+/**
+ * Normalize an arbitrary legacy JSON rec into a full Recommendation so the normalized
+ * write path (saveRecommendationSet → recommendation_items) never inserts NULL into a
+ * NOT NULL column. Legacy JSON files predate the current schema and can be sparse; unknown
+ * fields ride through the JSON `payload` column via the object spread.
+ *
+ * Numeric fields use `Number.isFinite` (NOT `typeof === 'number'`): `typeof NaN === 'number'`
+ * is `true`, and better-sqlite3 stores NaN/Infinity as NULL — which throws
+ * `NOT NULL constraint failed` on the REAL NOT NULL columns and would roll back the whole
+ * migration. `Number.isFinite` rejects NaN, Infinity, and -Infinity, so a bad numeric value
+ * defaults to a safe finite number instead of poisoning the batch.
+ */
+function normalizeLegacyRecommendation(raw: any, workspaceId: string, index: number): Recommendation {
+  const now = new Date().toISOString();
+  const normalized = {
+    ...(raw && typeof raw === 'object' ? raw : {}),
+    id: typeof raw?.id === 'string' && raw.id ? raw.id : `legacy-rec-${index}`,
+    workspaceId: typeof raw?.workspaceId === 'string' && raw.workspaceId ? raw.workspaceId : workspaceId,
+    priority: raw?.priority ?? 'ongoing',
+    type: raw?.type ?? 'technical',
+    title: raw?.title ?? '',
+    description: raw?.description ?? '',
+    insight: raw?.insight ?? '',
+    impact: raw?.impact ?? 'low',
+    effort: raw?.effort ?? 'low',
+    impactScore: Number.isFinite(raw?.impactScore) ? raw.impactScore : 0,
+    source: raw?.source ?? 'legacy-import',
+    affectedPages: Array.isArray(raw?.affectedPages) ? raw.affectedPages : [],
+    trafficAtRisk: Number.isFinite(raw?.trafficAtRisk) ? raw.trafficAtRisk : 0,
+    impressionsAtRisk: Number.isFinite(raw?.impressionsAtRisk) ? raw.impressionsAtRisk : 0,
+    estimatedGain: raw?.estimatedGain ?? '',
+    actionType: raw?.actionType ?? 'manual',
+    status: raw?.status ?? 'pending',
+    createdAt: typeof raw?.createdAt === 'string' && raw.createdAt ? raw.createdAt : now,
+    updatedAt: typeof raw?.updatedAt === 'string' && raw.updatedAt ? raw.updatedAt : now,
+  } as Recommendation;
+  // struck≠completed invariant (migration 168): a struck rec must never read as "done".
+  // A legacy blob may carry lifecycle:'struck' + status:'completed'; demote status to
+  // 'pending' before insert so the DB trigger doesn't ABORT and the stale value doesn't
+  // survive in the payload (reads parse the payload only). Mirrors coerceStruckCompleted
+  // in server/domains/recommendations/storage.ts.
+  if (normalized.lifecycle === 'struck' && normalized.status === 'completed') {
+    normalized.status = 'pending';
+  }
+  return normalized;
+}
+
+/**
+ * R7 cutover: the legacy JSON→SQLite seeder now emits recommendation_items ROWS via the
+ * normalized write path (saveRecommendationSet), not the retired recommendations blob. A
+ * fresh legacy-JSON import must land in rows because loadRecommendationSet reads rows only —
+ * a blob-only import would silently vanish post-cutover. saveRecommendationSet writes '[]' to
+ * the archive-placeholder blob column and the recs to recommendation_items.
+ *
+ * Idempotent like the previous INSERT OR IGNORE: a workspace that already has a set row is
+ * skipped, so re-running the migration never clobbers authoritative rows.
+ *
+ * Failure isolation (mirrors materializeAllRecommendationItems in storage.ts):
+ *  - Each file's write is wrapped in its own transaction + try/catch, so one bad file skips
+ *    with a loud log instead of aborting the whole batch (the previous single outer
+ *    transaction rolled back EVERY already-seeded workspace on one bad rec).
+ *  - Each normalized rec is validated with recommendationSchema.safeParse BEFORE insert. An
+ *    invalid rec (e.g. a present-but-unknown enum) is NOT inserted — it is pushed to
+ *    `dropped[]` and reported, never inserted-then-silently-dropped on read. Coercing a bad
+ *    enum to a default would silently change semantics; skip-and-report keeps a human in the
+ *    loop about exactly what did not migrate.
+ */
 function migrateRecommendations(): number {
   const dir = getDataDir('recommendations');
   if (!fs.existsSync(dir)) { console.log('[migrate] No recommendations directory — skipping.'); return 0; }
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
   if (files.length === 0) return 0;
 
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO recommendation_sets
-      (workspace_id, generated_at, recommendations, summary)
-    VALUES (@workspace_id, @generated_at, @recommendations, @summary)
-  `);
+  const existsStmt = db.prepare('SELECT 1 FROM recommendation_sets WHERE workspace_id = ?');
 
   let total = 0;
-  const run = db.transaction(() => {
-    for (const file of files) {
-      const wsId = path.basename(file, '.json');
-      let record: any;
-      try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
-      if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
-      const info = insert.run({
-        workspace_id: record.workspaceId || wsId,
-        generated_at: record.generatedAt || new Date().toISOString(),
-        recommendations: JSON.stringify(record.recommendations || []),
-        summary: JSON.stringify(record.summary || {}),
+  const dropped: Array<{ workspaceId: string; recId: string; reason: string }> = [];
+
+  for (const file of files) {
+    const wsId = path.basename(file, '.json');
+    let record: any;
+    try { record = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8')); } catch { continue; }
+    if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
+
+    const workspaceId = record.workspaceId || wsId;
+    // Idempotent: skip if a set row already exists (matches the old INSERT OR IGNORE semantics
+    // and never resurrects a stale blob over authoritative rows).
+    if (existsStmt.get(workspaceId)) continue;
+
+    const rawRecs = Array.isArray(record.recommendations) ? record.recommendations : [];
+    // Validate each normalized rec BEFORE insert; skip-and-report invalid ones (fail-closed
+    // instead of insert-then-silently-drop-on-read). This also makes the `raw:any` normalizer
+    // fail-closed at runtime rather than trusting the `as Recommendation` cast.
+    const recommendations: Recommendation[] = [];
+    rawRecs.forEach((raw: any, i: number) => {
+      const normalized = normalizeLegacyRecommendation(raw, workspaceId, i);
+      const parsed = recommendationSchema.safeParse(normalized);
+      if (parsed.success) {
+        recommendations.push(normalized);
+      } else {
+        const reason = parsed.error.issues.slice(0, 3)
+          .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+          .join('; ') || 'schema validation failed';
+        dropped.push({ workspaceId, recId: normalized.id, reason });
+      }
+    });
+
+    const summary: RecommendationSet['summary'] = {
+      ...emptyRecSummary,
+      ...(record.summary && typeof record.summary === 'object' && !Array.isArray(record.summary)
+        ? record.summary
+        : {}),
+    };
+
+    try {
+      // Per-file transaction: one bad file must not roll back already-seeded workspaces.
+      const runFile = db.transaction(() => {
+        saveRecommendationSet({
+          workspaceId,
+          generatedAt: record.generatedAt || new Date().toISOString(),
+          recommendations,
+          summary,
+        });
       });
-      total += info.changes;
-      console.log(`[migrate] recommendations/${file}: 1 set`);
+      runFile();
+      total += 1;
+      console.log(`[migrate] recommendations/${file}: 1 set → ${recommendations.length} item row(s)`);
+    } catch (err) {
+      // Loud skip: this file did not migrate, but the batch continues.
+      console.warn(`[migrate] recommendations/${file}: SKIPPED — write failed: ${err instanceof Error ? err.message : String(err)}`);
     }
-  });
-  run();
+  }
+
+  if (dropped.length > 0) {
+    console.warn(`[migrate] recommendations: dropped ${dropped.length} invalid rec(s) — not inserted (would fail schema on read):`);
+    for (const d of dropped) {
+      console.warn(`[migrate]   drop ${d.workspaceId}/${d.recId}: ${d.reason}`);
+    }
+  }
+
   return total;
 }
 
@@ -1081,6 +1207,34 @@ function migrateRankTracking(): number {
 
 // ── Tier 3 — Per-site snapshots + config/admin ──
 
+/**
+ * Resolve a legacy `site_id` (webflow_site_id) to the owning workspace's id, for
+ * populating the additive `workspace_id` column added to audit_snapshots /
+ * redirect_snapshots / performance_snapshots by migration 167
+ * (server/db/migrations/167-audit-snapshots-workspace-id.sql).
+ *
+ * Resolution is provably 1:1 — matching migration 167's CV-1 fix. workspaces.webflow_site_id
+ * has NO UNIQUE constraint, so a site_id can map to zero, one, or MANY workspaces. Only an
+ * EXACTLY-ONE match resolves; a zero-match (unresolvable) OR a >1-match (ambiguous) returns
+ * null so the imported row lands with a NULL workspace_id rather than fabricating or guessing
+ * an attribution. This mirrors the migration's own quarantine logic and never blocks the import.
+ *
+ * Cached per migrate-json.ts run since the same site_id repeats across many
+ * snapshot files, and workspaces don't change mid-import.
+ */
+const _siteIdToWorkspaceIdCache = new Map<string, string | null>();
+function resolveWorkspaceIdBySiteId(siteId: string | undefined | null): string | null {
+  if (!siteId) return null;
+  if (_siteIdToWorkspaceIdCache.has(siteId)) return _siteIdToWorkspaceIdCache.get(siteId)!;
+  // COUNT + MIN in one pass: resolve only when EXACTLY ONE workspace owns this site_id.
+  const row = db.prepare(
+    `SELECT COUNT(*) AS n, MIN(id) AS id FROM workspaces WHERE webflow_site_id = ?`,
+  ).get(siteId) as { n: number; id: string | null } | undefined;
+  const resolved = row && row.n === 1 ? row.id : null;
+  _siteIdToWorkspaceIdCache.set(siteId, resolved);
+  return resolved;
+}
+
 function migrateAuditSnapshots(): number {
   const reportsDir = getDataDir('reports');
   if (!fs.existsSync(reportsDir)) {
@@ -1090,8 +1244,8 @@ function migrateAuditSnapshots(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO audit_snapshots
-      (id, site_id, site_name, created_at, audit, logo_url, action_items, previous_score)
-    VALUES (@id, @site_id, @site_name, @created_at, @audit, @logo_url, @action_items, @previous_score)
+      (id, site_id, workspace_id, site_name, created_at, audit, logo_url, action_items, previous_score)
+    VALUES (@id, @site_id, @workspace_id, @site_name, @created_at, @audit, @logo_url, @action_items, @previous_score)
   `);
 
   let total = 0;
@@ -1106,9 +1260,11 @@ function migrateAuditSnapshots(): number {
       for (const file of files) {
         try {
           const data = JSON.parse(fs.readFileSync(path.join(siteDir, file), 'utf-8'));
+          const resolvedSiteId = data.siteId || siteId;
           const info = insert.run({
             id: data.id || file.replace('.json', ''),
-            site_id: data.siteId || siteId,
+            site_id: resolvedSiteId,
+            workspace_id: resolveWorkspaceIdBySiteId(resolvedSiteId),
             site_name: data.siteName || siteId,
             created_at: data.createdAt || new Date().toISOString(),
             audit: JSON.stringify(data.audit || {}),
@@ -1177,8 +1333,8 @@ function migrateRedirectSnapshots(): number {
 
   const insert = db.prepare(`
     INSERT OR IGNORE INTO redirect_snapshots
-      (id, site_id, created_at, result)
-    VALUES (@id, @site_id, @created_at, @result)
+      (id, site_id, workspace_id, created_at, result)
+    VALUES (@id, @site_id, @workspace_id, @created_at, @result)
   `);
 
   let total = 0;
@@ -1187,9 +1343,11 @@ function migrateRedirectSnapshots(): number {
     for (const file of files) {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(redirectsDir, file), 'utf-8'));
+        const resolvedSiteId = data.siteId || file.replace('.json', '');
         const info = insert.run({
           id: data.id || `redirect-${file.replace('.json', '')}-${Date.now()}`,
-          site_id: data.siteId || file.replace('.json', ''),
+          site_id: resolvedSiteId,
+          workspace_id: resolveWorkspaceIdBySiteId(resolvedSiteId),
           created_at: data.createdAt || new Date().toISOString(),
           result: JSON.stringify(data.result || {}),
         });
@@ -1214,8 +1372,8 @@ function migratePerformanceSnapshots(): number {
 
   const insert = db.prepare(`
     INSERT OR REPLACE INTO performance_snapshots
-      (sub, site_id, created_at, result)
-    VALUES (@sub, @site_id, @created_at, @result)
+      (sub, site_id, workspace_id, created_at, result)
+    VALUES (@sub, @site_id, @workspace_id, @created_at, @result)
   `);
 
   let total = 0;
@@ -1231,9 +1389,16 @@ function migratePerformanceSnapshots(): number {
       for (const file of files) {
         try {
           const data = JSON.parse(fs.readFileSync(path.join(subDir, file), 'utf-8'));
+          const resolvedSiteId = data.siteId || file.replace('.json', '');
+          // site_id is an overloaded composite key for some `sub` values
+          // (pagespeed-single: `${webflowSiteId}_${pageKey}`; competitor: a
+          // URL-derived key) — see docs/rules/snapshot-envelope.md. Exact-match
+          // resolution only; a composite key simply resolves to null here, same
+          // as migration 167's own quarantine logic (never guessed via prefix).
           const info = insert.run({
             sub,
-            site_id: data.siteId || file.replace('.json', ''),
+            site_id: resolvedSiteId,
+            workspace_id: resolveWorkspaceIdBySiteId(resolvedSiteId),
             created_at: data.createdAt || new Date().toISOString(),
             result: JSON.stringify(data.result ?? data),
           });

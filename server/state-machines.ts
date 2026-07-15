@@ -2,8 +2,30 @@
  * Centralized state machine transition guards.
  *
  * Every entity with a status column should define its valid transitions here.
- * Call validateTransition() before mutating status in DB layer functions.
+ * Call validateTransition(entity, transitions, from, to) before mutating status
+ * in DB layer functions — it THROWS InvalidTransitionError on an illegal move
+ * and returns the new status on success.
+ *
+ * Each `*_TRANSITIONS` table below is also wrapped by the shared lifecycle
+ * envelope (`registerLifecycle`, see the "Lifecycle envelope registration" block
+ * near the bottom). Registration is a typed view over these tables — it never
+ * changes their vocabulary or edges. `shared/types/lifecycle.ts` holds the
+ * contract types; census + verdicts live in
+ * `docs/rules/lifecycle-state-machines.md`.
  */
+
+import { registerLifecycle } from '../shared/types/lifecycle.js';
+import type {
+  MatrixGenerationAttemptStatus,
+  MatrixGenerationItemStatus,
+  MatrixGenerationRunStatus,
+} from '../shared/types/matrix-generation.js';
+import type {
+  BrandGenerationAttemptStatus,
+  BrandGenerationItemStatus,
+  BrandGenerationRunStatus,
+} from '../shared/types/brand-generation.js';
+import type { BrandContentOnboardingStatus } from '../shared/types/brand-content-onboarding.js';
 
 // ── Approval Item ──
 // pending ↔ approved ↔ applied
@@ -39,14 +61,15 @@ export type ContentRequestStatus = 'pending_payment' | 'requested' | 'brief_gene
 
 // ── Generated Post ──
 export const POST_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
-  generating: ['draft', 'error'],
-  error:      ['draft'],
+  generating:      ['needs_attention', 'draft', 'error'],
+  needs_attention: ['generating', 'draft', 'error'],
+  error:           ['generating', 'draft'],
   draft:      ['review'],
   review:     ['approved', 'draft'],  // draft = send back for edits
   approved:   [],                     // terminal (publish is tracked separately)
 };
 
-export type PostStatus = 'generating' | 'draft' | 'review' | 'approved' | 'error';
+export type PostStatus = 'generating' | 'needs_attention' | 'draft' | 'review' | 'approved' | 'error';
 
 // ── Work Order ──
 // completed → closed is the operator-only one-way close-out (no reopen): once
@@ -213,20 +236,6 @@ export const CLIENT_DELIVERABLE_TRANSITIONS: Record<string, readonly string[]> =
   completed:         [],
 };
 
-export type DeliverableStateStatus =
-  | 'draft'
-  | 'awaiting_client'
-  | 'changes_requested'
-  | 'partial'
-  | 'approved'
-  | 'declined'
-  | 'applied'
-  | 'expired'
-  | 'cancelled'
-  | 'ordered'
-  | 'in_progress'
-  | 'completed';
-
 // Per-type transition overrides (design §4.2). Each entry is MERGED onto the base map
 // (override keys replace the base key wholesale). Returned by getDeliverableTransitions.
 //   copy_section: approve is terminal (no →applied; the side-effect is voice-sample
@@ -240,6 +249,15 @@ const DELIVERABLE_TYPE_OVERRIDES: Record<string, Record<string, readonly string[
   copy_section: {
     changes_requested: ['draft', 'awaiting_client'],
     approved: [], // terminal — copy approve has no apply step
+  },
+  brand_generation: {
+    // One client decision may leave other suite items unresolved. Repeated
+    // item decisions therefore keep the parent honestly partial until the
+    // final source is approved. There is no whole-bundle decline or apply edge.
+    awaiting_client: ['awaiting_client', 'changes_requested', 'partial', 'approved', 'expired', 'cancelled'],
+    changes_requested: ['awaiting_client', 'changes_requested', 'partial', 'approved', 'expired', 'cancelled'],
+    partial: ['awaiting_client', 'partial', 'approved', 'changes_requested', 'expired', 'cancelled'],
+    approved: [],
   },
   // (briefing is handled by NOTIFICATION_DELIVERABLE_TYPES below; an override entry here
   // would be dead — getDeliverableTransitions short-circuits to {} before reading this map.)
@@ -367,6 +385,366 @@ export const TRACKED_KEYWORD_TRANSITIONS: Record<string, readonly string[]> = {
 };
 
 export type TrackedKeywordTransitionStatus = 'active' | 'paused' | 'deprecated' | 'replaced';
+
+// ── Copy Section (copy pipeline) ──
+// Folded from server/copy-review.ts (was a PARALLEL validator: VALID_TRANSITIONS +
+// isValidTransition). The section-level review machine:
+//   pending → draft                 (AI generates the copy)
+//   draft → client_review | approved  (send for review, or admin fast-approve)
+//   client_review → approved | revision_requested  (client responds)
+//   revision_requested → draft       (author revises)
+//   approved is terminal (approve harvests a voice sample; no reopen).
+// Same-state no-ops (e.g. re-generating a draft) are handled at the write boundary
+// in copy-review.ts by skipping the guard when from === to — never a self-edge here.
+export const COPY_SECTION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:            ['draft'],
+  draft:              ['client_review', 'approved'],
+  client_review:      ['approved', 'revision_requested'],
+  revision_requested: ['draft'],
+  approved:           [],  // terminal
+};
+
+export type CopySectionTransitionStatus =
+  | 'pending'
+  | 'draft'
+  | 'client_review'
+  | 'approved'
+  | 'revision_requested';
+
+// ── Voice Profile (brand engine calibration) ──
+// Folded from server/voice-calibration.ts (was a PARALLEL validator:
+// LEGAL_STATUS_TRANSITIONS + VoiceProfileStateTransitionError). The critical
+// constraint is that draft → calibrated is FORBIDDEN — the ONLY way to reach
+// `calibrated` is through `calibrating`, which runs the calibration pipeline that
+// populates voiceDNA + guardrails (skipping it would inject undefined DNA into
+// Layer 2 of buildSystemPrompt). See PR #168 scaled-review finding I5.
+//   draft → calibrating
+//   calibrating → draft | calibrated
+//   calibrated → draft | calibrating   (recalibrate)
+// No terminal state (a calibrated profile can be re-opened for recalibration), so
+// this table is registered in the envelope but is NOT part of the graph-contract's
+// terminal-requiring pinned list. Same-state no-ops are pre-filtered at the write
+// boundary in voice-calibration.ts (updates.status !== profile.status).
+export const VOICE_PROFILE_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:       ['calibrating'],
+  calibrating: ['draft', 'calibrated'],
+  calibrated:  ['draft', 'calibrating'],
+};
+
+export type VoiceProfileTransitionStatus = 'draft' | 'calibrating' | 'calibrated';
+
+// ── Insight resolution (analytics_insights.resolution_status) ──
+// The unguarded resolveInsight() path (server/analytics-insights-store.ts). The
+// stored column is nullable: a freshly computed insight has resolution_status NULL
+// (838 NULL rows in dev). NULL is modeled as the synthetic `unresolved` origin —
+// resolveInsight() coerces `currentStatus ?? 'unresolved'` before validating so a
+// null-origin NEVER crashes validateTransition.
+//   unresolved → in_progress | resolved   (start work, or resolve directly)
+//   in_progress → resolved                 (finish)
+//   resolved → in_progress                 (reopen — an admin/agent can re-open a
+//                                           resolved insight; previously tolerated,
+//                                           kept legal to avoid a runtime regression)
+// Idempotent replays (resolved → resolved, in_progress → in_progress) are handled
+// as a no-op at the call site (skip the guard when from === to) — NOT self-edges,
+// so this table has no self-transitions. No terminal state (resolved is reopenable),
+// so it is envelope-registered but not in the graph-contract pinned list.
+export const INSIGHT_RESOLUTION_TRANSITIONS: Record<string, readonly string[]> = {
+  unresolved:  ['in_progress', 'resolved'],
+  in_progress: ['resolved'],
+  resolved:    ['in_progress'],
+};
+
+export type InsightResolutionTransitionStatus = 'unresolved' | 'in_progress' | 'resolved';
+
+// ── Discovery Extraction (brand engine discovery) ──
+// server/discovery-ingestion.ts updateExtractionStatus. A triage lifecycle:
+//   pending → accepted | dismissed
+//   accepted / dismissed are terminal.
+// Re-accepting/re-dismissing an already-resolved extraction (idempotent PATCH) is a
+// no-op skipped at the write boundary — never a self-edge.
+export const EXTRACTION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:   ['accepted', 'dismissed'],
+  accepted:  [],  // terminal
+  dismissed: [],  // terminal
+};
+
+export type ExtractionTransitionStatus = 'pending' | 'accepted' | 'dismissed';
+
+// ── Suggested Brief (content decay → brief suggestion triage) ──
+// server/suggested-briefs-store.ts. Triage lifecycle:
+//   pending → accepted | dismissed | snoozed
+//   snoozed → accepted | dismissed | pending   (snooze expires back to pending)
+//   accepted / dismissed are terminal.
+export const SUGGESTED_BRIEF_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:   ['accepted', 'dismissed', 'snoozed'],
+  snoozed:   ['accepted', 'dismissed', 'pending'],
+  accepted:  [],  // terminal
+  dismissed: [],  // terminal
+};
+
+export type SuggestedBriefTransitionStatus = 'pending' | 'accepted' | 'dismissed' | 'snoozed';
+
+// ── SEO Suggestion (Webflow SEO meta suggestions) ──
+// server/seo-suggestions.ts markApplied/dismissSuggestions (bulk WHERE id IN writes).
+//   pending → applied | dismissed
+//   applied / dismissed are terminal.
+// Bulk writes read each row's current status and skip idempotent no-ops (re-dismiss a
+// dismissed suggestion, re-apply an applied one) at the write boundary — no self-edges.
+export const SEO_SUGGESTION_TRANSITIONS: Record<string, readonly string[]> = {
+  pending:   ['applied', 'dismissed'],
+  applied:   [],  // terminal
+  dismissed: [],  // terminal
+};
+
+export type SeoSuggestionTransitionStatus = 'pending' | 'applied' | 'dismissed';
+
+// ── Pending Schema (schema queue pre-generation) ──
+// server/schema-queue.ts. Pre-generated skeletons queued for a matrix cell:
+//   pending → applied | stale
+//   applied / stale are terminal.
+// markStaleByCellId already filters WHERE status = 'pending' in SQL; the guard is
+// belt-and-suspenders at the row level for any future direct-write path.
+export const PENDING_SCHEMA_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ['applied', 'stale'],
+  applied: [],  // terminal
+  stale:   [],  // terminal
+};
+
+export type PendingSchemaTransitionStatus = 'pending' | 'applied' | 'stale';
+
+// ── Client Signal (intent signals from client chat) ──
+// server/client-signals-store.ts updateSignalStatus. Operator triage.
+// IMPORTANT: the admin route (routes/client-signals.ts) DELIBERATELY allows both
+// forward AND backward moves so an operator can undo a mis-triage ("Status
+// transitions are intentionally unrestricted"). The guard therefore models the full
+// reversible triage graph among the three valid statuses — its job is to reject
+// out-of-union values (the stale store comment named new/acknowledged/resolved) and
+// centralise the vocabulary, NOT to impose a forward-only pipeline that would break
+// the documented undo path. Same-status no-ops are skipped at the write boundary.
+export const CLIENT_SIGNAL_TRANSITIONS: Record<string, readonly string[]> = {
+  new:      ['reviewed', 'actioned'],
+  reviewed: ['new', 'actioned'],
+  actioned: ['new', 'reviewed'],
+};
+
+export type ClientSignalTransitionStatus = 'new' | 'reviewed' | 'actioned';
+
+// ── Site Blueprint (page strategy) ──
+// server/page-strategy.ts updateBlueprint. Blueprint lifecycle:
+//   draft → active                (activate after generation/edit)
+//   active → archived | draft      (archive, or send back to rework)
+//   archived → draft | active      (unarchive to rework or reactivate)
+// archived is the primary terminal but reopenable (rework). Same-status updates from
+// the general update() path skip the guard at the write boundary (from === to).
+export const BLUEPRINT_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:    ['active', 'archived'],
+  active:   ['archived', 'draft'],
+  archived: ['draft', 'active'],
+};
+
+export type BlueprintTransitionStatus = 'draft' | 'active' | 'archived';
+
+// ── Brand Identity Deliverable (brand engine) ──
+// server/brand-identity.ts setDeliverableStatus. Two-state approve/revert cycle:
+//   draft → approved
+//   approved → draft   (revert to editing)
+// Re-approval (approved → approved) is a no-op short-circuited in setDeliverableStatus
+// (it captures priorStatus and skips the guard + side-effect when unchanged).
+export const BRAND_DELIVERABLE_TRANSITIONS: Record<string, readonly string[]> = {
+  draft:    ['approved'],
+  approved: ['draft'],
+};
+
+export type BrandDeliverableTransitionStatus = 'draft' | 'approved';
+
+// ── Client Location (local SEO) ──
+// server/client-locations.ts updateClientLocation. Two-state confirmation cycle:
+//   needs_review → confirmed
+//   confirmed → needs_review   (re-review, e.g. GBP data drift)
+// Same-status updates from the general update() path skip the guard (from === to).
+export const CLIENT_LOCATION_TRANSITIONS: Record<string, readonly string[]> = {
+  needs_review: ['confirmed'],
+  confirmed:    ['needs_review'],
+};
+
+export type ClientLocationTransitionStatus = 'needs_review' | 'confirmed';
+
+// ── Content Matrix Generation Run ──
+// M0 lands the durable lifecycle before M1/M3 execute work. Structural reads
+// never create a run; retries reopen only the explicitly resumable states.
+export const MATRIX_GENERATION_RUN_TRANSITIONS = {
+  queued: ['running', 'blocked', 'conflict', 'cancelled', 'failed'],
+  running: ['awaiting_review', 'completed', 'completed_with_errors', 'blocked', 'conflict', 'cancelled', 'failed'],
+  awaiting_review: ['running', 'completed', 'completed_with_errors', 'cancelled'],
+  completed: [],
+  completed_with_errors: ['running'],
+  blocked: ['queued', 'running', 'cancelled', 'failed'],
+  conflict: ['queued', 'running', 'cancelled', 'failed'],
+  cancelled: ['running'],
+  failed: ['queued', 'running', 'cancelled'],
+} as const satisfies Record<MatrixGenerationRunStatus, readonly MatrixGenerationRunStatus[]>;
+
+// ── Content Matrix Generation Item ──
+export const MATRIX_GENERATION_ITEM_TRANSITIONS = {
+  queued: ['preflighting', 'cancelled', 'failed'],
+  preflighting: ['preflighted', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  preflighted: ['generating_brief', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  generating_brief: ['generating_post', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  generating_post: ['auditing_deterministic', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  auditing_deterministic: ['auditing_model', 'revising', 'ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  auditing_model: ['revising', 'ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  revising: ['auditing_deterministic', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  ready_for_human_review: ['revising', 'needs_attention'],
+  needs_attention: ['queued', 'preflighting', 'auditing_deterministic', 'cancelled'],
+  blocked_missing_evidence: ['queued', 'preflighting', 'cancelled'],
+  conflict: ['queued', 'preflighting', 'cancelled'],
+  cancelled: [],
+  failed: ['queued', 'preflighting', 'auditing_deterministic', 'cancelled'],
+} as const satisfies Record<MatrixGenerationItemStatus, readonly MatrixGenerationItemStatus[]>;
+
+// ── Content Matrix Generation Attempt ──
+export const MATRIX_GENERATION_ATTEMPT_TRANSITIONS = {
+  running: ['completed', 'failed', 'cancelled'],
+  completed: [],
+  failed: [],
+  cancelled: [],
+} as const satisfies Record<MatrixGenerationAttemptStatus, readonly MatrixGenerationAttemptStatus[]>;
+
+// ── Brand Deliverable Generation Run ──
+// A full-suite bootstrap pauses truthfully in awaiting_review until an exact
+// finalized voice version resumes it. Explicit review-directed revisions may
+// reopen completed or mixed runs; cancelled runs remain terminal.
+export const BRAND_GENERATION_RUN_TRANSITIONS = {
+  queued: ['running', 'blocked', 'conflict', 'cancelled', 'failed'],
+  running: ['awaiting_review', 'completed', 'completed_with_errors', 'blocked', 'conflict', 'cancelled', 'failed'],
+  awaiting_review: ['running', 'cancelled', 'failed'],
+  completed: ['running'],
+  completed_with_errors: ['running', 'cancelled'],
+  blocked: ['running', 'cancelled', 'failed'],
+  conflict: ['running', 'cancelled', 'failed'],
+  cancelled: [],
+  failed: ['running', 'cancelled'],
+} as const satisfies Record<BrandGenerationRunStatus, readonly BrandGenerationRunStatus[]>;
+
+// ── Brand Deliverable Generation Item ──
+export const BRAND_GENERATION_ITEM_TRANSITIONS = {
+  queued: ['preflighting', 'cancelled', 'failed'],
+  preflighting: ['generating', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  generating: ['auditing_deterministic', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  // The review states are also legal recovery targets when a human-requested
+  // revision is cancelled or fails after entering either audit stage. The
+  // worker uses changes_requested because acceptance invalidated old lineage.
+  auditing_deterministic: ['auditing_model', 'revising', 'ready_for_human_review', 'changes_requested', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  auditing_model: ['revising', 'ready_for_human_review', 'changes_requested', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  revising: ['auditing_deterministic', 'ready_for_human_review', 'changes_requested', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
+  ready_for_human_review: ['approved', 'changes_requested', 'revising', 'conflict'],
+  approved: [],
+  changes_requested: ['revising', 'cancelled'],
+  needs_attention: ['preflighting', 'generating', 'revising', 'cancelled'],
+  blocked_missing_evidence: ['preflighting', 'cancelled'],
+  conflict: ['preflighting', 'revising', 'cancelled'],
+  cancelled: [],
+  failed: ['preflighting', 'generating', 'revising', 'cancelled'],
+} as const satisfies Record<BrandGenerationItemStatus, readonly BrandGenerationItemStatus[]>;
+
+// ── Brand Deliverable Generation Attempt ──
+export const BRAND_GENERATION_ATTEMPT_TRANSITIONS = {
+  running: ['completed', 'failed', 'cancelled'],
+  completed: [],
+  failed: [],
+  cancelled: [],
+} as const satisfies Record<BrandGenerationAttemptStatus, readonly BrandGenerationAttemptStatus[]>;
+
+// ── Brand → Content Onboarding ──
+// Coordinates the existing brand and matrix generators through explicit human
+// gates. Publish readiness is terminal here; publishing remains a separate act.
+export const BRAND_CONTENT_ONBOARDING_TRANSITIONS = {
+  intake_ready: ['brand_generating', 'cancelled', 'failed'],
+  brand_generating: ['awaiting_voice_review', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_voice_review: ['awaiting_voice_finalization', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_voice_finalization: ['brand_generating_dependents', 'needs_attention', 'cancelled', 'failed'],
+  brand_generating_dependents: ['awaiting_operator_review', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_operator_review: ['awaiting_client_review', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_client_review: ['awaiting_content_authorization', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_content_authorization: ['content_generating', 'needs_attention', 'cancelled', 'failed'],
+  content_generating: ['awaiting_content_review', 'needs_attention', 'cancelled', 'failed'],
+  awaiting_content_review: ['ready_to_publish', 'needs_attention', 'cancelled', 'failed'],
+  ready_to_publish: [],
+  needs_attention: [
+    'brand_generating',
+    'awaiting_voice_review',
+    'awaiting_voice_finalization',
+    'brand_generating_dependents',
+    'awaiting_operator_review',
+    'awaiting_client_review',
+    'awaiting_content_authorization',
+    'content_generating',
+    'awaiting_content_review',
+    'cancelled',
+    'failed',
+  ],
+  cancelled: [],
+  failed: [],
+} as const satisfies Record<
+  BrandContentOnboardingStatus,
+  readonly BrandContentOnboardingStatus[]
+>;
+
+// ── Lifecycle envelope registration ──
+// A typed VIEW over the transition tables above — never a second source of truth.
+// Each entry's `states` is derived from the table keys, so it can never drift from
+// the map `validateTransition` actually reads. Adding a new table above WITHOUT a
+// registration here fails the lifecycle-envelope contract test. Classification /
+// derived-projection unions are intentionally absent (see the census doc).
+//
+// NOTE (R4 boundary): RECOMMENDATION_TRANSITIONS and CLIENT_REC_TRANSITIONS are the
+// two-axis recommendation model. They are registered here as a FAITHFUL VIEW of the
+// existing single-writer edges only — this envelope does not formalize, collapse, or
+// otherwise pre-empt the two-axis shape (owner decision R4: keep the two-axis model).
+
+/** Wrap an existing transition table as a lifecycle definition, deriving states from its keys. */
+function registerTransitionTable(
+  entity: string,
+  transitions: Record<string, readonly string[]>,
+): void {
+  registerLifecycle({ entity, states: Object.keys(transitions), transitions });
+}
+
+registerTransitionTable('approval_item', APPROVAL_ITEM_TRANSITIONS);
+registerTransitionTable('content_request', CONTENT_REQUEST_TRANSITIONS);
+registerTransitionTable('post', POST_STATUS_TRANSITIONS);
+registerTransitionTable('work_order', WORK_ORDER_TRANSITIONS);
+registerTransitionTable('content_subscription', CONTENT_SUB_TRANSITIONS);
+registerTransitionTable('client_action', CLIENT_ACTION_TRANSITIONS);
+registerTransitionTable('recommendation', RECOMMENDATION_TRANSITIONS);
+registerTransitionTable('client_recommendation', CLIENT_REC_TRANSITIONS);
+registerTransitionTable('briefing_draft', BRIEFING_DRAFT_TRANSITIONS);
+registerTransitionTable('background_job', BACKGROUND_JOB_TRANSITIONS);
+registerTransitionTable('gbp_review_response', GBP_REVIEW_RESPONSE_TRANSITIONS);
+registerTransitionTable('client_deliverable', CLIENT_DELIVERABLE_TRANSITIONS);
+registerTransitionTable('matrix_cell', MATRIX_CELL_TRANSITIONS);
+registerTransitionTable('client_request', REQUEST_TRANSITIONS);
+registerTransitionTable('schema_plan', SCHEMA_PLAN_TRANSITIONS);
+registerTransitionTable('tracked_keyword', TRACKED_KEYWORD_TRANSITIONS);
+// R3-PR2: newly folded / newly guarded lifecycles.
+registerTransitionTable('copy_section', COPY_SECTION_TRANSITIONS);
+registerTransitionTable('voice_profile', VOICE_PROFILE_TRANSITIONS);
+registerTransitionTable('insight_resolution', INSIGHT_RESOLUTION_TRANSITIONS);
+registerTransitionTable('discovery_extraction', EXTRACTION_TRANSITIONS);
+registerTransitionTable('suggested_brief', SUGGESTED_BRIEF_TRANSITIONS);
+registerTransitionTable('seo_suggestion', SEO_SUGGESTION_TRANSITIONS);
+registerTransitionTable('pending_schema', PENDING_SCHEMA_TRANSITIONS);
+registerTransitionTable('client_signal', CLIENT_SIGNAL_TRANSITIONS);
+registerTransitionTable('blueprint', BLUEPRINT_TRANSITIONS);
+registerTransitionTable('brand_deliverable', BRAND_DELIVERABLE_TRANSITIONS);
+registerTransitionTable('client_location', CLIENT_LOCATION_TRANSITIONS);
+registerTransitionTable('matrix_generation_run', MATRIX_GENERATION_RUN_TRANSITIONS);
+registerTransitionTable('matrix_generation_item', MATRIX_GENERATION_ITEM_TRANSITIONS);
+registerTransitionTable('matrix_generation_attempt', MATRIX_GENERATION_ATTEMPT_TRANSITIONS);
+registerTransitionTable('brand_generation_run', BRAND_GENERATION_RUN_TRANSITIONS);
+registerTransitionTable('brand_generation_item', BRAND_GENERATION_ITEM_TRANSITIONS);
+registerTransitionTable('brand_generation_attempt', BRAND_GENERATION_ATTEMPT_TRANSITIONS);
+registerTransitionTable('brand_content_onboarding', BRAND_CONTENT_ONBOARDING_TRANSITIONS);
 
 // ── Generic validator ──
 

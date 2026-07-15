@@ -1,12 +1,35 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import db from '../../server/db/index.js';
-import { createWorkOrder, listWorkOrders } from '../../server/work-orders.js';
+
+const mockInvalidateMonthlyDigestCache = vi.hoisted(() => vi.fn());
+vi.mock('../../server/monthly-digest-cache.js', () => ({
+  invalidateMonthlyDigestCache: mockInvalidateMonthlyDigestCache,
+}));
+
+import { createWorkOrder, listWorkOrders, updateWorkOrder } from '../../server/work-orders.js';
 
 const WS_ID = 'work-order-json-validation-ws';
 
 describe('work-orders JSON validation', () => {
   beforeEach(() => {
     db.prepare("DELETE FROM work_orders WHERE workspace_id = ?").run(WS_ID);
+    mockInvalidateMonthlyDigestCache.mockClear();
+  });
+
+  it('invalidates the monthly digest when an order becomes completed', () => {
+    const created = createWorkOrder(WS_ID, {
+      paymentId: 'pay_digest',
+      productType: 'fix_meta',
+      pageIds: ['/one'],
+      issueChecks: ['title'],
+    });
+
+    updateWorkOrder(WS_ID, created.id, { status: 'in_progress' });
+    expect(mockInvalidateMonthlyDigestCache).not.toHaveBeenCalled();
+
+    updateWorkOrder(WS_ID, created.id, { status: 'completed' });
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledOnce();
+    expect(mockInvalidateMonthlyDigestCache).toHaveBeenCalledWith(WS_ID);
   });
 
   it('falls back safely when stored page_ids and issue_checks are malformed JSON', () => {

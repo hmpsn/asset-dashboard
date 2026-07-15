@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { FEATURE_FLAGS, FEATURE_FLAG_CATALOG, FEATURE_FLAG_GROUPS, FEATURE_FLAG_GROUP_LABELS } from '../../shared/types/feature-flags';
 
+// the-issue-client-reconciliation (P3) and the-issue-client-segment-inserts (P1) were
+// retired as phantoms in flag-sunset Wave 1 (reserved keys, zero readers) — see the
+// retired-flag assertions below. Re-add them if/when those features are actually built.
 const FAMILY = [
-  'the-issue-client-spine', 'the-issue-client-reconciliation', 'the-issue-client-return-hook',
-  'the-issue-client-segment-inserts', 'the-issue-client-next-bets',
+  'the-issue-client-spine', 'the-issue-client-return-hook', 'the-issue-client-next-bets',
 ] as const;
 
 describe('the-issue-client feature flag family', () => {
@@ -36,14 +38,14 @@ describe('the-issue-client-measured-capture (P1a website-native capture)', () =>
     const group = FEATURE_FLAG_GROUPS.find(g => g.label === 'The Issue (Client)');
     expect(group!.keys).toContain('the-issue-client-measured-capture');
   });
-  it('carries a P1a roadmap link + pilot-clients rollout, distinct from the P3 reconciliation flag', () => {
+  it('carries a P1a roadmap link + pilot-clients rollout', () => {
     const meta = FEATURE_FLAG_CATALOG['the-issue-client-measured-capture'].lifecycle;
     expect(meta.rolloutTarget).toBe('pilot-clients');
     expect(meta.linkedRoadmapItemId).toBe('the-issue-client-redesign-p1a-measured-capture');
   });
-  it('the P3 reconciliation flag stays reserved for CRM/call-tracking (NOT P1a)', () => {
-    expect(FEATURE_FLAGS['the-issue-client-reconciliation']).toBe(false);
-    expect(FEATURE_FLAG_CATALOG['the-issue-client-reconciliation'].lifecycle.removalCondition).toMatch(/CRM|call.?tracking|P3/i);
+  it('the P3 reconciliation phantom flag was retired (flag-sunset W1) — reserved key, zero readers', () => {
+    expect('the-issue-client-reconciliation' in FEATURE_FLAGS).toBe(false);
+    expect(FEATURE_FLAG_CATALOG['the-issue-client-reconciliation' as keyof typeof FEATURE_FLAG_CATALOG]).toBeUndefined();
   });
 });
 
@@ -86,9 +88,10 @@ describe('P1b bundle gating (Lane D, D1)', () => {
     expect(meta.owner).toBeTruthy();
   });
 
-  it('NEGATIVE — P1b parts are NOT gated on the P3 reconciliation flag (it stays CRM/call-tracking)', () => {
-    expect(FEATURE_FLAG_CATALOG['the-issue-client-reconciliation'].lifecycle.removalCondition).toMatch(/CRM|call.?tracking|P3/i);
-    // The P1b child flags are distinct keys from the reconciliation flag.
+  it('NEGATIVE — the P3 reconciliation flag was retired (flag-sunset W1); P1b was never gated on it', () => {
+    // Retired as a phantom (catalog entry, zero readers). Re-add the key if/when P3
+    // CRM/call-tracking reconciliation is actually built.
+    expect('the-issue-client-reconciliation' in FEATURE_FLAGS).toBe(false);
     for (const key of P1B_CHILD_FLAGS) {
       expect(key).not.toBe('the-issue-client-reconciliation');
     }

@@ -17,7 +17,6 @@ import {
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { saveRecommendations } from '../../server/recommendations.js';
 import { countActivityByType } from '../../server/activity-log.js';
-import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import db from '../../server/db/index.js';
 import type { Recommendation } from '../../shared/types/recommendations.js';
 
@@ -122,12 +121,9 @@ describe('runSentRecStalenessScan — dedup is robust to high unrelated activity
       }
     });
     insMany();
-
-    setWorkspaceFlagOverride('strategy-staleness-scan', wsId, true);
   });
 
   afterAll(() => {
-    setWorkspaceFlagOverride('strategy-staleness-scan', wsId, null);
     db.prepare('DELETE FROM activity_log WHERE workspace_id = ?').run(wsId);
     db.prepare('DELETE FROM recommendation_sets WHERE workspace_id = ?').run(wsId);
     cleanup();

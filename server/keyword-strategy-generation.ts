@@ -5,7 +5,7 @@
  */
 import { DEFAULT_SEO_DATA_PROVIDER, getConfiguredProvider, normalizeRuntimeSeoDataProvider, type ProviderName } from './seo-data-provider.js';
 import { incrementIfAllowed, decrementUsage } from './usage-tracking.js';
-import { updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
+import { computeEffectiveTier, updateWorkspace, getWorkspace, getTokenForSite } from './workspaces.js';
 import { createLogger } from './logger.js';
 import type { PageKeywordMap, KeywordStrategy, SeoDataStatus } from '../shared/types/workspace.js';
 import { fetchAndCacheKeywordStrategySeoData } from './keyword-strategy-seo-data.js';
@@ -17,7 +17,7 @@ import {
   type StrategyOutput,
 } from './keyword-strategy-ai-synthesis.js';
 import { enrichKeywordStrategy } from './keyword-strategy-enrichment.js';
-import { persistKeywordStrategy } from './keyword-strategy-persistence.js';
+import { KeywordStrategyRevisionConflictError, persistKeywordStrategy } from './keyword-strategy-persistence.js';
 import { resolveSiteKeywordMetrics } from './site-keyword-metrics.js';
 import { sanitizeKeywordStrategyDerivedArtifacts, sanitizeKeywordStrategyKeywordGaps, sanitizeKeywordStrategyOutput } from './keyword-strategy-sanitizer.js';
 import { queueKeywordStrategyPostUpdateFollowOns, seedKeywordStrategyTrackedKeywords, workspaceHasStrategyOwnedRankTracking } from './keyword-strategy-follow-ons.js';
@@ -31,12 +31,31 @@ import { keywordComparisonKey } from '../shared/keyword-normalization.js';
 import { backfillContentGapsToFloor, STRATEGY_CONTENT_GAP_FLOOR } from './keyword-strategy-helpers.js';
 import { recordGenerationQuality } from './generation-quality-store.js';
 import type { GenerationQuality } from '../shared/types/generation-quality.js';
+import { createHash } from 'crypto';
+import type { GenerationProvenance } from '../shared/types/ai-execution.js';
+import { getKeywordStrategyGenerationState } from './keyword-strategy-generation-store.js';
+import type { SynthesizeKeywordStrategyResult } from './keyword-strategy-ai-synthesis.js';
 
 // Re-exported for backward compatibility with existing callers.
 export { buildStrategyIntelligenceBlock, computeOpportunityScore, shouldFetchCompetitorData } from './keyword-strategy-helpers.js';
 
 const log = createLogger('keyword-strategy');
 export const KEYWORD_STRATEGY_MAX_PAGE_CAP = 2000;
+
+function generationProvenance(synthesis: SynthesizeKeywordStrategyResult): GenerationProvenance | undefined {
+  const last = synthesis.executions.at(-1);
+  if (!last) return undefined;
+  const inputFingerprint = createHash('sha256')
+    // Parallel page batches may complete in either order. Hash the canonical multiset
+    // of exact effective prompt fingerprints so latency cannot create false staleness.
+    .update(JSON.stringify(synthesis.executions.map(item => item.inputFingerprint).sort()))
+    .digest('hex');
+  return {
+    runId: last.execution.runId, operation: last.execution.operation, provider: last.execution.provider,
+    model: last.execution.model, inputFingerprint,
+    startedAt: synthesis.executions[0].execution.startedAt, completedAt: last.execution.completedAt,
+  };
+}
 
 // Concurrent generation guard: prevents two simultaneous strategy generations for the same
 // workspace from racing to the DB. The second request receives a 409 immediately.
@@ -143,6 +162,7 @@ export function reconcileSeoDataStatusAfterCanonicalDiscovery(
 export async function generateKeywordStrategy(options: GenerateKeywordStrategyOptions): Promise<GenerateKeywordStrategyResult> {
   const ws = getWorkspace(options.workspaceId);
   if (!ws) throw new KeywordStrategyGenerationError(404, { error: 'Workspace not found' });
+  const generationState = getKeywordStrategyGenerationState(ws.id);
   if (!ws.webflowSiteId) throw new KeywordStrategyGenerationError(400, { error: 'No Webflow site linked' });
 
   // Concurrent generation guard: reject duplicate in-flight requests immediately.
@@ -151,8 +171,8 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
   }
 
   // Atomically reserve a usage slot before the async AI work begins (closes TOCTOU race).
-  const tier = ws.tier || 'free';
-  if (!incrementIfAllowed(ws.id, tier, 'strategy_generations')) {
+  const effectiveTier = computeEffectiveTier(ws);
+  if (!incrementIfAllowed(ws.id, effectiveTier, 'strategy_generations')) {
     throw new KeywordStrategyGenerationError(429, {
       error: 'Strategy generation limit reached',
       message: `You've reached your monthly strategy generation limit. Upgrade for more.`,
@@ -365,6 +385,8 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
           seoDataMode,
           maxPages: maxPagesParam,
           seoDataStatus,
+          expectedRevision: generationState.revision,
+          provenance: generationProvenance(synthesis),
           searchData: {
             deviceBreakdown,
             countryBreakdown,
@@ -563,6 +585,8 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
       seoDataMode,
       maxPages: maxPagesParam,
       seoDataStatus,
+      expectedRevision: generationState.revision,
+      provenance: generationProvenance(synthesis),
       searchData: {
         deviceBreakdown,
         countryBreakdown,
@@ -623,6 +647,12 @@ export async function generateKeywordStrategy(options: GenerateKeywordStrategyOp
     const stack = err instanceof Error ? err.stack : '';
     log.error({ detail: msg, stack }, 'Keyword strategy error');
     if (err instanceof KeywordStrategyGenerationError) throw err;
+    if (err instanceof KeywordStrategyRevisionConflictError) {
+      throw new KeywordStrategyGenerationError(409, {
+        error: 'Keyword strategy changed while generation was in flight',
+        message: 'Your changes were preserved. Start generation again to use the latest inputs.',
+      });
+    }
     if (err instanceof KeywordStrategySynthesisError) {
       const wrapped = new KeywordStrategyGenerationError(err.statusCode, err.payload);
       wrapped.stack = err.stack;

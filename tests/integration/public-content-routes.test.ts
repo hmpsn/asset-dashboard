@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import { createContentRequest, updateContentRequest } from '../../server/content-requests.js';
+import { createContentRequest, getContentRequest, updateContentRequest } from '../../server/content-requests.js';
 import { upsertBrief, type ContentBrief } from '../../server/content-brief.js';
 import { savePost, type GeneratedPost } from '../../server/content-posts.js';
 import db from '../../server/db/index.js';
@@ -82,6 +82,16 @@ function makePublicPerformanceBrief(workspaceId: string, briefId: string): Conte
         },
       ],
     },
+    generationRevision: 4,
+    generationProvenance: {
+      runId: 'run_public_brief',
+      operation: 'content-brief-generate',
+      provider: 'openai',
+      model: 'gpt-5.4',
+      inputFingerprint: 'a'.repeat(64),
+      startedAt: '2026-06-14T00:00:00.000Z',
+      completedAt: '2026-06-14T00:00:01.000Z',
+    },
   };
 }
 
@@ -109,6 +119,13 @@ function makePublicPerformancePost(workspaceId: string, postId: string, briefId:
     totalWordCount: 500,
     targetWordCount: 1400,
     status: 'approved',
+    generationDiagnostics: [{
+      stage: 'section',
+      code: 'provider_error',
+      message: 'Internal provider detail',
+      sectionIndex: 0,
+      occurredAt: '2026-06-14T00:00:00.000Z',
+    }],
     aiReview: {
       review: {
         factual_accuracy: { pass: false, reason: 'Needs human review', humanReviewRequired: true },
@@ -120,6 +137,16 @@ function makePublicPerformancePost(workspaceId: string, postId: string, briefId:
       },
       reviewedAt: '2026-06-14T00:00:00.000Z',
       model: 'test-model',
+    },
+    generationRevision: 7,
+    generationProvenance: {
+      runId: 'run_public_post',
+      operation: 'content-post-section',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      inputFingerprint: 'b'.repeat(64),
+      startedAt: '2026-06-14T00:00:00.000Z',
+      completedAt: '2026-06-14T00:00:01.000Z',
     },
     createdAt: '2026-06-14T00:00:00.000Z',
     updatedAt: '2026-06-14T00:00:00.000Z',
@@ -238,11 +265,15 @@ describe('POST /api/public/content-request/:workspaceId', () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as { topic: string; targetKeyword: string; rationale: string; clientNote: string };
+    const body = await res.json() as { id: string; topic: string; targetKeyword: string };
     expect(body.topic).toBe('HTML Topic');
     expect(body.targetKeyword).toBe('html keyword');
-    expect(body.rationale).toBe('Needs cleanup');
-    expect(body.clientNote).toBe('Client note');
+    expect(body).not.toHaveProperty('rationale');
+    expect(body).not.toHaveProperty('clientNote');
+    expect(getContentRequest(wsId, body.id)).toMatchObject({
+      rationale: 'Needs cleanup',
+      clientNote: 'Client note',
+    });
   });
 
   it('accepts optional fields without error', async () => {
@@ -368,11 +399,15 @@ describe('POST /api/public/content-request/:workspaceId/submit', () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as { topic: string; targetKeyword: string; rationale: string; clientNote: string };
+    const body = await res.json() as { id: string; topic: string; targetKeyword: string };
     expect(body.topic).toBe('Client HTML Topic');
     expect(body.targetKeyword).toBe('client html keyword');
-    expect(body.rationale).toBe('Plain client note');
-    expect(body.clientNote).toBe('Plain client note');
+    expect(body).not.toHaveProperty('rationale');
+    expect(body).not.toHaveProperty('clientNote');
+    expect(getContentRequest(wsId, body.id)).toMatchObject({
+      rationale: 'Plain client note',
+      clientNote: 'Plain client note',
+    });
   });
 });
 
@@ -424,6 +459,7 @@ describe('GET /api/public/content-performance/:workspaceId', () => {
 	        'daysSincePublish',
 	        'ga4',
 	        'gsc',
+	        'itemId',
 	        'pageType',
 	        'publishedAt',
 	        'requestId',
@@ -458,6 +494,58 @@ describe('GET /api/public/content-performance/:workspaceId', () => {
       expect(serialized).not.toContain('Competitor-only private source text');
       expect(serialized).not.toContain('aiReview');
       expect(serialized).not.toContain('test-model');
+      expect(serialized).not.toContain('generationRevision');
+      expect(serialized).not.toContain('generationProvenance');
+      expect(serialized).not.toContain('run_public_');
+      expect(serialized).not.toContain('inputFingerprint');
+    } finally {
+      db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(workspace.id);
+      db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(workspace.id);
+      db.prepare('DELETE FROM content_briefs WHERE workspace_id = ?').run(workspace.id);
+      deleteWorkspace(workspace.id);
+    }
+  });
+});
+
+describe('public generated artifact projections', () => {
+  it('never returns generation revisions, provenance, run ids, or input fingerprints', async () => {
+    const workspace = createWorkspace(`PubContent Artifact Privacy ${ctx.PORT}`);
+    const briefId = `brief_public_artifact_${Date.now()}`;
+    const postId = `post_public_artifact_${Date.now()}`;
+    try {
+      upsertBrief(workspace.id, makePublicPerformanceBrief(workspace.id, briefId));
+      savePost(workspace.id, makePublicPerformancePost(workspace.id, postId, briefId));
+      const request = createContentRequest(workspace.id, {
+        topic: 'Emergency dentist guide',
+        targetKeyword: 'emergency dentist cost',
+        intent: 'informational',
+        priority: 'high',
+        rationale: 'Public artifact privacy test',
+        initialStatus: 'in_progress',
+      });
+      updateContentRequest(workspace.id, request.id, {
+        briefId,
+        postId,
+        status: 'post_review',
+      });
+
+      const briefResponse = await api(`/api/public/content-brief/${workspace.id}/${briefId}`);
+      expect(briefResponse.status).toBe(200);
+      const briefBody = await briefResponse.json() as Record<string, unknown>;
+      expect(briefBody).not.toHaveProperty('sourceEvidence');
+      expect(briefBody).not.toHaveProperty('generationRevision');
+      expect(briefBody).not.toHaveProperty('generationProvenance');
+
+      const postResponse = await api(`/api/public/content-posts/${workspace.id}/${postId}`);
+      expect(postResponse.status).toBe(200);
+      const postBody = await postResponse.json() as Record<string, unknown>;
+      expect(postBody).not.toHaveProperty('aiReview');
+      expect(postBody).not.toHaveProperty('generationDiagnostics');
+      expect(postBody).not.toHaveProperty('generationRevision');
+      expect(postBody).not.toHaveProperty('generationProvenance');
+      const serialized = JSON.stringify(postBody);
+      expect(serialized).not.toContain('run_public_post');
+      expect(serialized).not.toContain('inputFingerprint');
     } finally {
       db.prepare('DELETE FROM content_topic_requests WHERE workspace_id = ?').run(workspace.id);
       db.prepare('DELETE FROM content_posts WHERE workspace_id = ?').run(workspace.id);

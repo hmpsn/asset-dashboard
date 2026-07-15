@@ -9,6 +9,9 @@ import { createLogger } from './logger.js';
 import { composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
 import { buildProviderRetryDelayMs, RetryableProviderError, withProviderRetry } from './ai-provider-retry.js';
 import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
+import { aiDeduplicator, AIRequestDeduplicator } from './ai-deduplication.js';
+import { recordOperationTrace } from './platform-observability.js';
+import type { AICacheOutcome, AICachePolicy } from '../shared/types/ai-execution.js';
 
 const log = createLogger('anthropic');
 const AI_REQUEST_CANCELLED_MESSAGE = 'AI request cancelled';
@@ -38,6 +41,12 @@ interface AnthropicChatOptions {
   timeoutMs?: number;
   /** Optional caller cancellation signal. Composed with timeoutMs. */
   signal?: AbortSignal;
+  cachePolicy?: AICachePolicy;
+  runId?: string;
+  operation?: string;
+  executionCacheOutcome?: AICacheOutcome;
+  executionChainId?: string;
+  fallbackUsed?: boolean;
 }
 
 interface AnthropicChatResult {
@@ -45,6 +54,7 @@ interface AnthropicChatResult {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  execution?: { attempts: number; cacheOutcome: AICacheOutcome; originRunId?: string };
 }
 
 /**
@@ -52,6 +62,37 @@ interface AnthropicChatResult {
  * exponential backoff, timeout, and token tracking.
  */
 export async function callAnthropic(opts: AnthropicChatOptions): Promise<AnthropicChatResult> {
+  const model = opts.model ?? 'claude-sonnet-4-6';
+  const cachePolicy = opts.signal ? { mode: 'none' } as const : (opts.cachePolicy ?? { mode: 'inflight' } as const);
+  const key = AIRequestDeduplicator.createKey({
+    provider: 'anthropic',
+    operation: opts.operation ?? opts.feature,
+    model,
+    messages: [
+      ...(opts.system ? [{ role: 'system', content: opts.system }] : []),
+      ...opts.messages,
+    ],
+    temperature: opts.temperature,
+    maxTokens: opts.maxTokens,
+    workspaceId: opts.workspaceId,
+    feature: opts.feature,
+  });
+  const deduped = await aiDeduplicator.execute(
+    key,
+    () => executeAnthropicCall({ ...opts, executionCacheOutcome: cachePolicy.mode === 'none' ? 'bypass' : 'miss' }),
+    cachePolicy,
+  );
+  return {
+    ...deduped.value,
+    execution: {
+      attempts: deduped.value.execution?.attempts ?? 1,
+      cacheOutcome: deduped.cacheOutcome,
+      originRunId: deduped.value.execution?.originRunId,
+    },
+  };
+}
+
+async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<AnthropicChatResult> {
   const {
     model = 'claude-sonnet-4-6',
     system,
@@ -63,19 +104,29 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
     maxRetries = 3,
     timeoutMs = 90_000,
     signal,
+    runId,
+    operation = feature,
+    executionCacheOutcome = 'miss',
+    executionChainId,
+    fallbackUsed,
   } = opts;
+  const callStartMs = Date.now();
 
   if (isLocalFakeProviderModeEnabled()) {
     const text = `[local-fake-providers] Synthetic Anthropic response for "${feature}".`;
     const promptTokens = Math.max(1, Math.round(messages.length * 8));
     const completionTokens = Math.max(1, Math.round(text.length / 7));
     const totalTokens = promptTokens + completionTokens;
-    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId });
-    return { text, promptTokens, completionTokens, totalTokens };
+    logTokenUsage({ promptTokens, completionTokens, totalTokens, model, feature, workspaceId, durationMs: 1, runId, operation, provider: 'anthropic', attempts: 1, cacheOutcome: executionCacheOutcome, executionChainId, fallbackUsed });
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - callStartMs, workspaceId, message: `${model} local fake call completed`, runId, executionChainId, provider: 'anthropic', model, attempts: 1, cacheOutcome: executionCacheOutcome, fallbackUsed });
+    return { text, promptTokens, completionTokens, totalTokens, execution: { attempts: 1, cacheOutcome: executionCacheOutcome, originRunId: runId } };
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  if (!apiKey) {
+    recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: 'Anthropic API key not configured', runId, executionChainId, provider: 'anthropic', model, attempts: 0, cacheOutcome: executionCacheOutcome, fallbackUsed });
+    throw new Error('ANTHROPIC_API_KEY not configured');
+  }
 
   const bodyObj: Record<string, unknown> = {
     model,
@@ -87,14 +138,17 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
 
   const body = JSON.stringify(bodyObj);
 
-  const result = await withProviderRetry({
-    feature,
-    providerLabel: 'Anthropic',
-    logger: log,
-    maxRetries,
-    signal,
-    cancelMessage: AI_REQUEST_CANCELLED_MESSAGE,
-    run: async (attempt) => {
+  let attempts = 0;
+  try {
+    const result = await withProviderRetry({
+      feature,
+      providerLabel: 'Anthropic',
+      logger: log,
+      maxRetries,
+      signal,
+      cancelMessage: AI_REQUEST_CANCELLED_MESSAGE,
+      run: async (attempt) => {
+      attempts = attempt + 1;
       throwIfSignalAborted(signal, AI_REQUEST_CANCELLED_MESSAGE);
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -134,19 +188,35 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
       const completionTokens = data.usage?.output_tokens || 0;
       const totalTokens = promptTokens + completionTokens;
       return { text, promptTokens, completionTokens, totalTokens };
-    },
-  });
+      },
+    });
 
-  logTokenUsage({
-    promptTokens: result.promptTokens,
-    completionTokens: result.completionTokens,
-    totalTokens: result.totalTokens,
-    model,
-    feature,
-    workspaceId,
-  });
+    const durationMs = Date.now() - callStartMs;
+    logTokenUsage({
+      promptTokens: result.promptTokens,
+      completionTokens: result.completionTokens,
+      totalTokens: result.totalTokens,
+      model,
+      feature,
+      workspaceId,
+      durationMs,
+      runId,
+      operation,
+      provider: 'anthropic',
+      attempts,
+      cacheOutcome: executionCacheOutcome,
+      executionChainId,
+      fallbackUsed,
+    });
+    recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs, workspaceId, message: `${model} call completed`, runId, executionChainId, provider: 'anthropic', model, attempts, cacheOutcome: executionCacheOutcome, fallbackUsed });
 
-  return result;
+    return { ...result, execution: { attempts, cacheOutcome: executionCacheOutcome, originRunId: runId } };
+  } catch (err) {
+    if (!(signal?.aborted || (err instanceof Error && err.message === AI_REQUEST_CANCELLED_MESSAGE))) {
+      recordOperationTrace({ source: 'ai', operation, status: 'error', durationMs: Date.now() - callStartMs, workspaceId, message: err instanceof Error ? err.message : String(err), runId, executionChainId, provider: 'anthropic', model, attempts, cacheOutcome: executionCacheOutcome, fallbackUsed });
+    }
+    throw err;
+  }
 }
 
 /**
@@ -176,6 +246,8 @@ export interface AnthropicToolUseResult {
  * Call Anthropic Messages API with tool_use (structured output).
  * Forces the model to respond with the named tool's input_schema shape.
  * Returns the tool_use input block — guaranteed structured JSON.
+ * This legacy tool path is intentionally cache-none and outside callAI governance;
+ * production callers must migrate to a registered structured-output operation.
  */
 export async function callAnthropicWithTools(opts: {
   model?: string;

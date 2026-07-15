@@ -179,7 +179,7 @@ afterAll(async () => {
 });
 
 describe('workspace-context background job mutation safety', () => {
-  it('runs brand-voice generation through legacy route, writes one tracked action, and emits outcome broadcast once', async () => {
+  it('keeps generated brand-voice drafts out of calibrated outcomes', async () => {
     const startRes = await postJson(`/api/workspaces/${workspaceA.workspaceId}/generate-brand-voice`, {});
     expect(startRes.status).toBe(200);
     const started = await startRes.json() as { jobId: string };
@@ -197,13 +197,9 @@ describe('workspace-context background job mutation safety', () => {
       brandVoice: 'Confident, practical, and direct tone.',
     });
 
-    expect(countBrandVoiceActions(workspaceA.workspaceId)).toBe(1);
+    expect(countBrandVoiceActions(workspaceA.workspaceId)).toBe(0);
     expect(countRows('tracked_actions', workspaceB.workspaceId)).toBe(0);
-    expect(broadcastState.calls).toContainEqual(expect.objectContaining({
-      workspaceId: workspaceA.workspaceId,
-      event: WS_EVENTS.OUTCOME_ACTION_RECORDED,
-      payload: expect.objectContaining({ actionId: expect.any(String) }),
-    }));
+    expect(broadcastState.calls.some(call => call.event === WS_EVENTS.OUTCOME_ACTION_RECORDED)).toBe(false);
 
     broadcastState.calls = [];
     const secondStartRes = await postJson('/api/jobs', {
@@ -215,7 +211,7 @@ describe('workspace-context background job mutation safety', () => {
     const secondJob = await waitForJob(secondStart.jobId);
     expect(secondJob.status).toBe('done');
 
-    expect(countBrandVoiceActions(workspaceA.workspaceId)).toBe(1);
+    expect(countBrandVoiceActions(workspaceA.workspaceId)).toBe(0);
     expect(broadcastState.calls.some(call => call.event === WS_EVENTS.OUTCOME_ACTION_RECORDED)).toBe(false);
   });
 

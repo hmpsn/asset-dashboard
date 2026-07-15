@@ -127,8 +127,12 @@ describe('approval_batch adapters — round-trip (build → store → parse → 
 describe('B1 fix — audit_issue per-check field map', () => {
   it('maps title checks to seoTitle and meta-description checks to seoDescription', () => {
     expect(auditCheckField('title')).toBe('seoTitle');
+    expect(auditCheckField('title_length')).toBe('seoTitle');
+    expect(auditCheckField('missing_title')).toBe('seoTitle');
     expect(auditCheckField('duplicate-title')).toBe('seoTitle');
     expect(auditCheckField('meta-description')).toBe('seoDescription');
+    expect(auditCheckField('meta_length')).toBe('seoDescription');
+    expect(auditCheckField('missing_meta')).toBe('seoDescription');
     expect(auditCheckField('duplicate-description')).toBe('seoDescription');
   });
 

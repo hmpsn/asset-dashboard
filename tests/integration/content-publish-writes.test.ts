@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import http from 'http';
 import type { AddressInfo } from 'net';
 import db from '../../server/db/index.js';
+import { broadcastToWorkspace } from '../../server/broadcast.js';
 import {
   setupWebflowMocks,
   mockWebflowSuccess,
@@ -61,10 +62,18 @@ async function startTestServer(): Promise<{ server: http.Server; baseUrl: string
 }
 
 async function postJson(baseUrl: string, path: string, body: unknown): Promise<{ status: number; body: unknown }> {
+  const publishMatch = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)\/publish-to-webflow$/);
+  let requestBody = body;
+  if (publishMatch && body && typeof body === 'object' && !('expectedRevision' in body)) {
+    const row = db.prepare(
+      'SELECT generation_revision FROM content_posts WHERE workspace_id = ? AND id = ?',
+    ).get(publishMatch[1], publishMatch[2]) as { generation_revision: number } | undefined;
+    requestBody = { ...body, expectedRevision: row?.generation_revision ?? 0 };
+  }
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
   const responseBody = await res.json().catch(() => ({}));
   return { status: res.status, body: responseBody };
@@ -85,8 +94,29 @@ function seedPublishableContent(): SeededContent {
      SET webflow_site_id = ?, webflow_token = ?, publish_target = ?
      WHERE id = ?`,
   ).run(TEST_SITE_ID, TEST_TOKEN, PUBLISH_TARGET, seeded.workspaceId);
-  // Also update the seeded post status to 'draft' so the route allows it
-  db.prepare(`UPDATE content_posts SET status = 'draft' WHERE id = ?`).run(seeded.postId);
+  // Make the post delivery-complete so these tests exercise Webflow writes,
+  // rather than stopping at the truthful-completion publish guard.
+  db.prepare(`
+    UPDATE content_posts
+    SET status = 'draft',
+        introduction = ?,
+        sections = ?,
+        conclusion = ?
+    WHERE id = ?
+  `).run(
+    '<p>This introduction contains visible, publishable content.</p>',
+    JSON.stringify([{
+      index: 0,
+      heading: 'Complete section',
+      content: '<p>This section also contains visible, publishable content.</p>',
+      wordCount: 8,
+      targetWordCount: 300,
+      keywords: [],
+      status: 'done',
+    }]),
+    '<p>This conclusion completes the publishable article.</p>',
+    seeded.postId,
+  );
   return seeded;
 }
 
@@ -452,6 +482,60 @@ describe('Content Publish Writes — FM-2 Phantom Success', () => {
         r.method === 'POST',
       );
       expect(publishReq).toBeDefined();
+    });
+
+    it('returns success through an effect failure and retries via update without a duplicate create', async () => {
+      content.cleanup();
+      content = seedPublishableContent();
+
+      mockWebflowSuccess(
+        `/collections/${TEST_COLLECTION_ID}/items`,
+        { id: TEST_ITEM_ID },
+      );
+      mockWebflowSuccess(
+        `/collections/${TEST_COLLECTION_ID}/items/${TEST_ITEM_ID}`,
+        {},
+      );
+      mockWebflowSuccess(
+        `/collections/${TEST_COLLECTION_ID}/items/publish`,
+        { publishedItemIds: [TEST_ITEM_ID] },
+      );
+      vi.mocked(broadcastToWorkspace).mockImplementationOnce(() => {
+        throw new Error('injected publish broadcast failure');
+      });
+
+      const first = await postJson(
+        baseUrl,
+        `/api/content-posts/${content.workspaceId}/${content.postId}/publish-to-webflow`,
+        {},
+      );
+      expect(first).toMatchObject({
+        status: 200,
+        body: { success: true, itemId: TEST_ITEM_ID, isUpdate: false },
+      });
+
+      const { getPost } = await import('../../server/content-posts.js');
+      expect(getPost(content.workspaceId, content.postId)).toMatchObject({
+        webflowItemId: TEST_ITEM_ID,
+        webflowCollectionId: TEST_COLLECTION_ID,
+        publishedAt: expect.any(String),
+      });
+
+      const retry = await postJson(
+        baseUrl,
+        `/api/content-posts/${content.workspaceId}/${content.postId}/publish-to-webflow`,
+        {},
+      );
+      expect(retry).toMatchObject({
+        status: 200,
+        body: { success: true, itemId: TEST_ITEM_ID, isUpdate: true },
+      });
+
+      const createRequests = getCapturedRequests().filter(request => (
+        request.endpoint === `/collections/${TEST_COLLECTION_ID}/items`
+        && request.method === 'POST'
+      ));
+      expect(createRequests).toHaveLength(1);
     });
   });
 });
