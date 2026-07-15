@@ -148,7 +148,7 @@ describe('feature-flag lifecycle audit', () => {
       const reservedRows = report.rows.filter(
         r => FEATURE_FLAG_CATALOG[r.key].lifecycle.status === 'reserved',
       );
-      expect(reservedRows.map(row => row.key).sort()).toEqual(['content-matrix-generation']);
+      expect(reservedRows.map(row => row.key).sort()).toEqual([]);
 
       for (const row of reservedRows) {
         expect(row.doneTarget).toBeNull();

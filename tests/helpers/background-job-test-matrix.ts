@@ -123,6 +123,15 @@ export const BACKGROUND_JOB_LIFECYCLE_MATRIX: Record<BackgroundJobType, Backgrou
     },
     'tests/integration/content-post-generation-mutation-safety.test.ts',
   ),
+  [BACKGROUND_JOB_TYPES.CONTENT_MATRIX_GENERATION]: entry(
+    'CONTENT_MATRIX_GENERATION',
+    {
+      expectedLabel: 'Content Matrix Generation',
+      expectedCancellable: true,
+      expectedResultBehavior: 'domain-store-and-result',
+    },
+    'tests/contract/content-matrix-generation-m3-contracts.test.ts',
+  ),
   [BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION]: entry(
     'COPY_BATCH_GENERATION',
     {

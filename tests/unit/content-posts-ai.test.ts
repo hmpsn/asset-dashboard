@@ -216,6 +216,28 @@ describe('callCreativeAI fallback correlation', () => {
     expect(callAIMock).not.toHaveBeenCalled();
   });
 
+  it('does not dispatch fallback when the bounded reservation is exhausted', async () => {
+    isAnthropicConfiguredMock.mockReturnValue(true);
+    callAIMock.mockRejectedValueOnce(new Error('Claude unavailable'));
+    const budgetError = new Error('matrix generation budget exhausted');
+    const beforeBoundedProviderDispatch = vi.fn()
+      .mockReturnValueOnce(undefined)
+      .mockImplementationOnce(() => { throw budgetError; });
+
+    await expect(callCreativeAIWithMetadata({
+      ...opts,
+      maxRetries: 0,
+      beforeBoundedProviderDispatch,
+    })).rejects.toThrow(budgetError);
+
+    expect(beforeBoundedProviderDispatch).toHaveBeenCalledTimes(2);
+    expect(callAIMock).toHaveBeenCalledOnce();
+    expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'anthropic',
+      maxRetries: 0,
+    }));
+  });
+
   it('does not buy a fallback when metadata observation rejects a successful Claude call', async () => {
     isAnthropicConfiguredMock.mockReturnValue(true);
     callAIMock.mockResolvedValueOnce({

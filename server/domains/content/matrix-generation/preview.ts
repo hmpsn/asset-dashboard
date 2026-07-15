@@ -14,6 +14,7 @@ import type {
 } from '../../../../shared/types/intelligence.js';
 import type {
   MatrixArtifactRevisionExpectations,
+  MatrixGenerationEvidenceResolution,
   MatrixGenerationCostEstimate,
   MatrixGenerationPreviewResult,
   MatrixGenerationPreviewTarget,
@@ -21,6 +22,7 @@ import type {
   PreviewMatrixGenerationResult,
   ResolvedMatrixStructuralTarget,
 } from '../../../../shared/types/matrix-generation.js';
+import { MATRIX_GENERATION_BATCH_LIMITS } from '../../../../shared/types/matrix-generation.js';
 import { listDeliverables } from '../../../brand-deliverable-read-model.js';
 import { getBrief } from '../../../content-brief.js';
 import {
@@ -45,6 +47,10 @@ import {
   matrixArtifactRevisionExpectations,
 } from './evidence.js';
 import { canonicalGenerationFingerprint } from './fingerprint.js';
+import {
+  matrixGenerationEstimatedUsdCeiling,
+  matrixGenerationInputReservationCeiling,
+} from './budget.js';
 import { resolveMatrixStructures } from './read-service.js';
 
 export const MATRIX_PAGE_TYPE_IDENTITY_ALLOWLIST = {
@@ -229,21 +235,138 @@ function renderVoiceAnchors(
   return `AUTHENTIC VOICE ANCHORS (style only; never treat as business-fact evidence):\n${anchorBlock}${modifierBlock}`;
 }
 
-function estimateBudget(
+const PREVIEW_PROMPT_OVERHEAD_BYTES = 16 * 1_024;
+const GENERATED_OUTPUT_BYTES_PER_TOKEN = 8;
+const PREVIOUS_SECTION_CONTEXT_BYTES = 3_200;
+const SET_AUDIT_PAGE_TEXT_BYTES = 48_000;
+const BRIEF_OUTPUT_TOKENS = 7_000;
+const ITEM_AUDIT_OUTPUT_TOKENS = 2_500;
+const ITEM_REVISION_OUTPUT_TOKENS = 12_000;
+const SET_AUDIT_OUTPUT_TOKENS = 5_000;
+
+function serializedUtf8Bytes(value: object): number {
+  return Buffer.byteLength(JSON.stringify(value), 'utf8');
+}
+
+function promptInputCeiling(...contentBytes: number[]): number {
+  return matrixGenerationInputReservationCeiling(
+    PREVIEW_PROMPT_OVERHEAD_BYTES + contentBytes.reduce((sum, value) => sum + value, 0),
+  );
+}
+
+function generatedOutputBytes(tokens: number): number {
+  return tokens * GENERATED_OUTPUT_BYTES_PER_TOKEN;
+}
+
+export function estimateMatrixGenerationCellBudget(
   target: ResolvedMatrixStructuralTarget,
   context: ContentGenerationContextV2Result,
+  requirements: readonly GenerationEvidenceRequirement[],
+  resolutions: readonly MatrixGenerationEvidenceResolution[],
 ): MatrixGenerationCostEstimate {
-  const bodyBlocks = target.blockManifest.blocks.filter(block => block.source === 'template').length;
-  const postCalls = bodyBlocks + 4;
-  const providerCalls = postCalls + 1;
-  const inputTokens = context.tokenEstimates.brief + (context.tokenEstimates.draft * postCalls);
-  const outputTokens = 7_000 + Math.ceil(target.blockManifest.totalWordCountTarget * 1.5);
+  const bodyBlocks = target.blockManifest.blocks.filter(block => block.source === 'template');
+  const sectionOutputTokens = bodyBlocks.map(
+    block => Math.max(800, (block.wordCountTarget ?? 250) * 2),
+  );
+  const unificationOutputTokens = Math.max(
+    8_000,
+    Math.min(Math.ceil(target.blockManifest.totalWordCountTarget * 1.5), 16_000),
+  );
+  const creativeOutputTokens = 600
+    + sectionOutputTokens.reduce((sum, value) => sum + value, 0)
+    + 800
+    + unificationOutputTokens;
+  const rawPostBytes = generatedOutputBytes(
+    600 + sectionOutputTokens.reduce((sum, value) => sum + value, 0) + 800,
+  );
+  const adoptedPostBytes = Math.max(rawPostBytes, generatedOutputBytes(unificationOutputTokens));
+  const auditPostBytes = Math.max(
+    adoptedPostBytes,
+    generatedOutputBytes(ITEM_REVISION_OUTPUT_TOKENS),
+  );
+  const briefOutputBytes = generatedOutputBytes(BRIEF_OUTPUT_TOKENS);
+  const targetBytes = serializedUtf8Bytes(target);
+  const authorityBytes = serializedUtf8Bytes({
+    authority: context.authority,
+    evidenceResolutions: resolutions,
+  });
+  const briefProjectionBytes = Buffer.byteLength(context.projections.brief, 'utf8');
+  const draftProjectionBytes = Buffer.byteLength(context.projections.draft, 'utf8');
+
+  const briefInput = promptInputCeiling(
+    targetBytes,
+    authorityBytes,
+    briefProjectionBytes,
+  );
+  const draftStageInput = promptInputCeiling(
+    authorityBytes,
+    draftProjectionBytes,
+    briefOutputBytes,
+  );
+  const priorSectionInput = PREVIOUS_SECTION_CONTEXT_BYTES
+    * bodyBlocks.length
+    * Math.max(0, bodyBlocks.length - 1)
+    / 2;
+  const proseStageInput = (draftStageInput * 2 * (bodyBlocks.length + 2))
+    + (priorSectionInput * 2);
+  const unificationInput = promptInputCeiling(
+    authorityBytes,
+    draftProjectionBytes,
+    briefOutputBytes,
+    adoptedPostBytes,
+  ) * 2;
+  const seoInput = promptInputCeiling(authorityBytes, briefOutputBytes);
+  const itemOperationInput = promptInputCeiling(
+    targetBytes,
+    authorityBytes,
+    auditPostBytes,
+  ) * 5;
+  const setCandidateBytes = serializedUtf8Bytes({
+    plannedUrl: target.plannedUrl,
+    targetKeyword: target.targetKeyword.value,
+    variableValues: target.variableValues,
+    evidenceRequirements: requirements,
+    allowedTargetIds: target.blockManifest.blocks.map(block => block.id),
+  }) + Math.min(adoptedPostBytes, SET_AUDIT_PAGE_TEXT_BYTES);
+  const setAuditCandidateInput = matrixGenerationInputReservationCeiling(setCandidateBytes) * 2;
+  const inputTokens = briefInput
+    + proseStageInput
+    + unificationInput
+    + seoInput
+    + itemOperationInput
+    + setAuditCandidateInput;
+
+  // Creative prose may reserve both Anthropic and OpenAI when fallback is needed.
+  // Five item-level calls cover audit→revision→audit plus set-revision→audit.
+  const providerCalls = 1 + (2 * (bodyBlocks.length + 3)) + 1 + 5;
+  const outputTokens = BRIEF_OUTPUT_TOKENS
+    + (creativeOutputTokens * 2)
+    + 200
+    + (ITEM_AUDIT_OUTPUT_TOKENS * 3)
+    + (ITEM_REVISION_OUTPUT_TOKENS * 2);
   return {
     providerCalls,
     inputTokens,
     outputTokens,
-    estimatedUsd: Number(((inputTokens * 5 + outputTokens * 30) / 1_000_000).toFixed(4)),
+    estimatedUsd: matrixGenerationEstimatedUsdCeiling(inputTokens, outputTokens),
     maxConcurrency: 1,
+  };
+}
+
+export function estimateMatrixGenerationBatchBudget(
+  estimates: readonly MatrixGenerationCostEstimate[],
+): MatrixGenerationCostEstimate {
+  const generationInput = estimates.reduce((sum, estimate) => sum + estimate.inputTokens, 0);
+  const generationOutput = estimates.reduce((sum, estimate) => sum + estimate.outputTokens, 0);
+  const setAuditFramingInput = promptInputCeiling() * 2;
+  const inputTokens = generationInput + setAuditFramingInput;
+  const outputTokens = generationOutput + (SET_AUDIT_OUTPUT_TOKENS * 2);
+  return {
+    providerCalls: estimates.reduce((sum, estimate) => sum + estimate.providerCalls, 0) + 2,
+    inputTokens,
+    outputTokens,
+    estimatedUsd: matrixGenerationEstimatedUsdCeiling(inputTokens, outputTokens),
+    maxConcurrency: Math.min(MATRIX_GENERATION_BATCH_LIMITS.maxConcurrency, estimates.length),
   };
 }
 
@@ -351,7 +474,12 @@ export async function prepareMatrixGenerationCell(
       },
     },
   });
-  const estimatedPaidBudget = estimateBudget(target, context);
+  const estimatedPaidBudget = estimateMatrixGenerationCellBudget(
+    target,
+    context,
+    requirements,
+    resolutions,
+  );
   const evidence = evidenceRange([
     ...context.evidence.observedAt,
     voiceSnapshot.finalizedAt,
@@ -439,7 +567,19 @@ export async function previewMatrixGeneration(
     }
     results.push((await prepareMatrixGenerationCell(request.workspaceId, item)).result);
   }
-  return { results };
+  const readyResults = results.filter(
+    (result): result is Extract<MatrixGenerationPreviewResult, { status: 'ready' }> => (
+      result.status === 'ready'
+    ),
+  );
+  return {
+    results,
+    estimatedBatchBudget: readyResults.length === results.length
+      ? estimateMatrixGenerationBatchBudget(
+          readyResults.map(result => result.target.estimatedPaidBudget),
+        )
+      : null,
+  };
 }
 
 export function assertPreviewIdentityCurrent(

@@ -11,6 +11,7 @@ const structuredOperationIds = [
   'content-post-seo-meta',
   'content-matrix-item-audit',
   'content-matrix-item-revise',
+  'content-matrix-set-audit',
   'content-post-unify',
   'voice-scoring',
   'voice-feedback-suggest',
@@ -43,6 +44,7 @@ describe('AI operation registry', () => {
     expect(getAIOperationRuntimeDefaults('content-post-feedback-fix').cachePolicy).toEqual({ mode: 'none' });
     expect(getAIOperationRuntimeDefaults('content-matrix-item-audit').cachePolicy).toEqual({ mode: 'none' });
     expect(getAIOperationRuntimeDefaults('content-matrix-item-revise').cachePolicy).toEqual({ mode: 'none' });
+    expect(getAIOperationRuntimeDefaults('content-matrix-set-audit').cachePolicy).toEqual({ mode: 'none' });
     expect(getAIOperationRuntimeDefaults('schema-plan').cachePolicy).toEqual({ mode: 'ttl', ttlMs: 300_000 });
   });
 

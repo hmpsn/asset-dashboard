@@ -42,7 +42,7 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toContain('expectedVersion');
   });
 
-  it('explains the free, revision-safe content-matrix structural workflow', () => {
+  it('explains the previewed, bounded, review-gated content-matrix workflow', () => {
     for (const tool of [
       'list_content_matrices',
       'get_content_matrix',
@@ -50,10 +50,15 @@ describe('MCP server instructions', () => {
       'accept_content_template_generation_upgrade',
       'preview_content_matrix_generation',
       'resolve_content_matrix_evidence',
+      'start_content_matrix_generation',
+      'get_content_matrix_generation',
+      'retry_content_matrix_generation',
     ]) {
       expect(MCP_SERVER_INSTRUCTIONS).toContain(tool);
     }
     expect(MCP_SERVER_INSTRUCTIONS).toContain('expected_source_revision');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/caller-accepted hard limits/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/cannot approve or publish/i);
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not call AI/i);
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not.+create a generation run/i);
   });

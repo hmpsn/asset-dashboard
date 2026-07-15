@@ -245,13 +245,18 @@ Brand generation is a durable background workflow, not a synchronous copy endpoi
 | `start_brief_generation` | W | **[Paid API]** Background job: full research-backed brief generation. Returns `job_id`. |
 | `start_post_generation` | W | **[Paid API]** Background job: full post generation from a saved brief. Returns `job_id`. |
 
-### content-matrix-actions (`tools/content-matrix-actions.ts`) — free structural planning
+### content-matrix-actions (`tools/content-matrix-actions.ts`) — structural planning and bounded generation
 | Tool | R/W | Purpose |
 |------|-----|---------|
 | `list_content_matrices` | R | Cursor-paged matrix summaries, optionally filtered by template. |
 | `get_content_matrix` | R | Matrix metadata plus a revision-bound cursor page of cells. |
 | `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
 | `accept_content_template_generation_upgrade` | W | Explicitly accept or reject the exact version-conditional deterministic template upgrade proposal. |
+| `preview_content_matrix_generation` | R | Freeze exact generation inputs and return bounded call, token, and cost estimates without paid work. |
+| `resolve_content_matrix_evidence` | W | Resolve one typed factual requirement and invalidate the prior preview. |
+| `start_content_matrix_generation` | W | **[Paid API]** Start one bounded, idempotent background batch from exact preview fingerprints and accepted budget ceilings. |
+| `get_content_matrix_generation` | R | Read one durable batch plus cursor-paged item outcomes, audit findings, artifact revisions, and approval evidence. |
+| `retry_content_matrix_generation` | W | **[Paid API]** Resume selected failed or needs-attention checkpoints from exact revisions. |
 
 ### schema-actions (`tools/schema-actions.ts`)
 | Tool | R/W | Purpose |
@@ -343,6 +348,10 @@ consumer with a stale handle.
 - `start_local_seo_refresh`
 - `start_brief_generation`
 - `start_post_generation`
+- `start_content_matrix_generation` and `retry_content_matrix_generation` (one event per accepted job;
+  exact idempotent replays repair or reuse the same durable event)
+- `start_brand_deliverable_generation`, `resume_brand_deliverable_generation`, and
+  `start_brand_deliverable_revision` (one event per accepted job)
 - `get_workspace_intelligence` — only when `enrich_with_backlinks` or `resolve_entity_references`
   is set (per the handshake instructions; the counter is incremented inside the enrichment path).
 

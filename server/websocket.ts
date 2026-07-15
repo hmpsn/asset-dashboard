@@ -11,6 +11,7 @@ import { verifyAdminToken } from './middleware.js';
 import { getUserById } from './users.js';
 import { recoverStuckDiagnosticReports } from './diagnostic-store.js';
 import { reconcileBrandGenerationRunsAfterRestart } from './domains/brand/generation/recovery.js';
+import { reconcileMatrixGenerationRunsAfterRestart } from './domains/content/matrix-generation/recovery.js';
 import { drainBrandGenerationEffectOutbox } from './domains/brand/generation/effects.js';
 import {
   BACKGROUND_JOB_TYPES,
@@ -247,6 +248,7 @@ export function initWebSocket(server: Server): WebSocketServer {
   // Initialise subsystems that depend on broadcast
   initJobs(_broadcastJobEvent);
   initActivityBroadcast(_broadcastToWorkspace);
+  reconcileMatrixGenerationRunsAfterRestart();
   reconcileBrandGenerationRunsAfterRestart();
   drainBrandGenerationEffectOutbox();
   recoverStuckDiagnosticReports();

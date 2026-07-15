@@ -10,6 +10,7 @@ import type { MatrixGenerationPreviewTarget } from '../../../../shared/types/mat
 import { generateBrief } from '../../../content-brief.js';
 import { generatePost } from '../../../content-posts.js';
 import { countHtmlWords } from '../../../content-posts-ai.js';
+import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
 import {
   listCurrentMatrixCellEvidence,
   renderMatrixCellEvidencePrompt,
@@ -22,6 +23,7 @@ export interface MatrixGenerationStageOptions {
   executionChainId: string;
   signal?: AbortSignal;
   assertAuthority: () => void;
+  beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void;
 }
 
 function placeholderToken(requirement: MatrixGenerationPreviewTarget['evidenceRequirements'][number]): string {
@@ -99,6 +101,8 @@ export async function generateMatrixBriefStage(
       generationContextV2: options.context,
       skipKeywordStrategyCrossref: true,
       assertAuthority: options.assertAuthority,
+      maxRetries: 0,
+      beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
     },
   );
   return {
@@ -138,6 +142,8 @@ export async function generateMatrixPostStage(
     signal: options.signal,
     generationContextV2: options.context,
     assertAuthority: options.assertAuthority,
+    maxRetries: 0,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
   });
   const placeholders = options.target.evidenceRequirements
     .filter(canRenderGenerationPlaceholder)

@@ -16,6 +16,17 @@ import type {
   ContentCalendarDateSuggestionsResponse,
 } from '../../shared/types/content';
 import type { CopySectionStatus, ClientSuggestion } from '../../shared/types/copy-pipeline';
+import type {
+  ApproveMatrixPageForPublishReadinessResult,
+  GetMatrixGenerationResult,
+  MatrixGenerationBatchBudget,
+  PreviewMatrixGenerationResult,
+  PreviewMatrixGenerationSelection,
+  RetryMatrixGenerationItem,
+  RetryMatrixGenerationResult,
+  StartMatrixGenerationResult,
+  StartMatrixGenerationSelection,
+} from '../../shared/types/matrix-generation';
 
 export interface PublicCopyEntryListItem {
   id: string;
@@ -348,6 +359,60 @@ export const contentMatrices = {
       `/api/content-matrices/${wsId}/check-cannibalization`,
       { keyword },
     ),
+
+  previewGeneration: (
+    wsId: string,
+    matrixId: string,
+    selections: PreviewMatrixGenerationSelection[],
+  ) => post<PreviewMatrixGenerationResult>(
+    `/api/content-matrices/${wsId}/${matrixId}/generation-preview`,
+    { selections },
+  ),
+
+  startGeneration: (
+    wsId: string,
+    matrixId: string,
+    body: {
+      selections: StartMatrixGenerationSelection[];
+      acceptedBudget: MatrixGenerationBatchBudget;
+      idempotencyKey: string;
+    },
+  ) => post<StartMatrixGenerationResult>(
+    `/api/content-matrices/${wsId}/${matrixId}/generation-runs`,
+    body,
+  ),
+
+  getGeneration: (wsId: string, runId: string) =>
+    get<GetMatrixGenerationResult>(
+      `/api/content-matrices/${wsId}/generation-runs/${runId}?limit=100`,
+    ),
+
+  retryGeneration: (
+    wsId: string,
+    runId: string,
+    body: {
+      expectedRunRevision: number;
+      items: RetryMatrixGenerationItem[];
+      idempotencyKey: string;
+    },
+  ) => post<RetryMatrixGenerationResult>(
+    `/api/content-matrices/${wsId}/generation-runs/${runId}/retry`,
+    body,
+  ),
+
+  approveGenerationItem: (
+    wsId: string,
+    runId: string,
+    itemId: string,
+    body: {
+      expectedRunRevision: number;
+      expectedItemRevision: number;
+      expectedPostRevision: number;
+    },
+  ) => post<ApproveMatrixPageForPublishReadinessResult>(
+    `/api/content-matrices/${wsId}/generation-runs/${runId}/items/${itemId}/approve`,
+    body,
+  ),
 
   exportMatricesCsv: (wsId: string) =>
     `/api/export/${wsId}/matrices?format=csv`,

@@ -314,6 +314,25 @@ export const AI_OPERATION_REGISTRY = {
     defaultTimeoutMs: 90_000,
     defaultResearchMode: true,
   },
+  'content-matrix-set-audit': {
+    id: 'content-matrix-set-audit',
+    domain: 'content-pipeline',
+    feature: 'content-matrix-set-audit',
+    providerIntent: 'openai',
+    modelIntent: 'structured cross-page consistency and substantive-uniqueness audit',
+    outputMode: 'json',
+    parserExpectation: 'parseStructuredAIOutput(content-matrix-set-audit)',
+    researchMode: 'required',
+    executionMode: 'background-only',
+    retryPolicy: 'none',
+    timeoutProfile: 'long',
+    defaultProvider: 'openai',
+    defaultModel: 'gpt-5.4',
+    defaultResponseFormat: { type: 'json_object' },
+    defaultMaxRetries: 0,
+    defaultTimeoutMs: 90_000,
+    defaultResearchMode: true,
+  },
   'gbp-review-response-draft': {
     id: 'gbp-review-response-draft',
     domain: 'integrations',
@@ -949,6 +968,7 @@ const AI_OPERATION_CACHE_POLICY_OVERRIDES: Partial<Record<AIOperationId, AICache
   'brand-deliverable-audit': { mode: 'none' },
   'content-matrix-item-audit': { mode: 'none' },
   'content-matrix-item-revise': { mode: 'none' },
+  'content-matrix-set-audit': { mode: 'none' },
 };
 
 export function getAIOperationCachePolicy(operationId: AIOperationId): AICachePolicy {
