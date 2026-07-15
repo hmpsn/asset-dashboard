@@ -160,13 +160,48 @@ function creativeOutput(content: string, evidenceKeys: string[] = []) {
 }
 
 describe('brand generation AI operations', () => {
-  it('reserves Claude and fallback separately and preserves real execution provenance', async () => {
+  it('keeps the primary foundation call inside the shared two-dispatch envelope', async () => {
     const reserve = vi.fn();
     const callCreativeAI = vi.fn(async options => {
+      expect(options).toMatchObject({ maxTokens: 1_500, allowProviderFallback: false });
+      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
+      return aiResult(JSON.stringify({
+        summary: 'Warm and clear.',
+        voiceDNA: {
+          personalityTraits: ['Warm'],
+          toneSpectrum: { formal_casual: 7, serious_playful: 3, technical_accessible: 8 },
+          sentenceStyle: 'Short sentences.',
+          vocabularyLevel: 'Plain language.',
+        },
+        guardrails: {
+          forbiddenWords: [],
+          requiredTerminology: [],
+          toneBoundaries: ['Stay warm and clear.'],
+          antiPatterns: [],
+        },
+        contextModifiers: [],
+        claims: [],
+        unresolvedRequirementIds: [],
+      }));
+    });
+
+    await generateBrandGenerationCandidate({
+      frozenInput: frozenInput('voice_foundation'),
+      preflight: preflight(),
+      reserveProviderDispatch: reserve,
+      dependencies: { callCreativeAI },
+    });
+
+    expect(reserve).toHaveBeenCalledWith(expect.objectContaining({ outputTokens: 1_500 }));
+  });
+
+  it('reserves the primary creative call and preserves real execution provenance', async () => {
+    const reserve = vi.fn();
+    const callCreativeAI = vi.fn(async options => {
+      expect(options).toMatchObject({ maxTokens: 1_500, allowProviderFallback: false });
       await options.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
-      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: true });
       expect(`${options.systemPrompt}\n${options.userPrompt}`.split(brandGenerationPrompt.FINALIZED_VOICE_PROMPT_BEGIN)).toHaveLength(2);
-      return aiResult(creativeOutput('Care that makes the next step clear.'), true);
+      return aiResult(creativeOutput('Care that makes the next step clear.'), undefined, 'anthropic');
     });
     const result = await generateBrandGenerationCandidate({
       frozenInput: frozenInput(), preflight: preflight(), reserveProviderDispatch: reserve,
@@ -177,28 +212,21 @@ describe('brand generation AI operations', () => {
     expect(reservations).toEqual([
       expect.objectContaining({
         provider: 'anthropic', fallback: false, providerCalls: 1,
-        inputTokens: expect.any(Number), outputTokens: 2_500,
-        effectiveInputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
-      }),
-      expect.objectContaining({
-        provider: 'openai', fallback: true, providerCalls: 1,
-        inputTokens: expect.any(Number), outputTokens: 2_500,
+        inputTokens: expect.any(Number), outputTokens: 1_500,
         effectiveInputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       }),
     ]);
-    expect(reservations[0].effectiveInputFingerprint)
-      .not.toBe(reservations[1].effectiveInputFingerprint);
     expect(result.tokens).toEqual({ prompt: 321, completion: 123, total: 444 });
     expect(result.provenance).toMatchObject({
       runId: 'ai-run-1',
-      provider: 'openai',
-      model: 'gpt-5.5',
-      inputFingerprint: reservations[1].effectiveInputFingerprint,
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      inputFingerprint: reservations[0].effectiveInputFingerprint,
     });
-    expect(result.effectiveInputFingerprint).toBe(reservations[1].effectiveInputFingerprint);
+    expect(result.effectiveInputFingerprint).toBe(reservations[0].effectiveInputFingerprint);
     expect(result.effectiveInputFingerprint).not.toBe(prompt.effectiveInputFingerprint);
     expect(result.effectiveInputFingerprint).not.toBe(frozenInput().inputSnapshot.fingerprint);
-    expect(result.budgetUsage.providerCalls).toBe(2);
+    expect(result.budgetUsage.providerCalls).toBe(1);
   });
 
   it('fails closed when reported provider usage exceeds the pessimistic reservation', async () => {
@@ -218,18 +246,39 @@ describe('brand generation AI operations', () => {
     })).rejects.toThrow(/exceeded.*reservation/i);
   });
 
+  it('checks malformed primary output against its reservation before recovery', async () => {
+    const callCreativeAI = vi.fn(async options => {
+      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
+      return {
+        ...aiResult('{"content":42}'),
+        tokens: { prompt: 321, completion: 1_501, total: 1_822 },
+      };
+    });
+    const callStructuredAI = vi.fn();
+
+    await expect(generateBrandGenerationCandidate({
+      frozenInput: frozenInput(),
+      preflight: preflight(),
+      reserveProviderDispatch: vi.fn(),
+      dependencies: { callCreativeAI, callStructuredAI },
+    })).rejects.toThrow(/exceeded.*reservation/i);
+    expect(callStructuredAI).not.toHaveBeenCalled();
+  });
+
   it('rejects a candidate too large to complete the bounded audit pass', async () => {
     const oversized = 'x'.repeat(9_000);
     const callCreativeAI = vi.fn(async options => {
       await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
       return aiResult(creativeOutput(oversized));
     });
+    const callStructuredAI = vi.fn(async () => aiResult(creativeOutput(oversized), true, 'openai'));
     await expect(generateBrandGenerationCandidate({
       frozenInput: frozenInput(),
       preflight: preflight(),
       reserveProviderDispatch: vi.fn(),
-      dependencies: { callCreativeAI },
+      dependencies: { callCreativeAI, callStructuredAI },
     })).rejects.toThrow(/failed to parse AI structured output/i);
+    expect(callStructuredAI).toHaveBeenCalledOnce();
   });
 
   it('sizes related context with a universal quote-first minimal candidate', () => {
@@ -260,27 +309,53 @@ describe('brand generation AI operations', () => {
     }
   });
 
-  it('rejects unsupported evidence keys and deleted placeholders', async () => {
-    const unsupported = vi.fn(async options => {
+  it('uses the bounded recovery when the primary candidate violates grounding contracts', async () => {
+    const reserve = vi.fn();
+    const callCreativeAI = vi.fn(async options => {
       await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
       return aiResult(creativeOutput('A factual claim.', ['unknown-key']));
     });
+    const callStructuredAI = vi.fn(async () => (
+      aiResult(creativeOutput('A grounded creative proposal.'), true, 'openai')
+    ));
+
+    const result = await generateBrandGenerationCandidate({
+      frozenInput: frozenInput(), preflight: preflight(), reserveProviderDispatch: reserve,
+      dependencies: { callCreativeAI, callStructuredAI },
+    });
+
+    expect(result.output).toMatchObject({ content: 'A grounded creative proposal.' });
+    expect(reserve.mock.calls.map(call => call[0])).toEqual([
+      expect.objectContaining({ outputTokens: 1_500 }),
+      expect.objectContaining({ outputTokens: 2_500, fallback: true }),
+    ]);
+  });
+
+  it('rejects unsupported evidence keys and deleted placeholders', async () => {
+    const unsupportedOutput = creativeOutput('A factual claim.', ['unknown-key']);
+    const unsupported = vi.fn(async options => {
+      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
+      return aiResult(unsupportedOutput);
+    });
+    const unsupportedRepair = vi.fn(async () => aiResult(unsupportedOutput, true, 'openai'));
     await expect(generateBrandGenerationCandidate({
       frozenInput: frozenInput(), preflight: preflight(), reserveProviderDispatch: vi.fn(),
-      dependencies: { callCreativeAI: unsupported },
+      dependencies: { callCreativeAI: unsupported, callStructuredAI: unsupportedRepair },
     })).rejects.toThrow(/unsupported evidence key/i);
 
+    const deletedOutput = JSON.stringify({
+      content: 'The placeholder disappeared.',
+      claims: [{ text: 'A proposal.', classification: 'creative_proposal', evidenceKeys: [] }],
+      unresolvedRequirementIds: ['brand-intake:business.differentiators'],
+    });
     const deleted = vi.fn(async options => {
       await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
-      return aiResult(JSON.stringify({
-        content: 'The placeholder disappeared.',
-        claims: [{ text: 'A proposal.', classification: 'creative_proposal', evidenceKeys: [] }],
-        unresolvedRequirementIds: ['brand-intake:business.differentiators'],
-      }));
+      return aiResult(deletedOutput);
     });
+    const deletedRepair = vi.fn(async () => aiResult(deletedOutput, true, 'openai'));
     await expect(generateBrandGenerationCandidate({
       frozenInput: frozenInput(), preflight: preflight(true), reserveProviderDispatch: vi.fn(),
-      dependencies: { callCreativeAI: deleted },
+      dependencies: { callCreativeAI: deleted, callStructuredAI: deletedRepair },
     })).rejects.toThrow(/placeholder/i);
   });
 
@@ -325,34 +400,42 @@ describe('brand generation AI operations', () => {
         sourceType: 'content_matrix', sourceId: 'matrix-1', fieldPath: 'cell-1', capturedAt: now,
       }],
     }];
+    const structuralInferenceOutput = JSON.stringify({
+      content: 'Care that makes the next step clear.',
+      claims: [
+        {
+          text: 'Care that makes the next step clear.',
+          classification: 'creative_proposal',
+          evidenceKeys: [],
+        },
+        {
+          text: 'The business serves dentists in Austin.',
+          classification: 'inferred',
+          evidenceKeys: ['content-matrix:cell-1'],
+        },
+      ],
+      unresolvedRequirementIds: [],
+    });
     const structuralInference = vi.fn(async options => {
       await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
-      return aiResult(JSON.stringify({
-        content: 'Care that makes the next step clear.',
-        claims: [
-          {
-            text: 'Care that makes the next step clear.',
-            classification: 'creative_proposal',
-            evidenceKeys: [],
-          },
-          {
-            text: 'The business serves dentists in Austin.',
-            classification: 'inferred',
-            evidenceKeys: ['content-matrix:cell-1'],
-          },
-        ],
-        unresolvedRequirementIds: [],
-      }));
+      return aiResult(structuralInferenceOutput);
     });
+    const structuralInferenceRepair = vi.fn(async () => (
+      aiResult(structuralInferenceOutput, true, 'openai')
+    ));
     await expect(generateBrandGenerationCandidate({
       frozenInput: frozenInput(), preflight: structuralPreflight, reserveProviderDispatch: vi.fn(),
-      dependencies: { callCreativeAI: structuralInference },
+      dependencies: {
+        callCreativeAI: structuralInference,
+        callStructuredAI: structuralInferenceRepair,
+      },
     })).rejects.toThrow(/cannot support business assertions/i);
   });
 
   it('uses one reserved OpenAI repair when Anthropic succeeds with invalid structured output', async () => {
     const reserve = vi.fn();
     const callCreativeAI = vi.fn(async options => {
+      expect(options).toMatchObject({ maxTokens: 1_500, allowProviderFallback: false });
       await options.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
       return aiResult('{"content":42}', undefined, 'anthropic');
     });
@@ -360,6 +443,7 @@ describe('brand generation AI operations', () => {
       expect(options).toMatchObject({
         operation: 'brand-deliverable-generate',
         provider: 'openai',
+        maxTokens: 2_500,
         maxRetries: 0,
         fallbackUsed: true,
       });
@@ -371,8 +455,49 @@ describe('brand generation AI operations', () => {
     });
     expect(result.output).toMatchObject({ kind: 'deliverable_candidate', content: 'A clearer creative proposal.' });
     expect(reserve.mock.calls.map(call => call[0])).toEqual([
-      expect.objectContaining({ provider: 'anthropic', fallback: false }),
-      expect.objectContaining({ provider: 'openai', fallback: true }),
+      expect.objectContaining({ provider: 'anthropic', fallback: false, outputTokens: 1_500 }),
+      expect.objectContaining({ provider: 'openai', fallback: true, outputTokens: 2_500 }),
+    ]);
+    expect(callStructuredAI).toHaveBeenCalledOnce();
+  });
+
+  it('checks same-provider recovery usage against only its exact reservation', async () => {
+    const callCreativeAI = vi.fn(async options => {
+      await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
+      return aiResult('{"content":42}');
+    });
+    const callStructuredAI = vi.fn(async () => ({
+      ...aiResult(creativeOutput('A recovered creative proposal.'), true, 'openai'),
+      tokens: { prompt: 321, completion: 2_501, total: 2_822 },
+    }));
+
+    await expect(generateBrandGenerationCandidate({
+      frozenInput: frozenInput(),
+      preflight: preflight(),
+      reserveProviderDispatch: vi.fn(),
+      dependencies: { callCreativeAI, callStructuredAI },
+    })).rejects.toThrow(/exceeded.*reservation/i);
+  });
+
+  it('uses the same single OpenAI recovery dispatch after a reserved provider failure', async () => {
+    const reserve = vi.fn();
+    const callCreativeAI = vi.fn(async options => {
+      await options.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
+      throw new Error('Anthropic unavailable');
+    });
+    const callStructuredAI = vi.fn(async () => (
+      aiResult(creativeOutput('A bounded recovered proposal.'), true, 'openai')
+    ));
+
+    const result = await generateBrandGenerationCandidate({
+      frozenInput: frozenInput(), preflight: preflight(), reserveProviderDispatch: reserve,
+      dependencies: { callCreativeAI, callStructuredAI },
+    });
+
+    expect(result.output).toMatchObject({ content: 'A bounded recovered proposal.' });
+    expect(reserve.mock.calls.map(call => call[0])).toEqual([
+      expect.objectContaining({ provider: 'anthropic', outputTokens: 1_500 }),
+      expect.objectContaining({ provider: 'openai', outputTokens: 2_500 }),
     ]);
     expect(callStructuredAI).toHaveBeenCalledOnce();
   });
@@ -395,13 +520,15 @@ describe('brand generation AI operations', () => {
   });
 
   it('fails naming output that implies clearance and never dispatches after cancellation', async () => {
+    const badNamingOutput = creativeOutput('Northstar is trademark cleared and its domain is available.');
     const badNaming = vi.fn(async options => {
       await options.beforeProviderDispatch?.({ provider: 'openai', fallback: false });
-      return aiResult(creativeOutput('Northstar is trademark cleared and its domain is available.'));
+      return aiResult(badNamingOutput);
     });
+    const badNamingRepair = vi.fn(async () => aiResult(badNamingOutput, true, 'openai'));
     await expect(generateBrandGenerationCandidate({
       frozenInput: frozenInput('naming'), preflight: preflight(), reserveProviderDispatch: vi.fn(),
-      dependencies: { callCreativeAI: badNaming },
+      dependencies: { callCreativeAI: badNaming, callStructuredAI: badNamingRepair },
     })).rejects.toThrow(/clearance/i);
 
     const controller = new AbortController();

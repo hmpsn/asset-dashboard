@@ -71,6 +71,20 @@ function frozenInput(): BrandGenerationFrozenTargetInput {
   } as unknown as BrandGenerationFrozenTargetInput;
 }
 
+function foundationInput(): BrandGenerationFrozenTargetInput {
+  const input = frozenInput();
+  return {
+    ...input,
+    inputSnapshot: {
+      ...input.inputSnapshot,
+      target: 'voice_foundation',
+      voiceSnapshot: null,
+      artifactExpectation: null,
+    },
+    finalizedVoice: null,
+  } as BrandGenerationFrozenTargetInput;
+}
+
 function preflight(value = 'Northstar'): BrandGenerationPreflightResult {
   return {
     attemptOutput: {
@@ -121,6 +135,61 @@ const cleanAudit: GenerationAuditReport = {
 };
 
 describe('brand generation prompt bounds', () => {
+  it('states the exact voice scale and persisted candidate byte limit', () => {
+    const foundationPrompt = buildBrandGenerationPrompt(foundationInput(), preflight());
+    const deliverablePrompt = buildBrandGenerationPrompt(frozenInput(), preflight());
+
+    expect(foundationPrompt.userPrompt).toContain('numbers from 1 through 10 inclusive');
+    expect(foundationPrompt.userPrompt).toContain('at or below 4096 UTF-8 bytes');
+    expect(foundationPrompt.userPrompt).toContain('Target no more than 3000 UTF-8 bytes');
+    expect(foundationPrompt.userPrompt).toContain('at most 3 entries per guardrail group');
+    expect(foundationPrompt.userPrompt).toContain('at most 5 claims');
+    expect(foundationPrompt.userPrompt).toContain('literal vocabulary bans');
+    expect(foundationPrompt.userPrompt).toContain('Every factual or inferred assertion anywhere');
+    expect(foundationPrompt.userPrompt).toContain('compare every context modifier with the claims ledger');
+    expect(foundationPrompt.userPrompt).toContain('Prioritize audience and persona situations');
+    expect(deliverablePrompt.userPrompt).toContain('at or below 4096 UTF-8 bytes');
+    expect(deliverablePrompt.userPrompt).toContain('Target no more than 3000 UTF-8 bytes');
+  });
+
+  it('keeps model audit findings inside the candidate schema contract', () => {
+    const prompt = buildBrandGenerationAuditPrompt(
+      foundationInput(),
+      preflight(),
+      {
+        kind: 'foundation_candidate',
+        content: null,
+        foundationDraft: {
+          schemaVersion: 1,
+          summary: 'Warm and clear.',
+          voiceDNA: {
+            personalityTraits: ['Warm'],
+            toneSpectrum: { formal_casual: 7, serious_playful: 3, technical_accessible: 8 },
+            sentenceStyle: 'Short sentences.',
+            vocabularyLevel: 'Plain language.',
+          },
+          guardrails: {
+            forbiddenWords: [],
+            requiredTerminology: [],
+            toneBoundaries: [],
+            antiPatterns: [],
+          },
+          contextModifiers: [],
+          evidenceRequirementIds: [],
+          fingerprint: 'd'.repeat(64),
+        },
+        claims: [],
+        requirements: [],
+        placeholders: [],
+      },
+      cleanAudit,
+    );
+
+    expect(prompt.userPrompt).toContain('foundation fields have no per-field evidence slots');
+    expect(prompt.userPrompt).toContain('claim ledger');
+    expect(prompt.userPrompt).toContain('Do not request fields outside the supplied candidate schema');
+  });
+
   it('truncates UTF-8 text in one code-point-safe bounded pass', () => {
     const value = `${'x'.repeat(100_000)}😀tail`;
     const prefix = utf8Prefix(value, 2_052);

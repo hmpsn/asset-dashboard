@@ -308,6 +308,10 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     fallbackUsed,
   } = opts;
 
+  // GPT-5.5 currently accepts only its default temperature (1).
+  // Omitting the field keeps creative fallbacks compatible with that contract.
+  const requestTemperature = model.startsWith('gpt-5.5') ? undefined : temperature;
+
   // Cancellable requests are per-job work; counting them as explicit bypasses keeps
   // governance telemetry truthful without sharing an abortable promise.
   const effectivePolicy: AICachePolicy = signal ? { mode: 'none' } : cachePolicy;
@@ -319,7 +323,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     operation,
     model,
     messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) })),
-    temperature,
+    temperature: requestTemperature ?? 1,
     maxTokens,
     responseFormat,
     workspaceId,
@@ -328,7 +332,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
 
   const deduped = await aiDeduplicator.execute(
     dedupeKey,
-    () => executeOpenAICall({ model, messages, maxTokens, temperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionChainId, fallbackUsed, executionCacheOutcome: effectivePolicy.mode === 'none' ? 'bypass' : 'miss' }),
+    () => executeOpenAICall({ model, messages, maxTokens, temperature: requestTemperature, responseFormat, feature, workspaceId, maxRetries, timeoutMs, signal, runId, operation, executionChainId, fallbackUsed, executionCacheOutcome: effectivePolicy.mode === 'none' ? 'bypass' : 'miss' }),
     effectivePolicy,
   );
   return { ...deduped.value, execution: { attempts: deduped.value.execution?.attempts ?? 1, cacheOutcome: deduped.cacheOutcome, originRunId: deduped.value.execution?.originRunId } };
@@ -342,7 +346,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     model = 'gpt-5.4-mini',
     messages,
     maxTokens = 1000,
-    temperature = 0.7,
+    temperature,
     responseFormat,
     feature,
     workspaceId,
@@ -388,7 +392,7 @@ async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     model,
     messages,
     ...tokenLimit,
-    temperature,
+    ...(temperature !== undefined && { temperature }),
     ...(responseFormat && { response_format: responseFormat }),
   });
 

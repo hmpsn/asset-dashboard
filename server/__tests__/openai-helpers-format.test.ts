@@ -97,4 +97,55 @@ describe('callOpenAI response_format', () => {
     expect(body.max_tokens).toBe(123);
     expect(body.max_completion_tokens).toBeUndefined();
   });
+
+  it('omits custom temperature for GPT-5.5 chat models', async () => {
+    process.env.OPENAI_API_KEY = 'test-key-for-format-test';
+    const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation
+
+    await callOpenAI({
+      model: 'gpt-5.5',
+      messages: [{ role: 'user', content: 'test' }],
+      feature: 'test-gpt5-temperature',
+      temperature: 0.7,
+      maxRetries: 0,
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1);
+    const body = JSON.parse(call?.[1].body);
+    expect(body.temperature).toBeUndefined();
+  });
+
+  it('keeps custom temperature for GPT-5.4 chat models', async () => {
+    process.env.OPENAI_API_KEY = 'test-key-for-format-test';
+    const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation
+
+    await callOpenAI({
+      model: 'gpt-5.4',
+      messages: [{ role: 'user', content: 'test' }],
+      feature: 'test-gpt54-temperature',
+      temperature: 0.25,
+      maxRetries: 0,
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1);
+    const body = JSON.parse(call?.[1].body);
+    expect(body.temperature).toBe(0.25);
+  });
+
+  it('keeps custom temperature for legacy GPT-4 chat models', async () => {
+    process.env.OPENAI_API_KEY = 'test-key-for-format-test';
+    const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation
+
+    await callOpenAI({
+      model: 'gpt-4.1-mini',
+      messages: [{ role: 'user', content: 'test' }],
+      feature: 'test-legacy-temperature',
+      temperature: 0.25,
+      maxRetries: 0,
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1);
+    const body = JSON.parse(call?.[1].body);
+    expect(body.temperature).toBe(0.25);
+  });
 });

@@ -147,8 +147,13 @@ const PROVIDER_TOKEN_COST_MICROS = {
   openai: { input: 5, output: 30 },
 } as const;
 
-const CREATIVE_OUTPUT_TOKEN_CEILING = 2_500;
-const AUDIT_OUTPUT_TOKEN_CEILING = 1_500;
+// A dependent target's six-call worst case stays at the preflighted 13,000
+// output tokens: two stages × (1,500 primary + 2,500 recovery), plus two
+// 2,500-token audits. Foundation has no refinement stage, so its envelope is
+// 6,500 tokens. The larger recovery budget is reserved only when needed.
+const CREATIVE_PRIMARY_OUTPUT_TOKEN_CEILING = 1_500;
+const CREATIVE_RECOVERY_OUTPUT_TOKEN_CEILING = 2_500;
+const AUDIT_OUTPUT_TOKEN_CEILING = 2_500;
 
 function dependencies(
   overrides?: Partial<BrandGenerationAIDependencies>,
@@ -722,28 +727,30 @@ function provenanceFrom(
   };
 }
 
-function resultFrom<TOutput>(
-  output: TOutput,
+function assertResultWithinReservation(
   aiResult: AICallResult,
-  reservations: BrandProviderReservationRequest[],
-  preflight: BrandGenerationPreflightResult,
-): BrandGenerationAIOperationResult<TOutput> {
-  const providerReservations = reservations.filter(
-    reservation => reservation.provider === aiResult.execution.provider,
-  );
-  if (providerReservations.length === 0
-    || aiResult.tokens.prompt > providerReservations.reduce((sum, value) => sum + value.inputTokens, 0)
-    || aiResult.tokens.completion > providerReservations.reduce((sum, value) => sum + value.outputTokens, 0)) {
+  reservation: BrandProviderReservationRequest,
+): void {
+  if (aiResult.execution.provider !== reservation.provider) {
+    throw new BrandGenerationOutputContractError(
+      'Provider result was returned without its exact paid reservation.',
+    );
+  }
+  if (aiResult.tokens.prompt > reservation.inputTokens
+    || aiResult.tokens.completion > reservation.outputTokens) {
     throw new BrandGenerationOutputContractError(
       'Provider usage exceeded its pessimistic durable reservation.',
     );
   }
-  const successfulReservation = providerReservations.at(-1);
-  if (!successfulReservation) {
-    throw new BrandGenerationOutputContractError(
-      'Successful provider input has no exact durable fingerprint.',
-    );
-  }
+}
+
+function resultFrom<TOutput>(
+  output: TOutput,
+  aiResult: AICallResult,
+  successfulReservation: BrandProviderReservationRequest,
+  reservations: BrandProviderReservationRequest[],
+  preflight: BrandGenerationPreflightResult,
+): BrandGenerationAIOperationResult<TOutput> {
   return {
     output,
     provenance: provenanceFrom(
@@ -774,40 +781,73 @@ async function creativeDispatch<TOutput>(
   assertCanDispatch(input.preflight, input.reserveProviderDispatch, input.signal);
   const reservations: BrandProviderReservationRequest[] = [];
   const deps = dependencies(input.dependencies);
-  let aiResult = await deps.callCreativeAI({
-    operation,
-    systemPrompt: prompt.systemPrompt,
-    userPrompt: prompt.userPrompt,
-    maxTokens: 2_500,
-    workspaceId: input.frozenInput.workspaceId,
-    json: true,
-    researchMode: true,
-    maxRetries: 0,
-    signal: input.signal,
-    openAIModel: 'gpt-5.5',
-    beforeProviderDispatch: async dispatch => {
-      const reservation = providerReservation(
-        operation,
-        dispatch.provider,
-        dispatch.fallback,
-        renderedCreativeInput(prompt, dispatch.provider),
-        CREATIVE_OUTPUT_TOKEN_CEILING,
-      );
-      await input.reserveProviderDispatch(reservation);
-      reservations.push(reservation);
-    },
-  });
-  if (!reservations.some(reservation => reservation.provider === aiResult.execution.provider)) {
-    throw new BrandGenerationOutputContractError('Provider result was returned without a matching paid reservation.');
-  }
-  let output: TOutput;
+  let aiResult: AICallResult | undefined;
+  let initialFailure: unknown;
   try {
-    output = parseOutput(aiResult.text);
-  } catch (initialOutputError) {
-    // The creative wrapper already performs provider-error fallback. Only a
-    // schema/contract-invalid Anthropic success gets one explicit OpenAI repair
-    // dispatch; an invalid OpenAI result fails rather than looping.
-    if (aiResult.execution.provider !== 'anthropic') throw initialOutputError;
+    aiResult = await deps.callCreativeAI({
+      operation,
+      systemPrompt: prompt.systemPrompt,
+      userPrompt: prompt.userPrompt,
+      maxTokens: CREATIVE_PRIMARY_OUTPUT_TOKEN_CEILING,
+      workspaceId: input.frozenInput.workspaceId,
+      json: true,
+      researchMode: true,
+      maxRetries: 0,
+      signal: input.signal,
+      openAIModel: 'gpt-5.5',
+      allowProviderFallback: false,
+      beforeProviderDispatch: async dispatch => {
+        const reservation = providerReservation(
+          operation,
+          dispatch.provider,
+          dispatch.fallback,
+          renderedCreativeInput(prompt, dispatch.provider),
+          CREATIVE_PRIMARY_OUTPUT_TOKEN_CEILING,
+        );
+        await input.reserveProviderDispatch(reservation);
+        reservations.push(reservation);
+      },
+    });
+  } catch (error) {
+    // Reservation failures do not consume the recovery dispatch. A provider
+    // failure after a durable reservation may use the same single recovery as
+    // a schema-invalid response.
+    if (reservations.length === 0) throw error;
+    initialFailure = error;
+  }
+
+  const primaryResult = aiResult;
+  if (primaryResult) {
+    const primaryReservation = reservations.at(-1);
+    if (!primaryReservation) {
+      throw new BrandGenerationOutputContractError(
+        'Provider result was returned without its exact paid reservation.',
+      );
+    }
+    assertResultWithinReservation(primaryResult, primaryReservation);
+    let parsedOutput: { value: TOutput } | undefined;
+    try {
+      parsedOutput = { value: parseOutput(primaryResult.text) };
+    } catch (error) {
+      // One already-budgeted recovery may repair either malformed structure or
+      // a candidate rejected by deterministic grounding/safety validation. The
+      // recovery result must pass the exact same parser and guardrails.
+      initialFailure = error;
+    }
+    if (parsedOutput) {
+      // Provider-accounting failures are not candidate defects and therefore
+      // must fail closed without consuming the recovery dispatch.
+      return resultFrom(
+        parsedOutput.value,
+        primaryResult,
+        primaryReservation,
+        reservations,
+        input.preflight,
+      );
+    }
+  }
+
+  if (initialFailure !== undefined) {
     if (input.signal?.aborted) {
       throw input.signal.reason instanceof Error
         ? input.signal.reason
@@ -818,7 +858,7 @@ async function creativeDispatch<TOutput>(
       'openai',
       true,
       renderedStructuredInput(prompt, 'creative_repair'),
-      CREATIVE_OUTPUT_TOKEN_CEILING,
+      CREATIVE_RECOVERY_OUTPUT_TOKEN_CEILING,
     );
     await input.reserveProviderDispatch(fallbackReservation);
     reservations.push(fallbackReservation);
@@ -829,6 +869,7 @@ async function creativeDispatch<TOutput>(
         ? input.signal.reason
         : new Error('Brand generation was cancelled.');
     }
+    const executionChainId = primaryResult?.execution.executionChainId;
     aiResult = await deps.callStructuredAI({
       operation,
       provider: 'openai',
@@ -837,18 +878,28 @@ async function creativeDispatch<TOutput>(
         role: 'user',
         content: `${prompt.systemPrompt}\n\n${prompt.userPrompt}`,
       }],
-      maxTokens: CREATIVE_OUTPUT_TOKEN_CEILING,
+      maxTokens: CREATIVE_RECOVERY_OUTPUT_TOKEN_CEILING,
       workspaceId: input.frozenInput.workspaceId,
       responseFormat: { type: 'json_object' },
       researchMode: true,
       maxRetries: 0,
       signal: input.signal,
-      executionChainId: aiResult.execution.executionChainId,
+      ...(executionChainId
+        ? { executionChainId }
+        : {}),
       fallbackUsed: true,
     });
-    output = parseOutput(aiResult.text);
+    assertResultWithinReservation(aiResult, fallbackReservation);
+    return resultFrom(
+      parseOutput(aiResult.text),
+      aiResult,
+      fallbackReservation,
+      reservations,
+      input.preflight,
+    );
   }
-  return resultFrom(output, aiResult, reservations, input.preflight);
+
+  throw new BrandGenerationOutputContractError('Creative provider returned no result.');
 }
 
 export async function generateBrandGenerationCandidate(
@@ -942,6 +993,7 @@ export async function auditBrandGenerationCandidate(
     maxRetries: 0,
     signal: input.signal,
   });
+  assertResultWithinReservation(aiResult, reservation);
   const modelOutput = parseBrandModelAuditAIOutput(aiResult.text);
   const auditReport = mergeBrandGenerationAudit({
     frozenInput: input.frozenInput,
@@ -952,6 +1004,7 @@ export async function auditBrandGenerationCandidate(
   return resultFrom(
     { kind: 'audit', auditReport },
     aiResult,
+    reservation,
     [reservation],
     input.preflight,
   );
