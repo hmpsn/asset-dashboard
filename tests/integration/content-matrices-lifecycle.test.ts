@@ -434,6 +434,102 @@ describe('PATCH /api/content-matrices/:workspaceId/:matrixId/cells/:cellId — u
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// Generation preview + cell evidence
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('matrix generation preview and evidence routes', () => {
+  let matrixId = '';
+  let cellId = '';
+  let sourceRevision = { matrixRevision: 0, templateRevision: 0, cellRevision: 0 };
+
+  beforeAll(async () => {
+    const template = createTemplate(wsA, {
+      name: 'Generation route template',
+      pageType: 'service',
+      variables: [{ name: 'service', label: 'Service' }],
+      sections: [{
+        id: 'body',
+        name: 'Body',
+        headingTemplate: '{service}',
+        guidance: 'Explain the verified service.',
+        wordCountTarget: 300,
+        order: 0,
+        generationRole: 'body',
+        aeoContract: { modes: [], required: false },
+        ctaContract: { role: 'none', required: false },
+      }],
+      urlPattern: '/services/{service}',
+      keywordPattern: '{service}',
+      titlePattern: '{service}',
+      metaDescPattern: 'Learn about {service}.',
+      generationContractVersion: 1,
+    });
+    const created = await postJson(`/api/content-matrices/${wsA}`, {
+      name: 'Generation route matrix',
+      templateId: template.id,
+      dimensions: [{ variableName: 'service', values: ['Consulting'] }],
+      urlPattern: template.urlPattern,
+      keywordPattern: template.keywordPattern,
+    });
+    const matrix = await created.json();
+    matrixId = matrix.id;
+    cellId = matrix.cells[0].id;
+    sourceRevision = {
+      matrixRevision: matrix.revision,
+      templateRevision: template.revision ?? 0,
+      cellRevision: matrix.cells[0].revision,
+    };
+  });
+
+  it('previews without paid work and resolves a pre-run evidence requirement idempotently', async () => {
+    const previewResponse = await postJson(
+      `/api/content-matrices/${wsA}/${matrixId}/generation-preview`,
+      { selections: [{ cellId, expectedSourceRevision: sourceRevision }] },
+    );
+    expect(previewResponse.status).toBe(200);
+    const preview = await previewResponse.json();
+    expect(preview.results[0].status).toBe('blocked');
+    const requirementId = `matrix-cell:${cellId}:service-availability`;
+    expect(preview.results[0].blockingRequirementIds).toContain(requirementId);
+
+    const requestBody = {
+      value: { kind: 'boolean', value: true },
+      sourceRef: {
+        sourceType: 'operator_attestation',
+        sourceId: 'route-attestation-1',
+        capturedAt: '2026-07-14T12:00:00.000Z',
+      },
+      expectedSourceRevision: sourceRevision,
+      expectedArtifactRevisions: preview.results[0].expectedArtifactRevisions,
+      idempotencyKey: 'route-evidence-1',
+    };
+    const evidencePath = `/api/content-matrices/${wsA}/${matrixId}/cells/${cellId}/evidence/${encodeURIComponent(requirementId)}`;
+    const beforeEvents = broadcastState.calls.filter(call => (
+      (call.payload as { action?: string })?.action === 'matrix_generation_evidence_resolved'
+    )).length;
+    const created = await patchJson(evidencePath, requestBody);
+    expect(created.status).toBe(201);
+    const createdBody = await created.json();
+    expect(createdBody).toMatchObject({
+      created: true,
+      currentSourceRevision: {
+        matrixRevision: sourceRevision.matrixRevision,
+        templateRevision: sourceRevision.templateRevision,
+        cellRevision: sourceRevision.cellRevision + 1,
+      },
+    });
+
+    const replay = await patchJson(evidencePath, requestBody);
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ created: false });
+    const afterEvents = broadcastState.calls.filter(call => (
+      (call.payload as { action?: string })?.action === 'matrix_generation_evidence_resolved'
+    )).length;
+    expect(afterEvents).toBe(beforeEvents + 1);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // DELETE
 // ════════════════════════════════════════════════════════════════════════════
 

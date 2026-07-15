@@ -225,11 +225,13 @@ function findTargetPage(
   pages: readonly PageKeywordMap[],
   targetKeyword: string,
   pagePath?: string,
+  allowKeywordTargetMatch = true,
 ): PageKeywordMap | undefined {
   if (pagePath) {
     const byPath = pages.find(page => pageMatchesPath(page, pagePath));
     if (byPath) return byPath;
   }
+  if (!allowKeywordTargetMatch) return undefined;
   const target = targetKeyword.trim().toLowerCase();
   return pages.find(page => page.primaryKeyword?.trim().toLowerCase() === target
     || page.secondaryKeywords?.some(keyword => keyword.trim().toLowerCase() === target));
@@ -351,7 +353,12 @@ export async function buildContentGenerationContextV2(
   });
   const authority = opts.authority ?? capturedAuthority(workspaceId, intelligence);
   const seoBlocks = buildSeoPromptBlocks(intelligence.seoContext, { includePageMap: false });
-  const targetPage = findTargetPage(intelligence.seoContext?.strategy?.pageMap ?? [], opts.targetKeyword, opts.pagePath);
+  const targetPage = findTargetPage(
+    intelligence.seoContext?.strategy?.pageMap ?? [],
+    opts.targetKeyword,
+    opts.pagePath,
+    opts.allowKeywordTargetMatch ?? true,
+  );
   const targetPageForPrompt = targetPage && !opts.providerMetricsObservedAt
     ? {
         ...targetPage,
@@ -407,12 +414,15 @@ export async function buildContentGenerationContextV2(
     authority.userVoiceBlock,
   ], []);
 
-  const observedAt = Array.from(new Set([
-    intelligence.assembledAt,
+  const sourceObservedAt = Array.from(new Set([
     opts.sourceEvidence?.capturedAt,
     opts.providerMetricsObservedAt ?? undefined,
     ...briefEvidence.observedAt,
   ].filter((value): value is string => Boolean(value)))).sort();
+  const observedAt = Array.from(new Set([
+    intelligence.assembledAt,
+    ...sourceObservedAt,
+  ])).sort();
   const evidence = {
     capturedAt: observedAt.at(-1) ?? intelligence.assembledAt,
     freshThrough: observedAt[0] ?? intelligence.assembledAt,
@@ -433,9 +443,15 @@ export async function buildContentGenerationContextV2(
     workspaceId,
     targetKeyword: opts.targetKeyword,
     pagePath: targetPage?.pagePath,
+    allowKeywordTargetMatch: opts.allowKeywordTargetMatch ?? true,
     authority,
     projections,
-    evidence,
+    evidence: {
+      observedAt: sourceObservedAt,
+      capturedAt: sourceObservedAt.at(-1) ?? null,
+      freshThrough: sourceObservedAt[0] ?? null,
+      missing: evidence.missing,
+    },
     budgets,
   });
 

@@ -2,6 +2,7 @@
  * Content Matrices — REST API routes for bulk content planning grids.
  */
 import { Router } from 'express';
+import type { Request } from 'express';
 import {
   listMatrices,
   getMatrix,
@@ -43,6 +44,13 @@ import {
   MatrixGenerationSourceLimitError,
   matrixGenerationUtf8Bytes,
 } from '../../shared/types/matrix-generation.js';
+import { GENERATION_EVIDENCE_SOURCE_TYPES } from '../../shared/types/generation-evidence.js';
+import {
+  MatrixGenerationEvidenceError,
+  resolveContentMatrixEvidence,
+} from '../domains/content/matrix-generation/evidence.js';
+import { previewMatrixGeneration } from '../domains/content/matrix-generation/preview.js';
+import { MatrixReadServiceError } from '../domains/content/matrix-generation/read-service.js';
 
 const log = createLogger('routes:content-matrices');
 const router = Router();
@@ -147,6 +155,84 @@ const updateMatrixCellSchema = matrixCellSchema
     expectedCellRevision: z.number().int().nonnegative(),
   });
 
+const sourceRevisionSchema = z.object({
+  matrixRevision: z.number().int().nonnegative(),
+  templateRevision: z.number().int().nonnegative(),
+  cellRevision: z.number().int().nonnegative(),
+}).strict();
+
+const artifactRevisionExpectationsSchema = z.object({
+  brief: z.object({
+    artifactType: z.literal('content_brief'),
+    artifactId: z.string().min(1).nullable(),
+    generationRevision: z.number().int().nonnegative(),
+  }).strict(),
+  post: z.object({
+    artifactType: z.literal('generated_post'),
+    artifactId: z.string().min(1).nullable(),
+    generationRevision: z.number().int().nonnegative(),
+  }).strict(),
+}).strict();
+
+const previewMatrixGenerationSchema = z.object({
+  selections: z.array(z.object({
+    cellId: z.string().min(1),
+    expectedSourceRevision: sourceRevisionSchema,
+  }).strict()).min(1).max(25).superRefine((selections, ctx) => {
+    const seen = new Set<string>();
+    selections.forEach((selection, index) => {
+      if (seen.has(selection.cellId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'cellId'],
+          message: 'cellId values must be unique',
+        });
+      }
+      seen.add(selection.cellId);
+    });
+  }),
+}).strict();
+
+const evidenceValueSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('text'), value: z.string().trim().min(1).max(12_000) }).strict(),
+  z.object({ kind: z.literal('number'), value: z.number().finite(), unit: z.string().trim().min(1).max(100).optional() }).strict(),
+  z.object({ kind: z.literal('boolean'), value: z.boolean() }).strict(),
+  z.object({ kind: z.literal('text_list'), value: z.array(z.string().trim().min(1).max(2_000)).min(1).max(100) }).strict(),
+  z.object({ kind: z.literal('date'), value: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict(),
+  z.object({ kind: z.literal('url'), value: z.string().url().max(2_048) }).strict(),
+]);
+
+const resolveMatrixEvidenceSchema = z.object({
+  value: evidenceValueSchema,
+  sourceRef: z.object({
+    sourceType: z.enum(GENERATION_EVIDENCE_SOURCE_TYPES),
+    sourceId: z.string().min(1),
+    sourceRevision: z.number().int().nonnegative().optional(),
+    fieldPath: z.string().min(1).max(512).optional(),
+    label: z.string().min(1).max(512).optional(),
+    uri: z.string().url().max(2_048).optional(),
+    capturedAt: z.string().datetime(),
+  }).strict(),
+  expectedSourceRevision: sourceRevisionSchema,
+  expectedArtifactRevisions: artifactRevisionExpectationsSchema,
+  idempotencyKey: z.string().trim().min(1).max(200),
+}).strict();
+
+function matrixEvidenceResolver(req: Request) {
+  if (req.user) {
+    return {
+      actorType: 'operator' as const,
+      actorId: req.user.id,
+      actorLabel: req.user.name,
+    };
+  }
+  return {
+    actorType: 'operator' as const,
+    actorId: 'admin-hmac',
+    actorLabel: 'Admin operator',
+  };
+}
+
 /**
  * Map an illegal status transition (thrown by updateMatrix / updateMatrixCell via the cell state
  * machine) to a 409 with the machine's own message. Returning null defers to the default handling.
@@ -185,6 +271,88 @@ function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, u
   invalidateContentPipelineIntelligence(workspaceId);
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-plan', ...payload });
 }
+
+router.post(
+  '/api/content-matrices/:workspaceId/:matrixId/generation-preview',
+  requireWorkspaceAccess('workspaceId'),
+  validate(previewMatrixGenerationSchema),
+  async (req, res) => {
+    try {
+      const result = await previewMatrixGeneration({
+        workspaceId: req.params.workspaceId,
+        matrixId: req.params.matrixId,
+        selections: req.body.selections,
+      });
+      res.json(result);
+    } catch (err) {
+      if (err instanceof MatrixReadServiceError) {
+        const status = err.code === 'not_found' ? 404 : err.code === 'conflict' ? 409 : 422;
+        res.status(status).json({ error: err.message, code: err.code });
+        return;
+      }
+      log.error({ err }, 'Failed to preview matrix generation');
+      res.status(500).json({ error: 'Failed to preview matrix generation' });
+    }
+  },
+);
+
+router.patch(
+  '/api/content-matrices/:workspaceId/:matrixId/cells/:cellId/evidence/:requirementId',
+  requireWorkspaceAccess('workspaceId'),
+  validate(resolveMatrixEvidenceSchema),
+  async (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    try {
+      const resolvedBy = matrixEvidenceResolver(req);
+      const result = await resolveContentMatrixEvidence({
+        workspaceId,
+        matrixId: req.params.matrixId,
+        cellId: req.params.cellId,
+        requirementId: req.params.requirementId,
+        value: req.body.value,
+        sourceRef: req.body.sourceRef,
+        expectedSourceRevision: req.body.expectedSourceRevision,
+        expectedArtifactRevisions: req.body.expectedArtifactRevisions,
+        idempotencyKey: req.body.idempotencyKey,
+        resolvedBy,
+      });
+      if (result.created) {
+        addActivity(
+          workspaceId,
+          'content_updated',
+          'Resolved content-matrix generation evidence',
+          undefined,
+          {
+            matrixId: req.params.matrixId,
+            cellId: req.params.cellId,
+            requirementId: req.params.requirementId,
+            action: 'matrix_generation_evidence_resolved',
+          },
+          { id: resolvedBy.actorId, name: resolvedBy.actorLabel },
+        );
+        notifyContentPlanUpdated(workspaceId, {
+          matrixId: req.params.matrixId,
+          cellId: req.params.cellId,
+          requirementId: req.params.requirementId,
+          action: 'matrix_generation_evidence_resolved',
+        });
+      }
+      res.status(result.created ? 201 : 200).json(result);
+    } catch (err) {
+      if (err instanceof MatrixGenerationEvidenceError) {
+        const status = err.code === 'not_found'
+          ? 404
+          : err.code === 'conflict' || err.code === 'idempotency_conflict'
+            ? 409
+            : 422;
+        res.status(status).json({ error: err.message, code: err.code });
+        return;
+      }
+      log.error({ err }, 'Failed to resolve matrix generation evidence');
+      res.status(500).json({ error: 'Failed to resolve matrix generation evidence' });
+    }
+  },
+);
 
 // List all matrices for a workspace
 router.get('/api/content-matrices/:workspaceId', requireWorkspaceAccess('workspaceId'), (req, res) => {

@@ -23,7 +23,7 @@ describe('MCP tool workspace-scope schema census', () => {
     const names = ALL_TOOLS.map(tool => tool.name);
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
 
-    expect(ALL_TOOLS).toHaveLength(73);
+    expect(ALL_TOOLS).toHaveLength(75);
     expect(duplicates, `Duplicate MCP tool names: ${duplicates.join(', ')}`).toEqual([]);
   });
 

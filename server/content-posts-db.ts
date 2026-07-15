@@ -565,6 +565,24 @@ export function createPost(
   return created;
 }
 
+/** Persist a complete generated candidate exactly once at revision 1. */
+export function persistGeneratedPost(
+  workspaceId: string,
+  post: GeneratedPost,
+): PersistedGeneratedPost {
+  if (!post.generationProvenance) {
+    throw new Error('Generated content post persistence requires provenance');
+  }
+  if (post.status !== 'draft' || !isCompleteGeneratedPost(post, post.sections.length)) {
+    throw new IncompleteContentPostError();
+  }
+  return createPost(workspaceId, {
+    ...post,
+    generationRevision: 1,
+    generationProvenance: canonicalGenerationProvenanceSchema.parse(post.generationProvenance),
+  });
+}
+
 /**
  * Backward-compatible manual/import save. New generation code must use
  * `commitPostGeneration`; existing rows are updated with a revision CAS and the

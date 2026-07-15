@@ -129,6 +129,8 @@ function dependencies() {
       cells: { items: [], nextCursor: null },
     })),
     resolveMatrixStructures: vi.fn(async () => ({ results: [] })),
+    previewMatrixGeneration: vi.fn(async () => ({ results: [] })),
+    resolveContentMatrixEvidence: vi.fn(),
     acceptTemplateGenerationUpgrade: vi.fn(async () => ({
       status: 'accepted' as const,
       template: template(),
@@ -148,12 +150,14 @@ function textPayload(result: Awaited<ReturnType<ReturnType<typeof createContentM
 }
 
 describe('MCP content matrix read tools', () => {
-  it('advertises one dedicated four-tool snake_case family with described bounded inputs', () => {
+  it('advertises one dedicated six-tool snake_case family with described bounded inputs', () => {
     expect(contentMatrixActionTools.map(tool => tool.name)).toEqual([
       'list_content_matrices',
       'get_content_matrix',
       'resolve_content_matrix_cells',
       'accept_content_template_generation_upgrade',
+      'preview_content_matrix_generation',
+      'resolve_content_matrix_evidence',
     ]);
 
     for (const tool of contentMatrixActionTools as Tool[]) {
@@ -452,6 +456,155 @@ describe('MCP content matrix read tools', () => {
         },
       }],
     });
+  });
+
+  it('maps generation preview selections and readiness to the snake_case MCP contract', async () => {
+    const deps = dependencies();
+    deps.previewMatrixGeneration.mockResolvedValue({
+      results: [{
+        status: 'blocked',
+        matrixId: 'mtx_1',
+        templateId: 'tpl_1',
+        cellId: 'cell_1',
+        sourceRevision: { matrixRevision: 2, templateRevision: 4, cellRevision: 1 },
+        evidenceRequirements: [{
+          id: 'matrix-cell:cell_1:finalized-voice',
+          fieldPath: 'brand.voice',
+          claim: 'Current finalized voice is required.',
+          reason: 'Paid generation requires finalized voice.',
+          requirementStage: 'preflight',
+          claimKind: 'structural',
+          status: 'missing',
+          sourceRefs: [],
+        }],
+        blockingRequirementIds: ['matrix-cell:cell_1:finalized-voice'],
+        expectedArtifactRevisions: {
+          brief: { artifactType: 'content_brief', artifactId: null, generationRevision: 0 },
+          post: { artifactType: 'generated_post', artifactId: null, generationRevision: 0 },
+        },
+      }],
+    });
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('preview_content_matrix_generation', {
+      workspace_id: 'ws_1',
+      matrix_id: 'mtx_1',
+      selections: [{
+        cell_id: 'cell_1',
+        expected_source_revision: {
+          matrix_revision: 2,
+          template_revision: 4,
+          cell_revision: 1,
+        },
+      }],
+    }, { ...context, toolName: 'preview_content_matrix_generation' });
+
+    expect(deps.previewMatrixGeneration).toHaveBeenCalledWith({
+      workspaceId: 'ws_1',
+      matrixId: 'mtx_1',
+      selections: [{
+        cellId: 'cell_1',
+        expectedSourceRevision: { matrixRevision: 2, templateRevision: 4, cellRevision: 1 },
+      }],
+    });
+    expect(textPayload(result)).toMatchObject({
+      results: [{
+        status: 'blocked',
+        cell_id: 'cell_1',
+        source_revision: { matrix_revision: 2, template_revision: 4, cell_revision: 1 },
+        blocking_requirement_ids: ['matrix-cell:cell_1:finalized-voice'],
+        expected_artifact_revisions: {
+          brief: { artifact_type: 'content_brief', artifact_id: null, generation_revision: 0 },
+        },
+      }],
+      upgrade_proposals: [],
+    });
+  });
+
+  it('attributes one evidence mutation to the MCP key and keeps replays side-effect free', async () => {
+    const deps = dependencies();
+    const expectedArtifactRevisions = {
+      brief: { artifactType: 'content_brief' as const, artifactId: null, generationRevision: 0 },
+      post: { artifactType: 'generated_post' as const, artifactId: null, generationRevision: 0 },
+    };
+    const resolution = {
+      id: 'mce_1',
+      workspaceId: 'ws_1',
+      matrixId: 'mtx_1',
+      cellId: 'cell_1',
+      requirementId: 'matrix-cell:cell_1:service-availability',
+      value: { kind: 'boolean' as const, value: true },
+      sourceRef: {
+        sourceType: 'operator_attestation' as const,
+        sourceId: 'attestation_1',
+        capturedAt: '2026-07-14T12:00:00.000Z',
+      },
+      resolvedBy: { actorType: 'mcp' as const, actorId: 'key_1', actorLabel: 'Test key' },
+      expectedSourceRevision: { matrixRevision: 2, templateRevision: 4, cellRevision: 1 },
+      expectedArtifactRevisions,
+      resolvedAt: '2026-07-14T12:00:00.000Z',
+    };
+    deps.resolveContentMatrixEvidence.mockResolvedValueOnce({
+      resolution,
+      currentSourceRevision: { matrixRevision: 2, templateRevision: 4, cellRevision: 2 },
+      created: true,
+    }).mockResolvedValueOnce({
+      resolution,
+      currentSourceRevision: { matrixRevision: 2, templateRevision: 4, cellRevision: 2 },
+      created: false,
+    });
+    const handle = createContentMatrixActionHandler(deps);
+    const args = {
+      workspace_id: 'ws_1',
+      matrix_id: 'mtx_1',
+      cell_id: 'cell_1',
+      requirement_id: 'matrix-cell:cell_1:service-availability',
+      value: { kind: 'boolean', value: true },
+      source_ref: {
+        source_type: 'operator_attestation',
+        source_id: 'attestation_1',
+        captured_at: '2026-07-14T12:00:00.000Z',
+      },
+      expected_source_revision: {
+        matrix_revision: 2,
+        template_revision: 4,
+        cell_revision: 1,
+      },
+      expected_artifact_revisions: {
+        brief: { artifact_type: 'content_brief', artifact_id: null, generation_revision: 0 },
+        post: { artifact_type: 'generated_post', artifact_id: null, generation_revision: 0 },
+      },
+      idempotency_key: 'evidence-1',
+    };
+
+    const created = await handle(
+      'resolve_content_matrix_evidence',
+      args,
+      { ...context, toolName: 'resolve_content_matrix_evidence' },
+    );
+    expect(deps.resolveContentMatrixEvidence).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: 'ws_1',
+      requirementId: 'matrix-cell:cell_1:service-availability',
+      resolvedBy: { actorType: 'mcp', actorId: 'key_1', actorLabel: 'Test key' },
+      expectedArtifactRevisions,
+    }));
+    expect(textPayload(created)).toMatchObject({
+      created: true,
+      current_source_revision: { cell_revision: 2 },
+      resolution: { requirement_id: 'matrix-cell:cell_1:service-availability' },
+    });
+    expect(deps.invalidateContentPipelineIntelligence).toHaveBeenCalledOnce();
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledOnce();
+    expect(deps.addActivity).toHaveBeenCalledOnce();
+
+    await handle(
+      'resolve_content_matrix_evidence',
+      args,
+      { ...context, toolName: 'resolve_content_matrix_evidence' },
+    );
+    expect(deps.invalidateContentPipelineIntelligence).toHaveBeenCalledOnce();
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledOnce();
+    expect(deps.addActivity).toHaveBeenCalledOnce();
   });
 
   it('writes an accepted exact upgrade through the domain action and emits one MCP audit/event', async () => {
