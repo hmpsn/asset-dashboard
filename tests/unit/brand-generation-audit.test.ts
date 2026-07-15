@@ -183,6 +183,7 @@ describe('brand generation audits', () => {
     const callStructuredAI = vi.fn(async options => {
       expect(options).toMatchObject({
         operation: 'brand-deliverable-audit', provider: 'openai', maxRetries: 0,
+        maxTokens: 2_500,
         responseFormat: { type: 'json_object' },
       });
       return {
@@ -203,6 +204,7 @@ describe('brand generation audits', () => {
     expect(reserve).toHaveBeenCalledOnce();
     expect(reserve).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'brand-deliverable-audit', provider: 'openai', providerCalls: 1,
+      outputTokens: 2_500,
     }));
     expect(result.output.auditReport.verdict).toBe('ready_for_human_review');
     const reservation = reserve.mock.calls[0]?.[0];
@@ -211,5 +213,23 @@ describe('brand generation audits', () => {
       operation: 'brand-deliverable-audit',
       inputFingerprint: reservation?.effectiveInputFingerprint,
     });
+  });
+
+  it('checks malformed audit output against its reservation before parsing', async () => {
+    const callStructuredAI = vi.fn(async () => ({
+      text: '{"findings":42}',
+      tokens: { prompt: 100, completion: 2_501, total: 2_601 },
+      execution: {
+        runId: 'audit-run-2', operation: 'brand-deliverable-audit', provider: 'openai',
+        model: 'gpt-5.5', attempts: 1, cacheOutcome: 'bypass', startedAt: now,
+        completedAt: '2026-07-13T12:00:01.000Z', durationMs: 1_000,
+      },
+    } satisfies AICallResult));
+
+    await expect(auditBrandGenerationCandidate({
+      frozenInput, preflight, candidate: candidate(), revisionCount: 0,
+      reserveProviderDispatch: vi.fn(), dependencies: { callStructuredAI },
+      now: () => new Date(now),
+    })).rejects.toThrow(/exceeded.*reservation/i);
   });
 });

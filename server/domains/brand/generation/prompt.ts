@@ -158,11 +158,20 @@ NON-NEGOTIABLE AUTHORITY AND SAFETY CONTRACT:
 }
 
 function candidateOutputContract(target: BrandGenerationFrozenTargetInput['inputSnapshot']['target']): string {
+  const sizeContract = `Keep the complete JSON object at or below ${BRAND_GENERATION_LIMITS.maxCandidateSnapshotBytes} UTF-8 bytes. Target no more than 3000 UTF-8 bytes so the hard limit is not approached. Use concise strings and include only essential array items.`;
   if (target === 'voice_foundation') {
-    return `Return exactly:
+    return `Tone spectrum values must be numbers from 1 through 10 inclusive.
+${sizeContract}
+Use 3-5 short personality traits, at most 3 entries per guardrail group, at most 3 context modifiers, and at most 5 claims. Keep every prose field to one short sentence.
+Treat forbiddenWords as literal vocabulary bans, not broad concepts; never ban a term the foundation needs in order to explain an audience concern or anti-pattern.
+Every factual or inferred assertion anywhere in the foundation fields must be covered by the claims ledger and supported by accepted evidence. Prefer reusable voice direction over fact-heavy detail.
+Before returning, compare every context modifier with the claims ledger: cite all supporting accepted evidence keys in a claim or narrow the modifier to remove the unsupported assertion.
+Prioritize audience and persona situations in contextModifiers. Use accepted authentic samples for concrete cadence and style direction without treating them as proof of business facts.
+Return exactly:
 {"summary":string,"voiceDNA":{"personalityTraits":string[],"toneSpectrum":{"formal_casual":number,"serious_playful":number,"technical_accessible":number},"sentenceStyle":string,"vocabularyLevel":string,"humorStyle"?:string},"guardrails":{"forbiddenWords":string[],"requiredTerminology":{"use":string,"insteadOf":string}[],"toneBoundaries":string[],"antiPatterns":string[]},"contextModifiers":{"context":string,"description":string}[],"claims":{"text":string,"classification":"factual"|"inferred"|"creative_proposal","evidenceKeys":string[]}[],"unresolvedRequirementIds":string[]}`;
   }
-  return `Return exactly:
+  return `${sizeContract}
+Return exactly:
 {"content":string,"claims":{"text":string,"classification":"factual"|"inferred"|"creative_proposal","evidenceKeys":string[]}[],"unresolvedRequirementIds":string[]}`;
 }
 
@@ -375,6 +384,7 @@ export function buildBrandGenerationAuditPrompt(
   const userPrompt = [
     'TASK: Review the candidate for voice fit, persona fit, internal consistency, grounding gaps, and contradictions with related candidates.',
     'Report findings only. You cannot mark factual accuracy or no-hallucination checks as passed, and you cannot override deterministic failures.',
+    'SCHEMA BOUNDARY: foundation fields have no per-field evidence slots; assess their grounding through the claim ledger. Do not request fields outside the supplied candidate schema. Flag a grounding gap only when a factual or inferred assertion lacks claim-ledger coverage or accepted supporting evidence.',
     voiceAuthorityBlock(input),
     'FROZEN INPUT:',
     canonicalJson(commonInput(input, preflight)),
