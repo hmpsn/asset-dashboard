@@ -100,7 +100,10 @@ generated proposal. A lower layer may not rewrite a higher layer as fact.
 ## 5. MCP/API surface
 
 All new action inputs use snake_case, stable error codes, declared workspace
-scope, expected revisions, and idempotency keys. List/detail output is bounded.
+scope, expected revisions, and idempotency keys. The one exception is pSEO
+matrix materialization: its durable `(workspace, blueprint entry)` singleton
+link plus exact matrix-definition fingerprint is the resource-scoped idempotency
+authority, so a redundant caller key is not stored. List/detail output is bounded.
 The canonical runtime registry is the sole authority for discovery, dispatch,
 schema census, and workspace authorization. Authenticated MCP key ID/label and
 request/tool identity are retained for internal activity and durable run
@@ -134,6 +137,8 @@ rejections are intentionally generic and never reflect caller values.
 | `get_content_matrix_generation` | Summary plus cursor-paged item states/audit outcomes |
 | `retry_content_matrix_generation` | Retry only failed/blocked-authorized items against explicit current revisions |
 | `resolve_content_matrix_evidence` | Attach a typed value + durable source ref to one cell requirement with the full expected source revision; works before a run exists, invalidates preview, and never starts paid work |
+| `get_pseo_matrix_plan` | Read one collection blueprint entry, linked template variables, and exact entry/template authority |
+| `create_content_matrix_from_pseo_plan` | Create/link the singleton matrix from exact source authority plus explicit dimensions; never starts generation |
 
 ### Brand tools
 

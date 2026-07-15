@@ -44,6 +44,8 @@ describe('MCP server instructions', () => {
 
   it('explains the previewed, bounded, review-gated content-matrix workflow', () => {
     for (const tool of [
+      'get_pseo_matrix_plan',
+      'create_content_matrix_from_pseo_plan',
       'list_content_matrices',
       'get_content_matrix',
       'resolve_content_matrix_cells',
@@ -61,6 +63,7 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/cannot approve or publish/i);
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not call AI/i);
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not.+create a generation run/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/never previews or starts generation/i);
   });
 
   it('explains the immutable, evidence-addressed brand-intake workflow', () => {

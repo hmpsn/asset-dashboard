@@ -15,6 +15,13 @@ import {
   createContentMatrixActionHandler,
 } from '../../server/mcp/tools/content-matrix-actions.js';
 import { isValidatedMcpJsonV1ErrorResult } from '../../server/mcp/tool-errors.js';
+import { PseoMatrixBridgeError } from '../../server/domains/content/matrix-generation/pseo-bridge.js';
+
+const pseoExpectedSource = {
+  entry_updated_at: '2026-07-14T00:00:00.000Z',
+  template_id: 'tpl_1',
+  template_revision: 4,
+};
 
 const context = {
   requestId: 'request_1',
@@ -200,6 +207,52 @@ function dependencies() {
     startMatrixGeneration: vi.fn(),
     getMatrixGeneration: vi.fn(),
     retryMatrixGeneration: vi.fn(),
+    getPseoMatrixPlan: vi.fn(() => ({
+      source: {
+        workspaceId: 'ws_1',
+        blueprintId: 'blueprint_1',
+        entryId: 'entry_1',
+        entryUpdatedAt: '2026-07-14T00:00:00.000Z',
+        templateId: 'tpl_1',
+        templateRevision: 4,
+      },
+      entry: {
+        name: 'Service locations',
+        pageType: 'location' as const,
+        isCollection: true,
+      },
+      template: {
+        name: 'Location template',
+        pageType: 'location' as const,
+        variables: [
+          { name: 'service', label: 'Service' },
+          { name: 'location', label: 'Location' },
+        ],
+        urlPattern: '/locations/{location}/{service}',
+        keywordPattern: '{service} in {location}',
+      },
+    })),
+    createMatrixFromPseoPlan: vi.fn(() => ({
+      replayed: false,
+      source: {
+        workspaceId: 'ws_1',
+        blueprintId: 'blueprint_1',
+        entryId: 'entry_1',
+        entryUpdatedAt: '2026-07-14T00:00:01.000Z',
+        templateId: 'tpl_1',
+        templateRevision: 4,
+        matrixId: 'mtx_created',
+      },
+      matrix: {
+        id: 'mtx_created',
+        name: 'Service locations',
+        revision: 1,
+        templateRevision: 4,
+        cellCount: 4,
+        createdAt: '2026-07-14T00:00:00.000Z',
+        updatedAt: '2026-07-14T00:00:00.000Z',
+      },
+    })),
     acceptTemplateGenerationUpgrade: vi.fn(async () => ({
       status: 'accepted' as const,
       template: template(),
@@ -220,7 +273,7 @@ function textPayload(result: Awaited<ReturnType<ReturnType<typeof createContentM
 }
 
 describe('MCP content matrix read tools', () => {
-  it('advertises one dedicated nine-tool snake_case family with described bounded inputs', () => {
+  it('advertises one dedicated eleven-tool snake_case family with described bounded inputs', () => {
     expect(contentMatrixActionTools.map(tool => tool.name)).toEqual([
       'list_content_matrices',
       'get_content_matrix',
@@ -231,6 +284,8 @@ describe('MCP content matrix read tools', () => {
       'start_content_matrix_generation',
       'get_content_matrix_generation',
       'retry_content_matrix_generation',
+      'get_pseo_matrix_plan',
+      'create_content_matrix_from_pseo_plan',
     ]);
 
     for (const tool of contentMatrixActionTools as Tool[]) {
@@ -255,6 +310,165 @@ describe('MCP content matrix read tools', () => {
         selections: { minItems: 1, maxItems: 25 },
       },
     });
+  });
+
+  it('reads bounded pSEO source authority before materialization', async () => {
+    const deps = dependencies();
+    const handle = createContentMatrixActionHandler(deps);
+    const result = await handle('get_pseo_matrix_plan', {
+      workspace_id: 'ws_1',
+      blueprint_id: 'blueprint_1',
+      entry_id: 'entry_1',
+    }, { ...context, toolName: 'get_pseo_matrix_plan' });
+
+    expect(result.isError).not.toBe(true);
+    expect(deps.getPseoMatrixPlan).toHaveBeenCalledWith({
+      workspaceId: 'ws_1',
+      blueprintId: 'blueprint_1',
+      entryId: 'entry_1',
+    });
+    expect(textPayload(result)).toMatchObject({
+      source: {
+        entry_updated_at: pseoExpectedSource.entry_updated_at,
+        template_id: 'tpl_1',
+        template_revision: 4,
+      },
+      template: {
+        variables: [
+          { name: 'service', label: 'Service' },
+          { name: 'location', label: 'Location' },
+        ],
+      },
+    });
+  });
+
+  it('materializes a pSEO plan once, maps its source identity, and emits no generation command', async () => {
+    const deps = dependencies();
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('create_content_matrix_from_pseo_plan', {
+      workspace_id: 'ws_1',
+      blueprint_id: 'blueprint_1',
+      entry_id: 'entry_1',
+      expected_source_revision: pseoExpectedSource,
+      dimensions: [
+        { variable_name: 'service', values: ['Laundry', 'Dry Cleaning'] },
+        { variable_name: 'location', values: ['Austin', 'Round Rock'] },
+      ],
+    }, { ...context, toolName: 'create_content_matrix_from_pseo_plan' });
+
+    expect(result.isError).not.toBe(true);
+    expect(deps.createMatrixFromPseoPlan).toHaveBeenCalledWith({
+      workspaceId: 'ws_1',
+      blueprintId: 'blueprint_1',
+      entryId: 'entry_1',
+      expectedSourceRevision: {
+        entryUpdatedAt: pseoExpectedSource.entry_updated_at,
+        templateId: 'tpl_1',
+        templateRevision: 4,
+      },
+      dimensions: [
+        { variableName: 'service', values: ['Laundry', 'Dry Cleaning'] },
+        { variableName: 'location', values: ['Austin', 'Round Rock'] },
+      ],
+    });
+    expect(textPayload(result)).toMatchObject({
+      replayed: false,
+      source: {
+        workspace_id: 'ws_1',
+        blueprint_id: 'blueprint_1',
+        entry_id: 'entry_1',
+        entry_updated_at: '2026-07-14T00:00:01.000Z',
+        template_id: 'tpl_1',
+        template_revision: 4,
+        matrix_id: 'mtx_created',
+      },
+      matrix: { id: 'mtx_created', cell_count: 4 },
+    });
+    expect(deps.startMatrixGeneration).not.toHaveBeenCalled();
+    expect(deps.addActivity).toHaveBeenCalledOnce();
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledTimes(2);
+    expect(deps.invalidateContentPipelineIntelligence).toHaveBeenCalledWith('ws_1');
+  });
+
+  it('replays pSEO materialization without duplicate activity or broadcasts', async () => {
+    const deps = dependencies();
+    deps.createMatrixFromPseoPlan.mockReturnValue({
+      ...deps.createMatrixFromPseoPlan(),
+      replayed: true,
+    });
+    deps.createMatrixFromPseoPlan.mockClear();
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('create_content_matrix_from_pseo_plan', {
+      workspace_id: 'ws_1',
+      blueprint_id: 'blueprint_1',
+      entry_id: 'entry_1',
+      expected_source_revision: pseoExpectedSource,
+      dimensions: [{ variable_name: 'service', values: ['Laundry'] }],
+    }, { ...context, toolName: 'create_content_matrix_from_pseo_plan' });
+
+    expect(result.isError).not.toBe(true);
+    expect(textPayload(result)).toMatchObject({ replayed: true });
+    expect(deps.addActivity).not.toHaveBeenCalled();
+    expect(deps.broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(deps.invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
+  });
+
+  it('returns the committed matrix when optional post-commit effects fail', async () => {
+    const deps = dependencies();
+    deps.invalidateContentPipelineIntelligence.mockImplementation(() => {
+      throw new Error('cache unavailable');
+    });
+    deps.broadcastToWorkspace.mockImplementation(() => {
+      throw new Error('socket unavailable');
+    });
+    deps.addActivity.mockImplementation(() => {
+      throw new Error('activity unavailable');
+    });
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('create_content_matrix_from_pseo_plan', {
+      workspace_id: 'ws_1',
+      blueprint_id: 'blueprint_1',
+      entry_id: 'entry_1',
+      expected_source_revision: pseoExpectedSource,
+      dimensions: [{ variable_name: 'service', values: ['Laundry'] }],
+    }, { ...context, toolName: 'create_content_matrix_from_pseo_plan' });
+
+    expect(result.isError).not.toBe(true);
+    expect(textPayload(result)).toMatchObject({ replayed: false, matrix: { id: 'mtx_created' } });
+    expect(deps.invalidateContentPipelineIntelligence).toHaveBeenCalledOnce();
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledTimes(2);
+    expect(deps.addActivity).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['not_found', MCP_TOOL_ERROR_CODES.NOT_FOUND, false],
+    ['conflict', MCP_TOOL_ERROR_CODES.CONFLICT, true],
+    ['precondition_failed', MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED, false],
+  ] as const)('maps pSEO %s failures to stable json_v1 errors', async (code, expectedCode, retryable) => {
+    const deps = dependencies();
+    deps.createMatrixFromPseoPlan.mockImplementation(() => {
+      throw new PseoMatrixBridgeError(code, 'source_changed', 'sensitive detail');
+    });
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('create_content_matrix_from_pseo_plan', {
+      workspace_id: 'ws_1',
+      blueprint_id: 'blueprint_1',
+      entry_id: 'entry_1',
+      expected_source_revision: pseoExpectedSource,
+      dimensions: [{ variable_name: 'service', values: ['Laundry'] }],
+    }, { ...context, toolName: 'create_content_matrix_from_pseo_plan' });
+
+    expect(result.isError).toBe(true);
+    expect(textPayload(result)).toMatchObject({
+      code: expectedCode,
+      retryable,
+      details: { reason: 'source_changed' },
+    });
+    expect(JSON.stringify(textPayload(result))).not.toContain('sensitive detail');
   });
 
   it('returns only branded json_v1 validation errors', async () => {

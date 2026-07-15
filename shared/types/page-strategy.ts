@@ -28,7 +28,7 @@ export interface SectionPlanItem {
 // SPEC ADDENDUM §2: Do NOT create a separate BlueprintPageType.
 // Import ContentPageType from content.ts and use it everywhere.
 // Task 2 Step 2 extends ContentPageType with the new values.
-import type { ContentPageType } from './content.js';
+import type { ContentPageType, MatrixDimension } from './content.js';
 
 // Re-export for convenience — all blueprint code uses ContentPageType
 export type { ContentPageType as BlueprintPageType };
@@ -54,6 +54,71 @@ export interface BlueprintEntry {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ═══ PSEO MATRIX MATERIALIZATION ═══
+
+export interface CreatePseoMatrixFromPlanInput {
+  workspaceId: string;
+  blueprintId: string;
+  entryId: string;
+  expectedSourceRevision: PseoMatrixPlanSourceRevision;
+  dimensions: MatrixDimension[];
+}
+
+export interface PseoMatrixPlanSourceRevision {
+  entryUpdatedAt: string;
+  templateId: string;
+  templateRevision: number;
+}
+
+export interface PseoMatrixPlanResult {
+  source: {
+    workspaceId: string;
+    blueprintId: string;
+    entryId: string;
+    matrixId?: string;
+  } & PseoMatrixPlanSourceRevision;
+  entry: {
+    name: string;
+    pageType: ContentPageType;
+    isCollection: boolean;
+  };
+  template: {
+    name: string;
+    pageType: ContentPageType;
+    variables: Array<{
+      name: string;
+      label: string;
+      description?: string;
+    }>;
+    urlPattern: string;
+    keywordPattern: string;
+  };
+}
+
+export interface PseoMatrixSourceIdentity {
+  workspaceId: string;
+  blueprintId: string;
+  entryId: string;
+  entryUpdatedAt: string;
+  templateId: string;
+  templateRevision: number;
+  matrixId: string;
+}
+
+export interface PseoMatrixMaterializationResult {
+  replayed: boolean;
+  source: PseoMatrixSourceIdentity;
+  matrix: {
+    id: string;
+    name: string;
+    revision: number;
+    templateRevision: number;
+    cellCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
 }
 
 // ═══ SITE BLUEPRINT ═══
