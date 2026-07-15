@@ -1,6 +1,7 @@
 import type { BrandIntakeRevisionRef } from './brand-intake.js';
 import type {
   ApprovedBrandDeliverableRef,
+  BrandGenerationBudgetRequest,
   FinalizedVoiceSnapshotRef,
 } from './brand-generation.js';
 import type {
@@ -8,9 +9,11 @@ import type {
   GenerationResolverAttribution,
 } from './generation-evidence.js';
 import type {
+  MatrixGenerationBatchBudget,
   MatrixGenerationInputSelection,
   MatrixSourceRevision,
 } from './matrix-generation.js';
+import type { McpToolExecutionContext } from './mcp-runtime.js';
 
 export const BRAND_CONTENT_ONBOARDING_STATUSES = [
   'intake_ready',
@@ -119,7 +122,7 @@ export type BrandContentOnboardingGateEvidence =
 
 export interface BrandContentOnboardingInputs {
   intakeRevision: BrandIntakeRevisionRef;
-  matrixSelection: MatrixGenerationInputSelection | null;
+  matrixSelection: MatrixGenerationInputSelection;
 }
 
 export interface BrandContentOnboardingChildren {
@@ -155,10 +158,77 @@ export interface BrandContentOnboardingRun {
   completedAt: string | null;
 }
 
+export type PublicBrandContentOnboardingCreatorAttribution =
+  | (GenerationResolverAttribution & { actorType: 'operator' | 'client' })
+  | { actorType: 'mcp' | 'system' };
+
+type PublicGateEvidenceProjection<T> = T extends BrandContentOnboardingGateEvidence
+  ? Omit<T, 'recordedBy'> & {
+      recordedBy: PublicBrandContentOnboardingCreatorAttribution;
+    }
+  : never;
+
+export type PublicBrandContentOnboardingGateEvidence =
+  PublicGateEvidenceProjection<BrandContentOnboardingGateEvidence>;
+
+/** Safe HTTP/MCP projection; operational idempotency and MCP key identity stay private. */
+export type PublicBrandContentOnboardingRun = Omit<
+  BrandContentOnboardingRun,
+  'idempotencyKey' | 'createdBy' | 'gateEvidence'
+> & {
+  createdBy: PublicBrandContentOnboardingCreatorAttribution;
+  gateEvidence: PublicBrandContentOnboardingGateEvidence[];
+};
+
+export interface StartBrandContentOnboardingRequest {
+  workspaceId: string;
+  intakeRevisionId: string;
+  expectedIntakeRevision: number;
+  expectedIntakeFingerprint: string;
+  matrixSelection: MatrixGenerationInputSelection;
+  brandBudget: BrandGenerationBudgetRequest;
+  idempotencyKey: string;
+  startedBy: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
+}
+
+export interface GetBrandContentOnboardingRequest {
+  workspaceId: string;
+  runId: string;
+}
+
+export interface BrandContentOnboardingCommandResult {
+  run: PublicBrandContentOnboardingRun;
+  advanced: boolean;
+  replayed: boolean;
+  /** Present only when this command accepted existing paid child work. */
+  paidJobId: string | null;
+}
+
+export type StartBrandContentOnboardingResult = BrandContentOnboardingCommandResult;
+export type ResumeBrandContentOnboardingResult = BrandContentOnboardingCommandResult;
+
+export interface AuthorizeBrandContentGenerationRequest {
+  workspaceId: string;
+  runId: string;
+  expectedRevision: number;
+  expectedStatus: 'awaiting_content_authorization';
+  authorizationId: string;
+  expectedMatrixSelectionFingerprint: string;
+  acceptedBudget: MatrixGenerationBatchBudget;
+  idempotencyKey: string;
+  authorizedBy: GenerationHumanReviewerAttribution;
+}
+
+export type AuthorizeBrandContentGenerationResult = BrandContentOnboardingCommandResult;
+
 export interface ResumeBrandContentOnboardingRequest {
+  workspaceId: string;
   runId: string;
   expectedRevision: number;
   expectedStatus: BrandContentOnboardingStatus;
   gateEvidenceId: string;
   idempotencyKey: string;
+  resumedBy: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
 }

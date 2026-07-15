@@ -719,6 +719,16 @@
       "tier": "premium",
       "impact": "high",
       "clientFacing": true
+    },
+    {
+      "id": 73,
+      "title": "Brand-to-Content Onboarding Pipeline",
+      "oneLiner": "Coordinates approved brand voice and identity into bounded, audited matrix page sets through MCP while preserving every human review and publication gate",
+      "category": "content",
+      "painPoints": ["onboarding", "brand-voice", "content-production", "scale"],
+      "tier": "premium",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }

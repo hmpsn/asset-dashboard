@@ -46,6 +46,10 @@ import {
   brandGenerationActionTools,
   handleBrandGenerationActionTool,
 } from './tools/brand-generation-actions.js';
+import {
+  brandContentOnboardingActionTools,
+  handleBrandContentOnboardingActionTool,
+} from './tools/brand-content-onboarding-actions.js';
 import { schemaActionTools, handleSchemaActionTool } from './tools/schema-actions.js';
 import {
   analyticsReadActionTools,
@@ -380,6 +384,12 @@ const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Obje
     family: 'brand-generation-actions',
     tools: brandGenerationActionTools,
     handler: handleBrandGenerationActionTool,
+    errorContract: jsonV1Contract,
+  },
+  {
+    family: 'brand-content-onboarding-actions',
+    tools: brandContentOnboardingActionTools,
+    handler: handleBrandContentOnboardingActionTool,
     errorContract: jsonV1Contract,
   },
   {

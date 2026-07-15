@@ -412,7 +412,7 @@ const KCC_CATALOG = {
 // shared/types MCP schema modules (NOT server/mcp/tools/* — those files only consume the
 // schemas). Completeness for this context is checked by the contract test reading the real
 // Zod schema `.options` at runtime rather than a `satisfies` mapped type (Zod enums don't
-// produce an importable union alias here). Additive-only: 80 MCP tools + long-lived
+// produce an importable union alias here). Additive-only: 83 MCP tools + long-lived
 // per-workspace API keys mean these keys must never be renamed once shipped.
 
 const MCP_CATALOG: Record<string, ActionCatalogEntry> = {

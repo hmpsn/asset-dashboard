@@ -86,7 +86,9 @@ function exactVoiceRef(snapshot: FinalizedVoiceSnapshot): FinalizedVoiceSnapshot
   };
 }
 
-function approvedRef(deliverable: BrandDeliverable): ApprovedBrandDeliverableRef {
+export function approvedBrandDeliverableRef(
+  deliverable: BrandDeliverable,
+): ApprovedBrandDeliverableRef {
   const contentFingerprint = canonicalBrandGenerationFingerprint(deliverable.content);
   const approvedAt = deliverable.updatedAt;
   const ref = {
@@ -109,7 +111,7 @@ function approvedContext(
   if (target === 'voice_foundation') return [];
   return deliverables
     .filter(deliverable => deliverable.status === 'approved')
-    .map(deliverable => ({ ref: approvedRef(deliverable), content: deliverable.content }))
+    .map(deliverable => ({ ref: approvedBrandDeliverableRef(deliverable), content: deliverable.content }))
     .sort((left, right) => (
       left.ref.deliverableType.localeCompare(right.ref.deliverableType)
       || left.ref.deliverableId.localeCompare(right.ref.deliverableId)
