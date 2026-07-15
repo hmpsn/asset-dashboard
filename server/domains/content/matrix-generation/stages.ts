@@ -11,6 +11,7 @@ import { generateBrief } from '../../../content-brief.js';
 import { generatePost } from '../../../content-posts.js';
 import { countHtmlWords } from '../../../content-posts-ai.js';
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
+import { MATRIX_READER_FACING_PROSE_CONTRACT } from './audit.js';
 import {
   listCurrentMatrixCellEvidence,
   renderMatrixCellEvidencePrompt,
@@ -28,6 +29,12 @@ export interface MatrixGenerationStageOptions {
 
 function placeholderToken(requirement: MatrixGenerationPreviewTarget['evidenceRequirements'][number]): string {
   return `[NEEDS CLIENT INPUT: ${requirement.clientSafePrompt ?? requirement.reason}]`;
+}
+
+function readerFacingToneAndStyle(value: string | undefined): string {
+  const current = value?.trim();
+  if (current?.includes(MATRIX_READER_FACING_PROSE_CONTRACT)) return current;
+  return [current, MATRIX_READER_FACING_PROSE_CONTRACT].filter(Boolean).join('\n');
 }
 
 function lockedOutline(target: MatrixGenerationPreviewTarget, generated: ContentBrief) {
@@ -78,6 +85,7 @@ export async function generateMatrixBriefStage(
       businessContext: [
         `STRUCTURAL PAGE TARGET (layout and targeting only; not business-fact evidence):\nPage type: ${target.pageType}\nPlanned path: ${target.plannedUrl}`,
         evidencePrompt,
+        MATRIX_READER_FACING_PROSE_CONTRACT,
       ].filter(Boolean).join('\n\n'),
       pageType: target.pageType,
       templateId: target.templateId,
@@ -121,7 +129,17 @@ export async function generateMatrixBriefStage(
       type,
       notes: 'Apply the schema type locked by the content template.',
     })),
+    sourceEvidence: {
+      ...(generated.sourceEvidence ?? {}),
+      capturedAt: target.evidenceFreshThrough,
+    },
     generationRevision: 0,
+    generationProvenance: generated.generationProvenance
+      ? {
+          ...generated.generationProvenance,
+          evidenceCapturedAt: target.evidenceFreshThrough,
+        }
+      : generated.generationProvenance,
   };
 }
 
@@ -136,7 +154,28 @@ export async function generateMatrixPostStage(
   brief: ContentBrief,
   options: MatrixGenerationStageOptions,
 ): Promise<GeneratedPost> {
-  const post = await generatePost(options.workspaceId, brief, undefined, {
+  const resolutions = listCurrentMatrixCellEvidence(
+    options.workspaceId,
+    options.target.matrixId,
+    options.target.cellId,
+  );
+  const evidencePrompt = renderMatrixCellEvidencePrompt(
+    options.target.evidenceRequirements,
+    resolutions,
+  );
+  const contractedBrief = {
+    ...brief,
+    executiveSummary: [
+      brief.executiveSummary?.trim(),
+      evidencePrompt,
+    ].filter(Boolean).join('\n\n'),
+    toneAndStyle: readerFacingToneAndStyle(brief.toneAndStyle),
+    sourceEvidence: {
+      ...(brief.sourceEvidence ?? {}),
+      capturedAt: options.target.evidenceFreshThrough,
+    },
+  };
+  const post = await generatePost(options.workspaceId, contractedBrief, undefined, {
     persist: false,
     executionChainId: options.executionChainId,
     signal: options.signal,

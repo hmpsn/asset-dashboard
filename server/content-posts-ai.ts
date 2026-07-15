@@ -444,7 +444,11 @@ export function buildBriefContextBlock(brief: ContentBrief, siteDomain?: string)
   }
 
   if (brief.internalLinkSuggestions?.length) {
-    const domain = siteDomain ? `https://${siteDomain}` : '';
+    const normalizedDomain = siteDomain
+      ?.trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/^\/+|\/+$/g, '');
+    const domain = normalizedDomain ? `https://${normalizedDomain}` : '';
     const linkLines = brief.internalLinkSuggestions.map(l => {
       const slug = l.startsWith('/') ? l : `/${l}`;
       return domain ? `- ${domain}${slug}` : `- ${slug}`;

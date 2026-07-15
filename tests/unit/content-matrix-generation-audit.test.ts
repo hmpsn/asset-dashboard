@@ -15,6 +15,8 @@ import {
 } from '../../server/domains/content/matrix-generation/audit.js';
 import {
   applyMatrixGenerationRevision,
+  prepareMatrixGenerationAuditOperation,
+  prepareMatrixGenerationRevisionOperation,
 } from '../../server/domains/content/matrix-generation/operations.js';
 import {
   parseMatrixGenerationModelAuditAIOutput,
@@ -494,6 +496,62 @@ describe('content matrix generation model audit merge', () => {
 });
 
 describe('content matrix generation structured operation contracts', () => {
+  it('treats leaked evidence mechanics as a revisionable reader-facing contract violation', () => {
+    const prepared = prepareMatrixGenerationAuditOperation({
+      workspaceId: 'ws-1',
+      target: target(),
+      post: post(),
+      authority: {
+        voiceSnapshot: {
+          voiceVersion: 1,
+          profileRevision: 1,
+          voiceDNA: voiceGuardrails as never,
+          guardrails: voiceGuardrails,
+          contextModifiers: [],
+          anchors: [],
+        },
+        approvedIdentity: [],
+        evidenceResolutions: [],
+      } as never,
+      deterministicReport: audit(),
+      executionChainId: 'matrix-reader-contract',
+    });
+
+    expect(prepared.system).toContain('Never narrate internal evidence');
+    expect(prepared.system).toContain('recommend revision');
+    expect(prepared.system).toContain('[NEEDS CLIENT INPUT: ...] placeholders are exempt');
+    expect(prepared.system).toContain('Contact details used exactly once in their allowed block are compliant');
+    expect(prepared.system).toContain('optional approved amenity');
+  });
+
+  it('gives automatic revision the reader contract and exact authorized placeholder census', () => {
+    const prepared = prepareMatrixGenerationRevisionOperation({
+      workspaceId: 'ws-1',
+      target: target(),
+      post: post(),
+      authority: {
+        voiceSnapshot: {
+          voiceVersion: 1,
+          profileRevision: 1,
+          voiceDNA: voiceGuardrails as never,
+          guardrails: voiceGuardrails,
+          contextModifiers: [],
+          anchors: [],
+        },
+        approvedIdentity: [],
+        evidenceResolutions: [],
+      } as never,
+      auditReport: audit(),
+      executionChainId: 'matrix-reader-revision-contract',
+    });
+
+    expect(prepared.system).toContain('Never narrate internal evidence');
+    expect(prepared.system).toContain('Never create or preserve an unauthorized placeholder');
+    expect(JSON.parse(prepared.messages[0].content)).toMatchObject({
+      authorizedPlaceholderTokens: [],
+    });
+  });
+
   it('accepts only the typed model audit shape', () => {
     expect(parseMatrixGenerationModelAuditAIOutput(JSON.stringify({
       revisionRecommended: false,

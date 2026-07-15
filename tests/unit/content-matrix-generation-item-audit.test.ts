@@ -9,6 +9,7 @@ import type {
   GeneratedPost,
 } from '../../shared/types/content.js';
 import type { GenerationProvenance } from '../../shared/types/ai-execution.js';
+import type { GenerationEvidenceValue } from '../../shared/types/generation-evidence.js';
 import type {
   MatrixGenerationPreviewTarget,
   ResolvedMatrixStructuralTarget,
@@ -193,7 +194,7 @@ async function preview(fixture: Fixture) {
 async function resolveEvidence(
   fixture: Fixture,
   requirementId: string,
-  value: { kind: 'boolean'; value: true } | { kind: 'url'; value: string },
+  value: GenerationEvidenceValue,
 ): Promise<void> {
   const result = (await preview(fixture)).results[0];
   if (!result) throw new Error('Missing preview result');
@@ -336,6 +337,18 @@ async function committedFixture(resolveCta: boolean) {
     fixture,
     `matrix-cell:${cellId}:service-availability`,
     { kind: 'boolean', value: true },
+  );
+  await resolveEvidence(
+    fixture,
+    `matrix-cell:${cellId}:service-details`,
+    {
+      kind: 'text_list',
+      value: [
+        'The service starts with a focused review of the organization’s current search priorities.',
+        'The team explains the findings in plain language and answers questions before recommending work.',
+        'The client receives a practical sequence of next steps grounded in the completed review.',
+      ],
+    },
   );
   if (resolveCta) {
     await resolveEvidence(
