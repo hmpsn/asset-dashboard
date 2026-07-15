@@ -34,6 +34,7 @@ import {
   deleteVoiceSample,
   listCalibrationSessions,
   VoiceProfileValidationError,
+  VoiceProfileRevisionConflictError,
   VoiceProfileStateTransitionError,
 } from '../../server/voice-calibration.js';
 import db from '../../server/db/index.js';
@@ -375,6 +376,16 @@ describe('updateVoiceProfile — field updates', () => {
     ).toThrow(/no voice profile/i);
   });
 
+  it('rejects an update prepared from a stale profile revision', () => {
+    const current = getVoiceProfile(ws.workspaceId)!;
+    expect(() => updateVoiceProfileWithResult(
+      ws.workspaceId,
+      { voiceDNA: SAMPLE_DNA },
+      current.revision - 1,
+    )).toThrow(VoiceProfileRevisionConflictError);
+    expect(getVoiceProfile(ws.workspaceId)!.revision).toBe(current.revision);
+  });
+
   it('rejects count, text, and UTF-8 JSON overflow before mutating the profile', () => {
     const before = getVoiceProfile(ws.workspaceId)!;
     const assertUnchanged = (): void => {
@@ -474,6 +485,27 @@ describe('addVoiceSample', () => {
   it('stores source when provided', () => {
     const sample = addVoiceSample(ws.workspaceId, 'Transcript sample', 'body', 'transcript_extraction');
     expect(sample.source).toBe('transcript_extraction');
+  });
+
+  it('stores MCP-proposed samples without treating them as manual evidence', () => {
+    const sample = addVoiceSample(ws.workspaceId, 'Draft example from MCP chat', 'body', 'mcp_proposed');
+    expect(sample.source).toBe('mcp_proposed');
+    expect(getVoiceProfile(ws.workspaceId)!.samples.find(item => item.id === sample.id)?.source)
+      .toBe('mcp_proposed');
+  });
+
+  it('rejects a sample prepared from a stale profile revision', () => {
+    const current = getVoiceProfile(ws.workspaceId)!;
+    expect(() => addVoiceSample(
+      ws.workspaceId,
+      'Stale sample must not be stored',
+      'body',
+      'mcp_proposed',
+      current.revision - 1,
+    )).toThrow(VoiceProfileRevisionConflictError);
+    expect(getVoiceProfile(ws.workspaceId)!.samples.some(
+      item => item.content === 'Stale sample must not be stored',
+    )).toBe(false);
   });
 
   it('defaults source to "manual" when not provided', () => {

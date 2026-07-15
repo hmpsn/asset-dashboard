@@ -79,6 +79,7 @@ export type VoiceSampleContext = 'headline' | 'body' | 'cta' | 'about' | 'servic
 export const VOICE_SAMPLE_SOURCES = [
   'manual',
   'transcript_extraction',
+  'mcp_proposed',
   'calibration_loop',
   'identity_approved',
   'copy_approved',

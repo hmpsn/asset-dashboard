@@ -183,7 +183,42 @@ function dependencies() {
   const applyVoiceFinalizationPostCommitEffects = vi.fn<
     BrandVoiceActionDependencies['applyVoiceFinalizationPostCommitEffects']
   >();
+  const profile = {
+    id: 'voice_profile_1',
+    workspaceId: WORKSPACE_ID,
+    revision: 3,
+    status: 'calibrating' as const,
+    voiceDNA: VOICE_DNA,
+    guardrails: GUARDRAILS,
+    contextModifiers: [],
+    samples: [],
+    createdAt: '2026-07-14T10:00:00.000Z',
+    updatedAt: '2026-07-14T11:00:00.000Z',
+  };
+  const getVoiceProfile = vi.fn(() => profile);
+  const createVoiceProfile = vi.fn(() => profile);
+  const updateVoiceProfileWithResult = vi.fn(() => ({ profile: { ...profile, revision: 4 }, changed: true }));
+  const addVoiceSample = vi.fn(() => ({
+    id: 'voice_sample_2',
+    voiceProfileId: profile.id,
+    content: 'We explain every option before you decide.',
+    contextTag: 'body' as const,
+    source: 'manual' as const,
+    sortOrder: 1,
+    createdAt: '2026-07-14T12:00:00.000Z',
+  }));
+  const addActivity = vi.fn();
+  const broadcastToWorkspace = vi.fn();
+  const invalidateIntelligenceCache = vi.fn();
   const value: BrandVoiceActionDependencies = {
+    getWorkspace: vi.fn(() => ({ id: WORKSPACE_ID }) as never),
+    getVoiceProfile,
+    createVoiceProfile,
+    updateVoiceProfileWithResult,
+    addVoiceSample,
+    addActivity,
+    broadcastToWorkspace,
+    invalidateIntelligenceCache,
     getBrandVoicePage,
     consumeVoiceFinalizationAuthorization,
     applyVoiceFinalizationPostCommitEffects,
@@ -193,6 +228,13 @@ function dependencies() {
     getBrandVoicePage,
     consumeVoiceFinalizationAuthorization,
     applyVoiceFinalizationPostCommitEffects,
+    getVoiceProfile,
+    createVoiceProfile,
+    updateVoiceProfileWithResult,
+    addVoiceSample,
+    addActivity,
+    broadcastToWorkspace,
+    invalidateIntelligenceCache,
   };
 }
 
@@ -203,9 +245,12 @@ function textPayload(result: Awaited<ReturnType<ReturnType<typeof createBrandVoi
 }
 
 describe('MCP brand voice actions', () => {
-  it('advertises one dedicated two-tool snake_case json-v1 family', () => {
+  it('advertises one dedicated five-tool snake_case json-v1 family', () => {
     expect(brandVoiceActionTools.map(tool => tool.name)).toEqual([
       'get_brand_voice',
+      'create_brand_voice_profile',
+      'update_brand_voice_draft',
+      'add_brand_voice_sample',
       'finalize_brand_voice',
     ]);
     for (const tool of brandVoiceActionTools as Tool[]) {
@@ -217,10 +262,84 @@ describe('MCP brand voice actions', () => {
         expect(property.description).toEqual(expect.any(String));
       }
     }
-    expect(brandVoiceActionTools[1]?.inputSchema).toMatchObject({
+    expect(brandVoiceActionTools[4]?.inputSchema).toMatchObject({
       additionalProperties: false,
       required: ['workspace_id', 'authorization_token'],
     });
+  });
+
+  it('idempotently ensures a voice profile without overwriting an existing draft', async () => {
+    const deps = dependencies();
+    const result = await createBrandVoiceActionHandler(deps.value)(
+      'create_brand_voice_profile',
+      { workspace_id: WORKSPACE_ID },
+      workspaceContext(),
+    );
+
+    expect(textPayload(result)).toMatchObject({
+      profile: { id: 'voice_profile_1', revision: 3 },
+      created: false,
+    });
+    expect(deps.createVoiceProfile).not.toHaveBeenCalled();
+    expect(deps.addActivity).not.toHaveBeenCalled();
+  });
+
+  it('writes complete draft voice fields at the exact profile revision', async () => {
+    const deps = dependencies();
+    const result = await createBrandVoiceActionHandler(deps.value)(
+      'update_brand_voice_draft',
+      {
+        workspace_id: WORKSPACE_ID,
+        expected_profile_revision: 3,
+        voice_dna: {
+          personality_traits: ['warm', 'direct'],
+          tone_spectrum: {
+            formal_casual: 7,
+            serious_playful: 4,
+            technical_accessible: 8,
+          },
+          sentence_style: 'Short, direct sentences with a calm cadence.',
+          vocabulary_level: 'Plain language with precise clinical terms.',
+        },
+        guardrails: {
+          forbidden_words: ['guaranteed'],
+          required_terminology: [{ use: 'care plan', instead_of: 'treatment package' }],
+          tone_boundaries: ['Never sound dismissive.'],
+          anti_patterns: [],
+        },
+      },
+      workspaceContext(),
+    );
+
+    expect(result.isError).not.toBe(true);
+    expect(deps.updateVoiceProfileWithResult).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      expect.objectContaining({
+        voiceDNA: expect.objectContaining({ personalityTraits: ['warm', 'direct'] }),
+        guardrails: expect.objectContaining({
+          requiredTerminology: [{ use: 'care plan', insteadOf: 'treatment package' }],
+        }),
+      }),
+      3,
+    );
+    expect(deps.addActivity).toHaveBeenCalledTimes(1);
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps every MCP-added sample out of finalization anchors', async () => {
+    const deps = dependencies();
+    const handle = createBrandVoiceActionHandler(deps.value);
+    const draft = await handle('add_brand_voice_sample', {
+      workspace_id: WORKSPACE_ID,
+      expected_profile_revision: 3,
+      content: 'A generated example for discussion.',
+      context: 'body',
+    }, workspaceContext());
+
+    expect(deps.addVoiceSample).toHaveBeenNthCalledWith(
+      1, WORKSPACE_ID, 'A generated example for discussion.', 'body', 'mcp_proposed', 3,
+    );
+    expect(textPayload(draft)).toMatchObject({ eligible_as_finalization_anchor: false });
   });
 
   it('returns only the safe readiness projection in snake_case', async () => {

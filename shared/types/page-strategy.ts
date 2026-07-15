@@ -121,6 +121,24 @@ export interface PseoMatrixMaterializationResult {
   };
 }
 
+export interface PseoBlueprintEntrySummary {
+  blueprintId: string;
+  blueprintName: string;
+  blueprintStatus: BlueprintStatus;
+  blueprintUpdatedAt: string;
+  entryId: string;
+  entryName: string;
+  entryUpdatedAt: string;
+  pageType: ContentPageType;
+  templateId: string | null;
+  matrixId: string | null;
+}
+
+export interface ListPseoBlueprintEntriesResult {
+  items: PseoBlueprintEntrySummary[];
+  nextCursor: string | null;
+}
+
 // ═══ SITE BLUEPRINT ═══
 
 export type BlueprintStatus = 'draft' | 'active' | 'archived';

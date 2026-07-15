@@ -67,9 +67,9 @@ function parseErrorText(result: Awaited<ReturnType<ReturnType<typeof createMcpTo
 const masterAuth = { scope: 'all' as const, label: 'master' };
 
 describe('canonical MCP tool registry', () => {
-  it('is the sole 18-family, 83-tool discovery source with exact global tools', () => {
+  it('is the sole 18-family, 88-tool discovery source with exact global tools', () => {
     const definitions = listMcpToolDefinitions();
-    expect(definitions).toHaveLength(83);
+    expect(definitions).toHaveLength(88);
     expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(18);
     expect(
       [...MCP_TOOL_REGISTRY.values()]
@@ -96,6 +96,7 @@ describe('canonical MCP tool registry', () => {
         .filter(entry => entry.errorContract === 'json_v1')
         .map(entry => entry.definition.name),
     ).toEqual([
+      'list_pseo_blueprint_entries',
       'list_content_matrices',
       'get_content_matrix',
       'resolve_content_matrix_cells',
@@ -107,9 +108,13 @@ describe('canonical MCP tool registry', () => {
       'retry_content_matrix_generation',
       'get_pseo_matrix_plan',
       'create_content_matrix_from_pseo_plan',
+      'submit_brand_intake',
       'get_brand_intake',
       'resolve_brand_intake_evidence',
       'get_brand_voice',
+      'create_brand_voice_profile',
+      'update_brand_voice_draft',
+      'add_brand_voice_sample',
       'finalize_brand_voice',
       'start_brand_deliverable_generation',
       'get_brand_generation',

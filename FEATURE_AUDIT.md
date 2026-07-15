@@ -9860,3 +9860,13 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Truthful boundary:** Residual conservative model findings—including provenance-sensitive amenity/experience wording and one CTA/link issue exposed by the malformed-domain bug—kept both items in `needs_attention`. The deterministic URL defect is fixed and pinned by unit coverage; no further paid canary or stochastic audit heuristic was added. Both posts remain `draft`, with no Webflow item or collection identity, publish timestamp, publish slug, publish reconciliation, or `content-publish` job.
 
 **Files:** matrix-generation evidence, stage, audit, and revision operations; content-post brief link rendering; focused evidence, stage, audit, item-audit, and content-quality tests; `docs/rules/mcp-deliverable-generation.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 697. MCP chat control plane for intake, pSEO discovery, and voice drafting 2026-07-15
+
+**Status:** Complete on `codex/mcp-chat-control-plane`; human approval UX remains the isolated next PR.
+
+**What it does:** Makes the existing guarded generation pipeline reachable from MCP chat without weakening its human gates. `submit_brand_intake` normalizes questionnaire fields into the immutable intake service and durably replays caller-keyed submissions. `list_pseo_blueprint_entries` returns bounded collection-entry identities plus linked template/matrix IDs before authoritative `get_pseo_matrix_plan` validation. Voice chat can idempotently ensure a profile, revision-safely replace DNA/guardrails/context modifiers, and add proposed samples.
+
+**Safety:** Missing intake facts remain empty, and caller-stable submission keys replay the original revision even after intervening intake edits. Voice writes use exact profile revisions, so stale chat state cannot overwrite newer operator work. Every MCP-added sample persists as `mcp_proposed` and is structurally ineligible for finalization until a human explicitly attests it in the platform; a human must still select and authorize exact anchors. MCP cannot mint its own operator authorization or finalize without the one-time human-issued token.
+
+**Files:** migration 194; MCP intake/voice/matrix schemas and action handlers; intake submission command ledger and voice concurrency contracts; pSEO blueprint discovery projection; MCP registry documentation and focused unit/contract tests; `data/roadmap.json`; `FEATURE_AUDIT.md`.

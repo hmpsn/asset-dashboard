@@ -45,6 +45,11 @@ interface BrandIntakeRevisionRow {
   created_at: string;
 }
 
+interface BrandIntakeSubmissionCommandRow {
+  intake_revision_id: string;
+  mutation_fingerprint: string;
+}
+
 export interface StoredBrandIntakeRevision {
   revision: BrandIntakeRevision;
   projectionState: BrandIntakeCompatibilityProjectionState;
@@ -133,6 +138,16 @@ const stmts = createStmtCache(() => ({
     WHERE revision_row.workspace_id = ?
       AND revision_row.idempotency_key = ?
     LIMIT 1
+  `),
+  getSubmissionCommand: db.prepare(`
+    SELECT intake_revision_id, mutation_fingerprint
+    FROM brand_intake_submission_commands
+    WHERE workspace_id = ? AND idempotency_key = ?
+  `),
+  insertSubmissionCommand: db.prepare(`
+    INSERT INTO brand_intake_submission_commands (
+      workspace_id, idempotency_key, mutation_fingerprint, intake_revision_id, created_at
+    ) VALUES (?, ?, ?, ?, ?)
   `),
   insert: db.prepare(`
     INSERT INTO brand_intake_revisions (
@@ -366,6 +381,40 @@ export function getStoredBrandIntakeRevisionByIdempotencyKey(
     idempotencyKey,
   ) as BrandIntakeRevisionRow | undefined;
   return row ? rowToStoredRevision(row) : null;
+}
+
+export function getBrandIntakeSubmissionCommand(
+  workspaceId: string,
+  idempotencyKey: string,
+): { revision: StoredBrandIntakeRevision; mutationFingerprint: string } | null {
+  const row = stmts().getSubmissionCommand.get(
+    workspaceId,
+    idempotencyKey,
+  ) as BrandIntakeSubmissionCommandRow | undefined;
+  if (!row) return null;
+  const revision = getStoredBrandIntakeRevisionById(workspaceId, row.intake_revision_id);
+  if (!revision) {
+    throw new BrandIntakePersistenceContractError(
+      'Brand intake submission command references a missing revision',
+    );
+  }
+  return { revision, mutationFingerprint: row.mutation_fingerprint };
+}
+
+export function insertBrandIntakeSubmissionCommand(input: {
+  workspaceId: string;
+  idempotencyKey: string;
+  mutationFingerprint: string;
+  intakeRevisionId: string;
+  createdAt: string;
+}): void {
+  stmts().insertSubmissionCommand.run(
+    input.workspaceId,
+    input.idempotencyKey,
+    input.mutationFingerprint,
+    input.intakeRevisionId,
+    input.createdAt,
+  );
 }
 
 export function insertStoredBrandIntakeRevision(input: InsertBrandIntakeRevisionInput): void {

@@ -293,11 +293,13 @@ export interface BrandIntakeSubmissionRequest {
   payload: BrandIntakePayload;
   source: BrandIntakeSource;
   submitter: BrandIntakeSubmitter;
+  idempotencyKey?: string;
 }
 
 export interface BrandIntakeSubmissionResult {
   revision: BrandIntakeRevision;
   created: boolean;
+  replayed: boolean;
   projectionChanged: boolean;
 }
 
