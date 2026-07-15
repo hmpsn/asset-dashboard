@@ -9,6 +9,8 @@ const structuredOperationIds = [
   'discovery-extraction',
   'monthly-digest',
   'content-post-seo-meta',
+  'content-matrix-item-audit',
+  'content-matrix-item-revise',
   'content-post-unify',
   'voice-scoring',
   'voice-feedback-suggest',
@@ -39,6 +41,8 @@ describe('AI operation registry', () => {
   it('defaults generation to inflight-only and requires explicit TTL opt-in', () => {
     expect(getAIOperationRuntimeDefaults('content-brief-regenerate').cachePolicy).toEqual({ mode: 'inflight' });
     expect(getAIOperationRuntimeDefaults('content-post-feedback-fix').cachePolicy).toEqual({ mode: 'none' });
+    expect(getAIOperationRuntimeDefaults('content-matrix-item-audit').cachePolicy).toEqual({ mode: 'none' });
+    expect(getAIOperationRuntimeDefaults('content-matrix-item-revise').cachePolicy).toEqual({ mode: 'none' });
     expect(getAIOperationRuntimeDefaults('schema-plan').cachePolicy).toEqual({ mode: 'ttl', ttlMs: 300_000 });
   });
 

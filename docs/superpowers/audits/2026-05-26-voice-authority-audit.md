@@ -9,12 +9,12 @@ Secondary integrations: `analytics-intelligence`, `seo-health`, `content-pipelin
 
 This audit is the control artifact for the voice authority sprint. It classifies server-side AI consumers by how they receive workspace voice instructions.
 
-- `correct`: 22
+- `correct`: 23
 - `builder-backed`: 5
 - `drift`: 0
 - `documented-exception`: 18
 
-_(Count updated 2026-07-14: grounded brand generation added with an exact immutable finalized-voice authority.)_
+_(Count updated 2026-07-14: grounded brand and matrix-page generation use exact immutable finalized-voice authority.)_
 
 Authority rules:
 
@@ -62,6 +62,7 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/diagnostic-orchestrator.ts` | correct | Uses diagnostic builder evidence and `buildSystemPrompt()` for synthesis. |
 | `server/discovery-ingestion.ts` | documented-exception | Extracts source evidence for brand engine; no existing brand voice should bias extraction. |
 | `server/domains/brand/generation/operations.ts` | correct | Uses the exact immutable operator-finalized voice snapshot frozen into each generation target; provisional voice cannot reach dependent generation. |
+| `server/domains/content/matrix-generation/operations.ts` | correct | Audits and revises against the exact immutable finalized-voice snapshot frozen into the matrix item authority. |
 | `server/google-business-profile-review-response-ai.ts` | correct | Uses `buildSystemPrompt()` for public Google review response drafts. |
 | `server/internal-links.ts` | correct | Uses `effectiveBrandVoiceBlock` and `buildSystemPrompt()`. |
 | `server/keyword-recommendations.ts` | builder-backed | Uses recommendation context; raw voice appears only as business-fit text. |
