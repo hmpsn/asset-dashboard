@@ -1,6 +1,6 @@
 // tests/component/ContentPlanner.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { ContentPlanner } from '../../src/components/ContentPlanner';
@@ -66,12 +66,14 @@ vi.mock('../../src/api/content', () => ({
   },
 }));
 
-// useFeatureFlag itself stays real so the loading → loaded hook transition is exercised.
-vi.mock('../../src/api/misc', async () => {
-  const actual = await vi.importActual<typeof import('../../src/api/misc')>('../../src/api/misc');
+vi.mock('../../src/api/platform', async () => {
+  const actual = await vi.importActual<typeof import('../../src/api/platform')>('../../src/api/platform');
   return {
     ...actual,
-    featureFlags: { list: vi.fn() },
+    workspaceFeatureFlags: {
+      ...actual.workspaceFeatureFlags,
+      list: vi.fn(),
+    },
   };
 });
 
@@ -82,10 +84,13 @@ function makeQueryClient() {
   });
 }
 
-function renderContentPlanner(workspaceId = 'ws1') {
+function renderContentPlanner(
+  workspaceId = 'ws1',
+  initialEntry = '/ws/ws1',
+) {
   return render(
     <QueryClientProvider client={makeQueryClient()}>
-      <MemoryRouter initialEntries={['/ws/ws1']}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <ContentPlanner workspaceId={workspaceId} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -130,12 +135,13 @@ describe('ContentPlanner', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const content = await import('../../src/api/content');
-    const misc = await import('../../src/api/misc');
+    const platform = await import('../../src/api/platform');
     vi.mocked(content.contentTemplates.list).mockResolvedValue([]);
     vi.mocked(content.contentMatrices.list).mockResolvedValue([]);
-    vi.mocked(misc.featureFlags.list).mockResolvedValue({
-      'content-matrix-generation': false,
-    } as never);
+    vi.mocked(platform.workspaceFeatureFlags.list).mockResolvedValue([{
+      key: 'content-matrix-generation',
+      enabled: false,
+    }] as never);
     vi.mocked(content.contentMatrices.getGeneration).mockImplementation(
       () => new Promise(() => {}),
     );
@@ -390,12 +396,13 @@ describe('ContentPlanner', () => {
     ));
   });
 
-  it('mounts the generation action after the real feature flag loads enabled', async () => {
+  it('mounts the generation action after the real workspace flag loads enabled', async () => {
     const content = await import('../../src/api/content');
-    const misc = await import('../../src/api/misc');
-    vi.mocked(misc.featureFlags.list).mockResolvedValue({
-      'content-matrix-generation': true,
-    } as never);
+    const platform = await import('../../src/api/platform');
+    vi.mocked(platform.workspaceFeatureFlags.list).mockResolvedValue([{
+      key: 'content-matrix-generation',
+      enabled: true,
+    }] as never);
     vi.mocked(content.contentTemplates.list).mockResolvedValue([mockTemplate]);
     vi.mocked(content.contentMatrices.list).mockResolvedValue([mockMatrix]);
     renderContentPlanner();
@@ -407,10 +414,11 @@ describe('ContentPlanner', () => {
 
   it('previews exact revisions and requires budget confirmation before starting', async () => {
     const content = await import('../../src/api/content');
-    const misc = await import('../../src/api/misc');
-    vi.mocked(misc.featureFlags.list).mockResolvedValue({
-      'content-matrix-generation': true,
-    } as never);
+    const platform = await import('../../src/api/platform');
+    vi.mocked(platform.workspaceFeatureFlags.list).mockResolvedValue([{
+      key: 'content-matrix-generation',
+      enabled: true,
+    }] as never);
     vi.mocked(content.contentTemplates.list).mockResolvedValue([mockTemplate]);
     vi.mocked(content.contentMatrices.list).mockResolvedValue([mockMatrix]);
     vi.mocked(content.contentMatrices.previewGeneration).mockResolvedValue({
@@ -468,6 +476,170 @@ describe('ContentPlanner', () => {
         idempotencyKey: expect.any(String),
       }),
     ));
+  });
+
+  it('reviews a generated page and approves its exact revisions without publishing', async () => {
+    const content = await import('../../src/api/content');
+    const platform = await import('../../src/api/platform');
+    vi.mocked(platform.workspaceFeatureFlags.list).mockResolvedValue([{
+      key: 'content-matrix-generation',
+      enabled: true,
+    }] as never);
+    vi.mocked(content.contentTemplates.list).mockResolvedValue([mockTemplate]);
+    vi.mocked(content.contentMatrices.list).mockResolvedValue([mockMatrix]);
+    vi.mocked(content.contentMatrices.previewGeneration).mockResolvedValue({
+      results: [{
+        status: 'ready',
+        matrixId: 'mat-1',
+        templateId: 'tpl-1',
+        cellId: 'c1',
+        sourceRevision: { matrixRevision: 5, templateRevision: 3, cellRevision: 7 },
+        target: { effectiveInputFingerprint: 'a'.repeat(64) },
+      }],
+      estimatedBatchBudget: {
+        providerCalls: 4,
+        inputTokens: 12_000,
+        outputTokens: 3_000,
+        estimatedUsd: 1.23,
+        maxConcurrency: 1,
+      },
+    } as never);
+    vi.mocked(content.contentMatrices.startGeneration).mockResolvedValue({
+      run: { id: 'run-1' },
+      jobId: 'job-1',
+      existing: false,
+    } as never);
+    vi.mocked(content.contentMatrices.getGeneration).mockResolvedValue({
+      run: {
+        id: 'run-1',
+        revision: 11,
+        status: 'completed',
+        counts: {
+          selected: 1,
+          queued: 0,
+          running: 0,
+          readyForHumanReview: 1,
+          needsAttention: 0,
+          blocked: 0,
+          conflicts: 0,
+          failed: 0,
+          cancelled: 0,
+        },
+        setAuditReport: { findings: [], verdict: 'ready_for_human_review' },
+      },
+      items: {
+        items: [{
+          id: 'item-1',
+          cellId: 'c1',
+          revision: 12,
+          status: 'ready_for_human_review',
+          postId: 'post-1',
+          approvalEvidence: null,
+          auditReport: { verdict: 'ready_for_human_review', unresolvedRequirementIds: [] },
+          error: null,
+          setAuditFindings: [],
+          target: { targetKeyword: 'austin seo', plannedUrl: '/services/austin', pageType: 'location' },
+          currentArtifactRevisions: {
+            brief: { artifactType: 'content_brief', artifactId: 'brief-1', generationRevision: 4 },
+            post: { artifactType: 'generated_post', artifactId: 'post-1', generationRevision: 13 },
+          },
+        }],
+        nextCursor: null,
+      },
+    } as never);
+    vi.mocked(content.contentMatrices.approveGenerationItem).mockResolvedValue({} as never);
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderContentPlanner();
+
+    fireEvent.click(await screen.findByText('City Pages Matrix'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate Pages' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate 1 page' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Review page' }));
+    expect(open).toHaveBeenCalledWith(
+      '/ws/ws1/content-pipeline?tab=posts&post=post-1',
+      '_blank',
+      'noopener,noreferrer',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approve for export' }));
+    expect(content.contentMatrices.approveGenerationItem).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/does not send or publish/i)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve for export' }));
+
+    await waitFor(() => expect(content.contentMatrices.approveGenerationItem).toHaveBeenCalledWith(
+      'ws1',
+      'run-1',
+      'item-1',
+      {
+        expectedRunRevision: 11,
+        expectedItemRevision: 12,
+        expectedPostRevision: 13,
+      },
+    ));
+    await waitFor(() => expect(
+      screen.getByRole('button', { name: 'Approve for export' }),
+    ).toBeEnabled());
+    open.mockRestore();
+  });
+
+  it('restores an MCP-started generation run from the planner deep link', async () => {
+    const content = await import('../../src/api/content');
+    const platform = await import('../../src/api/platform');
+    vi.mocked(platform.workspaceFeatureFlags.list).mockResolvedValue([{
+      key: 'content-matrix-generation',
+      enabled: true,
+    }] as never);
+    vi.mocked(content.contentTemplates.list).mockResolvedValue([mockTemplate]);
+    vi.mocked(content.contentMatrices.list).mockResolvedValue([mockMatrix]);
+    vi.mocked(content.contentMatrices.getGeneration).mockResolvedValue({
+      run: {
+        id: 'run-mcp-1',
+        revision: 11,
+        status: 'completed',
+        counts: {
+          selected: 1,
+          queued: 0,
+          running: 0,
+          readyForHumanReview: 1,
+          needsAttention: 0,
+          blocked: 0,
+          conflicts: 0,
+          failed: 0,
+          cancelled: 0,
+        },
+        setAuditReport: { findings: [], verdict: 'ready_for_human_review' },
+      },
+      items: {
+        items: [{
+          id: 'item-1',
+          cellId: 'c1',
+          revision: 12,
+          status: 'ready_for_human_review',
+          postId: 'post-1',
+          approvalEvidence: null,
+          auditReport: { verdict: 'ready_for_human_review', unresolvedRequirementIds: [] },
+          error: null,
+          setAuditFindings: [],
+          target: { targetKeyword: 'austin seo', plannedUrl: '/services/austin', pageType: 'location' },
+          currentArtifactRevisions: {
+            brief: { artifactType: 'content_brief', artifactId: 'brief-1', generationRevision: 4 },
+            post: { artifactType: 'generated_post', artifactId: 'post-1', generationRevision: 13 },
+          },
+        }],
+        nextCursor: null,
+      },
+    } as never);
+
+    renderContentPlanner(
+      'ws1',
+      '/ws/ws1/content-pipeline?tab=planner&matrix=mat-1&run=run-mcp-1',
+    );
+
+    expect(await screen.findByRole('button', { name: 'Review page' })).toBeInTheDocument();
+    expect(content.contentMatrices.getGeneration).toHaveBeenCalledWith('ws1', 'run-mcp-1');
+    expect(screen.getByTestId('matrix-grid')).toBeInTheDocument();
   });
 
   it('saves an opened template draft against its frozen source revision', async () => {

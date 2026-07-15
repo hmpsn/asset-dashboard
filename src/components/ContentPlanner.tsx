@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, Layers, FileText, Grid3X3, AlertTriangle } from 'lucide-react';
 import {
   SectionCard,
@@ -17,8 +18,9 @@ import { TemplateEditor, MatrixBuilder, MatrixGrid, MatrixGenerationStatus } fro
 import { contentTemplates, contentMatrices } from '../api/content';
 import { extractErrorMessage } from '../lib/extractErrorMessage';
 import { queryKeys } from '../lib/queryKeys';
-import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useMatrixGeneration } from '../hooks/admin/useMatrixGeneration';
+import { useWorkspaceFeatureFlags } from '../hooks/admin/useWorkspaceFeatureFlags';
+import { adminPath } from '../routes';
 import type { ContentTemplate, ContentMatrix, MatrixCell } from './matrix';
 import type {
   MatrixGenerationCostEstimate,
@@ -43,15 +45,32 @@ interface PendingMatrixGeneration {
   idempotencyKey: string;
 }
 
+interface PendingMatrixApproval {
+  item: MatrixGenerationItemRead;
+  expectedRunRevision: number;
+}
+
 export function ContentPlanner({ workspaceId, embedded = false }: ContentPlannerProps) {
   const queryClient = useQueryClient();
-  const [view, setView] = useState<View>({ mode: 'list' });
+  const [searchParams] = useSearchParams();
+  const linkedMatrixId = searchParams.get('matrix') ?? '';
+  const linkedRunId = searchParams.get('run');
+  const [view, setView] = useState<View>(() => (
+    linkedMatrixId ? { mode: 'matrix-grid', matrixId: linkedMatrixId } : { mode: 'list' }
+  ));
   const [error, setError] = useState<string | null>(null);
   const [generationBlocker, setGenerationBlocker] = useState<string | null>(null);
   const [pendingGeneration, setPendingGeneration] = useState<PendingMatrixGeneration | null>(null);
-  const matrixGenerationEnabled = useFeatureFlag('content-matrix-generation');
+  const [pendingApproval, setPendingApproval] = useState<PendingMatrixApproval | null>(null);
+  const workspaceFlags = useWorkspaceFeatureFlags(workspaceId);
+  const matrixGenerationEnabled = workspaceFlags.data
+    ?.find(flag => flag.key === 'content-matrix-generation')?.enabled ?? false;
   const activeMatrixId = view.mode === 'matrix-grid' ? view.matrixId : '';
-  const matrixGeneration = useMatrixGeneration(workspaceId, activeMatrixId);
+  const matrixGeneration = useMatrixGeneration(
+    workspaceId,
+    activeMatrixId,
+    activeMatrixId === linkedMatrixId ? linkedRunId : null,
+  );
 
   const templatesQuery = useQuery({
     queryKey: queryKeys.admin.contentTemplates(workspaceId),
@@ -258,6 +277,35 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
     }
   }, [matrixGeneration.retry, matrixGeneration.run.data?.run]);
 
+  const handleReviewGeneratedPage = useCallback((item: MatrixGenerationItemRead) => {
+    if (!item.postId) return;
+    const url = `${adminPath(workspaceId, 'content-pipeline')}?tab=posts&post=${encodeURIComponent(item.postId)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [workspaceId]);
+
+  const handleApproveGeneratedPage = useCallback((item: MatrixGenerationItemRead) => {
+    const run = matrixGeneration.run.data?.run;
+    if (!run) return;
+    setPendingApproval({ item, expectedRunRevision: run.revision });
+  }, [matrixGeneration.run.data?.run]);
+
+  const handleConfirmApproval = useCallback(async () => {
+    if (!pendingApproval) return;
+    const request = pendingApproval;
+    setPendingApproval(null);
+    try {
+      setError(null);
+      await matrixGeneration.approve.mutateAsync({
+        itemId: request.item.id,
+        expectedRunRevision: request.expectedRunRevision,
+        expectedItemRevision: request.item.revision,
+        expectedPostRevision: request.item.currentArtifactRevisions.post.generationRevision,
+      });
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to approve this page'));
+    }
+  }, [matrixGeneration.approve, pendingApproval]);
+
   const handleCellUpdate = useCallback(async (cellId: string, updates: Partial<MatrixCell>) => {
     if (view.mode !== 'matrix-grid') return;
     try {
@@ -281,6 +329,15 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
       setError(extractErrorMessage(err, 'Failed to update cell'));
     }
   }, [workspaceId, view, matrices, queryClient]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 gap-3">
+        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
+        <span className="t-caption-sm text-[var(--brand-text)]">Loading content planner…</span>
+      </div>
+    );
+  }
 
   // ── Render sub-views ──
 
@@ -379,6 +436,11 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
             result={matrixGeneration.run.data}
             retrying={matrixGeneration.retry.isPending}
             onRetry={handleRetryGeneration}
+            approvingItemId={matrixGeneration.approve.isPending
+              ? matrixGeneration.approve.variables?.itemId ?? null
+              : null}
+            onReview={handleReviewGeneratedPage}
+            onApprove={handleApproveGeneratedPage}
           />
         )}
         <MatrixGrid
@@ -402,20 +464,21 @@ export function ContentPlanner({ workspaceId, embedded = false }: ContentPlanner
           onConfirm={() => { void handleConfirmGeneration(); }}
           onCancel={() => setPendingGeneration(null)}
         />
+        <ConfirmDialog
+          open={Boolean(pendingApproval)}
+          title="Approve this page for export?"
+          message={pendingApproval
+            ? `Approve “${pendingApproval.item.target?.targetKeyword ?? pendingApproval.item.cellId}” after review. This records human approval and marks the page ready for export. It does not send or publish the page.`
+            : ''}
+          confirmLabel="Approve for export"
+          onConfirm={() => { void handleConfirmApproval(); }}
+          onCancel={() => setPendingApproval(null)}
+        />
       </div>
     );
   }
 
   // ── List view (default) ──
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24 gap-3">
-        <Icon as={Loader2} size="lg" className="animate-spin text-accent-brand" />
-        <span className="t-caption-sm text-[var(--brand-text)]">Loading content planner…</span>
-      </div>
-    );
-  }
 
   if ((error || queryError) && !templates.length && !matrices.length) {
     return (
