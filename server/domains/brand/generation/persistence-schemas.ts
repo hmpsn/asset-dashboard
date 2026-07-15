@@ -1,5 +1,6 @@
 import { z } from '../../../middleware/validate.js';
 import {
+  AUTHENTIC_VOICE_SAMPLE_SOURCES,
   BRAND_DELIVERABLE_TYPES,
 } from '../../../../shared/types/brand-engine.js';
 import {
@@ -109,7 +110,7 @@ const evidenceSourceRefSchema = z.object({
   label: z.string().min(1).max(500).optional(),
   uri: z.string().min(1).max(2_048).optional(),
   capturedAt: brandGenerationTimestampSchema,
-  voiceSampleSource: z.enum(['manual', 'transcript_extraction']).optional(),
+  voiceSampleSource: z.enum(AUTHENTIC_VOICE_SAMPLE_SOURCES).optional(),
 }).strict().superRefine((source, ctx) => {
   if (source.sourceType === 'voice_sample' && !source.voiceSampleSource) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Voice samples require an authentic source' });

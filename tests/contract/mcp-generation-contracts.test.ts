@@ -105,6 +105,7 @@ describe('MCP matrix + brand generation shared contracts', () => {
     expect(AUTHENTIC_VOICE_SAMPLE_SOURCES).toEqual([
       'manual',
       'transcript_extraction',
+      'operator_attested',
     ]);
     expect(STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES).toEqual([
       'content_matrix',

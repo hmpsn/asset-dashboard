@@ -48,6 +48,10 @@ export const voiceSampleInputSchema = z.object({
   source: z.enum(VOICE_SAMPLE_SOURCES).optional(),
 }).strict();
 
+export const attestVoiceSampleSchema = z.object({
+  expectedProfileRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+}).strict();
+
 export const updateVoiceProfileSchema = z.object({
   // Keep the complete persisted status vocabulary at the validation boundary.
   // The domain service rejects attempts to claim `calibrated` so callers retain

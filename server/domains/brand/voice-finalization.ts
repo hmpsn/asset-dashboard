@@ -68,6 +68,7 @@ import {
   finalizedVoiceAnchorSnapshotSchema,
   finalizedVoiceSnapshotSchema,
   finalizedVoiceSnapshotV1Schema,
+  finalizedVoiceSnapshotV2Schema,
   generationOperatorAttributionSchema,
   voiceFinalizationExecutionAttributionSchema,
   voiceCalibrationSelectionSnapshotSchema,
@@ -326,7 +327,7 @@ const stmts = createStmtCache(() => ({
     SELECT COUNT(*) AS count
     FROM voice_samples sample
     WHERE sample.voice_profile_id = @voice_profile_id
-      AND sample.source IN ('manual', 'transcript_extraction')
+      AND sample.source IN ('manual', 'transcript_extraction', 'operator_attested')
       AND (sample.sort_order IS NULL OR typeof(sample.sort_order) = 'integer')
       AND length(sample.id) BETWEEN 1 AND @max_id_length
       AND sample.id = trim(sample.id)
@@ -347,7 +348,7 @@ const stmts = createStmtCache(() => ({
       sample.sort_order, sample.created_at
     FROM voice_samples sample
     WHERE sample.voice_profile_id = @voice_profile_id
-      AND sample.source IN ('manual', 'transcript_extraction')
+      AND sample.source IN ('manual', 'transcript_extraction', 'operator_attested')
       AND (sample.sort_order IS NULL OR typeof(sample.sort_order) = 'integer')
       AND length(sample.id) BETWEEN 1 AND @max_id_length
       AND sample.id = trim(sample.id)
@@ -637,8 +638,13 @@ function parseFinalizedSnapshotByVersion(
   candidate: unknown,
 ): FinalizedVoiceSnapshot {
   switch (row.schema_version) {
-    case VOICE_FINALIZATION_SCHEMA_VERSIONS.snapshot: {
+    case VOICE_FINALIZATION_SCHEMA_VERSIONS.snapshotV1: {
       const parsed = finalizedVoiceSnapshotV1Schema.safeParse(candidate);
+      if (parsed.success) return parsed.data as FinalizedVoiceSnapshot;
+      break;
+    }
+    case VOICE_FINALIZATION_SCHEMA_VERSIONS.snapshot: {
+      const parsed = finalizedVoiceSnapshotV2Schema.safeParse(candidate);
       if (parsed.success) return parsed.data as FinalizedVoiceSnapshot;
       break;
     }
@@ -988,7 +994,9 @@ function rowToEligibleVoiceAnchor(row: unknown): EligibleVoiceAnchor {
     context: sample.context_tag ?? 'body',
     sourceLabel: sample.source === 'manual'
       ? 'Operator-entered voice sample'
-      : 'Transcript voice sample',
+      : sample.source === 'operator_attested'
+        ? 'Operator-attested chat proposal'
+        : 'Transcript voice sample',
     capturedAt: sample.created_at,
   };
 }

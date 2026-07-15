@@ -39,7 +39,8 @@ export const VOICE_FINALIZATION_LIMITS = {
 
 /** Frozen persistence codecs. Add a new version instead of mutating version 1. */
 export const VOICE_FINALIZATION_SCHEMA_VERSIONS = {
-  snapshot: 1,
+  snapshotV1: 1,
+  snapshot: 2,
   authorizationRequest: 1,
 } as const;
 

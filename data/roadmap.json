@@ -2128,6 +2128,18 @@
           "shippedAt": "2026-07-15",
           "owner": "platform-foundation",
           "notes": "Adds the missing chat entry points without weakening human approval: immutable MCP intake submission with durable caller-key replay, bounded collection blueprint/entry discovery, and revision-safe voice profile/DNA/guardrail/context/sample writes. MCP-added samples remain proposed and cannot enter the authentic anchor pool until a human attests them in the platform. The separate follow-up owns that attestation, the clear approval surface, and one-time MCP authorization handoff."
+        },
+        {
+          "id": "brand-voice-approval-surface",
+          "title": "Chat-driven voice review — operator attestation, platform approval, and one-time MCP code",
+          "source": "2026-07-15 MCP reachability dry-run and owner direction",
+          "est": "M",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-15",
+          "shippedAt": "2026-07-15",
+          "owner": "brand-engine",
+          "notes": "Makes voice approval explicit and reachable in the platform while preserving the human gate. Review & approve is the default voice section; the checklist exposes missing DNA, guardrails, authentic anchors, and MCP proposals. MCP-proposed samples require a revision-safe human attestation before they become finalization evidence. The operator may finalize directly or create the existing 15-minute, one-use, exact-command bearer code for MCP to consume. MCP cannot mint the code, attest its own samples, or use a reusable approval password."
         }
       ],
       "shippedAt": "2026-07-14"

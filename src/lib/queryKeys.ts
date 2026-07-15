@@ -170,6 +170,7 @@ export const queryKeys = {
     // Brand Engine — Voice & Identity
     brandIntake: (wsId: string) => ['admin-brand-intake', wsId] as const,
     voiceProfile: (wsId: string) => ['admin-voice-profile', wsId] as const,
+    voiceReadiness: (wsId: string) => ['admin-voice-readiness', wsId] as const,
     brandIdentity: (wsId: string) => ['admin-brand-identity', wsId] as const,
     brandGenerationAll: (wsId: string) => ['admin-brand-generation', wsId] as const,
     brandGeneration: (wsId: string, runId: string) =>

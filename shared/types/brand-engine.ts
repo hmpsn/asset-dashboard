@@ -80,6 +80,7 @@ export const VOICE_SAMPLE_SOURCES = [
   'manual',
   'transcript_extraction',
   'mcp_proposed',
+  'operator_attested',
   'calibration_loop',
   'identity_approved',
   'copy_approved',
@@ -91,6 +92,7 @@ export type VoiceSampleSource = (typeof VOICE_SAMPLE_SOURCES)[number];
 export const AUTHENTIC_VOICE_SAMPLE_SOURCES = [
   'manual',
   'transcript_extraction',
+  'operator_attested',
 ] as const satisfies readonly VoiceSampleSource[];
 
 export type AuthenticVoiceSampleSource =

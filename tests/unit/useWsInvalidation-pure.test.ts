@@ -124,6 +124,7 @@ describe('useWsInvalidation registry parity (pure)', () => {
     const keys = adminKeys(WS_EVENTS.VOICE_PROFILE_UPDATED);
 
     expect(keys).toContainEqual(queryKeys.admin.voiceProfile(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.voiceReadiness(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.intelligence(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.intelligenceAll(WS_ID));
     expect(keys).toContainEqual(queryKeys.client.monthlyDigest(WS_ID));
