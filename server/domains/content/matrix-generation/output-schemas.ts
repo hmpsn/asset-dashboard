@@ -31,6 +31,25 @@ export type MatrixGenerationRevisionAIOutput = z.infer<
   typeof matrixGenerationRevisionAIOutputSchema
 >;
 
+const setAuditFindingSchema = z.object({
+  code: z.string().trim().min(1).max(120),
+  kind: z.enum(['prose', 'provenance']),
+  severity: z.enum(['warning', 'error']),
+  message: z.string().trim().min(1).max(2_000),
+  affectedItemIds: z.array(z.string().trim().min(1).max(200)).min(1).max(25),
+  affectedTargetIds: z.array(z.string().trim().min(1).max(420)).min(1).max(64),
+  requiresHumanReview: z.boolean(),
+  revisionRecommended: z.boolean(),
+}).strict();
+
+export const matrixGenerationSetAuditAIOutputSchema = z.object({
+  findings: z.array(setAuditFindingSchema).max(100),
+}).strict();
+
+export type MatrixGenerationSetAuditAIOutput = z.infer<
+  typeof matrixGenerationSetAuditAIOutputSchema
+>;
+
 export function parseMatrixGenerationModelAuditAIOutput(
   raw: string,
 ): MatrixGenerationModelAuditAIOutput {
@@ -48,5 +67,15 @@ export function parseMatrixGenerationRevisionAIOutput(
     raw,
     matrixGenerationRevisionAIOutputSchema,
     'content-matrix-item-revise',
+  );
+}
+
+export function parseMatrixGenerationSetAuditAIOutput(
+  raw: string,
+): MatrixGenerationSetAuditAIOutput {
+  return parseStructuredAIOutput(
+    raw,
+    matrixGenerationSetAuditAIOutputSchema,
+    'content-matrix-set-audit',
   );
 }

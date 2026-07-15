@@ -579,7 +579,7 @@ export const MATRIX_GENERATION_RUN_TRANSITIONS = {
   completed_with_errors: ['running'],
   blocked: ['queued', 'running', 'cancelled', 'failed'],
   conflict: ['queued', 'running', 'cancelled', 'failed'],
-  cancelled: [],
+  cancelled: ['running'],
   failed: ['queued', 'running', 'cancelled'],
 } as const satisfies Record<MatrixGenerationRunStatus, readonly MatrixGenerationRunStatus[]>;
 
@@ -593,12 +593,12 @@ export const MATRIX_GENERATION_ITEM_TRANSITIONS = {
   auditing_deterministic: ['auditing_model', 'revising', 'ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
   auditing_model: ['revising', 'ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
   revising: ['auditing_deterministic', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'],
-  ready_for_human_review: [],
-  needs_attention: ['queued', 'preflighting', 'cancelled'],
+  ready_for_human_review: ['revising', 'needs_attention'],
+  needs_attention: ['queued', 'preflighting', 'auditing_deterministic', 'cancelled'],
   blocked_missing_evidence: ['queued', 'preflighting', 'cancelled'],
   conflict: ['queued', 'preflighting', 'cancelled'],
   cancelled: [],
-  failed: ['queued', 'preflighting', 'cancelled'],
+  failed: ['queued', 'preflighting', 'auditing_deterministic', 'cancelled'],
 } as const satisfies Record<MatrixGenerationItemStatus, readonly MatrixGenerationItemStatus[]>;
 
 // ── Content Matrix Generation Attempt ──

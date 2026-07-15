@@ -523,6 +523,8 @@ export function updateMatrixCell(
     requireExpectedCellRevision?: boolean;
     /** Domain-owned revision advance for a normalized evidence mutation. */
     revisionReason?: 'evidence_resolution';
+    /** A surrounding transaction will queue schema generation after it commits. */
+    skipSchemaPreGeneration?: boolean;
   } = {},
 ): ContentMatrix | undefined {
   if (options.requireExpectedCellRevision && options.expectedCellRevision === undefined) {
@@ -652,7 +654,8 @@ export function updateMatrixCell(
 
   // D7: Queue schema pre-generation on status transition to brief_generated or approved
   // Runs after DB save so the async function reads correct cell data
-  if (updates.status === 'brief_generated' || updates.status === 'approved') {
+  if (!options.skipSchemaPreGeneration
+    && (updates.status === 'brief_generated' || updates.status === 'approved')) {
     void queueSchemaPreGeneration(workspaceId, matrixId, cellId);
   }
 

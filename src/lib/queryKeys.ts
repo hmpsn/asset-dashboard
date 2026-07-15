@@ -64,6 +64,9 @@ export const queryKeys = {
       [...adminContentPerformanceKey(wsId), 'trend', itemId] as const,
     contentTemplates: (wsId: string) => ['content-templates', wsId] as const,
     contentMatrices: (wsId: string) => ['content-matrices', wsId] as const,
+    contentMatrixGenerationAll: (wsId: string) => ['content-matrix-generation', wsId] as const,
+    contentMatrixGeneration: (wsId: string, runId: string) =>
+      ['content-matrix-generation', wsId, runId] as const,
     roi: (wsId: string) => ['admin-roi', wsId] as const,
     // The Issue (Client) P1a — admin conversion-tracking verification readout (pinned/typed/
     // forms-connected/last-lead). Invalidated by form capture + form-source config broadcasts.

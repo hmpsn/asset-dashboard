@@ -39,6 +39,7 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/discovery-ingestion.ts', classification: 'documented-exception' },
   { file: 'server/domains/brand/generation/operations.ts', classification: 'correct' },
   { file: 'server/domains/content/matrix-generation/operations.ts', classification: 'correct' },
+  { file: 'server/domains/content/matrix-generation/set-audit.ts', classification: 'documented-exception' },
   { file: 'server/google-business-profile-review-response-ai.ts', classification: 'correct' },
   { file: 'server/internal-links.ts', classification: 'correct' },
   { file: 'server/keyword-recommendations.ts', classification: 'builder-backed' },

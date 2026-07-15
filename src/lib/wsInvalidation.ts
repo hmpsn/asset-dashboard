@@ -184,6 +184,7 @@ function adminInvalidationKeys(
         queryKeys.admin.postsDetailAll(workspaceId),
         queryKeys.admin.contentTemplates(workspaceId),
         queryKeys.admin.contentMatrices(workspaceId),
+        queryKeys.admin.contentMatrixGenerationAll(workspaceId),
         ...contentPipelineKeys(workspaceId),
         queryKeys.admin.roi(workspaceId),
         queryKeys.client.roi(workspaceId),

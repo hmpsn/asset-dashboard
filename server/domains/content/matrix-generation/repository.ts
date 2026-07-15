@@ -9,6 +9,10 @@ import type {
   MatrixGenerationRunStatus,
   MatrixGenerationStage,
   MatrixGenerationAttemptStatus,
+  MatrixGenerationAcceptedBudget,
+  MatrixGenerationBudgetUsage,
+  MatrixGenerationSetAuditReport,
+  MatrixPageApprovalEvidence,
   MatrixGenerationPreviewTarget,
   MatrixGenerationSelection,
   PersistedMatrixGenerationRun,
@@ -69,6 +73,8 @@ interface MatrixGenerationRunRow {
   idempotency_key: string;
   selection_fingerprint: string;
   job_id: string | null;
+  accepted_budget: string | null;
+  set_audit_report: string | null;
   selected_count: number;
   queued_count: number;
   running_count: number;
@@ -115,6 +121,7 @@ interface MatrixGenerationItemRow {
   brief_id: string | null;
   post_id: string | null;
   audit_report: string | null;
+  approval_evidence: string | null;
   attempt_count: number;
   automatic_revision_count: 0 | 1;
   error: string | null;
@@ -553,6 +560,71 @@ const sanitizedErrorSchema = z.object({
   stage: z.string().optional(),
 });
 
+const batchBudgetLimitsSchema = z.object({
+  maxProviderCalls: z.number().int().positive(),
+  maxInputTokens: z.number().int().positive(),
+  maxOutputTokens: z.number().int().positive(),
+  maxEstimatedUsd: z.number().positive(),
+  maxConcurrency: z.number().int().positive(),
+}).strict();
+
+const costEstimateSchema = z.object({
+  providerCalls: z.number().int().nonnegative(),
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  estimatedUsd: z.number().nonnegative(),
+  maxConcurrency: z.number().int().positive(),
+}).strict();
+
+const budgetUsageSchema = z.object({
+  providerCalls: z.number().int().nonnegative(),
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  estimatedUsd: z.number().nonnegative(),
+}).strict();
+
+const acceptedBudgetSchema = z.object({
+  estimate: costEstimateSchema,
+  limits: batchBudgetLimitsSchema,
+  reserved: budgetUsageSchema,
+}).strict();
+
+const setAuditFindingSchema = z.object({
+  id: z.string().min(1),
+  source: z.enum(['deterministic', 'model']),
+  kind: z.enum(['structural', 'prose', 'provenance']),
+  code: z.string().min(1),
+  severity: z.enum(['warning', 'error']),
+  message: z.string(),
+  affectedItemIds: z.array(z.string().min(1)),
+  affectedTargetIds: z.array(z.string().min(1)),
+  requiresHumanReview: z.boolean(),
+}).strict();
+
+const setAuditReportSchema = z.object({
+  verdict: z.enum(['passed', 'needs_attention', 'source_correction_required']),
+  findings: z.array(setAuditFindingSchema),
+  passCount: z.union([z.literal(1), z.literal(2)]),
+  modelProvenance: generationProvenanceSchema.nullable(),
+  auditedAt: z.string().min(1),
+}).strict();
+
+const humanReviewerSchema = resolverAttributionSchema.extend({
+  actorType: z.enum(['operator', 'client']),
+}).strict();
+
+const pageApprovalEvidenceSchema = z.object({
+  runId: z.string().min(1),
+  itemId: z.string().min(1),
+  matrixId: z.string().min(1),
+  cellId: z.string().min(1),
+  sourceRevision: sourceRevisionSchema,
+  postId: z.string().min(1),
+  postRevision: z.number().int().nonnegative(),
+  approvedBy: humanReviewerSchema,
+  approvedAt: z.string().min(1),
+}).strict();
+
 const stmts = createStmtCache(() => ({
   selectByIdempotency: db.prepare(`
     SELECT *
@@ -563,6 +635,17 @@ const stmts = createStmtCache(() => ({
     SELECT *
     FROM content_matrix_generation_runs
     WHERE id = ? AND workspace_id = ?
+  `),
+  selectByJob: db.prepare(`
+    SELECT *
+    FROM content_matrix_generation_runs
+    WHERE workspace_id = ? AND job_id = ?
+  `),
+  listRecoverableRuns: db.prepare(`
+    SELECT *
+    FROM content_matrix_generation_runs
+    WHERE status IN ('queued', 'running')
+    ORDER BY created_at ASC, id ASC
   `),
   selectSelections: db.prepare(`
     SELECT matrix_id, cell_id, matrix_revision, template_revision, cell_revision,
@@ -601,6 +684,7 @@ const stmts = createStmtCache(() => ({
         brief_id = @brief_id,
         post_id = @post_id,
         audit_report = @audit_report,
+        approval_evidence = @approval_evidence,
         automatic_revision_count = @automatic_revision_count,
         error = @error,
         updated_at = @updated_at,
@@ -632,6 +716,32 @@ const stmts = createStmtCache(() => ({
         completed_at = @completed_at
     WHERE id = @id AND workspace_id = @workspace_id
       AND revision = @expected_revision AND status = @expected_status
+  `),
+  updateRunSetAudit: db.prepare(`
+    UPDATE content_matrix_generation_runs
+    SET revision = revision + 1,
+        set_audit_report = @set_audit_report,
+        updated_at = @updated_at
+    WHERE id = @id AND workspace_id = @workspace_id
+      AND revision = @expected_revision
+  `),
+  updateRunBudget: db.prepare(`
+    UPDATE content_matrix_generation_runs
+    SET revision = revision + 1,
+        accepted_budget = @accepted_budget,
+        updated_at = @updated_at
+    WHERE id = @id AND workspace_id = @workspace_id
+      AND revision = @expected_revision
+  `),
+  recordApprovalEvidence: db.prepare(`
+    UPDATE content_matrix_generation_items
+    SET revision = revision + 1,
+        approval_evidence = @approval_evidence,
+        updated_at = @updated_at
+    WHERE id = @id AND workspace_id = @workspace_id
+      AND run_id = @run_id AND revision = @expected_revision
+      AND status = 'ready_for_human_review'
+      AND approval_evidence IS NULL
   `),
   insertAttempt: db.prepare(`
     INSERT INTO content_matrix_generation_attempts (
@@ -666,14 +776,14 @@ const stmts = createStmtCache(() => ({
   insertRun: db.prepare(`
     INSERT INTO content_matrix_generation_runs (
       id, workspace_id, matrix_id, template_id, status, revision,
-      idempotency_key, selection_fingerprint, job_id,
+      idempotency_key, selection_fingerprint, job_id, accepted_budget, set_audit_report,
       selected_count, queued_count, running_count,
       ready_for_human_review_count, needs_attention_count, blocked_count,
       conflict_count, failed_count, cancelled_count, created_by,
       mcp_execution_context, created_at, updated_at, completed_at
     ) VALUES (
       @id, @workspace_id, @matrix_id, @template_id, 'queued', 0,
-      @idempotency_key, @selection_fingerprint, NULL,
+      @idempotency_key, @selection_fingerprint, @job_id, @accepted_budget, NULL,
       @selected_count, @queued_count, 0,
       0, 0, 0,
       0, 0, 0, @created_by,
@@ -685,14 +795,14 @@ const stmts = createStmtCache(() => ({
       id, run_id, workspace_id, matrix_id, cell_id,
       matrix_revision, template_revision, cell_revision,
       structural_fingerprint, preview_fingerprint, status, revision,
-      structural_target, preview_target, brief_id, post_id, audit_report,
+      structural_target, preview_target, brief_id, post_id, audit_report, approval_evidence,
       attempt_count, automatic_revision_count, error,
       created_at, updated_at, completed_at
     ) VALUES (
       @id, @run_id, @workspace_id, @matrix_id, @cell_id,
       @matrix_revision, @template_revision, @cell_revision,
       @structural_fingerprint, @preview_fingerprint, 'queued', 0,
-      NULL, NULL, NULL, NULL, NULL,
+      NULL, NULL, NULL, NULL, NULL, NULL,
       0, 0, NULL,
       @created_at, @updated_at, NULL
     )
@@ -760,6 +870,7 @@ function assertCreateRequest(request: CreateMatrixGenerationRunRequest): {
   createdBy: z.infer<typeof resolverAttributionSchema>;
   mcpExecutionContext: z.infer<typeof mcpExecutionContextSchema> | null;
   selections: MatrixGenerationSelection;
+  acceptedBudget: MatrixGenerationAcceptedBudget | null;
 } {
   if (!request.workspaceId || !request.matrixId || !request.templateId) {
     throw new MatrixGenerationPersistenceContractError('Workspace, matrix, and template IDs are required');
@@ -769,6 +880,21 @@ function assertCreateRequest(request: CreateMatrixGenerationRunRequest): {
   }
   if (!Array.isArray(request.selections) || request.selections.length === 0) {
     throw new MatrixGenerationPersistenceContractError('A matrix generation run requires at least one previewed cell');
+  }
+  const jobId = request.jobId ?? null;
+  const budgetResult = request.acceptedBudget === undefined || request.acceptedBudget === null
+    ? null
+    : acceptedBudgetSchema.safeParse(request.acceptedBudget);
+  if ((jobId === null) !== (budgetResult === null)) {
+    throw new MatrixGenerationPersistenceContractError(
+      'Batch matrix generation requires both a job ID and accepted budget',
+    );
+  }
+  if (jobId !== null && (!jobId.trim() || jobId !== jobId.trim() || jobId.length > 200)) {
+    throw new MatrixGenerationPersistenceContractError('Matrix generation job ID is invalid');
+  }
+  if (budgetResult && !budgetResult.success) {
+    throw new MatrixGenerationPersistenceContractError('Matrix generation accepted budget is invalid');
   }
   const cellIds = new Set<string>();
   const parsedSelections: MatrixGenerationReadySelectionItem[] = [];
@@ -834,6 +960,7 @@ function assertCreateRequest(request: CreateMatrixGenerationRunRequest): {
     createdBy: createdBy.data,
     mcpExecutionContext: parsedContext,
     selections: [firstSelection, ...remainingSelections],
+    acceptedBudget: budgetResult?.data ?? null,
   };
 }
 
@@ -885,6 +1012,25 @@ function rowToRun(row: MatrixGenerationRunRow): PersistedMatrixGenerationRun {
     throw new MatrixGenerationPersistenceContractError('Stored MCP execution context is invalid');
   }
   assertRunAttributionContext(row.workspace_id, createdBy, mcpExecutionContext, true);
+  const acceptedBudget = row.accepted_budget
+    ? parseJsonSafe(row.accepted_budget, acceptedBudgetSchema, null, {
+        workspaceId: row.workspace_id,
+        table: 'content_matrix_generation_runs',
+        field: 'accepted_budget',
+      })
+    : null;
+  const setAuditReport = row.set_audit_report
+    ? parseJsonSafe(row.set_audit_report, setAuditReportSchema, null, {
+        workspaceId: row.workspace_id,
+        table: 'content_matrix_generation_runs',
+        field: 'set_audit_report',
+      })
+    : null;
+  if ((row.accepted_budget && !acceptedBudget) || (row.set_audit_report && !setAuditReport)) {
+    throw new MatrixGenerationPersistenceContractError(
+      'Stored matrix generation batch metadata is invalid',
+    );
+  }
   const selectionRows = stmts().selectSelections.all(row.id, row.workspace_id) as MatrixGenerationSelectionRow[];
   const [firstSelectionRow, ...remainingSelectionRows] = selectionRows;
   if (!firstSelectionRow) {
@@ -924,6 +1070,8 @@ function rowToRun(row: MatrixGenerationRunRow): PersistedMatrixGenerationRun {
     selectionFingerprint: row.selection_fingerprint,
     selections,
     jobId: row.job_id,
+    acceptedBudget: acceptedBudget as MatrixGenerationAcceptedBudget | null,
+    setAuditReport: setAuditReport as MatrixGenerationSetAuditReport | null,
     counts: countsFromRow(row),
     createdBy,
     mcpExecutionContext,
@@ -1064,6 +1212,12 @@ function rowToItem(row: MatrixGenerationItemRow): MatrixGenerationItem {
       row.workspace_id,
       'audit_report',
     ),
+    approvalEvidence: parseStoredSnapshot<MatrixPageApprovalEvidence>(
+      row.approval_evidence,
+      pageApprovalEvidenceSchema,
+      row.workspace_id,
+      'approval_evidence',
+    ),
     attemptCount: row.attempt_count,
     automaticRevisionCount: row.automatic_revision_count,
     error: parseStoredSnapshot<NonNullable<MatrixGenerationItem['error']>>(
@@ -1102,6 +1256,18 @@ export function getPersistedMatrixGenerationRunByIdempotency(
     idempotencyKey,
   ) as MatrixGenerationRunRow | undefined;
   return row ? rowToRun(row) : null;
+}
+
+export function getPersistedMatrixGenerationRunByJob(
+  workspaceId: string,
+  jobId: string,
+): PersistedMatrixGenerationRun | null {
+  const row = stmts().selectByJob.get(workspaceId, jobId) as MatrixGenerationRunRow | undefined;
+  return row ? rowToRun(row) : null;
+}
+
+export function listRecoverableMatrixGenerationRuns(): PersistedMatrixGenerationRun[] {
+  return (stmts().listRecoverableRuns.all() as MatrixGenerationRunRow[]).map(rowToRun);
 }
 
 /** Public-safe run read. Internal callers needing evidence use the explicit persisted read. */
@@ -1171,6 +1337,7 @@ function writeMatrixGenerationItem(input: {
   briefId?: string;
   postId?: string;
   auditReport?: MatrixGenerationItem['auditReport'];
+  approvalEvidence?: MatrixGenerationItem['approvalEvidence'];
   automaticRevisionCount?: MatrixGenerationItem['automaticRevisionCount'];
   error?: MatrixGenerationItem['error'];
 }): MatrixGenerationItem {
@@ -1201,6 +1368,9 @@ function writeMatrixGenerationItem(input: {
     audit_report: input.auditReport === undefined
       ? current.auditReport ? JSON.stringify(current.auditReport) : null
       : input.auditReport ? JSON.stringify(input.auditReport) : null,
+    approval_evidence: input.approvalEvidence === undefined
+      ? current.approvalEvidence ? JSON.stringify(current.approvalEvidence) : null
+      : input.approvalEvidence ? JSON.stringify(input.approvalEvidence) : null,
     automatic_revision_count: input.automaticRevisionCount
       ?? current.automaticRevisionCount,
     error: input.error === undefined
@@ -1227,6 +1397,7 @@ export function transitionMatrixGenerationItem(input: {
   briefId?: string;
   postId?: string;
   auditReport?: MatrixGenerationItem['auditReport'];
+  approvalEvidence?: MatrixGenerationItem['approvalEvidence'];
   automaticRevisionCount?: MatrixGenerationItem['automaticRevisionCount'];
   error?: MatrixGenerationItem['error'];
 }): MatrixGenerationItem {
@@ -1297,6 +1468,167 @@ export function transitionMatrixGenerationRun(input: {
     if (info.changes !== 1) throw new MatrixGenerationRevisionConflictError('run', input.runId);
     const updated = getPersistedMatrixGenerationRun(input.workspaceId, input.runId);
     if (!updated) throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    return updated;
+  };
+  return db.inTransaction ? write() : db.transaction(write).immediate();
+}
+
+export function saveMatrixGenerationSetAuditReport(input: {
+  workspaceId: string;
+  runId: string;
+  expectedRunRevision: number;
+  report: MatrixGenerationSetAuditReport;
+}): PersistedMatrixGenerationRun {
+  const parsed = setAuditReportSchema.safeParse(input.report);
+  if (!parsed.success) {
+    throw new MatrixGenerationPersistenceContractError('Matrix generation set audit report is invalid');
+  }
+  const write = (): PersistedMatrixGenerationRun => {
+    const current = getPersistedMatrixGenerationRun(input.workspaceId, input.runId);
+    if (!current || current.revision !== input.expectedRunRevision) {
+      throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    }
+    const info = stmts().updateRunSetAudit.run({
+      id: input.runId,
+      workspace_id: input.workspaceId,
+      expected_revision: input.expectedRunRevision,
+      set_audit_report: JSON.stringify(parsed.data),
+      updated_at: new Date().toISOString(),
+    });
+    if (info.changes !== 1) throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    const updated = getPersistedMatrixGenerationRun(input.workspaceId, input.runId);
+    if (!updated) throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    return updated;
+  };
+  return db.inTransaction ? write() : db.transaction(write).immediate();
+}
+
+export function clearMatrixGenerationSetAuditReport(input: {
+  workspaceId: string;
+  runId: string;
+  expectedRunRevision: number;
+}): PersistedMatrixGenerationRun {
+  const write = (): PersistedMatrixGenerationRun => {
+    const current = getPersistedMatrixGenerationRun(input.workspaceId, input.runId);
+    if (!current || current.revision !== input.expectedRunRevision) {
+      throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    }
+    if (!current.setAuditReport) return current;
+    const info = stmts().updateRunSetAudit.run({
+      id: input.runId,
+      workspace_id: input.workspaceId,
+      expected_revision: input.expectedRunRevision,
+      set_audit_report: null,
+      updated_at: new Date().toISOString(),
+    });
+    if (info.changes !== 1) throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    const updated = getPersistedMatrixGenerationRun(input.workspaceId, input.runId);
+    if (!updated) throw new MatrixGenerationRevisionConflictError('run', input.runId);
+    return updated;
+  };
+  return db.inTransaction ? write() : db.transaction(write).immediate();
+}
+
+export type MatrixGenerationBudgetDimension = keyof MatrixGenerationBudgetUsage;
+
+export class MatrixGenerationBudgetExceededError extends Error {
+  readonly code = 'matrix_generation_budget_exceeded';
+  readonly dimension: MatrixGenerationBudgetDimension;
+
+  constructor(dimension: MatrixGenerationBudgetDimension) {
+    super(`Matrix generation cannot reserve more ${dimension} within the accepted budget`);
+    this.name = 'MatrixGenerationBudgetExceededError';
+    this.dimension = dimension;
+  }
+}
+
+export function reserveMatrixGenerationBudget(input: {
+  workspaceId: string;
+  runId: string;
+  reservation: MatrixGenerationBudgetUsage;
+}): PersistedMatrixGenerationRun {
+  const parsed = budgetUsageSchema.safeParse(input.reservation);
+  if (!parsed.success) {
+    throw new MatrixGenerationPersistenceContractError('Matrix generation budget reservation is invalid');
+  }
+  return db.transaction(() => {
+    const run = getPersistedMatrixGenerationRun(input.workspaceId, input.runId);
+    if (!run?.acceptedBudget) {
+      throw new MatrixGenerationPersistenceContractError('Matrix generation run has no accepted budget');
+    }
+    const current = run.acceptedBudget.reserved;
+    const next: MatrixGenerationBudgetUsage = {
+      providerCalls: current.providerCalls + parsed.data.providerCalls,
+      inputTokens: current.inputTokens + parsed.data.inputTokens,
+      outputTokens: current.outputTokens + parsed.data.outputTokens,
+      estimatedUsd: Number((current.estimatedUsd + parsed.data.estimatedUsd).toFixed(6)),
+    };
+    const limits = run.acceptedBudget.limits;
+    const exceeded: MatrixGenerationBudgetDimension | undefined = [
+      ['providerCalls', next.providerCalls, limits.maxProviderCalls],
+      ['inputTokens', next.inputTokens, limits.maxInputTokens],
+      ['outputTokens', next.outputTokens, limits.maxOutputTokens],
+      ['estimatedUsd', next.estimatedUsd, limits.maxEstimatedUsd],
+    ].find(([, value, limit]) => value > limit)?.[0] as MatrixGenerationBudgetDimension | undefined;
+    if (exceeded) throw new MatrixGenerationBudgetExceededError(exceeded);
+    const acceptedBudget: MatrixGenerationAcceptedBudget = {
+      ...run.acceptedBudget,
+      reserved: next,
+    };
+    const info = stmts().updateRunBudget.run({
+      id: run.id,
+      workspace_id: run.workspaceId,
+      expected_revision: run.revision,
+      accepted_budget: JSON.stringify(acceptedBudget),
+      updated_at: new Date().toISOString(),
+    });
+    if (info.changes !== 1) throw new MatrixGenerationRevisionConflictError('run', run.id);
+    const updated = getPersistedMatrixGenerationRun(run.workspaceId, run.id);
+    if (!updated) throw new MatrixGenerationRevisionConflictError('run', run.id);
+    return updated;
+  }).immediate();
+}
+
+export function recordMatrixPageApprovalEvidence(input: {
+  workspaceId: string;
+  runId: string;
+  itemId: string;
+  expectedItemRevision: number;
+  evidence: MatrixPageApprovalEvidence;
+}): MatrixGenerationItem {
+  const parsed = pageApprovalEvidenceSchema.safeParse(input.evidence);
+  if (!parsed.success) {
+    throw new MatrixGenerationPersistenceContractError('Matrix page approval evidence is invalid');
+  }
+  const write = (): MatrixGenerationItem => {
+    const item = getMatrixGenerationItem(input.workspaceId, input.itemId);
+    if (
+      !item
+      || item.runId !== input.runId
+      || item.revision !== input.expectedItemRevision
+      || item.status !== 'ready_for_human_review'
+      || item.approvalEvidence !== null
+      || parsed.data.runId !== item.runId
+      || parsed.data.itemId !== item.id
+      || parsed.data.matrixId !== item.matrixId
+      || parsed.data.cellId !== item.cellId
+      || parsed.data.postId !== item.postId
+      || canonicalGenerationFingerprint(parsed.data.sourceRevision)
+        !== canonicalGenerationFingerprint(item.sourceRevision)
+    ) {
+      throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+    }
+    const info = stmts().recordApprovalEvidence.run({
+      id: input.itemId,
+      workspace_id: input.workspaceId,
+      run_id: input.runId,
+      expected_revision: input.expectedItemRevision,
+      approval_evidence: JSON.stringify(parsed.data),
+      updated_at: new Date().toISOString(),
+    });
+    if (info.changes !== 1) throw new MatrixGenerationRevisionConflictError('item', input.itemId);
+    const updated = getMatrixGenerationItem(input.workspaceId, input.itemId);
+    if (!updated) throw new MatrixGenerationRevisionConflictError('item', input.itemId);
     return updated;
   };
   return db.inTransaction ? write() : db.transaction(write).immediate();
@@ -1609,7 +1941,7 @@ export function createMatrixGenerationRun(
   request: CreateMatrixGenerationRunRequest,
 ): CreateMatrixGenerationRunResult {
   const validated = assertCreateRequest(request);
-  const create = db.transaction((): CreateMatrixGenerationRunResult => {
+  const create = (): CreateMatrixGenerationRunResult => {
     const replay = stmts().selectByIdempotency.get(
       request.workspaceId,
       request.matrixId,
@@ -1639,6 +1971,10 @@ export function createMatrixGenerationRun(
       template_id: request.templateId,
       idempotency_key: request.idempotencyKey,
       selection_fingerprint: request.selectionFingerprint,
+      job_id: request.jobId ?? null,
+      accepted_budget: validated.acceptedBudget
+        ? JSON.stringify(validated.acceptedBudget)
+        : null,
       selected_count: validated.selections.length,
       queued_count: validated.selections.length,
       created_by: JSON.stringify(validated.createdBy),
@@ -1668,6 +2004,6 @@ export function createMatrixGenerationRun(
 
     const row = stmts().selectById.get(runId, request.workspaceId) as MatrixGenerationRunRow;
     return { run: rowToRun(row), existing: false };
-  });
-  return create.immediate();
+  };
+  return db.inTransaction ? create() : db.transaction(create).immediate();
 }

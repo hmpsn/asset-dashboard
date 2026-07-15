@@ -37,9 +37,11 @@ import {
 
 import { requireWorkspaceAccess } from '../auth.js';
 import { InvalidTransitionError } from '../state-machines.js';
+import { ActiveJobResourceConflict } from '../jobs.js';
 import { validate, z } from '../middleware/validate.js';
 import {
   MATRIX_GENERATION_SOURCE_LIMITS,
+  MATRIX_GENERATION_BATCH_LIMITS,
   MatrixGenerationSchemaTypeContractError,
   MatrixGenerationSourceLimitError,
   matrixGenerationUtf8Bytes,
@@ -51,6 +53,17 @@ import {
 } from '../domains/content/matrix-generation/evidence.js';
 import { previewMatrixGeneration } from '../domains/content/matrix-generation/preview.js';
 import { MatrixReadServiceError } from '../domains/content/matrix-generation/read-service.js';
+import {
+  getMatrixGeneration,
+  MatrixGenerationBatchNotFoundError,
+  MatrixGenerationBatchPreconditionError,
+  retryMatrixGeneration,
+  startMatrixGeneration,
+} from '../domains/content/matrix-generation/batch-service.js';
+import {
+  approveMatrixPageForPublishReadiness,
+  MatrixPageApprovalPreconditionError,
+} from '../domains/content/matrix-generation/approval-service.js';
 
 const log = createLogger('routes:content-matrices');
 const router = Router();
@@ -193,6 +206,48 @@ const previewMatrixGenerationSchema = z.object({
   }),
 }).strict();
 
+const startMatrixGenerationSchema = z.object({
+  selections: z.array(z.object({
+    cellId: z.string().min(1),
+    expectedSourceRevision: sourceRevisionSchema,
+    expectedPreviewFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  }).strict()).min(1).max(MATRIX_GENERATION_BATCH_LIMITS.maxItems).superRefine((selections, ctx) => {
+    const seen = new Set<string>();
+    selections.forEach((selection, index) => {
+      if (seen.has(selection.cellId)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [index, 'cellId'], message: 'cellId values must be unique' });
+      }
+      seen.add(selection.cellId);
+    });
+  }),
+  acceptedBudget: z.object({
+    maxProviderCalls: z.number().int().positive().max(MATRIX_GENERATION_BATCH_LIMITS.maxProviderCalls),
+    maxInputTokens: z.number().int().positive().max(MATRIX_GENERATION_BATCH_LIMITS.maxInputTokens),
+    maxOutputTokens: z.number().int().positive().max(MATRIX_GENERATION_BATCH_LIMITS.maxOutputTokens),
+    maxEstimatedUsd: z.number().positive().max(MATRIX_GENERATION_BATCH_LIMITS.maxEstimatedUsd),
+    maxConcurrency: z.number().int().min(1).max(MATRIX_GENERATION_BATCH_LIMITS.maxConcurrency),
+  }).strict(),
+  idempotencyKey: z.string().trim().min(1).max(200),
+}).strict();
+
+const retryMatrixGenerationSchema = z.object({
+  expectedRunRevision: z.number().int().nonnegative(),
+  items: z.array(z.object({
+    itemId: z.string().min(1),
+    expectedItemRevision: z.number().int().nonnegative(),
+    sourceRevision: sourceRevisionSchema,
+    expectedArtifactRevisions: artifactRevisionExpectationsSchema,
+    reusableCheckpointFingerprint: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+  }).strict()).min(1).max(MATRIX_GENERATION_BATCH_LIMITS.maxItems),
+  idempotencyKey: z.string().trim().min(1).max(200),
+}).strict();
+
+const approveMatrixGenerationItemSchema = z.object({
+  expectedRunRevision: z.number().int().nonnegative(),
+  expectedItemRevision: z.number().int().nonnegative(),
+  expectedPostRevision: z.number().int().nonnegative(),
+}).strict();
+
 const evidenceValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('text'), value: z.string().trim().min(1).max(12_000) }).strict(),
   z.object({ kind: z.literal('number'), value: z.number().finite(), unit: z.string().trim().min(1).max(100).optional() }).strict(),
@@ -292,6 +347,188 @@ router.post(
       }
       log.error({ err }, 'Failed to preview matrix generation');
       res.status(500).json({ error: 'Failed to preview matrix generation' });
+    }
+  },
+);
+
+router.post(
+  '/api/content-matrices/:workspaceId/:matrixId/generation-runs',
+  requireWorkspaceAccess('workspaceId'),
+  validate(startMatrixGenerationSchema),
+  async (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    try {
+      const createdBy = matrixEvidenceResolver(req);
+      const result = await startMatrixGeneration({
+        workspaceId,
+        matrixId: req.params.matrixId,
+        selections: req.body.selections,
+        acceptedBudget: req.body.acceptedBudget,
+        idempotencyKey: req.body.idempotencyKey,
+        createdBy,
+        mcpExecutionContext: null,
+      });
+      if (!result.existing) {
+        addActivity(
+          workspaceId,
+          'content_updated',
+          `Started generation for ${result.run.selections.length} matrix pages`,
+          undefined,
+          {
+            matrixId: req.params.matrixId,
+            runId: result.run.id,
+            jobId: result.jobId,
+            action: 'matrix_generation_started',
+          },
+          { id: createdBy.actorId, name: createdBy.actorLabel },
+        );
+        notifyContentPlanUpdated(workspaceId, {
+          matrixId: req.params.matrixId,
+          runId: result.run.id,
+          action: 'matrix_generation_started',
+        });
+      }
+      res.status(result.existing ? 200 : 202).json(result);
+    } catch (err) {
+      if (err instanceof ActiveJobResourceConflict) {
+        return res.status(409).json({ error: err.message, code: err.code, jobId: err.jobId });
+      }
+      if (err instanceof MatrixGenerationBatchPreconditionError) {
+        return res.status(422).json({ error: err.message, code: err.code });
+      }
+      log.error({ err }, 'Failed to start matrix generation');
+      res.status(500).json({ error: 'Failed to start matrix generation' });
+    }
+  },
+);
+
+router.get(
+  '/api/content-matrices/:workspaceId/generation-runs/:runId',
+  requireWorkspaceAccess('workspaceId'),
+  (req, res) => {
+    const query = z.object({
+      cursor: z.string().min(1).max(2_048).optional(),
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+    }).safeParse(req.query);
+    if (!query.success) return res.status(400).json({ error: 'Invalid generation-run query' });
+    try {
+      res.json(getMatrixGeneration({
+        workspaceId: req.params.workspaceId,
+        runId: req.params.runId,
+        cursor: query.data.cursor,
+        limit: query.data.limit,
+      }));
+    } catch (err) {
+      if (err instanceof ActiveJobResourceConflict) {
+        return res.status(409).json({ error: err.message, code: err.code, jobId: err.jobId });
+      }
+      if (err instanceof MatrixGenerationBatchNotFoundError) {
+        return res.status(404).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof MatrixGenerationBatchPreconditionError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      log.error({ err }, 'Failed to read matrix generation run');
+      res.status(500).json({ error: 'Failed to read matrix generation run' });
+    }
+  },
+);
+
+router.post(
+  '/api/content-matrices/:workspaceId/generation-runs/:runId/retry',
+  requireWorkspaceAccess('workspaceId'),
+  validate(retryMatrixGenerationSchema),
+  (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    try {
+      const requestedBy = matrixEvidenceResolver(req);
+      const result = retryMatrixGeneration({
+        workspaceId,
+        runId: req.params.runId,
+        expectedRunRevision: req.body.expectedRunRevision,
+        items: req.body.items,
+        idempotencyKey: req.body.idempotencyKey,
+        mode: 'resume',
+        requestedBy,
+        mcpExecutionContext: null,
+      });
+      if (!result.existing) {
+        addActivity(
+          workspaceId,
+          'content_updated',
+          `Retried ${req.body.items.length} matrix generation items`,
+          undefined,
+          {
+            runId: req.params.runId,
+            jobId: result.jobId,
+            action: 'matrix_generation_retry_started',
+          },
+          { id: requestedBy.actorId, name: requestedBy.actorLabel },
+        );
+        notifyContentPlanUpdated(workspaceId, {
+          runId: req.params.runId,
+          action: 'matrix_generation_retry_started',
+        });
+      }
+      res.status(result.existing ? 200 : 202).json(result);
+    } catch (err) {
+      if (err instanceof ActiveJobResourceConflict) {
+        return res.status(409).json({ error: err.message, code: err.code, jobId: err.jobId });
+      }
+      if (err instanceof MatrixGenerationBatchNotFoundError) {
+        return res.status(404).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof MatrixGenerationBatchPreconditionError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      log.error({ err }, 'Failed to retry matrix generation');
+      res.status(500).json({ error: 'Failed to retry matrix generation' });
+    }
+  },
+);
+
+router.post(
+  '/api/content-matrices/:workspaceId/generation-runs/:runId/items/:itemId/approve',
+  requireWorkspaceAccess('workspaceId'),
+  validate(approveMatrixGenerationItemSchema),
+  (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    try {
+      const approvedBy = matrixEvidenceResolver(req);
+      const result = approveMatrixPageForPublishReadiness({
+        workspaceId,
+        runId: req.params.runId,
+        itemId: req.params.itemId,
+        expectedRunRevision: req.body.expectedRunRevision,
+        expectedItemRevision: req.body.expectedItemRevision,
+        expectedPostRevision: req.body.expectedPostRevision,
+        approvedBy,
+      });
+      addActivity(
+        workspaceId,
+        'content_updated',
+        'Approved a generated matrix page for export',
+        undefined,
+        {
+          runId: req.params.runId,
+          itemId: req.params.itemId,
+          postId: result.approvalEvidence.postId,
+          action: 'matrix_generation_page_approved',
+        },
+        { id: approvedBy.actorId, name: approvedBy.actorLabel },
+      );
+      notifyContentPlanUpdated(workspaceId, {
+        runId: req.params.runId,
+        itemId: req.params.itemId,
+        action: 'matrix_generation_page_approved',
+      });
+      res.json(result);
+    } catch (err) {
+      if (err instanceof MatrixPageApprovalPreconditionError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      log.error({ err }, 'Failed to approve generated matrix page');
+      res.status(500).json({ error: 'Failed to approve generated matrix page' });
     }
   },
 );

@@ -75,6 +75,7 @@ import {
   countHtmlWords,
   generateSeoMeta,
   unifyPost,
+  type BoundedProviderDispatch,
 } from './content-posts-ai.js';
 
 const log = createLogger('content-posts');
@@ -254,6 +255,12 @@ export interface GeneratePostOptions {
   generationContextV2?: ContentGenerationContextV2Result;
   /** Cheap source/authority CAS check around paid work. */
   assertAuthority?: () => void;
+  /** Bounded parent workflows disable dispatcher-internal retries. */
+  maxRetries?: number;
+  /** Bounded parent workflows may disallow an unreserved provider fallback. */
+  allowProviderFallback?: boolean;
+  /** Durable reservation hook invoked before every provider dispatch. */
+  beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void | Promise<void>;
 }
 
 export function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
@@ -782,6 +789,11 @@ export async function generatePost(
   const totalSteps = contentPostGenerationTotalSteps(brief);
   const executionChainId = options.executionChainId ?? randomUUID();
   const acceptedExecutions: AcceptedGenerationExecution[] = [];
+  const boundedDispatch = {
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
+  };
   let completedSteps = 0;
   const reportProgress = (message: string, progress = completedSteps) => {
     options.onProgress?.({ message, progress, total: totalSteps });
@@ -902,6 +914,7 @@ export async function generatePost(
     throwIfSignalAborted(options.signal, GENERATION_CANCELLED_MESSAGE);
     assertCurrentAuthority();
     const generatedIntroduction = await generateIntroduction(brief, voiceCtx, workspaceId, siteDomain, {
+      ...boundedDispatch,
       signal: options.signal,
       executionChainId,
       promptAuthority,
@@ -951,6 +964,7 @@ export async function generatePost(
         workspaceId,
         siteDomain,
         {
+          ...boundedDispatch,
           signal: options.signal,
           executionChainId,
           promptAuthority,
@@ -997,6 +1011,7 @@ export async function generatePost(
   try {
     assertCurrentAuthority();
     const generatedConclusion = await generateConclusion(brief, voiceCtx, workspaceId, siteDomain, {
+      ...boundedDispatch,
       signal: options.signal,
       executionChainId,
       promptAuthority,
@@ -1063,6 +1078,7 @@ export async function generatePost(
     assertCurrentAuthority();
     const preUnifyWords = countHtmlWords(post.introduction) + post.sections.reduce((s, sec) => s + sec.wordCount, 0) + countHtmlWords(post.conclusion);
     const unified = await unifyPost(post, brief, voiceCtx, workspaceId, {
+      ...boundedDispatch,
       signal: options.signal,
       executionChainId,
       promptAuthority,
@@ -1146,6 +1162,7 @@ export async function generatePost(
   try {
     assertCurrentAuthority();
     const seoMeta = await generateSeoMeta(post, brief, workspaceId, {
+      ...boundedDispatch,
       signal: options.signal,
       executionChainId,
       promptAuthority,

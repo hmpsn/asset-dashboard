@@ -44,9 +44,9 @@ describe('MCP deliverable-generation rollout flags', () => {
         staleAuditCadence: 'weekly',
       });
     }
-    expect(FEATURE_FLAG_CATALOG['content-matrix-generation'].lifecycle.status).toBe('reserved');
+    expect(FEATURE_FLAG_CATALOG['content-matrix-generation'].lifecycle.status).toBe('active');
     expect(FEATURE_FLAG_CATALOG['content-matrix-generation'].lifecycle.removalCondition)
-      .toContain('2026-08-03');
+      .toContain('2026-08-11');
     expect(FEATURE_FLAG_CATALOG['brand-deliverable-generation'].lifecycle.status).toBe('active');
     expect(FEATURE_FLAG_CATALOG['brand-deliverable-generation'].lifecycle.removalCondition)
       .toContain('B3');

@@ -208,13 +208,13 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
     group: 'Platform Intelligence Enhancements',
     lifecycle: {
       owner: 'content-pipeline',
-      status: 'reserved',
+      status: 'active',
       createdAt: '2026-07-13',
       rolloutTarget: 'staging-validation',
-      removalCondition: 'Re-audit by 2026-08-03; if the paid matrix-run start gate is still unwired, remove the reservation. Once active, retire after the matrix generation workflow is staging-validated and the guarded path is the supported default.',
+      removalCondition: 'Re-audit by 2026-08-11; retire after the matrix generation workflow is staging-validated and the guarded path is the supported default.',
       linkedRoadmapItemId: 'mcp-content-matrix-generation',
       staleAuditCadence: 'weekly',
-      lastReviewedAt: '2026-07-13',
+      lastReviewedAt: '2026-07-14',
     },
   },
   'content-generation-context-v2': {

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  MATRIX_GENERATION_BATCH_LIMITS,
   MATRIX_GENERATION_SOURCE_LIMITS,
   MATRIX_READ_LIMITS,
 } from './matrix-generation.js';
@@ -139,6 +140,98 @@ export const resolveContentMatrixEvidenceInputSchema = z.object({
     .describe('Caller-stable replay key for this exact evidence mutation.'),
 }).strict();
 
+const batchBudgetSchema = z.object({
+  max_provider_calls: z.number().int().positive()
+    .max(MATRIX_GENERATION_BATCH_LIMITS.maxProviderCalls)
+    .describe('Maximum provider calls the caller accepts for this batch.'),
+  max_input_tokens: z.number().int().positive()
+    .max(MATRIX_GENERATION_BATCH_LIMITS.maxInputTokens)
+    .describe('Maximum input tokens the caller accepts for this batch.'),
+  max_output_tokens: z.number().int().positive()
+    .max(MATRIX_GENERATION_BATCH_LIMITS.maxOutputTokens)
+    .describe('Maximum output tokens the caller accepts for this batch.'),
+  max_estimated_usd: z.number().positive()
+    .max(MATRIX_GENERATION_BATCH_LIMITS.maxEstimatedUsd)
+    .describe('Maximum estimated USD cost the caller accepts for this batch.'),
+  max_concurrency: z.number().int().min(1)
+    .max(MATRIX_GENERATION_BATCH_LIMITS.maxConcurrency)
+    .describe('Maximum concurrent matrix pages the caller accepts.'),
+}).strict();
+
+const startSelectionSchema = matrixResolutionSelectionSchema.extend({
+  expected_preview_fingerprint: fingerprintSchema
+    .describe('Exact effective-input fingerprint returned by generation preview.'),
+}).strict();
+
+export const startContentMatrixGenerationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  matrix_id: durableIdSchema.describe('Durable content matrix ID.'),
+  selections: z.array(startSelectionSchema)
+    .min(1)
+    .max(MATRIX_GENERATION_BATCH_LIMITS.maxItems)
+    .superRefine((selections, ctx) => {
+      const seen = new Set<string>();
+      selections.forEach((selection, index) => {
+        if (seen.has(selection.cell_id)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [index, 'cell_id'],
+            message: 'cell_id values must be unique',
+          });
+        }
+        seen.add(selection.cell_id);
+      });
+    })
+    .describe('One to 25 unique previewed cells with exact source and preview revisions.'),
+  accepted_budget: batchBudgetSchema
+    .describe('Hard ceilings that must cover the aggregate preview estimate.'),
+  idempotency_key: z.string().trim().min(1).max(200)
+    .describe('Caller-stable replay key for this exact batch snapshot.'),
+}).strict();
+
+export const getContentMatrixGenerationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  run_id: durableIdSchema.describe('Durable matrix generation run ID.'),
+  cursor: cursorSchema.optional()
+    .describe('Opaque item cursor bound to the current run revision.'),
+  limit: z.number().int().min(1).max(MATRIX_READ_LIMITS.maxPageSize).optional()
+    .describe(`Item page size; defaults to 25 and caps at ${MATRIX_READ_LIMITS.maxPageSize}.`),
+}).strict();
+
+const retryItemSchema = z.object({
+  item_id: durableIdSchema,
+  expected_item_revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  source_revision: sourceRevisionSchema,
+  expected_artifact_revisions: artifactRevisionExpectationsSchema,
+  reusable_checkpoint_fingerprint: fingerprintSchema.nullable(),
+}).strict();
+
+export const retryContentMatrixGenerationInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  run_id: durableIdSchema.describe('Durable matrix generation run ID.'),
+  expected_run_revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
+    .describe('Exact run revision returned by get_content_matrix_generation.'),
+  items: z.array(retryItemSchema)
+    .min(1)
+    .max(MATRIX_GENERATION_BATCH_LIMITS.maxItems)
+    .superRefine((items, ctx) => {
+      const seen = new Set<string>();
+      items.forEach((item, index) => {
+        if (seen.has(item.item_id)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [index, 'item_id'],
+            message: 'item_id values must be unique',
+          });
+        }
+        seen.add(item.item_id);
+      });
+    })
+    .describe('Explicit failed or needs-attention items with exact reusable checkpoints.'),
+  idempotency_key: z.string().trim().min(1).max(200)
+    .describe('Caller-stable replay key for this exact retry selection.'),
+}).strict();
+
 export const acceptContentTemplateGenerationUpgradeInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   template_id: durableIdSchema.describe('Durable content template ID.'),
@@ -160,6 +253,15 @@ export type PreviewContentMatrixGenerationInput = z.infer<
 >;
 export type ResolveContentMatrixEvidenceInput = z.infer<
   typeof resolveContentMatrixEvidenceInputSchema
+>;
+export type StartContentMatrixGenerationInput = z.infer<
+  typeof startContentMatrixGenerationInputSchema
+>;
+export type GetContentMatrixGenerationInput = z.infer<
+  typeof getContentMatrixGenerationInputSchema
+>;
+export type RetryContentMatrixGenerationInput = z.infer<
+  typeof retryContentMatrixGenerationInputSchema
 >;
 export type AcceptContentTemplateGenerationUpgradeInput = z.infer<
   typeof acceptContentTemplateGenerationUpgradeInputSchema

@@ -1,6 +1,6 @@
 import type { AICallOptions, AICallResult } from '../../../ai.js';
 import { callAI, renderAIProviderInput } from '../../../ai.js';
-import { countHtmlWords } from '../../../content-posts-ai.js';
+import { countHtmlWords, type BoundedProviderDispatch } from '../../../content-posts-ai.js';
 import { sanitizeRichText } from '../../../html-sanitize.js';
 import { extractLinks } from '../../../seo-audit-html.js';
 import {
@@ -59,6 +59,7 @@ interface MatrixGenerationOperationBaseInput {
   signal?: AbortSignal;
   dependencies?: Partial<MatrixGenerationAIDependencies>;
   prepared?: PreparedMatrixGenerationOperation;
+  beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void;
 }
 
 export interface PreparedMatrixGenerationOperation {
@@ -338,6 +339,17 @@ export async function auditMatrixGenerationCandidate(
     input.prepared,
     prepareMatrixGenerationAuditOperation(input),
   );
+  input.beforeBoundedProviderDispatch?.({
+    provider: 'openai',
+    fallback: false,
+    renderedInput: renderAIProviderInput({
+      provider: 'openai',
+      system: prepared.system,
+      messages: prepared.messages,
+      researchMode: true,
+    }),
+    maxOutputTokens: 2_500,
+  });
   const result = await dependencies(input.dependencies).callAI({
     operation: 'content-matrix-item-audit',
     system: prepared.system,
@@ -399,6 +411,17 @@ export async function reviseMatrixGenerationCandidate(
     input.prepared,
     prepareMatrixGenerationRevisionOperation(input),
   );
+  input.beforeBoundedProviderDispatch?.({
+    provider: 'openai',
+    fallback: false,
+    renderedInput: renderAIProviderInput({
+      provider: 'openai',
+      system: prepared.system,
+      messages: prepared.messages,
+      researchMode: true,
+    }),
+    maxOutputTokens: 12_000,
+  });
   const result = await dependencies(input.dependencies).callAI({
     operation: 'content-matrix-item-revise',
     system: prepared.system,

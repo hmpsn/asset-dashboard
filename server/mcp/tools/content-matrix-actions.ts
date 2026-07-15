@@ -1,11 +1,14 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
 import {
   acceptContentTemplateGenerationUpgradeInputSchema,
+  getContentMatrixGenerationInputSchema,
   getContentMatrixInputSchema,
   listContentMatricesInputSchema,
   previewContentMatrixGenerationInputSchema,
   resolveContentMatrixEvidenceInputSchema,
   resolveContentMatrixCellsInputSchema,
+  retryContentMatrixGenerationInputSchema,
+  startContentMatrixGenerationInputSchema,
 } from '../../../shared/types/mcp-matrix-schemas.js';
 import {
   MCP_TOOL_ERROR_CODES,
@@ -31,12 +34,21 @@ import {
 } from '../../domains/content/matrix-generation/evidence.js';
 import { previewMatrixGeneration } from '../../domains/content/matrix-generation/preview.js';
 import {
+  getMatrixGeneration,
+  MatrixGenerationBatchNotFoundError,
+  MatrixGenerationBatchPreconditionError,
+  retryMatrixGeneration,
+  startMatrixGeneration,
+} from '../../domains/content/matrix-generation/batch-service.js';
+import {
   acceptTemplateGenerationUpgrade,
   type AcceptTemplateGenerationUpgradeActionResult,
   TemplateGenerationUpgradeError,
 } from '../../domains/content/matrix-generation/upgrade-action.js';
 import { invalidateContentPipelineIntelligence } from '../../intelligence-freshness.js';
+import { ActiveJobResourceConflict } from '../../jobs.js';
 import { toMcpJsonSchema } from '../json-schema.js';
+import { recordPaidCallOnce } from '../paid-call-counter.js';
 import { mcpJsonV1Error } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
 import { WS_EVENTS } from '../../ws-events.js';
@@ -78,6 +90,24 @@ export const contentMatrixActionTools: Tool[] = [
       'Resolve one stable matrix-cell evidence requirement with a typed value and factual source. The version-conditional mutation advances only that cell revision, invalidating the prior preview; re-preview before any generation start.',
     inputSchema: toMcpJsonSchema(resolveContentMatrixEvidenceInputSchema),
   },
+  {
+    name: 'start_content_matrix_generation',
+    description:
+      '[Paid API] Start one bounded background generation run for explicitly previewed matrix cells. Requires exact source revisions, preview fingerprints, caller-accepted budget ceilings, and an idempotency key. Produces review-ready drafts only; never approves or publishes.',
+    inputSchema: toMcpJsonSchema(startContentMatrixGenerationInputSchema),
+  },
+  {
+    name: 'get_content_matrix_generation',
+    description:
+      'Read one durable matrix generation run and a cursor-paged set of per-cell outcomes, audit findings, artifact IDs, and human approval evidence.',
+    inputSchema: toMcpJsonSchema(getContentMatrixGenerationInputSchema),
+  },
+  {
+    name: 'retry_content_matrix_generation',
+    description:
+      '[Paid API] Resume explicitly selected failed or needs-attention matrix items from exact run, item, source, artifact, and reusable-checkpoint revisions. Does not replace approved work and never publishes.',
+    inputSchema: toMcpJsonSchema(retryContentMatrixGenerationInputSchema),
+  },
 ];
 
 type MaybePromise<T> = T | Promise<T>;
@@ -88,12 +118,16 @@ export interface ContentMatrixActionDependencies {
   resolveMatrixStructures: typeof resolveMatrixStructures;
   previewMatrixGeneration: typeof previewMatrixGeneration;
   resolveContentMatrixEvidence: typeof resolveContentMatrixEvidence;
+  startMatrixGeneration: typeof startMatrixGeneration;
+  getMatrixGeneration: typeof getMatrixGeneration;
+  retryMatrixGeneration: typeof retryMatrixGeneration;
   acceptTemplateGenerationUpgrade: (
     request: Parameters<typeof acceptTemplateGenerationUpgrade>[0],
   ) => MaybePromise<ReturnType<typeof acceptTemplateGenerationUpgrade>>;
   addActivity: typeof addActivity;
   broadcastToWorkspace: typeof broadcastToWorkspace;
   invalidateContentPipelineIntelligence: typeof invalidateContentPipelineIntelligence;
+  recordPaidCallOnce: typeof recordPaidCallOnce;
 }
 
 const defaultDependencies: ContentMatrixActionDependencies = {
@@ -102,10 +136,14 @@ const defaultDependencies: ContentMatrixActionDependencies = {
   resolveMatrixStructures,
   previewMatrixGeneration,
   resolveContentMatrixEvidence,
+  startMatrixGeneration,
+  getMatrixGeneration,
+  retryMatrixGeneration,
   acceptTemplateGenerationUpgrade,
   addActivity,
   broadcastToWorkspace,
   invalidateContentPipelineIntelligence,
+  recordPaidCallOnce,
 };
 
 function snakeCaseKey(key: string): string {
@@ -128,6 +166,19 @@ function toMcpPayload(value: unknown, preserveObjectKeys = false): unknown {
       toMcpPayload(child, preserveObjectKeys || IDENTITY_KEYED_MAP_FIELDS.has(key)),
     ]),
   );
+}
+
+function paidMatrixCommandSuccess<T extends { jobId: string }>(
+  result: T,
+  workspaceId: string,
+  dependencies: ContentMatrixActionDependencies,
+): CallToolResult {
+  const eventKey = `mcp:matrix-generation:accepted-command:${result.jobId}`;
+  const warning = dependencies.recordPaidCallOnce(eventKey, 1, workspaceId).warning;
+  return mcpSuccess(toMcpPayload({
+    ...result,
+    ...(warning ? { warning } : {}),
+  }));
 }
 
 function projectResolveResult(result: ResolveMatrixStructuresResult): {
@@ -161,7 +212,11 @@ function projectPreviewResult(result: PreviewMatrixGenerationResult) {
     const { proposal, ...identity } = item;
     return { ...identity, proposalFingerprint: proposal.proposalFingerprint };
   });
-  return { results, upgradeProposals: [...upgradeProposals.values()] };
+  return {
+    results,
+    estimatedBatchBudget: result.estimatedBatchBudget,
+    upgradeProposals: [...upgradeProposals.values()],
+  };
 }
 
 function mcpAttribution(context: McpToolExecutionContext) {
@@ -439,6 +494,132 @@ export function createContentMatrixActionHandler(
         return mcpSuccess(toMcpPayload(result));
       }
 
+      if (name === 'start_content_matrix_generation') {
+        const parsed = startContentMatrixGenerationInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        const selections = parsed.data.selections.map(selection => ({
+          cellId: selection.cell_id,
+          expectedSourceRevision: {
+            matrixRevision: selection.expected_source_revision.matrix_revision,
+            templateRevision: selection.expected_source_revision.template_revision,
+            cellRevision: selection.expected_source_revision.cell_revision,
+          },
+          expectedPreviewFingerprint: selection.expected_preview_fingerprint,
+        }));
+        const first = selections[0];
+        if (!first) return validationError();
+        const result = await dependencies.startMatrixGeneration({
+          workspaceId: parsed.data.workspace_id,
+          matrixId: parsed.data.matrix_id,
+          selections: [first, ...selections.slice(1)],
+          acceptedBudget: {
+            maxProviderCalls: parsed.data.accepted_budget.max_provider_calls,
+            maxInputTokens: parsed.data.accepted_budget.max_input_tokens,
+            maxOutputTokens: parsed.data.accepted_budget.max_output_tokens,
+            maxEstimatedUsd: parsed.data.accepted_budget.max_estimated_usd,
+            maxConcurrency: parsed.data.accepted_budget.max_concurrency,
+          },
+          idempotencyKey: parsed.data.idempotency_key,
+          createdBy: mcpAttribution(context),
+          mcpExecutionContext: context,
+        });
+        if (!result.existing) {
+          dependencies.broadcastToWorkspace(parsed.data.workspace_id, WS_EVENTS.CONTENT_UPDATED, {
+            domain: 'content-plan',
+            matrixId: parsed.data.matrix_id,
+            runId: result.run.id,
+            action: 'matrix_generation_started',
+          });
+          dependencies.addActivity(
+            parsed.data.workspace_id,
+            'content_updated',
+            `Started generation for ${result.run.selections.length} matrix pages`,
+            undefined,
+            {
+              source: 'mcp-chat',
+              matrixId: parsed.data.matrix_id,
+              runId: result.run.id,
+              jobId: result.jobId,
+              action: 'matrix_generation_started',
+            },
+          );
+        }
+        return paidMatrixCommandSuccess({
+          ...result,
+          dashboardUrl: `/ws/${encodeURIComponent(parsed.data.workspace_id)}/content`,
+        }, parsed.data.workspace_id, dependencies);
+      }
+
+      if (name === 'get_content_matrix_generation') {
+        const parsed = getContentMatrixGenerationInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        return mcpSuccess(toMcpPayload(dependencies.getMatrixGeneration({
+          workspaceId: parsed.data.workspace_id,
+          runId: parsed.data.run_id,
+          cursor: parsed.data.cursor,
+          limit: parsed.data.limit,
+        })));
+      }
+
+      if (name === 'retry_content_matrix_generation') {
+        const parsed = retryContentMatrixGenerationInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        const items = parsed.data.items.map(item => ({
+          itemId: item.item_id,
+          expectedItemRevision: item.expected_item_revision,
+          sourceRevision: {
+            matrixRevision: item.source_revision.matrix_revision,
+            templateRevision: item.source_revision.template_revision,
+            cellRevision: item.source_revision.cell_revision,
+          },
+          expectedArtifactRevisions: {
+            brief: {
+              artifactType: 'content_brief' as const,
+              artifactId: item.expected_artifact_revisions.brief.artifact_id,
+              generationRevision: item.expected_artifact_revisions.brief.generation_revision,
+            },
+            post: {
+              artifactType: 'generated_post' as const,
+              artifactId: item.expected_artifact_revisions.post.artifact_id,
+              generationRevision: item.expected_artifact_revisions.post.generation_revision,
+            },
+          },
+          reusableCheckpointFingerprint: item.reusable_checkpoint_fingerprint,
+        }));
+        const first = items[0];
+        if (!first) return validationError();
+        const result = dependencies.retryMatrixGeneration({
+          workspaceId: parsed.data.workspace_id,
+          runId: parsed.data.run_id,
+          expectedRunRevision: parsed.data.expected_run_revision,
+          items: [first, ...items.slice(1)],
+          idempotencyKey: parsed.data.idempotency_key,
+          mode: 'resume',
+          requestedBy: mcpAttribution(context),
+          mcpExecutionContext: context,
+        });
+        if (!result.existing) {
+          dependencies.broadcastToWorkspace(parsed.data.workspace_id, WS_EVENTS.CONTENT_UPDATED, {
+            domain: 'content-plan',
+            runId: parsed.data.run_id,
+            action: 'matrix_generation_retry_started',
+          });
+          dependencies.addActivity(
+            parsed.data.workspace_id,
+            'content_updated',
+            `Retried ${items.length} matrix generation items`,
+            undefined,
+            {
+              source: 'mcp-chat',
+              runId: parsed.data.run_id,
+              jobId: result.jobId,
+              action: 'matrix_generation_retry_started',
+            },
+          );
+        }
+        return paidMatrixCommandSuccess(result, parsed.data.workspace_id, dependencies);
+      }
+
       return unknownToolError();
     } catch (error) {
       if (error instanceof MatrixReadServiceError) return readServiceError(error);
@@ -455,6 +636,28 @@ export function createContentMatrixActionHandler(
         });
       }
       if (error instanceof MatrixGenerationSourceLimitError) return generationSourceLimitError();
+      if (error instanceof MatrixGenerationBatchNotFoundError) {
+        return mcpJsonV1Error({
+          code: MCP_TOOL_ERROR_CODES.NOT_FOUND,
+          message: error.message,
+          retryable: false,
+        });
+      }
+      if (error instanceof MatrixGenerationBatchPreconditionError) {
+        return mcpJsonV1Error({
+          code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
+          message: error.message,
+          retryable: true,
+        });
+      }
+      if (error instanceof ActiveJobResourceConflict) {
+        return mcpJsonV1Error({
+          code: MCP_TOOL_ERROR_CODES.CONFLICT,
+          message: error.message,
+          retryable: true,
+          details: { active_job_id: error.jobId },
+        });
+      }
       throw error;
     }
   };

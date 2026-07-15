@@ -2,7 +2,7 @@
   "version": 1,
   "updatedAt": "2026-07-14",
   "tolerance": 0.05,
-  "total": 1731799,
+  "total": 1734430,
   "entries": {
     "css:assets/index.css": 37307,
     "css:vendor/fontawesome/fontawesome-sharp-regular-subset.min.css": 1203,
@@ -148,7 +148,7 @@
     "js:src/components/ContentPerformance.tsx": 7431,
     "js:src/components/ContentPipeline.tsx": 27031,
     "js:src/components/ContentPipelineGuide.tsx": 2597,
-    "js:src/components/ContentPlanner.tsx": 14255,
+    "js:src/components/ContentPlanner.tsx": 16886,
     "js:src/components/ContentSubscriptions.tsx": 2677,
     "js:src/components/dev/DsHarness.tsx": 4110,
     "js:src/components/FeatureLibrary.tsx": 2199,

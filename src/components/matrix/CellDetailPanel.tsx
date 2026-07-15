@@ -14,6 +14,7 @@ interface CellDetailPanelProps {
   onClose: () => void;
   onCellUpdate: (cellId: string, updates: Partial<MatrixCell>) => void;
   onGenerateBrief?: (cellId: string) => void;
+  generationBusy?: boolean;
   onSendReview?: (cellId: string) => void;
   onFlag?: (cellId: string, comment: string) => void;
 }
@@ -58,6 +59,7 @@ export function CellDetailPanel({
   onClose,
   onCellUpdate,
   onGenerateBrief,
+  generationBusy = false,
   onSendReview,
   onFlag,
 }: CellDetailPanelProps) {
@@ -301,11 +303,12 @@ export function CellDetailPanel({
             <Button
               variant="primary"
               size="sm"
-              icon={FileText}
+              icon={PenTool}
+              loading={generationBusy}
               onClick={() => onGenerateBrief(cell.id)}
               className="w-full"
             >
-              Generate Brief
+              Generate Page
             </Button>
           )}
 

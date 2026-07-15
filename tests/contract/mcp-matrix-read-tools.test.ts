@@ -4,6 +4,10 @@ import type { ContentTemplate } from '../../shared/types/content.js';
 import {
   MatrixGenerationSourceLimitError,
   type ContentTemplateGenerationUpgradeProposal,
+  type GetMatrixGenerationResult,
+  type MatrixGenerationRun,
+  type RetryMatrixGenerationResult,
+  type StartMatrixGenerationResult,
 } from '../../shared/types/matrix-generation.js';
 import { MCP_TOOL_ERROR_CODES } from '../../shared/types/mcp-runtime.js';
 import {
@@ -41,6 +45,65 @@ function template(): ContentTemplate {
     metaDescPattern: 'Learn about {service}.',
     createdAt: '2026-07-01T00:00:00.000Z',
     updatedAt: '2026-07-01T00:00:00.000Z',
+  };
+}
+
+function generationRun(): MatrixGenerationRun {
+  const timestamp = '2026-07-14T12:00:00.000Z';
+  return {
+    id: 'run_1',
+    workspaceId: 'ws_1',
+    matrixId: 'mtx_1',
+    templateId: 'tpl_1',
+    status: 'queued',
+    revision: 0,
+    selectionFingerprint: 'c'.repeat(64),
+    selections: [{
+      matrixId: 'mtx_1',
+      cellId: 'cell_1',
+      sourceRevision: { matrixRevision: 2, templateRevision: 4, cellRevision: 1 },
+      structuralFingerprint: 'a'.repeat(64),
+      previewFingerprint: 'b'.repeat(64),
+    }],
+    jobId: 'job_1',
+    acceptedBudget: {
+      estimate: {
+        providerCalls: 15,
+        inputTokens: 31_000,
+        outputTokens: 27_500,
+        estimatedUsd: 0.98,
+        maxConcurrency: 1,
+      },
+      limits: {
+        maxProviderCalls: 15,
+        maxInputTokens: 31_000,
+        maxOutputTokens: 27_500,
+        maxEstimatedUsd: 0.98,
+        maxConcurrency: 1,
+      },
+      reserved: {
+        providerCalls: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        estimatedUsd: 0,
+      },
+    },
+    setAuditReport: null,
+    counts: {
+      selected: 1,
+      queued: 1,
+      running: 0,
+      readyForHumanReview: 0,
+      needsAttention: 0,
+      blocked: 0,
+      conflicts: 0,
+      failed: 0,
+      cancelled: 0,
+    },
+    createdBy: { actorType: 'mcp' },
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    completedAt: null,
   };
 }
 
@@ -129,8 +192,14 @@ function dependencies() {
       cells: { items: [], nextCursor: null },
     })),
     resolveMatrixStructures: vi.fn(async () => ({ results: [] })),
-    previewMatrixGeneration: vi.fn(async () => ({ results: [] })),
+    previewMatrixGeneration: vi.fn(async () => ({
+      results: [],
+      estimatedBatchBudget: null,
+    })),
     resolveContentMatrixEvidence: vi.fn(),
+    startMatrixGeneration: vi.fn(),
+    getMatrixGeneration: vi.fn(),
+    retryMatrixGeneration: vi.fn(),
     acceptTemplateGenerationUpgrade: vi.fn(async () => ({
       status: 'accepted' as const,
       template: template(),
@@ -140,6 +209,7 @@ function dependencies() {
     addActivity: vi.fn(),
     broadcastToWorkspace: vi.fn(),
     invalidateContentPipelineIntelligence: vi.fn(),
+    recordPaidCallOnce: vi.fn(() => ({ count: 1 })),
   };
 }
 
@@ -150,7 +220,7 @@ function textPayload(result: Awaited<ReturnType<ReturnType<typeof createContentM
 }
 
 describe('MCP content matrix read tools', () => {
-  it('advertises one dedicated six-tool snake_case family with described bounded inputs', () => {
+  it('advertises one dedicated nine-tool snake_case family with described bounded inputs', () => {
     expect(contentMatrixActionTools.map(tool => tool.name)).toEqual([
       'list_content_matrices',
       'get_content_matrix',
@@ -158,6 +228,9 @@ describe('MCP content matrix read tools', () => {
       'accept_content_template_generation_upgrade',
       'preview_content_matrix_generation',
       'resolve_content_matrix_evidence',
+      'start_content_matrix_generation',
+      'get_content_matrix_generation',
+      'retry_content_matrix_generation',
     ]);
 
     for (const tool of contentMatrixActionTools as Tool[]) {
@@ -461,6 +534,7 @@ describe('MCP content matrix read tools', () => {
   it('maps generation preview selections and readiness to the snake_case MCP contract', async () => {
     const deps = dependencies();
     deps.previewMatrixGeneration.mockResolvedValue({
+      estimatedBatchBudget: null,
       results: [{
         status: 'blocked',
         matrixId: 'mtx_1',
@@ -508,6 +582,7 @@ describe('MCP content matrix read tools', () => {
       }],
     });
     expect(textPayload(result)).toMatchObject({
+      estimated_batch_budget: null,
       results: [{
         status: 'blocked',
         cell_id: 'cell_1',
@@ -605,6 +680,157 @@ describe('MCP content matrix read tools', () => {
     expect(deps.invalidateContentPipelineIntelligence).toHaveBeenCalledOnce();
     expect(deps.broadcastToWorkspace).toHaveBeenCalledOnce();
     expect(deps.addActivity).toHaveBeenCalledOnce();
+  });
+
+  it('maps start, read, and selected retry through the batch service without approval authority', async () => {
+    const deps = dependencies();
+    const run = generationRun();
+    const startResult: StartMatrixGenerationResult = {
+      run,
+      jobId: 'job_1',
+      estimatedBudget: run.acceptedBudget!.estimate,
+      existing: false,
+    };
+    deps.startMatrixGeneration
+      .mockResolvedValueOnce(startResult)
+      .mockResolvedValueOnce({ ...startResult, existing: true });
+    const readResult: GetMatrixGenerationResult = {
+      run,
+      items: { items: [], nextCursor: null },
+    };
+    deps.getMatrixGeneration.mockReturnValue(readResult);
+    const retryResult: RetryMatrixGenerationResult = {
+      run: { ...run, status: 'running', revision: 1 },
+      jobId: 'job_retry_1',
+      existing: false,
+    };
+    deps.retryMatrixGeneration.mockReturnValue(retryResult);
+    const handle = createContentMatrixActionHandler(deps);
+    const startInput = {
+      workspace_id: 'ws_1',
+      matrix_id: 'mtx_1',
+      selections: [{
+        cell_id: 'cell_1',
+        expected_source_revision: {
+          matrix_revision: 2,
+          template_revision: 4,
+          cell_revision: 1,
+        },
+        expected_preview_fingerprint: 'b'.repeat(64),
+      }],
+      accepted_budget: {
+        max_provider_calls: 15,
+        max_input_tokens: 31_000,
+        max_output_tokens: 27_500,
+        max_estimated_usd: 0.98,
+        max_concurrency: 1,
+      },
+      idempotency_key: 'matrix-start-1',
+    };
+
+    const started = await handle(
+      'start_content_matrix_generation',
+      startInput,
+      { ...context, toolName: 'start_content_matrix_generation' },
+    );
+    await handle(
+      'start_content_matrix_generation',
+      startInput,
+      { ...context, toolName: 'start_content_matrix_generation' },
+    );
+    expect(deps.startMatrixGeneration).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: 'ws_1',
+      matrixId: 'mtx_1',
+      createdBy: {
+        actorType: 'mcp',
+        actorId: 'key_1',
+        actorLabel: 'Test key',
+      },
+      mcpExecutionContext: expect.objectContaining({ toolName: 'start_content_matrix_generation' }),
+    }));
+    expect(textPayload(started)).toMatchObject({
+      job_id: 'job_1',
+      existing: false,
+      dashboard_url: '/ws/ws_1/content',
+    });
+    expect(deps.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      1,
+      'mcp:matrix-generation:accepted-command:job_1',
+      1,
+      'ws_1',
+    );
+    expect(deps.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      2,
+      'mcp:matrix-generation:accepted-command:job_1',
+      1,
+      'ws_1',
+    );
+    expect(deps.addActivity).toHaveBeenCalledTimes(1);
+
+    const read = await handle('get_content_matrix_generation', {
+      workspace_id: 'ws_1',
+      run_id: 'run_1',
+      limit: 10,
+    }, { ...context, toolName: 'get_content_matrix_generation' });
+    expect(deps.getMatrixGeneration).toHaveBeenCalledWith({
+      workspaceId: 'ws_1',
+      runId: 'run_1',
+      cursor: undefined,
+      limit: 10,
+    });
+    expect(textPayload(read)).toMatchObject({ run: { id: 'run_1' }, items: { items: [] } });
+
+    const retried = await handle('retry_content_matrix_generation', {
+      workspace_id: 'ws_1',
+      run_id: 'run_1',
+      expected_run_revision: 0,
+      items: [{
+        item_id: 'item_1',
+        expected_item_revision: 3,
+        source_revision: {
+          matrix_revision: 2,
+          template_revision: 4,
+          cell_revision: 1,
+        },
+        expected_artifact_revisions: {
+          brief: {
+            artifact_type: 'content_brief',
+            artifact_id: 'brief_1',
+            generation_revision: 1,
+          },
+          post: {
+            artifact_type: 'generated_post',
+            artifact_id: 'post_1',
+            generation_revision: 2,
+          },
+        },
+        reusable_checkpoint_fingerprint: 'd'.repeat(64),
+      }],
+      idempotency_key: 'matrix-retry-1',
+    }, { ...context, toolName: 'retry_content_matrix_generation' });
+    expect(deps.retryMatrixGeneration).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceId: 'ws_1',
+      runId: 'run_1',
+      mode: 'resume',
+      requestedBy: {
+        actorType: 'mcp',
+        actorId: 'key_1',
+        actorLabel: 'Test key',
+      },
+      items: [expect.objectContaining({
+        itemId: 'item_1',
+        reusableCheckpointFingerprint: 'd'.repeat(64),
+      })],
+    }));
+    expect(textPayload(retried)).toMatchObject({ job_id: 'job_retry_1', existing: false });
+    expect(deps.recordPaidCallOnce).toHaveBeenNthCalledWith(
+      3,
+      'mcp:matrix-generation:accepted-command:job_retry_1',
+      1,
+      'ws_1',
+    );
+    expect(deps.addActivity).toHaveBeenCalledTimes(2);
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledTimes(2);
   });
 
   it('writes an accepted exact upgrade through the domain action and emits one MCP audit/event', async () => {

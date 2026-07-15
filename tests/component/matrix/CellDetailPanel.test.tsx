@@ -173,23 +173,23 @@ describe('CellDetailPanel', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('shows Generate Brief action button when onGenerateBrief provided and no briefId', () => {
+  it('shows Generate Page action button when onGenerateBrief provided and no briefId', () => {
     const onGenerateBrief = vi.fn();
     renderPanel({ cell: PLANNED_CELL, onGenerateBrief });
-    expect(screen.getByRole('button', { name: /generate brief/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /generate page/i })).toBeInTheDocument();
   });
 
-  it('Generate Brief button calls onGenerateBrief with cell id', () => {
+  it('Generate Page button calls onGenerateBrief with cell id', () => {
     const onGenerateBrief = vi.fn();
     renderPanel({ cell: PLANNED_CELL, onGenerateBrief });
-    fireEvent.click(screen.getByRole('button', { name: /generate brief/i }));
+    fireEvent.click(screen.getByRole('button', { name: /generate page/i }));
     expect(onGenerateBrief).toHaveBeenCalledWith(PLANNED_CELL.id);
   });
 
-  it('does not show Generate Brief button when brief already exists', () => {
+  it('does not show Generate Page button when brief already exists', () => {
     const onGenerateBrief = vi.fn();
     renderPanel({ cell: BRIEF_CELL, onGenerateBrief });
-    expect(screen.queryByRole('button', { name: /generate brief/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /generate page/i })).not.toBeInTheDocument();
   });
 
   it('shows Send to client button when onSendReview provided and brief exists, not in review/published status', () => {

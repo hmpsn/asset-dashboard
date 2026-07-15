@@ -56,6 +56,7 @@ import {
 } from './generation-provenance.js';
 import { canonicalGenerationProvenanceSchema } from './schemas/generation-provenance.js';
 import { throwIfSignalAborted } from './abort-helpers.js';
+import type { BoundedProviderDispatch } from './content-posts-ai.js';
 
 const log = createLogger('content-brief');
 const BRIEF_GENERATION_CANCELLED_MESSAGE = 'Content brief generation cancelled';
@@ -1489,6 +1490,10 @@ export async function generateBrief(
     skipKeywordStrategyCrossref?: boolean;
     /** Cheap source/authority CAS check around paid work. */
     assertAuthority?: () => void;
+    /** Bounded parent workflows disable dispatcher-internal retries. */
+    maxRetries?: number;
+    /** Durable reservation hook invoked before the provider call. */
+    beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void | Promise<void>;
   },
 ): Promise<ContentBrief> {
   throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
@@ -1912,16 +1917,29 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
 
   throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   options?.assertAuthority?.();
+  const briefMessages = [{ role: 'user' as const, content: prompt }];
+  await options?.beforeBoundedProviderDispatch?.({
+    provider: 'openai',
+    fallback: false,
+    renderedInput: renderAIProviderInput({
+      provider: 'openai',
+      system: systemPrompt,
+      messages: briefMessages,
+      researchMode: true,
+    }),
+    maxOutputTokens: 7_000,
+  });
   const aiResult = await callAI({
     operation: 'content-brief-generate',
     model: 'gpt-5.4',
     system: systemPrompt,
-    messages: [{ role: 'user', content: prompt }],
+    messages: briefMessages,
     maxTokens: 7000,
     temperature: 0.5,
     responseFormat: { type: 'json_object' },
     researchMode: true,
     workspaceId,
+    maxRetries: options?.maxRetries,
     executionChainId: options?.executionChainId,
     signal: options?.signal,
   });

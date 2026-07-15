@@ -17,6 +17,10 @@ import db from '../../server/db/index.js';
 import { createMatrix, getMatrix } from '../../server/content-matrices.js';
 import { createTemplate } from '../../server/content-templates.js';
 import { getPost, updatePostField } from '../../server/content-posts-db.js';
+import { listJobs } from '../../server/jobs.js';
+import {
+  approveMatrixPageForPublishReadiness,
+} from '../../server/domains/content/matrix-generation/approval-service.js';
 import {
   resolveContentMatrixEvidence,
 } from '../../server/domains/content/matrix-generation/evidence.js';
@@ -33,8 +37,10 @@ import type {
 import {
   commitMatrixGenerationDraft,
   createMatrixGenerationRun,
+  getPersistedMatrixGenerationRun,
   listMatrixGenerationAttempts,
   listMatrixGenerationItems,
+  saveMatrixGenerationSetAuditReport,
   transitionMatrixGenerationItem,
   transitionMatrixGenerationRun,
 } from '../../server/domains/content/matrix-generation/repository.js';
@@ -451,6 +457,70 @@ function revisedBlocks(input: ReviseMatrixGenerationCandidateInput) {
 }
 
 describe('auditMatrixGenerationItem', () => {
+  it('requires the set audit before human approval and never queues publication', async () => {
+    const committed = await committedFixture(true);
+    const audited = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-approval-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => operationResult(
+        input,
+        'content-matrix-item-audit',
+        { revisionRecommended: false, findings: [] },
+      ),
+    });
+    const runBeforeSetAudit = getPersistedMatrixGenerationRun(
+      committed.fixture.workspaceId,
+      audited.item.runId,
+    )!;
+    const approvalRequest = {
+      workspaceId: committed.fixture.workspaceId,
+      runId: runBeforeSetAudit.id,
+      itemId: audited.item.id,
+      expectedRunRevision: runBeforeSetAudit.revision,
+      expectedItemRevision: audited.item.revision,
+      expectedPostRevision: audited.post.generationRevision,
+      approvedBy: { actorType: 'operator' as const, actorId: 'matrix-approver' },
+    };
+
+    expect(() => approveMatrixPageForPublishReadiness(approvalRequest)).toThrow(
+      /not ready for human approval/i,
+    );
+
+    const run = saveMatrixGenerationSetAuditReport({
+      workspaceId: committed.fixture.workspaceId,
+      runId: runBeforeSetAudit.id,
+      expectedRunRevision: runBeforeSetAudit.revision,
+      report: {
+        verdict: 'passed',
+        findings: [],
+        passCount: 1,
+        modelProvenance: provenance('content-matrix-set-audit'),
+        auditedAt: new Date().toISOString(),
+      },
+    });
+    const publishJobsBefore = listJobs(committed.fixture.workspaceId)
+      .filter(job => job.type === 'content-publish').length;
+    const approved = approveMatrixPageForPublishReadiness({
+      ...approvalRequest,
+      expectedRunRevision: run.revision,
+    });
+
+    expect(approved.item.approvalEvidence).toMatchObject({
+      postId: audited.post.id,
+      approvedBy: { actorType: 'operator', actorId: 'matrix-approver' },
+    });
+    expect(getPost(committed.fixture.workspaceId, audited.post.id)?.status).toBe('approved');
+    expect(getMatrix(committed.fixture.workspaceId, committed.fixture.matrix.id)?.cells[0].status)
+      .toBe('approved');
+    expect(listJobs(committed.fixture.workspaceId)
+      .filter(job => job.type === 'content-publish')).toHaveLength(publishJobsBefore);
+  });
+
   it('persists exactly one revision, re-audits it, and exposes every paid call provenance', async () => {
     const committed = await committedFixture(true);
     let auditCalls = 0;

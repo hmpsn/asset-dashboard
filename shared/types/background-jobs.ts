@@ -12,6 +12,7 @@ export const BACKGROUND_JOB_TYPES = {
   DEEP_DIAGNOSTIC: 'deep-diagnostic',
   CONTENT_BRIEF_GENERATION: 'content-brief-generation',
   CONTENT_POST_GENERATION: 'content-post-generation',
+  CONTENT_MATRIX_GENERATION: 'content-matrix-generation',
   COPY_BATCH_GENERATION: 'copy-batch-generation',
   KNOWLEDGE_BASE_GENERATION: 'knowledge-base-generation',
   BRAND_VOICE_GENERATION: 'brand-voice-generation',
@@ -61,6 +62,7 @@ export const JOB_RESOURCE_TYPES = {
   CONTENT_BRIEF: 'content_brief',
   CONTENT_POST_FOR_BRIEF: 'content_post_for_brief',
   CONTENT_POST: 'content_post',
+  CONTENT_MATRIX_CELL: 'content_matrix_cell',
   COPY_ENTRY: 'copy_entry',
 } as const;
 
@@ -197,6 +199,13 @@ export const BACKGROUND_JOB_METADATA: { [K in BackgroundJobType]: BackgroundJobT
   [BACKGROUND_JOB_TYPES.CONTENT_POST_GENERATION]: {
     label: 'Content Post Generation',
     description: 'Generates a full post from a saved content brief.',
+    cancellable: true,
+    resultBehavior: 'domain-store-and-result',
+    class: 'user',
+  },
+  [BACKGROUND_JOB_TYPES.CONTENT_MATRIX_GENERATION]: {
+    label: 'Content Matrix Generation',
+    description: 'Generates and audits an explicitly selected set of matrix pages for human review.',
     cancellable: true,
     resultBehavior: 'domain-store-and-result',
     class: 'user',

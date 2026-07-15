@@ -30,6 +30,7 @@ import {
   transitionMatrixGenerationRun,
 } from './repository.js';
 import { generateMatrixBriefStage, generateMatrixPostStage } from './stages.js';
+import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
 
 export interface GenerateMatrixCellRequest {
   workspaceId: string;
@@ -134,6 +135,7 @@ function persistFailure(
   itemId: string,
   status: 'failed' | 'conflict' | 'cancelled',
   stage?: string,
+  terminalizeRun = true,
 ): void {
   const item = getMatrixGenerationItem(workspaceId, itemId);
   if (item && !['ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'].includes(item.status)) {
@@ -149,7 +151,7 @@ function persistFailure(
       // A competing terminal write wins; never rewrite it from this stale worker.
     }
   }
-  const run = getPersistedMatrixGenerationRun(workspaceId, runId);
+  const run = terminalizeRun ? getPersistedMatrixGenerationRun(workspaceId, runId) : null;
   if (run && (run.status === 'queued' || run.status === 'running')) {
     try {
       transitionMatrixGenerationRun({
@@ -161,6 +163,172 @@ function persistFailure(
     } catch { // catch-ok -- a competing run terminal write wins over this stale worker
       // Same stale-worker rule as the item write.
     }
+  }
+}
+
+export interface GenerateMatrixRunItemRequest {
+  workspaceId: string;
+  runId: string;
+  itemId: string;
+  signal?: AbortSignal;
+  beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void;
+}
+
+export interface GenerateMatrixRunItemResult {
+  item: MatrixGenerationItem;
+  briefId: string;
+  postId: string;
+}
+
+/** Executes one existing run item without creating or terminalizing its parent run. */
+export async function generateMatrixRunItem(
+  request: GenerateMatrixRunItemRequest,
+): Promise<GenerateMatrixRunItemResult> {
+  let item = getMatrixGenerationItem(request.workspaceId, request.itemId);
+  if (!item || item.runId !== request.runId || item.status !== 'queued') {
+    throw new MatrixGenerationRevisionConflictError('item', request.itemId);
+  }
+  let activeAttempt: MatrixGenerationAttempt | null = null;
+  let stage: 'preflight' | 'brief_generation' | 'post_generation' = 'preflight';
+
+  try {
+    const structural = await resolveMatrixStructures({
+      workspaceId: request.workspaceId,
+      matrixId: item.matrixId,
+      selections: [{
+        cellId: item.cellId,
+        expectedSourceRevision: item.sourceRevision,
+      }],
+    });
+    const structuralResult = structural.results[0];
+    if (!structuralResult || structuralResult.status !== 'resolved') {
+      throw new MatrixGenerationRevisionConflictError('item', item.id);
+    }
+    const prepared = await prepareMatrixGenerationCell(request.workspaceId, structuralResult);
+    if (
+      prepared.result.status !== 'ready'
+      || !prepared.context
+      || prepared.result.target.effectiveInputFingerprint !== item.previewFingerprint
+      || prepared.result.target.structuralFingerprint !== item.structuralFingerprint
+    ) {
+      throw new MatrixGenerationRevisionConflictError('item', item.id);
+    }
+    const target = prepared.result.target;
+    const executionChainId = `matrix-cell:${request.runId}:${item.id}:${randomUUID()}`;
+    const assertAuthority = () => assertPreviewIdentityCurrent(request.workspaceId, target);
+
+    item = transitionMatrixGenerationItem({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      expectedRevision: item.revision,
+      nextStatus: 'preflighting',
+      structuralTarget: structuralResult.target,
+      previewTarget: target,
+    });
+    assertAuthority();
+    item = transitionMatrixGenerationItem({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      expectedRevision: item.revision,
+      nextStatus: 'preflighted',
+    });
+    item = transitionMatrixGenerationItem({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      expectedRevision: item.revision,
+      nextStatus: 'generating_brief',
+    });
+
+    stage = 'brief_generation';
+    const briefAttempt = startMatrixGenerationAttempt({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      expectedItemRevision: item.revision,
+      stage,
+      effectiveInputFingerprint: canonicalGenerationFingerprint({
+        preview: target.effectiveInputFingerprint,
+        stage,
+      }),
+    });
+    item = briefAttempt.item;
+    activeAttempt = briefAttempt.attempt;
+    const brief = await generateMatrixBriefStage({
+      workspaceId: request.workspaceId,
+      target,
+      context: prepared.context,
+      executionChainId,
+      signal: request.signal,
+      assertAuthority,
+      beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
+    });
+    if (!brief.generationProvenance) {
+      throw new Error('Brief generation did not return provenance');
+    }
+    activeAttempt = finishMatrixGenerationAttempt({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      attemptId: activeAttempt.id,
+      nextStatus: 'completed',
+      provenance: brief.generationProvenance,
+    });
+    item = transitionMatrixGenerationItem({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      expectedRevision: item.revision,
+      nextStatus: 'generating_post',
+    });
+
+    stage = 'post_generation';
+    const postAttempt = startMatrixGenerationAttempt({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      expectedItemRevision: item.revision,
+      stage,
+      effectiveInputFingerprint: canonicalGenerationFingerprint({
+        preview: target.effectiveInputFingerprint,
+        briefInput: brief.generationProvenance.inputFingerprint,
+        stage,
+      }),
+    });
+    item = postAttempt.item;
+    activeAttempt = postAttempt.attempt;
+    const post = await generateMatrixPostStage(brief, {
+      workspaceId: request.workspaceId,
+      target,
+      context: prepared.context,
+      executionChainId,
+      signal: request.signal,
+      assertAuthority,
+      beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
+    });
+    if (post.status !== 'draft' || !post.generationProvenance) {
+      throw new Error('Post generation did not produce a complete draft with provenance');
+    }
+    activeAttempt = finishMatrixGenerationAttempt({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      attemptId: activeAttempt.id,
+      nextStatus: 'completed',
+      provenance: post.generationProvenance,
+    });
+    const committed = commitMatrixGenerationDraft({
+      workspaceId: request.workspaceId,
+      itemId: item.id,
+      expectedItemRevision: item.revision,
+      target,
+      brief,
+      post,
+    });
+    return {
+      item: committed.item,
+      briefId: committed.brief.id,
+      postId: committed.post.id,
+    };
+  } catch (error) {
+    const status = executionFailureStatus(error, request.signal);
+    safelyFinishAttempt(request.workspaceId, item.id, activeAttempt, status);
+    persistFailure(request.workspaceId, request.runId, item.id, status, stage, false);
+    throw new MatrixGenerationCellExecutionError(status, request.runId, item.id);
   }
 }
 
@@ -257,133 +425,35 @@ export async function generateMatrixCell(
     };
   }
 
-  let activeAttempt: MatrixGenerationAttempt | null = null;
-  let stage: 'preflight' | 'brief_generation' | 'post_generation' = 'preflight';
-  const executionChainId = `matrix-cell:${run.id}:${item.id}:${randomUUID()}`;
-  const assertAuthority = () => assertPreviewIdentityCurrent(request.workspaceId, target);
-
   try {
-    item = transitionMatrixGenerationItem({
-      workspaceId: request.workspaceId,
-      itemId: item.id,
-      expectedRevision: item.revision,
-      nextStatus: 'preflighting',
-      structuralTarget: structuralResult.target,
-      previewTarget: target,
-    });
-    assertAuthority();
-    item = transitionMatrixGenerationItem({
-      workspaceId: request.workspaceId,
-      itemId: item.id,
-      expectedRevision: item.revision,
-      nextStatus: 'preflighted',
-    });
-    item = transitionMatrixGenerationItem({
-      workspaceId: request.workspaceId,
-      itemId: item.id,
-      expectedRevision: item.revision,
-      nextStatus: 'generating_brief',
-    });
     run = transitionMatrixGenerationRun({
       workspaceId: request.workspaceId,
       runId: run.id,
       expectedRevision: run.revision,
       nextStatus: 'running',
     });
-
-    stage = 'brief_generation';
-    const briefAttempt = startMatrixGenerationAttempt({
+    const generated = await generateMatrixRunItem({
       workspaceId: request.workspaceId,
+      runId: run.id,
       itemId: item.id,
-      expectedItemRevision: item.revision,
-      stage,
-      effectiveInputFingerprint: canonicalGenerationFingerprint({
-        preview: target.effectiveInputFingerprint,
-        stage,
-      }),
-    });
-    item = briefAttempt.item;
-    activeAttempt = briefAttempt.attempt;
-    const brief = await generateMatrixBriefStage({
-      workspaceId: request.workspaceId,
-      target,
-      context: prepared.context,
-      executionChainId,
       signal: request.signal,
-      assertAuthority,
     });
-    if (!brief.generationProvenance) {
-      throw new Error('Brief generation did not return provenance');
-    }
-    activeAttempt = finishMatrixGenerationAttempt({
-      workspaceId: request.workspaceId,
-      itemId: item.id,
-      attemptId: activeAttempt.id,
-      nextStatus: 'completed',
-      provenance: brief.generationProvenance,
-    });
-    item = transitionMatrixGenerationItem({
-      workspaceId: request.workspaceId,
-      itemId: item.id,
-      expectedRevision: item.revision,
-      nextStatus: 'generating_post',
-    });
-
-    stage = 'post_generation';
-    const postAttempt = startMatrixGenerationAttempt({
-      workspaceId: request.workspaceId,
-      itemId: item.id,
-      expectedItemRevision: item.revision,
-      stage,
-      effectiveInputFingerprint: canonicalGenerationFingerprint({
-        preview: target.effectiveInputFingerprint,
-        briefInput: brief.generationProvenance.inputFingerprint,
-        stage,
-      }),
-    });
-    item = postAttempt.item;
-    activeAttempt = postAttempt.attempt;
-    const post = await generateMatrixPostStage(brief, {
-      workspaceId: request.workspaceId,
-      target,
-      context: prepared.context,
-      executionChainId,
-      signal: request.signal,
-      assertAuthority,
-    });
-    if (post.status !== 'draft' || !post.generationProvenance) {
-      throw new Error('Post generation did not produce a complete draft with provenance');
-    }
-    activeAttempt = finishMatrixGenerationAttempt({
-      workspaceId: request.workspaceId,
-      itemId: item.id,
-      attemptId: activeAttempt.id,
-      nextStatus: 'completed',
-      provenance: post.generationProvenance,
-    });
-    const committed = commitMatrixGenerationDraft({
-      workspaceId: request.workspaceId,
-      itemId: item.id,
-      expectedItemRevision: item.revision,
-      target,
-      brief,
-      post,
-    });
-    item = committed.item;
+    item = generated.item;
     run = getPersistedMatrixGenerationRun(request.workspaceId, run.id) ?? run;
     return {
       status: 'draft_created',
       run,
       item,
-      briefId: committed.brief.id,
-      postId: committed.post.id,
+      briefId: generated.briefId,
+      postId: generated.postId,
       auditPending: true,
       replayed: false,
     };
   } catch (error) {
-    const status = executionFailureStatus(error, request.signal);
-    safelyFinishAttempt(request.workspaceId, item.id, activeAttempt, status);
-    persistFailure(request.workspaceId, run.id, item.id, status, stage);
+    const status = error instanceof MatrixGenerationCellExecutionError
+      ? error.status
+      : executionFailureStatus(error, request.signal);
+    persistFailure(request.workspaceId, run.id, item.id, status);
     throw new MatrixGenerationCellExecutionError(status, run.id, item.id);
   }
 }

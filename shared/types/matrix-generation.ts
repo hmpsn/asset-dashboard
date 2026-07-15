@@ -25,6 +25,7 @@ import {
   type GenerationRunCounts,
   type GenerationRunStatus,
   type GenerationSanitizedError,
+  type GenerationHumanReviewerAttribution,
   type GenerationOperatorAttribution,
   type GenerationResolverAttribution,
 } from './generation-evidence.js';
@@ -1008,6 +1009,88 @@ export interface MatrixGenerationCostEstimate {
   maxConcurrency: number;
 }
 
+/** Caller-accepted ceilings frozen before any batch provider work starts. */
+export interface MatrixGenerationBatchBudget {
+  maxProviderCalls: number;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+  maxEstimatedUsd: number;
+  maxConcurrency: number;
+}
+
+export interface MatrixGenerationBudgetUsage {
+  providerCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedUsd: number;
+}
+
+export interface MatrixGenerationAcceptedBudget {
+  estimate: MatrixGenerationCostEstimate;
+  limits: MatrixGenerationBatchBudget;
+  reserved: MatrixGenerationBudgetUsage;
+}
+
+export const MATRIX_GENERATION_BATCH_LIMITS = {
+  maxItems: MATRIX_READ_LIMITS.maxResolveSelection,
+  maxProviderCalls: 1_250,
+  maxInputTokens: 25_000_000,
+  maxOutputTokens: 1_000_000,
+  maxEstimatedUsd: 150,
+  maxConcurrency: 3,
+} as const;
+
+export const MATRIX_GENERATION_SET_FINDING_KINDS = [
+  'structural',
+  'prose',
+  'provenance',
+] as const;
+
+export type MatrixGenerationSetFindingKind =
+  (typeof MATRIX_GENERATION_SET_FINDING_KINDS)[number];
+
+export interface MatrixGenerationSetAuditFinding {
+  id: string;
+  source: 'deterministic' | 'model';
+  kind: MatrixGenerationSetFindingKind;
+  code: string;
+  severity: 'warning' | 'error';
+  message: string;
+  affectedItemIds: string[];
+  affectedTargetIds: string[];
+  requiresHumanReview: boolean;
+}
+
+export const MATRIX_GENERATION_SET_AUDIT_VERDICTS = [
+  'passed',
+  'needs_attention',
+  'source_correction_required',
+] as const;
+
+export type MatrixGenerationSetAuditVerdict =
+  (typeof MATRIX_GENERATION_SET_AUDIT_VERDICTS)[number];
+
+export interface MatrixGenerationSetAuditReport {
+  verdict: MatrixGenerationSetAuditVerdict;
+  findings: MatrixGenerationSetAuditFinding[];
+  /** One rerun is allowed after a prose-only item revision; never a second rewrite pass. */
+  passCount: 1 | 2;
+  modelProvenance: GenerationProvenance | null;
+  auditedAt: string;
+}
+
+export interface MatrixPageApprovalEvidence {
+  runId: string;
+  itemId: string;
+  matrixId: string;
+  cellId: string;
+  sourceRevision: MatrixSourceRevision;
+  postId: string;
+  postRevision: number;
+  approvedBy: GenerationHumanReviewerAttribution;
+  approvedAt: string;
+}
+
 export interface MatrixArtifactRevisionExpectations {
   brief: {
     artifactType: 'content_brief';
@@ -1075,6 +1158,8 @@ export type MatrixGenerationPreviewResult =
 
 export interface PreviewMatrixGenerationResult {
   results: MatrixGenerationPreviewResult[];
+  /** Present only when every selected cell is ready for the paid batch. */
+  estimatedBatchBudget: MatrixGenerationCostEstimate | null;
 }
 
 export interface ContentTemplateGenerationUpgradeProposal {
@@ -1238,6 +1323,8 @@ interface MatrixGenerationRunBase {
   selectionFingerprint: string;
   selections: MatrixGenerationSelection;
   jobId: string | null;
+  acceptedBudget: MatrixGenerationAcceptedBudget | null;
+  setAuditReport: MatrixGenerationSetAuditReport | null;
   counts: GenerationRunCounts;
   createdAt: string;
   updatedAt: string;
@@ -1286,6 +1373,8 @@ export interface CreateMatrixGenerationRunRequest {
   idempotencyKey: string;
   selectionFingerprint: string;
   selections: MatrixGenerationSelection;
+  jobId?: string | null;
+  acceptedBudget?: MatrixGenerationAcceptedBudget | null;
   createdBy: GenerationResolverAttribution;
   mcpExecutionContext: McpToolExecutionContext | null;
 }
@@ -1308,6 +1397,7 @@ export interface MatrixGenerationItem {
   briefId: string | null;
   postId: string | null;
   auditReport: GenerationAuditReport | null;
+  approvalEvidence: MatrixPageApprovalEvidence | null;
   attemptCount: number;
   automaticRevisionCount: GenerationAutomaticRevisionCount;
   error: GenerationSanitizedError | null;
@@ -1359,3 +1449,96 @@ export type RetryMatrixGenerationRequest =
       mode: 'replace';
       replacementAuthorization: MatrixGenerationReplacementAuthorization;
     });
+
+export interface StartMatrixGenerationSelection {
+  cellId: string;
+  expectedSourceRevision: MatrixSourceRevision;
+  expectedPreviewFingerprint: string;
+}
+
+export type StartMatrixGenerationSelections = readonly [
+  StartMatrixGenerationSelection,
+  ...StartMatrixGenerationSelection[],
+];
+
+export interface StartMatrixGenerationRequest {
+  workspaceId: string;
+  matrixId: string;
+  selections: StartMatrixGenerationSelections;
+  acceptedBudget: MatrixGenerationBatchBudget;
+  idempotencyKey: string;
+  createdBy: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
+}
+
+export interface StartMatrixGenerationResult {
+  run: MatrixGenerationRun;
+  jobId: string;
+  estimatedBudget: MatrixGenerationCostEstimate;
+  existing: boolean;
+}
+
+export interface GetMatrixGenerationRequest {
+  workspaceId: string;
+  runId: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface MatrixGenerationItemRead extends Omit<
+  MatrixGenerationItem,
+  'structuralTarget' | 'previewTarget'
+> {
+  target: {
+    targetKeyword: string;
+    plannedUrl: string;
+    pageType: BriefPageType;
+  } | null;
+  setAuditFindings: MatrixGenerationSetAuditFinding[];
+  currentArtifactRevisions: MatrixArtifactRevisionExpectations;
+  reusableCheckpointFingerprint: string | null;
+}
+
+export interface GetMatrixGenerationResult {
+  run: MatrixGenerationRun;
+  items: MatrixCursorPage<MatrixGenerationItemRead>;
+}
+
+export type RetryMatrixGenerationCommandRequest = RetryMatrixGenerationRequest & {
+  workspaceId: string;
+  requestedBy: GenerationResolverAttribution;
+  mcpExecutionContext: McpToolExecutionContext | null;
+};
+
+export interface MatrixGenerationRetryCommand {
+  id: string;
+  workspaceId: string;
+  runId: string;
+  idempotencyKey: string;
+  requestFingerprint: string;
+  request: RetryMatrixGenerationCommandRequest;
+  jobId: string;
+  createdAt: string;
+}
+
+export interface RetryMatrixGenerationResult {
+  run: MatrixGenerationRun;
+  jobId: string;
+  existing: boolean;
+}
+
+export interface ApproveMatrixPageForPublishReadinessRequest {
+  workspaceId: string;
+  runId: string;
+  itemId: string;
+  expectedRunRevision: number;
+  expectedItemRevision: number;
+  expectedPostRevision: number;
+  approvedBy: GenerationHumanReviewerAttribution;
+}
+
+export interface ApproveMatrixPageForPublishReadinessResult {
+  run: MatrixGenerationRun;
+  item: MatrixGenerationItem;
+  approvalEvidence: MatrixPageApprovalEvidence;
+}

@@ -8,8 +8,10 @@ import type {
   MatrixGenerationItem,
   MatrixGenerationItemStatus,
   MatrixGenerationPreviewTarget,
+  MatrixGenerationSetAuditFinding,
 } from '../../../../shared/types/matrix-generation.js';
 import type { PersistedGeneratedPost } from '../../../../shared/types/content.js';
+import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
 import { getDeliverable } from '../../../brand-deliverable-read-model.js';
 import { getMatrix } from '../../../content-matrices.js';
 import { getTemplate } from '../../../content-templates.js';
@@ -45,6 +47,7 @@ import {
   getMatrixGenerationItem,
   MatrixGenerationRevisionConflictError,
   startMatrixGenerationAttempt,
+  transitionMatrixGenerationItem,
 } from './repository.js';
 
 export interface AuditMatrixGenerationItemRequest {
@@ -54,6 +57,7 @@ export interface AuditMatrixGenerationItemRequest {
   expectedPostRevision: number;
   executionChainId?: string;
   signal?: AbortSignal;
+  beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void;
 }
 
 export interface AuditMatrixGenerationItemResult {
@@ -138,12 +142,13 @@ function loadAuditItem(
   request: AuditMatrixGenerationItemRequest,
   expectedItemRevision: number,
   expectedPostRevision: number,
+  expectedStatus: MatrixGenerationItemStatus = 'auditing_deterministic',
 ): LoadedAuditItem {
   const item = getMatrixGenerationItem(request.workspaceId, request.itemId);
   if (
     !item
     || item.revision !== expectedItemRevision
-    || item.status !== 'auditing_deterministic'
+    || item.status !== expectedStatus
     || !item.previewTarget
     || !item.postId
     || item.previewFingerprint !== item.previewTarget.effectiveInputFingerprint
@@ -386,6 +391,7 @@ export async function auditMatrixGenerationItem(
       deterministicReport,
       executionChainId,
       signal: request.signal,
+      beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
     };
     const preparedAudit = prepareMatrixGenerationAuditOperation(auditInput);
     const modelAttempt = startMatrixGenerationAttempt({
@@ -486,6 +492,7 @@ export async function auditMatrixGenerationItem(
       auditReport: mergedReport,
       executionChainId,
       signal: request.signal,
+      beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
     };
     const preparedRevision = prepareMatrixGenerationRevisionOperation(revisionInput);
     const revisionAttempt = startMatrixGenerationAttempt({
@@ -561,5 +568,167 @@ export async function auditMatrixGenerationItem(
         automaticRevisionApplied,
       );
     }
+  }
+}
+
+export interface ReviseMatrixGenerationItemForSetAuditRequest {
+  workspaceId: string;
+  itemId: string;
+  expectedItemRevision: number;
+  expectedPostRevision: number;
+  findings: MatrixGenerationSetAuditFinding[];
+  signal?: AbortSignal;
+  beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void;
+}
+
+/** Spends the same one-pass item allowance on prose-only set feedback, then reruns item gates. */
+export async function reviseMatrixGenerationItemForSetAudit(
+  request: ReviseMatrixGenerationItemForSetAuditRequest,
+  overrides?: Partial<MatrixGenerationItemAuditDependencies>,
+): Promise<AuditMatrixGenerationItemResult> {
+  const deps = dependencies(overrides);
+  let loaded = loadAuditItem(
+    request,
+    request.expectedItemRevision,
+    request.expectedPostRevision,
+    'ready_for_human_review',
+  );
+  if (
+    loaded.item.automaticRevisionCount !== 0
+    || loaded.item.auditReport?.verdict !== 'ready_for_human_review'
+    || request.findings.length === 0
+    || request.findings.some(finding => finding.kind !== 'prose')
+  ) {
+    throw new MatrixGenerationItemAuditPreconditionError(
+      'Set-level revision requires an unused allowance and prose-only findings.',
+    );
+  }
+  const blockIds = new Set<string>(loaded.target.blockManifest.blocks.map(block => block.id));
+  const modelFindings = request.findings.map(setFinding => {
+    const affectedTargetIds = setFinding.affectedTargetIds
+      .map(targetId => targetId.startsWith(`${loaded.item.id}:`)
+        ? targetId.slice(loaded.item.id.length + 1)
+        : targetId)
+      .filter(targetId => blockIds.has(targetId));
+    return {
+      code: `set_${setFinding.code}`,
+      severity: setFinding.severity,
+      message: setFinding.message,
+      affectedTargetIds: affectedTargetIds.length > 0
+        ? affectedTargetIds
+        : [loaded.target.blockManifest.blocks[0].id],
+      requiresHumanReview: false,
+    };
+  });
+  const revisionReport: GenerationAuditReport = {
+    ...loaded.item.auditReport,
+    verdict: 'needs_attention',
+    modelFindings: [...loaded.item.auditReport.modelFindings, ...modelFindings],
+    unresolvedRequirementIds: [],
+  };
+  loaded = {
+    ...loaded,
+    item: transitionMatrixGenerationItem({
+      workspaceId: request.workspaceId,
+      itemId: loaded.item.id,
+      expectedRevision: loaded.item.revision,
+      nextStatus: 'revising',
+      auditReport: revisionReport,
+    }),
+  };
+  const executionChainId = `matrix-set-revision-${randomUUID()}`;
+  const revisionInput = {
+    workspaceId: request.workspaceId,
+    target: loaded.target,
+    post: loaded.post,
+    authority: loaded.authority,
+    auditReport: revisionReport,
+    executionChainId,
+    signal: request.signal,
+    beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
+  };
+  const preparedRevision = prepareMatrixGenerationRevisionOperation(revisionInput);
+  const revisionAttempt = startMatrixGenerationAttempt({
+    workspaceId: request.workspaceId,
+    itemId: loaded.item.id,
+    expectedItemRevision: loaded.item.revision,
+    stage: 'revision',
+    effectiveInputFingerprint: preparedRevision.effectiveInputFingerprint,
+  });
+  loaded = { ...loaded, item: revisionAttempt.item };
+  let revisionResult: Awaited<ReturnType<typeof reviseMatrixGenerationCandidate>> | undefined;
+  try {
+    revisionResult = await deps.reviseCandidate({
+      ...revisionInput,
+      prepared: preparedRevision,
+    });
+    if (
+      revisionResult.effectiveInputFingerprint !== preparedRevision.effectiveInputFingerprint
+      || revisionResult.provenance.inputFingerprint !== preparedRevision.effectiveInputFingerprint
+    ) {
+      throw new MatrixGenerationItemAuditPreconditionError(
+        'The set-level revision result does not match its reserved provider input.',
+      );
+    }
+    const replacement = applyMatrixGenerationRevision(
+      loaded.target,
+      loaded.post,
+      revisionResult.output,
+    );
+    const committed = commitMatrixGenerationRevision({
+      workspaceId: request.workspaceId,
+      itemId: loaded.item.id,
+      expectedItemRevision: loaded.item.revision,
+      expectedPostRevision: loaded.post.generationRevision,
+      attemptId: revisionAttempt.attempt.id,
+      replacement,
+      provenance: revisionResult.provenance,
+    });
+    const audited = await auditMatrixGenerationItem({
+      workspaceId: request.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId,
+      signal: request.signal,
+      beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
+    }, overrides);
+    return {
+      ...audited,
+      providerCalls: audited.providerCalls + 1,
+      automaticRevisionApplied: true,
+    };
+  } catch (error) {
+    const cancelled = request.signal?.aborted === true;
+    const conflict = isRevisionConflict(error);
+    const revisionError = stageError(
+      'revision',
+      cancelled
+        ? 'matrix_generation_cancelled'
+        : conflict
+          ? 'matrix_generation_conflict'
+          : 'matrix_generation_set_revision_failed',
+      cancelled
+        ? 'Matrix page set revision was cancelled.'
+        : conflict
+          ? 'The generated page changed while its set revision was running.'
+          : 'The set-level page revision did not produce an accepted result.',
+      !cancelled && !conflict,
+    );
+    const item = finishAttempt({
+      loaded,
+      attemptId: revisionAttempt.attempt.id,
+      attemptStatus: cancelled ? 'cancelled' : 'failed',
+      nextItemStatus: cancelled ? 'cancelled' : conflict ? 'conflict' : 'needs_attention',
+      report: revisionReport,
+      provenance: revisionResult?.provenance,
+      error: revisionError,
+    });
+    return terminalResult(
+      item,
+      currentPostOrFallback(request.workspaceId, loaded.post),
+      1,
+      false,
+    );
   }
 }

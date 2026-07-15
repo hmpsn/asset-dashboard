@@ -26,13 +26,20 @@ vi.mock('../../src/components/matrix', async () => {
         <button onClick={onCancel}>Cancel</button>
       </div>
     ),
-    MatrixGrid: ({ onCellUpdate }: {
+    MatrixGrid: ({ onCellUpdate, onBulkAction, generationEnabled }: {
       onCellUpdate: (cellId: string, updates: Record<string, unknown>) => void;
+      onBulkAction: (action: 'generate_briefs', cellIds: string[]) => void;
+      generationEnabled?: boolean;
     }) => (
       <div data-testid="matrix-grid">
         <button onClick={() => onCellUpdate('c1', { customKeyword: 'austin seo agency' })}>
           Update first cell
         </button>
+        {generationEnabled && (
+          <button onClick={() => onBulkAction('generate_briefs', ['c1'])}>
+            Generate Pages
+          </button>
+        )}
       </div>
     ),
   };
@@ -50,9 +57,23 @@ vi.mock('../../src/api/content', () => ({
     create: vi.fn(),
     updateCell: vi.fn(),
     sendSamples: vi.fn(),
+    previewGeneration: vi.fn(),
+    startGeneration: vi.fn(),
+    getGeneration: vi.fn(),
+    retryGeneration: vi.fn(),
+    approveGenerationItem: vi.fn(),
     exportMatricesCsv: vi.fn(() => '/export/csv'),
   },
 }));
+
+// useFeatureFlag itself stays real so the loading → loaded hook transition is exercised.
+vi.mock('../../src/api/misc', async () => {
+  const actual = await vi.importActual<typeof import('../../src/api/misc')>('../../src/api/misc');
+  return {
+    ...actual,
+    featureFlags: { list: vi.fn() },
+  };
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function makeQueryClient() {
@@ -90,14 +111,15 @@ const mockTemplate = {
 const mockMatrix = {
   id: 'mat-1',
   workspaceId: 'ws1',
+  revision: 5,
   name: 'City Pages Matrix',
   templateId: 'tpl-1',
   dimensions: [{ variableName: 'city', label: 'City', values: ['Austin', 'Dallas'] }],
   urlPattern: '/services/[city]',
   keywordPattern: '[city] seo',
   cells: [
-    { id: 'c1', revision: 7, url: '/services/austin', keyword: 'austin seo', status: 'planned' as const, variables: { city: 'Austin' }, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-    { id: 'c2', url: '/services/dallas', keyword: 'dallas seo', status: 'published' as const, variables: { city: 'Dallas' }, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+    { id: 'c1', revision: 7, plannedUrl: '/services/austin', targetKeyword: 'austin seo', status: 'planned' as const, variableValues: { city: 'Austin' } },
+    { id: 'c2', revision: 2, plannedUrl: '/services/dallas', targetKeyword: 'dallas seo', status: 'published' as const, variableValues: { city: 'Dallas' } },
   ],
   stats: { total: 2, planned: 1, briefGenerated: 0, drafted: 0, reviewed: 0, published: 1 },
   createdAt: '2026-01-01T00:00:00Z',
@@ -108,8 +130,15 @@ describe('ContentPlanner', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const content = await import('../../src/api/content');
+    const misc = await import('../../src/api/misc');
     vi.mocked(content.contentTemplates.list).mockResolvedValue([]);
     vi.mocked(content.contentMatrices.list).mockResolvedValue([]);
+    vi.mocked(misc.featureFlags.list).mockResolvedValue({
+      'content-matrix-generation': false,
+    } as never);
+    vi.mocked(content.contentMatrices.getGeneration).mockImplementation(
+      () => new Promise(() => {}),
+    );
   });
 
   it('renders without crash', () => {
@@ -358,6 +387,86 @@ describe('ContentPlanner', () => {
       'mat-1',
       'c1',
       { customKeyword: 'austin seo agency', expectedCellRevision: 7 },
+    ));
+  });
+
+  it('mounts the generation action after the real feature flag loads enabled', async () => {
+    const content = await import('../../src/api/content');
+    const misc = await import('../../src/api/misc');
+    vi.mocked(misc.featureFlags.list).mockResolvedValue({
+      'content-matrix-generation': true,
+    } as never);
+    vi.mocked(content.contentTemplates.list).mockResolvedValue([mockTemplate]);
+    vi.mocked(content.contentMatrices.list).mockResolvedValue([mockMatrix]);
+    renderContentPlanner();
+
+    fireEvent.click(await screen.findByText('City Pages Matrix'));
+
+    expect(await screen.findByRole('button', { name: 'Generate Pages' })).toBeInTheDocument();
+  });
+
+  it('previews exact revisions and requires budget confirmation before starting', async () => {
+    const content = await import('../../src/api/content');
+    const misc = await import('../../src/api/misc');
+    vi.mocked(misc.featureFlags.list).mockResolvedValue({
+      'content-matrix-generation': true,
+    } as never);
+    vi.mocked(content.contentTemplates.list).mockResolvedValue([mockTemplate]);
+    vi.mocked(content.contentMatrices.list).mockResolvedValue([mockMatrix]);
+    vi.mocked(content.contentMatrices.previewGeneration).mockResolvedValue({
+      results: [{
+        status: 'ready',
+        matrixId: 'mat-1',
+        templateId: 'tpl-1',
+        cellId: 'c1',
+        sourceRevision: { matrixRevision: 5, templateRevision: 3, cellRevision: 7 },
+        target: { effectiveInputFingerprint: 'a'.repeat(64) },
+      }],
+      estimatedBatchBudget: {
+        providerCalls: 4,
+        inputTokens: 12_000,
+        outputTokens: 3_000,
+        estimatedUsd: 1.23,
+        maxConcurrency: 1,
+      },
+    } as never);
+    vi.mocked(content.contentMatrices.startGeneration).mockResolvedValue({
+      run: { id: 'run-1' },
+      jobId: 'job-1',
+      existing: false,
+    } as never);
+    renderContentPlanner();
+
+    fireEvent.click(await screen.findByText('City Pages Matrix'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate Pages' }));
+
+    expect(await screen.findByText(/estimated \$1\.23/i)).toBeInTheDocument();
+    expect(content.contentMatrices.previewGeneration).toHaveBeenCalledWith('ws1', 'mat-1', [{
+      cellId: 'c1',
+      expectedSourceRevision: { matrixRevision: 5, templateRevision: 3, cellRevision: 7 },
+    }]);
+    expect(content.contentMatrices.startGeneration).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 page' }));
+
+    await waitFor(() => expect(content.contentMatrices.startGeneration).toHaveBeenCalledWith(
+      'ws1',
+      'mat-1',
+      expect.objectContaining({
+        selections: [{
+          cellId: 'c1',
+          expectedSourceRevision: { matrixRevision: 5, templateRevision: 3, cellRevision: 7 },
+          expectedPreviewFingerprint: 'a'.repeat(64),
+        }],
+        acceptedBudget: {
+          maxProviderCalls: 4,
+          maxInputTokens: 12_000,
+          maxOutputTokens: 3_000,
+          maxEstimatedUsd: 1.23,
+          maxConcurrency: 1,
+        },
+        idempotencyKey: expect.any(String),
+      }),
     ));
   });
 

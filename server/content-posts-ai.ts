@@ -114,15 +114,26 @@ export interface CreativeAICallOptions {
   openAIModel?: 'gpt-5.4' | 'gpt-5.5';
   /** B2 sets zero so every paid dispatcher invocation is reserved explicitly. */
   maxRetries?: number;
+  /** Bounded callers may disable the automatic Claude-to-OpenAI fallback. */
+  allowProviderFallback?: boolean;
   /** Called before each Claude/OpenAI dispatch; throwing blocks that paid call. */
   beforeProviderDispatch?: (dispatch: {
     provider: 'anthropic' | 'openai';
     fallback: boolean;
   }) => void | Promise<void>;
+  /** Durable budget reservation hook invoked with the exact rendered provider input. */
+  beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void | Promise<void>;
   /** Logical workflow/job correlation shared across composite content stages. */
   executionChainId?: string;
   /** Receives each successful provider result; callers retain it only if that output is adopted. */
   onExecution?: (execution: AcceptedGenerationExecution) => void;
+}
+
+export interface BoundedProviderDispatch {
+  provider: 'anthropic' | 'openai';
+  fallback: boolean;
+  renderedInput: ReturnType<typeof renderAIProviderInput>;
+  maxOutputTokens: number;
 }
 
 export const CREATIVE_JSON_ONLY_INSTRUCTION = 'IMPORTANT: Return ONLY a single valid JSON object. No prose, no preamble, no markdown code fences. The response must start with { and end with }.';
@@ -163,8 +174,18 @@ export async function callCreativeAIWithMetadata(
   let claudeAttemptFailed = false;
 
   if (isAnthropicConfigured()) {
-    await opts.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
     const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'anthropic');
+    await opts.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
+    await opts.beforeBoundedProviderDispatch?.({
+      provider: 'anthropic',
+      fallback: false,
+      renderedInput: renderAIProviderInput({
+        provider: 'anthropic',
+        ...providerInput,
+        researchMode,
+      }),
+      maxOutputTokens: maxTokens,
+    });
     let result: AICallResult | undefined;
     try {
       result = await callAI({
@@ -184,6 +205,7 @@ export async function callCreativeAIWithMetadata(
       });
     } catch (err) {
       if (opts.signal?.aborted) throw err;
+      if (opts.allowProviderFallback === false) throw err;
       claudeAttemptFailed = true;
       log.info(`[${featureLabel}] Claude failed (${err instanceof Error ? err.message : err}), falling back to GPT`);
     }
@@ -208,6 +230,16 @@ export async function callCreativeAIWithMetadata(
     fallback: claudeAttemptFailed,
   });
   const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'openai');
+  await opts.beforeBoundedProviderDispatch?.({
+    provider: 'openai',
+    fallback: claudeAttemptFailed,
+    renderedInput: renderAIProviderInput({
+      provider: 'openai',
+      ...providerInput,
+      researchMode,
+    }),
+    maxOutputTokens: maxTokens,
+  });
   const result = await callAI({
     operation: opts.operation,
     provider: 'openai',
@@ -263,6 +295,9 @@ const PAGE_TYPE_WRITER_ROLE: Record<string, string> = {
 export interface ContentAIGenerationOptions {
   signal?: AbortSignal;
   executionChainId?: string;
+  maxRetries?: number;
+  allowProviderFallback?: boolean;
+  beforeBoundedProviderDispatch?: CreativeAICallOptions['beforeBoundedProviderDispatch'];
   onExecution?: (execution: AcceptedGenerationExecution) => void;
   /** Captured once by content-generation-context-v2 and reused across every stage. */
   promptAuthority?: SystemPromptAuthority;
@@ -501,6 +536,9 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
     executionChainId: options.executionChainId,
     onExecution: options.onExecution,
   });
@@ -604,6 +642,9 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
     executionChainId: options.executionChainId,
     onExecution: options.onExecution,
   });
@@ -675,6 +716,9 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
     executionChainId: options.executionChainId,
     onExecution: options.onExecution,
   });
@@ -748,13 +792,26 @@ Return valid JSON only:
       'You are an expert SEO copywriter. Return only valid JSON with seoTitle and seoMetaDescription.',
       options,
     );
+    const messages = [{ role: 'user' as const, content: prompt }];
+    await options.beforeBoundedProviderDispatch?.({
+      provider: 'openai',
+      fallback: false,
+      renderedInput: renderAIProviderInput({
+        provider: 'openai',
+        system: systemPrompt,
+        messages,
+        researchMode: false,
+      }),
+      maxOutputTokens: 200,
+    });
     const result = await callAI({
       operation: 'content-post-seo-meta',
       system: systemPrompt,
-      messages: [{ role: 'user', content: prompt }],
+      messages,
       maxTokens: 200,
       temperature: 0.5,
       workspaceId,
+      maxRetries: options.maxRetries,
       signal: options.signal,
       executionChainId: options.executionChainId,
     });
@@ -893,6 +950,9 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     json: true,
     researchMode: true,
     signal: options.signal,
+    maxRetries: options.maxRetries,
+    allowProviderFallback: options.allowProviderFallback,
+    beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
     executionChainId: options.executionChainId,
     onExecution: options.onExecution,
   });
@@ -983,13 +1043,27 @@ Return ONLY valid JSON in this exact format:
     promptOptions,
   );
 
+  const messages = [{ role: 'user' as const, content: prompt }];
+  await options.beforeBoundedProviderDispatch?.({
+    provider: 'openai',
+    fallback: false,
+    renderedInput: renderAIProviderInput({
+      provider: 'openai',
+      system: systemPrompt,
+      messages,
+      researchMode: false,
+    }),
+    maxOutputTokens: 500,
+  });
+
   const result = await callAI({
     operation: 'voice-scoring',
     system: systemPrompt,
-    messages: [{ role: 'user', content: prompt }],
+    messages,
     maxTokens: 500,
     temperature: 0.3,
     workspaceId,
+    maxRetries: options.maxRetries,
     executionChainId: options.executionChainId,
     signal: options.signal,
   });
