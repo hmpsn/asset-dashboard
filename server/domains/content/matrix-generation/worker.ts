@@ -29,7 +29,10 @@ import {
   transitionMatrixGenerationRun,
 } from './repository.js';
 import { getMatrixGenerationRetryCommandByJob } from './retry-repository.js';
-import { auditMatrixGenerationSet } from './set-audit.js';
+import {
+  auditMatrixGenerationSet,
+  isItemBlockingMatrixGenerationSetAuditFinding,
+} from './set-audit.js';
 import { generateMatrixRunItem } from './single-cell.js';
 import { matrixGenerationProviderReservation } from './budget.js';
 
@@ -75,7 +78,9 @@ const TERMINAL_RUN_STATUSES = new Set<MatrixGenerationRunStatus>([
   'failed',
 ]);
 
-function terminalStatus(items: readonly MatrixGenerationItem[]): MatrixGenerationRunStatus {
+export function matrixGenerationTerminalStatus(
+  items: readonly MatrixGenerationItem[],
+): MatrixGenerationRunStatus {
   if (items.length > 0 && items.every(item => item.status === 'ready_for_human_review')) {
     return 'completed';
   }
@@ -133,7 +138,8 @@ function demoteReadyItemsWithoutSetAudit(workspaceId: string, runId: string): vo
   if (!run) return;
   for (const item of listMatrixGenerationItems(workspaceId, runId)) {
     const unresolvedSetFinding = run.setAuditReport?.findings.some(
-      finding => finding.affectedItemIds.includes(item.id),
+      finding => isItemBlockingMatrixGenerationSetAuditFinding(finding)
+        && finding.affectedItemIds.includes(item.id),
     ) ?? true;
     if (item.status !== 'ready_for_human_review' || !unresolvedSetFinding) continue;
     transitionMatrixGenerationItem({
@@ -177,7 +183,7 @@ function recordUnexpectedWorkerFailure(
     const current = getPersistedMatrixGenerationRun(workspaceId, runId);
     if (!current) return;
     const items = listMatrixGenerationItems(workspaceId, runId);
-    const status = current.status === 'queued' ? 'failed' : terminalStatus(items);
+    const status = current.status === 'queued' ? 'failed' : matrixGenerationTerminalStatus(items);
     const ended = TERMINAL_RUN_STATUSES.has(current.status)
       ? current
       : transitionMatrixGenerationRun({
@@ -270,6 +276,9 @@ async function runSetAudit(
   signal: AbortSignal,
   beforeBoundedProviderDispatch: (dispatch: BoundedProviderDispatch) => void,
 ): Promise<void> {
+  const auditRun = getPersistedMatrixGenerationRun(workspaceId, runId);
+  if (!auditRun) return;
+  const expectedCandidateCount = auditRun.selections.length;
   let readyItems = listMatrixGenerationItems(workspaceId, runId)
     .filter(item => item.status === 'ready_for_human_review' && item.postId && item.previewTarget);
   if (readyItems.length === 0 || signal.aborted) return;
@@ -282,6 +291,7 @@ async function runSetAudit(
     result = await auditMatrixGenerationSet({
       workspaceId,
       candidates,
+      expectedCandidateCount,
       passCount: 1,
       signal,
       beforeBoundedProviderDispatch,
@@ -346,6 +356,7 @@ async function runSetAudit(
     result = await auditMatrixGenerationSet({
       workspaceId,
       candidates: revisedCandidates,
+      expectedCandidateCount,
       passCount: 2,
       signal,
       beforeBoundedProviderDispatch,
@@ -360,7 +371,9 @@ async function runSetAudit(
     report: result.report,
   });
   if (result.report.verdict === 'passed') return;
-  const affected = new Set(result.report.findings.flatMap(finding => finding.affectedItemIds));
+  const affected = new Set(result.report.findings
+    .filter(isItemBlockingMatrixGenerationSetAuditFinding)
+    .flatMap(finding => finding.affectedItemIds));
   for (const item of listMatrixGenerationItems(workspaceId, runId)) {
     if (item.status === 'ready_for_human_review' && affected.has(item.id)) {
       transitionMatrixGenerationItem({
@@ -440,7 +453,7 @@ export async function runMatrixGenerationJob(jobId: string): Promise<void> {
       const current = getPersistedMatrixGenerationRun(run.workspaceId, run.id);
       if (!current) throw new Error('Matrix generation run disappeared before completion');
       const items = listMatrixGenerationItems(current.workspaceId, current.id);
-      const status = signal.aborted ? 'cancelled' : terminalStatus(items);
+      const status = signal.aborted ? 'cancelled' : matrixGenerationTerminalStatus(items);
       const ended = current.status === status
         ? current
         : transitionMatrixGenerationRun({

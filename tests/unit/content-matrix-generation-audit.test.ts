@@ -257,6 +257,7 @@ function audit(overrides: {
   target?: MatrixGenerationPreviewTarget;
   post?: GeneratedPost;
   knownInternalPaths?: string[];
+  internalPathCensusComplete?: boolean;
   revisionCount?: 0 | 1;
 } = {}) {
   const targetValue = overrides.target ?? target();
@@ -272,7 +273,7 @@ function audit(overrides: {
       evidence(CTA_REQUIREMENT, { kind: 'url', value: 'https://example.com/contact' }),
     ],
     knownInternalPaths: overrides.knownInternalPaths ?? ['/about', '/contact'],
-    internalPathCensusComplete: true,
+    internalPathCensusComplete: overrides.internalPathCensusComplete ?? true,
     voiceGuardrails,
     revisionCount: overrides.revisionCount ?? 0,
     now: () => new Date(NOW),
@@ -334,6 +335,23 @@ describe('content matrix generation deterministic audit', () => {
 
     expect(checkResult(report, 'locked-metadata')).toBe('passed');
     expect(checkResult(report, 'metadata-lengths')).toBe('failed');
+  });
+
+  it('does not require a complete internal-path census when the draft has no relative links', () => {
+    const candidate = post();
+
+    expect(checkResult(audit({
+      post: candidate,
+      knownInternalPaths: [],
+      internalPathCensusComplete: false,
+    }), 'internal-paths')).toBe('passed');
+
+    candidate.sections[2].content = '<p><a href="/contact">Contact us</a>.</p>';
+    expect(checkResult(audit({
+      post: candidate,
+      knownInternalPaths: ['/contact'],
+      internalPathCensusComplete: false,
+    }), 'internal-paths')).toBe('failed');
   });
 
   it('fails thin variable-only location copy, duplicated blocks, and lexical voice violations', () => {
@@ -415,7 +433,28 @@ describe('content matrix generation model audit merge', () => {
     expect(checkResult(modelPass, 'keyword-introduction-coverage')).toBe('failed');
   });
 
-  it('does not spend the revision allowance when the model marks a finding for attention only', () => {
+  it('routes a non-revisionable human-only warning to human review', () => {
+    const deterministic = audit();
+    const merged = mergeMatrixGenerationAudit({
+      target: target(),
+      deterministicReport: deterministic,
+      modelOutput: {
+        revisionRecommended: true,
+        findings: [{
+          code: 'human_context',
+          severity: 'warning',
+          message: 'A human should confirm this implication before review.',
+          affectedTargetIds: ['template:cta'],
+          requiresHumanReview: true,
+        }],
+      },
+    });
+
+    expect(merged.verdict).toBe('ready_for_human_review');
+    expect(getMatrixGenerationAuditDisposition(merged, 0, true)).toBe('ready');
+  });
+
+  it('keeps an actionable warning in needs attention even without a revision recommendation', () => {
     const deterministic = audit();
     const merged = mergeMatrixGenerationAudit({
       target: target(),
@@ -423,11 +462,11 @@ describe('content matrix generation model audit merge', () => {
       modelOutput: {
         revisionRecommended: false,
         findings: [{
-          code: 'human_context',
+          code: 'voice_violation',
           severity: 'warning',
-          message: 'A human should confirm this implication before review.',
+          message: 'The draft violates an explicit voice requirement.',
           affectedTargetIds: ['template:cta'],
-          requiresHumanReview: true,
+          requiresHumanReview: false,
         }],
       },
     });
@@ -494,10 +533,49 @@ describe('content matrix generation structured operation contracts', () => {
         index === 1 ? { ...block, targetId: output.blocks[0].targetId } : block
       )),
     })).toThrow(/block census/i);
-    expect(() => applyMatrixGenerationRevision(targetValue, candidate, {
-      blocks: output.blocks.map((block, index) => index === 0
-        ? { ...block, html: `${block.html}<p><a href="https://invented.example">New link</a></p>` }
-        : block),
-    })).toThrow(/added or changed a link/i);
+    const addedLinkRevision = applyMatrixGenerationRevision(targetValue, candidate, {
+      blocks: output.blocks.map((block, index) => {
+        if (index === 0) {
+          return {
+            ...block,
+            html: `${block.html}<p><a href="https://invented.example">New link</a> and <a href="https://example.com/contact">moved approved link</a></p>`,
+          };
+        }
+        if (index === 3) {
+          return {
+            ...block,
+            html: '<p><a href="https://example.com/contact">New same-url CTA</a> before <a href="https://example.com/contact">Schedule an SEO consulting conversation</a></p>',
+          };
+        }
+        return block;
+      }),
+    });
+    expect(addedLinkRevision.introduction).not.toContain('https://invented.example');
+    expect(addedLinkRevision.introduction).not.toContain('https://example.com/contact');
+    expect(addedLinkRevision.introduction).toContain('New link');
+    expect(addedLinkRevision.introduction).toContain('moved approved link');
+    expect(addedLinkRevision.sections[2]?.content).toContain('https://example.com/contact');
+    expect(addedLinkRevision.sections[2]?.content).toContain('New same-url CTA');
+    expect(addedLinkRevision.sections[2]?.content)
+      .not.toContain('<a href="https://example.com/contact">New same-url CTA</a>');
+    expect(addedLinkRevision.sections[2]?.content)
+      .toMatch(/<a href="https:\/\/example\.com\/contact"[^>]*>Schedule an SEO consulting conversation<\/a>/);
+  });
+
+  it('preserves an accepted query-string link through revision sanitization', () => {
+    const targetValue = target();
+    const candidate = post(targetValue);
+    candidate.sections[2].content = '<p><a href="https://example.com/contact?source=matrix&amp;medium=cta">Contact the team</a>.</p>';
+    const revised = applyMatrixGenerationRevision(targetValue, candidate, {
+      blocks: targetValue.blockManifest.blocks.map((block, index) => ({
+        targetId: block.id,
+        html: index === 3
+          ? '<p><a href="https://example.com/contact?source=matrix&amp;medium=cta">Contact the team</a>.</p>'
+          : `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
+      })),
+    });
+
+    expect(revised.sections[2]?.content)
+      .toContain('https://example.com/contact?source=matrix&amp;medium=cta');
   });
 });

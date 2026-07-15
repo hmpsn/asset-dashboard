@@ -4,6 +4,7 @@ import { MatrixGenerationStatus } from '../../../src/components/matrix/MatrixGen
 import type {
   GetMatrixGenerationResult,
   MatrixGenerationItemRead,
+  MatrixGenerationSetAuditFinding,
 } from '../../../shared/types/matrix-generation';
 
 function item(
@@ -106,5 +107,43 @@ describe('MatrixGenerationStatus', () => {
 
     expect(screen.getByText('Generating and auditing selected pages')).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '33');
+  });
+
+  it('keeps review actions available for a human-only set warning', () => {
+    const warning: MatrixGenerationSetAuditFinding = {
+      id: 'human-only-warning',
+      source: 'model',
+      kind: 'provenance',
+      code: 'human_confirmation',
+      severity: 'warning',
+      message: 'Confirm this implication during review.',
+      affectedItemIds: ['ready'],
+      affectedTargetIds: ['ready:template:body'],
+      requiresHumanReview: true,
+    };
+    const data = result('completed');
+    data.run.setAuditReport = {
+      verdict: 'passed',
+      findings: [warning],
+      passCount: 1,
+      modelProvenance: null,
+      auditedAt: '2026-07-15T12:00:00.000Z',
+    };
+    data.items.items[0].setAuditFindings = [warning];
+
+    render(
+      <MatrixGenerationStatus
+        result={data}
+        retrying={false}
+        onRetry={vi.fn()}
+        approvingItemId={null}
+        onReview={vi.fn()}
+        onApprove={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Review page' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Approve for export' })).toBeInTheDocument();
+    expect(screen.getAllByText(warning.message)).toHaveLength(2);
   });
 });

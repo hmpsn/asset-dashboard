@@ -7,6 +7,8 @@ import {
   transitionMatrixGenerationItem,
   transitionMatrixGenerationRun,
 } from './repository.js';
+import { isItemBlockingMatrixGenerationSetAuditFinding } from './set-audit.js';
+import { matrixGenerationTerminalStatus } from './worker.js';
 
 const TERMINAL_ITEM_STATUSES = new Set([
   'ready_for_human_review',
@@ -59,7 +61,8 @@ export function reconcileMatrixGenerationRunsAfterRestart(): number {
     if (!currentRun) continue;
     for (const item of items) {
       const unresolvedSetFinding = currentRun.setAuditReport?.findings.some(
-        finding => finding.affectedItemIds.includes(item.id),
+        finding => isItemBlockingMatrixGenerationSetAuditFinding(finding)
+          && finding.affectedItemIds.includes(item.id),
       ) ?? true;
       if (item.status !== 'ready_for_human_review' || !unresolvedSetFinding) continue;
       transitionMatrixGenerationItem({
@@ -79,11 +82,7 @@ export function reconcileMatrixGenerationRunsAfterRestart(): number {
       workspaceId: currentRun.workspaceId,
       runId: currentRun.id,
       expectedRevision: currentRun.revision,
-      nextStatus: currentRun.status === 'running'
-        && reconciledItems.some(item => item.status === 'ready_for_human_review'
-          || item.status === 'needs_attention')
-        ? 'completed_with_errors'
-        : 'failed',
+      nextStatus: matrixGenerationTerminalStatus(reconciledItems),
     });
     reconciled += 1;
   }

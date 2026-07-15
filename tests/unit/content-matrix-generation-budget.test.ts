@@ -265,13 +265,15 @@ describe('content matrix preview budget', () => {
   it('does not reject its exact preview ceiling across every mocked provider stage', async () => {
     const target = legalGuidanceHeavyTarget();
     const context = generationContext();
-    const cellEstimate = estimateMatrixGenerationCellBudget(target, context, [], []);
-    const accepted = estimateMatrixGenerationBatchBudget([cellEstimate]);
-    const tenCellEstimate = estimateMatrixGenerationBatchBudget(
-      Array.from({ length: 10 }, () => cellEstimate),
-    );
+    const cellEstimate = estimateMatrixGenerationCellBudget(target, context, []);
     target.estimatedPaidBudget = cellEstimate;
+    const accepted = estimateMatrixGenerationBatchBudget([target]);
+    const tenCellEstimate = estimateMatrixGenerationBatchBudget(
+      Array.from({ length: 10 }, () => target),
+    );
 
+    expect(accepted).toEqual(cellEstimate);
+    expect(tenCellEstimate.providerCalls).toBe((cellEstimate.providerCalls * 10) + 2);
     expect(accepted.inputTokens).toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxInputTokens);
     expect(accepted.outputTokens).toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxOutputTokens);
     expect(accepted.estimatedUsd).toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxEstimatedUsd);
@@ -384,8 +386,6 @@ describe('content matrix preview budget', () => {
     await auditMatrixGenerationCandidate({ ...operationBase, deterministicReport: report });
     await reviseMatrixGenerationCandidate({ ...operationBase, auditReport: report });
     await auditMatrixGenerationCandidate({ ...operationBase, deterministicReport: report });
-    await reviseMatrixGenerationCandidate({ ...operationBase, auditReport: report });
-    await auditMatrixGenerationCandidate({ ...operationBase, deterministicReport: report });
 
     const candidate = {
       item: { id: 'item-budget', previewTarget: target } as MatrixGenerationItem,
@@ -394,12 +394,14 @@ describe('content matrix preview budget', () => {
     await auditMatrixGenerationSet({
       workspaceId: WORKSPACE_ID,
       candidates: [candidate],
+      expectedCandidateCount: 1,
       passCount: 1,
       beforeBoundedProviderDispatch: reserve,
     });
     await auditMatrixGenerationSet({
       workspaceId: WORKSPACE_ID,
       candidates: [candidate],
+      expectedCandidateCount: 1,
       passCount: 2,
       beforeBoundedProviderDispatch: reserve,
     });

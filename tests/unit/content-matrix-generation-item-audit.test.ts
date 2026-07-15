@@ -497,7 +497,17 @@ describe('auditMatrixGenerationItem', () => {
       expectedRunRevision: runBeforeSetAudit.revision,
       report: {
         verdict: 'passed',
-        findings: [],
+        findings: [{
+          id: 'mgsf-human-review',
+          source: 'model',
+          kind: 'provenance',
+          code: 'human_fact_check',
+          severity: 'warning',
+          message: 'A human should confirm this factual implication.',
+          affectedItemIds: [audited.item.id],
+          affectedTargetIds: [],
+          requiresHumanReview: true,
+        }],
         passCount: 1,
         modelProvenance: provenance('content-matrix-set-audit'),
         auditedAt: new Date().toISOString(),
@@ -612,7 +622,7 @@ describe('auditMatrixGenerationItem', () => {
     expect(revisionCalls).toBe(1);
   });
 
-  it('keeps a human-only model finding out of the automatic revision path', async () => {
+  it('routes a human-only model finding to review without automatic revision', async () => {
     const committed = await committedFixture(true);
     let revisionCalls = 0;
     const result = await auditMatrixGenerationItem({
@@ -640,12 +650,37 @@ describe('auditMatrixGenerationItem', () => {
     });
 
     expect(result.item).toMatchObject({
-      status: 'needs_attention',
+      status: 'ready_for_human_review',
       automaticRevisionCount: 0,
+      auditReport: { verdict: 'ready_for_human_review' },
     });
     expect(result.providerCalls).toBe(1);
     expect(result.automaticRevisionApplied).toBe(false);
     expect(revisionCalls).toBe(0);
+  });
+
+  it('continues model audit with an incomplete page census when there are no relative links', async () => {
+    const committed = await committedFixture(true);
+    let auditCalls = 0;
+    const result = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-audit-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: false }),
+      auditCandidate: async input => {
+        auditCalls += 1;
+        return operationResult(input, 'content-matrix-item-audit', {
+          revisionRecommended: false,
+          findings: [],
+        });
+      },
+    });
+
+    expect(result.item.status).toBe('ready_for_human_review');
+    expect(auditCalls).toBe(1);
   });
 
   it('blocks an unresolved ready-stage fact before model audit or revision spend', async () => {
