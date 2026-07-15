@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './Toast';
@@ -6,7 +6,7 @@ import {
   Save, Sparkles, BookOpen, Users, MessageSquare,
   Plus, Pencil, Trash2, Check, Upload, Mic, Award, Map, BrainCircuit, Building2,
 } from 'lucide-react';
-import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, IconButton, ConfirmDialog, FormInput, FormSelect, FormTextarea } from './ui';
+import { PageHeader, SectionCard, TabBar, ErrorState, NextStepsCard, ProgressIndicator, Icon, Button, IconButton, ConfirmDialog, FormInput, FormSelect, FormTextarea, Skeleton } from './ui';
 import { ErrorBoundary } from './ErrorBoundary';
 import { workspaces } from '../api';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -17,7 +17,6 @@ import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
 import type { AudiencePersona, TargetGeo } from '../../shared/types/workspace';
 import { BrandscriptTab } from './brand/BrandscriptTab';
 import { DiscoveryTab } from './brand/DiscoveryTab';
-import { VoiceTab } from './brand/VoiceTab';
 import { IdentityTab } from './brand/IdentityTab';
 import { PageStrategyTab } from './brand/PageStrategyTab';
 import { BlueprintDetail } from './brand/BlueprintDetail';
@@ -27,6 +26,11 @@ import { RichTextEditor } from './post-editor/RichTextEditor';
 import { EeatAssetsTab } from './settings/EeatAssetsTab';
 import { BusinessFootprintTab } from './settings/BusinessFootprintTab';
 import { IntelligenceProfileTab } from './settings/IntelligenceProfileTab';
+
+const VoiceTab = lazy(async () => {
+  const module = await import('./brand/VoiceTab');
+  return { default: module.VoiceTab };
+});
 
 interface WorkspaceData {
   id: string;
@@ -534,7 +538,11 @@ export function BrandHub({ workspaceId, webflowSiteId, chromeless = false, activ
 
       {renderedTab === 'brandscript' && <BrandscriptTab workspaceId={workspaceId} />}
       {renderedTab === 'discovery' && <DiscoveryTab workspaceId={workspaceId} />}
-      {renderedTab === 'voice' && <VoiceTab workspaceId={workspaceId} />}
+      {renderedTab === 'voice' && (
+        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <VoiceTab workspaceId={workspaceId} />
+        </Suspense>
+      )}
       {renderedTab === 'identity' && <IdentityTab workspaceId={workspaceId} />}
       {renderedTab === 'business-footprint' && (
         <BusinessFootprintTab

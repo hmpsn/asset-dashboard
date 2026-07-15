@@ -1,5 +1,5 @@
 // @ds-rebuilt
-import { useCallback } from 'react';
+import { lazy, Suspense, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { workspaces } from '../../api';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
@@ -14,7 +14,6 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { BrandHub } from '../BrandHub';
 import { BrandscriptTab } from '../brand/BrandscriptTab';
 import { DiscoveryTab } from '../brand/DiscoveryTab';
-import { VoiceTab } from '../brand/VoiceTab';
 import { IdentityTab } from '../brand/IdentityTab';
 import { BusinessFootprintTab } from '../settings/BusinessFootprintTab';
 import { EeatAssetsTab } from '../settings/EeatAssetsTab';
@@ -41,6 +40,11 @@ import {
   type BrandAiTab,
   useBrandAiSurfaceState,
 } from './useBrandAiSurfaceState';
+
+const VoiceTab = lazy(async () => {
+  const module = await import('../brand/VoiceTab');
+  return { default: module.VoiceTab };
+});
 
 interface BrandAiSurfaceProps {
   workspaceId: string;
@@ -928,7 +932,13 @@ function BrandAiPanel({
     );
   }
   if (tab === 'discovery') return <DiscoveryTab workspaceId={workspaceId} />;
-  if (tab === 'voice') return <VoiceTab workspaceId={workspaceId} />;
+  if (tab === 'voice') {
+    return (
+      <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+        <VoiceTab workspaceId={workspaceId} />
+      </Suspense>
+    );
+  }
   if (tab === 'identity') {
     return (
       <IdentityTab

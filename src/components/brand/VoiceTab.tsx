@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Mic, Loader2 } from 'lucide-react';
 import { SectionCard, EmptyState, Skeleton, TabBar, Icon, Button, InlineBanner } from '../ui';
 import { DNASection } from './voice-tab/DNASection';
@@ -6,7 +7,11 @@ import { GuardrailsSection } from './voice-tab/GuardrailsSection';
 import { CalibrationSection } from './voice-tab/CalibrationSection';
 import { VOICE_TAB_SECTIONS, useVoiceTabShell } from './voice-tab/useVoiceTabShell';
 import type { VoiceSection } from './voice-tab/useVoiceTabShell';
-import { VoiceApprovalSection } from './voice-tab/VoiceApprovalSection';
+
+const VoiceApprovalSection = lazy(async () => {
+  const module = await import('./voice-tab/VoiceApprovalSection');
+  return { default: module.VoiceApprovalSection };
+});
 
 export function VoiceTab({ workspaceId }: { workspaceId: string }) {
   const {
@@ -112,15 +117,17 @@ export function VoiceTab({ workspaceId }: { workspaceId: string }) {
       />
 
       {activeSection === 'approval' && (
-        <VoiceApprovalSection
-          workspaceId={workspaceId}
-          profile={profile}
-          readiness={readiness}
-          isReadinessLoading={isReadinessLoading}
-          readinessError={readinessError}
-          onChanged={invalidateProfile}
-          onRetryReadiness={() => { void refetchReadiness(); }}
-        />
+        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <VoiceApprovalSection
+            workspaceId={workspaceId}
+            profile={profile}
+            readiness={readiness}
+            isReadinessLoading={isReadinessLoading}
+            readinessError={readinessError}
+            onChanged={invalidateProfile}
+            onRetryReadiness={() => { void refetchReadiness(); }}
+          />
+        </Suspense>
       )}
 
       {activeSection === 'samples' && (
