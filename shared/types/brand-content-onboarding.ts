@@ -10,6 +10,7 @@ import type {
 } from './generation-evidence.js';
 import type {
   MatrixGenerationBatchBudget,
+  MatrixGenerationCostEstimate,
   MatrixGenerationInputSelection,
   MatrixSourceRevision,
 } from './matrix-generation.js';
@@ -221,6 +222,19 @@ export interface AuthorizeBrandContentGenerationRequest {
 }
 
 export type AuthorizeBrandContentGenerationResult = BrandContentOnboardingCommandResult;
+
+export interface PreviewBrandContentGenerationAuthorizationRequest {
+  workspaceId: string;
+  runId: string;
+  expectedRevision: number;
+  expectedStatus: 'awaiting_content_authorization';
+}
+
+/** Exact fresh matrix preview a human must inspect before authorizing paid content work. */
+export interface PreviewBrandContentGenerationAuthorizationResult {
+  matrixSelectionFingerprint: string;
+  estimatedBudget: MatrixGenerationCostEstimate;
+}
 
 export interface ResumeBrandContentOnboardingRequest {
   workspaceId: string;

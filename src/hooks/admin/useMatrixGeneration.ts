@@ -11,14 +11,18 @@ import type {
   StartMatrixGenerationSelection,
 } from '../../../shared/types/matrix-generation';
 
-export function useMatrixGeneration(workspaceId: string, matrixId: string) {
+export function useMatrixGeneration(
+  workspaceId: string,
+  matrixId: string,
+  initialRunId: string | null = null,
+) {
   const queryClient = useQueryClient();
   const { trackJob } = useBackgroundTasks();
-  const [runId, setRunId] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(initialRunId);
 
   useEffect(() => {
-    setRunId(null);
-  }, [matrixId]);
+    setRunId(initialRunId);
+  }, [matrixId, initialRunId]);
 
   const preview = useMutation({
     mutationFn: (selections: PreviewMatrixGenerationSelection[]) =>
@@ -71,5 +75,27 @@ export function useMatrixGeneration(workspaceId: string, matrixId: string) {
     },
   });
 
-  return { preview, start, run, retry };
+  const approve = useMutation({
+    mutationFn: (request: {
+      itemId: string;
+      expectedRunRevision: number;
+      expectedItemRevision: number;
+      expectedPostRevision: number;
+    }) => {
+      if (!runId) throw new Error('No matrix generation run is selected');
+      const { itemId, ...body } = request;
+      return contentMatrices.approveGenerationItem(workspaceId, runId, itemId, body);
+    },
+    onSuccess: () => {
+      if (runId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.admin.contentMatrixGeneration(workspaceId, runId),
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.contentMatrices(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+    },
+  });
+
+  return { preview, start, run, retry, approve };
 }

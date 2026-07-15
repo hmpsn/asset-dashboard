@@ -154,5 +154,42 @@ describe('brand content onboarding HTTP adapters', () => {
     );
     expect(disabled.status).toBe(403);
     await expect(disabled.json()).resolves.toMatchObject({ code: 'feature_disabled' });
+
+    const invalidPreview = await ctx.api(
+      `/api/brand-content-onboarding/${workspaceId}/runs/${runId}/content-authorization-preview`,
+      {
+        method: 'POST',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedRevision: 0 }),
+      },
+    );
+    expect(invalidPreview.status).toBe(400);
+
+    const disabledPreview = await ctx.api(
+      `/api/brand-content-onboarding/${workspaceId}/runs/${runId}/content-authorization-preview`,
+      {
+        method: 'POST',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedRevision: 0,
+          expectedStatus: 'awaiting_content_authorization',
+        }),
+      },
+    );
+    expect(disabledPreview.status).toBe(403);
+    await expect(disabledPreview.json()).resolves.toMatchObject({ code: 'feature_disabled' });
+
+    const forbiddenPreview = await ctx.api(
+      `/api/brand-content-onboarding/${otherWorkspaceId}/runs/${runId}/content-authorization-preview`,
+      {
+        method: 'POST',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedRevision: 0,
+          expectedStatus: 'awaiting_content_authorization',
+        }),
+      },
+    );
+    expect(forbiddenPreview.status).toBe(403);
   });
 });

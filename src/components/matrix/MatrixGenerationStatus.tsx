@@ -1,4 +1,4 @@
-import { RefreshCw, Sparkles } from 'lucide-react';
+import { Check, Eye, RefreshCw, Sparkles } from 'lucide-react';
 import type {
   GetMatrixGenerationResult,
   MatrixGenerationItemRead,
@@ -17,6 +17,9 @@ interface MatrixGenerationStatusProps {
   result: GetMatrixGenerationResult;
   retrying: boolean;
   onRetry: (items: MatrixGenerationItemRead[]) => void;
+  approvingItemId: string | null;
+  onReview: (item: MatrixGenerationItemRead) => void;
+  onApprove: (item: MatrixGenerationItemRead) => void;
 }
 
 const ITEM_LABELS: Record<MatrixGenerationItemRead['status'], string> = {
@@ -66,6 +69,9 @@ export function MatrixGenerationStatus({
   result,
   retrying,
   onRetry,
+  approvingItemId,
+  onReview,
+  onApprove,
 }: MatrixGenerationStatusProps) {
   const { run } = result;
   const items = result.items.items;
@@ -125,24 +131,55 @@ export function MatrixGenerationStatus({
         />
 
         <div className="divide-y divide-[var(--brand-border)]">
-          {items.map(item => (
-            <div key={item.id} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
-              <div className="min-w-0">
-                <p className="t-caption font-medium text-[var(--brand-text-bright)] truncate">
-                  {item.target?.targetKeyword ?? item.cellId}
-                </p>
-                {(item.error?.message || item.setAuditFindings[0]?.message) && (
-                  <p className="t-caption-sm text-[var(--brand-text-muted)] line-clamp-2">
-                    {item.error?.message ?? item.setAuditFindings[0]?.message}
+          {items.map(item => {
+            const canApprove = !active
+              && Boolean(run.setAuditReport)
+              && item.status === 'ready_for_human_review'
+              && item.auditReport?.verdict === 'ready_for_human_review'
+              && item.auditReport.unresolvedRequirementIds.length === 0
+              && !item.approvalEvidence
+              && Boolean(item.postId)
+              && item.currentArtifactRevisions.post.artifactId === item.postId
+              && item.setAuditFindings.length === 0;
+            return (
+              <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                <div className="min-w-0 flex-1">
+                  <p className="t-caption font-medium text-[var(--brand-text-bright)] truncate">
+                    {item.target?.targetKeyword ?? item.cellId}
                   </p>
-                )}
+                  {(item.error?.message || item.setAuditFindings[0]?.message) && (
+                    <p className="t-caption-sm text-[var(--brand-text-muted)] line-clamp-2">
+                      {item.error?.message ?? item.setAuditFindings[0]?.message}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-none flex-wrap items-center justify-end gap-1.5">
+                  {canApprove && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={Eye}
+                        onClick={() => onReview(item)}
+                      >
+                        Review page
+                      </Button>
+                      <Button
+                        size="sm"
+                        icon={Check}
+                        loading={approvingItemId === item.id}
+                        onClick={() => onApprove(item)}
+                      >
+                        Approve for export
+                      </Button>
+                    </>
+                  )}
+                  {item.approvalEvidence && <Badge label="Approved for export" tone="teal" />}
+                  <Badge label={ITEM_LABELS[item.status]} tone={itemTone(item.status)} />
+                </div>
               </div>
-              <div className="flex flex-none items-center gap-1.5">
-                {item.approvalEvidence && <Badge label="Approved for export" tone="teal" />}
-                <Badge label={ITEM_LABELS[item.status]} tone={itemTone(item.status)} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </SectionCard>

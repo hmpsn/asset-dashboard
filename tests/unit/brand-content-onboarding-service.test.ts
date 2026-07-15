@@ -17,6 +17,7 @@ import {
   authorizeBrandContentGeneration,
   BrandContentOnboardingServiceError,
   getBrandContentOnboarding,
+  previewBrandContentGenerationAuthorization,
   resumeBrandContentOnboarding,
   startBrandContentOnboarding,
   type BrandContentOnboardingDependencies,
@@ -642,21 +643,28 @@ describe('brand content onboarding service', () => {
     expect(result.run.status).toBe('awaiting_content_authorization');
     expect(result.run.approvedIdentity).toHaveLength(1);
 
-    const startSelections = [{
-      cellId: 'cell-1',
-      expectedSourceRevision: selection[0].sourceRevision,
-      expectedPreviewFingerprint: previewFingerprint,
-    }];
+    const authorizationPreview = await previewBrandContentGenerationAuthorization({
+      workspaceId,
+      runId: result.run.id,
+      expectedRevision: result.run.revision,
+      expectedStatus: 'awaiting_content_authorization',
+    }, deps);
+    expect(authorizationPreview).toMatchObject({
+      estimatedBudget: {
+        providerCalls: 2,
+        inputTokens: 100,
+        outputTokens: 200,
+        estimatedUsd: 0.05,
+        maxConcurrency: 1,
+      },
+    });
     result = await authorizeBrandContentGeneration({
       workspaceId,
       runId: result.run.id,
       expectedRevision: result.run.revision,
       expectedStatus: 'awaiting_content_authorization',
       authorizationId: 'content-authorization-1',
-      expectedMatrixSelectionFingerprint: canonicalGenerationFingerprint({
-        matrixId: 'matrix-1',
-        selections: startSelections,
-      }),
+      expectedMatrixSelectionFingerprint: authorizationPreview.matrixSelectionFingerprint,
       acceptedBudget: matrixBudget,
       idempotencyKey: 'authorize-content',
       authorizedBy: { actorType: 'operator', actorId: 'operator-1' },
@@ -777,6 +785,29 @@ describe('brand content onboarding service', () => {
       attentionResumeStatus: 'awaiting_content_authorization',
     });
     expect(startMatrix).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale content-authorization preview before recomputing the matrix', async () => {
+    const { workspaceId, intakeRevisionId } = seedWorkspace();
+    const { state, deps } = harness(workspaceId, intakeRevisionId);
+    const run = seedContentGate(
+      workspaceId,
+      intakeRevisionId,
+      'awaiting_content_authorization',
+    );
+    state.voiceFinalized = true;
+    const preview = vi.fn(deps.previewMatrixGeneration!);
+
+    await expect(previewBrandContentGenerationAuthorization({
+      workspaceId,
+      runId: run.id,
+      expectedRevision: run.revision - 1,
+      expectedStatus: 'awaiting_content_authorization',
+    }, { ...deps, previewMatrixGeneration: preview })).rejects.toMatchObject({
+      code: 'precondition_failed',
+      status: 409,
+    });
+    expect(preview).not.toHaveBeenCalled();
   });
 
   it('reattaches an exact paid matrix child before attempting a stale live preview', async () => {

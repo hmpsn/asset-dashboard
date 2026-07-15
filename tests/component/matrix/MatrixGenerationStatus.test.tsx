@@ -19,6 +19,18 @@ function item(
       : null,
     setAuditFindings: [],
     approvalEvidence: null,
+    auditReport: status === 'ready_for_human_review'
+      ? { verdict: 'ready_for_human_review', unresolvedRequirementIds: [] }
+      : null,
+    postId: status === 'ready_for_human_review' ? `post-${id}` : null,
+    currentArtifactRevisions: {
+      brief: { artifactType: 'content_brief', artifactId: null, generationRevision: 0 },
+      post: {
+        artifactType: 'generated_post',
+        artifactId: status === 'ready_for_human_review' ? `post-${id}` : null,
+        generationRevision: status === 'ready_for_human_review' ? 9 : 0,
+      },
+    },
   } as unknown as MatrixGenerationItemRead;
 }
 
@@ -38,7 +50,9 @@ function result(status: GetMatrixGenerationResult['run']['status']): GetMatrixGe
         failed: status === 'running' ? 0 : 1,
         cancelled: 0,
       },
-      setAuditReport: null,
+      setAuditReport: status === 'running'
+        ? null
+        : { verdict: 'ready_for_human_review', findings: [] },
     },
     items: {
       items: [
@@ -54,11 +68,16 @@ function result(status: GetMatrixGenerationResult['run']['status']): GetMatrixGe
 describe('MatrixGenerationStatus', () => {
   it('shows honest per-page outcomes and retries only failed pages', () => {
     const onRetry = vi.fn();
+    const onReview = vi.fn();
+    const onApprove = vi.fn();
     render(
       <MatrixGenerationStatus
         result={result('completed_with_errors')}
         retrying={false}
         onRetry={onRetry}
+        approvingItemId={null}
+        onReview={onReview}
+        onApprove={onApprove}
       />,
     );
 
@@ -67,6 +86,10 @@ describe('MatrixGenerationStatus', () => {
     expect(screen.getAllByText('Failed')).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'Retry 1 page' }));
     expect(onRetry).toHaveBeenCalledWith([expect.objectContaining({ id: 'failed' })]);
+    fireEvent.click(screen.getByRole('button', { name: 'Review page' }));
+    expect(onReview).toHaveBeenCalledWith(expect.objectContaining({ id: 'ready' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve for export' }));
+    expect(onApprove).toHaveBeenCalledWith(expect.objectContaining({ id: 'ready' }));
   });
 
   it('shows contextual progress while the parent run is active', () => {
@@ -75,6 +98,9 @@ describe('MatrixGenerationStatus', () => {
         result={result('running')}
         retrying={false}
         onRetry={vi.fn()}
+        approvingItemId={null}
+        onReview={vi.fn()}
+        onApprove={vi.fn()}
       />,
     );
 

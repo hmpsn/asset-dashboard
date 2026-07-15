@@ -603,7 +603,7 @@ export function createContentMatrixActionHandler(
         }
         return paidMatrixCommandSuccess({
           ...result,
-          dashboardUrl: `/ws/${encodeURIComponent(parsed.data.workspace_id)}/content`,
+          dashboardUrl: `/ws/${encodeURIComponent(parsed.data.workspace_id)}/content-pipeline?tab=planner&matrix=${encodeURIComponent(parsed.data.matrix_id)}&run=${encodeURIComponent(result.run.id)}`,
         }, parsed.data.workspace_id, dependencies);
       }
 

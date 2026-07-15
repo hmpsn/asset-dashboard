@@ -965,7 +965,7 @@ describe('MCP content matrix read tools', () => {
     expect(textPayload(started)).toMatchObject({
       job_id: 'job_1',
       existing: false,
-      dashboard_url: '/ws/ws_1/content',
+      dashboard_url: '/ws/ws_1/content-pipeline?tab=planner&matrix=mtx_1&run=run_1',
     });
     expect(deps.recordPaidCallOnce).toHaveBeenNthCalledWith(
       1,

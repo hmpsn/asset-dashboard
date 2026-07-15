@@ -19,6 +19,7 @@ import {
   authorizeBrandContentGeneration,
   BrandContentOnboardingServiceError,
   getBrandContentOnboarding,
+  previewBrandContentGenerationAuthorization,
   resumeBrandContentOnboarding,
   startBrandContentOnboarding,
 } from '../domains/brand-content-onboarding/service.js';
@@ -90,6 +91,11 @@ const authorizationSchema = z.object({
   expectedMatrixSelectionFingerprint: fingerprintSchema,
   acceptedBudget: matrixBudgetSchema,
   idempotencyKey: idempotencySchema,
+}).strict();
+
+const authorizationPreviewSchema = z.object({
+  expectedRevision: revisionSchema,
+  expectedStatus: z.literal('awaiting_content_authorization'),
 }).strict();
 
 function operatorFromRequest(req: Request) {
@@ -202,6 +208,30 @@ export function createBrandContentOnboardingRoutes(): Router {
         if (sendError(res, error)) return;
         log.error({ error, workspaceId, runId }, 'failed to resume brand-content onboarding');
         res.status(500).json({ error: 'Failed to resume brand-content onboarding' });
+      }
+    },
+  );
+
+  router.post(
+    '/api/brand-content-onboarding/:workspaceId/runs/:runId/content-authorization-preview',
+    requireWorkspaceAccess('workspaceId'),
+    validate(authorizationPreviewSchema),
+    async (req, res) => {
+      const { workspaceId, runId } = req.params;
+      if (!idSchema.safeParse(runId).success) {
+        return res.status(400).json({ error: 'Invalid onboarding run ID' });
+      }
+      try {
+        const body = authorizationPreviewSchema.parse(req.body);
+        res.json(await previewBrandContentGenerationAuthorization({
+          workspaceId,
+          runId,
+          ...body,
+        }));
+      } catch (error) {
+        if (sendError(res, error)) return;
+        log.error({ error, workspaceId, runId }, 'failed to preview onboarding content authorization');
+        res.status(500).json({ error: 'Failed to preview onboarding content authorization' });
       }
     },
   );

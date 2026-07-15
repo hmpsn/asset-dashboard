@@ -6,6 +6,8 @@ import type {
   BrandContentOnboardingResumeStatus,
   BrandContentOnboardingRun,
   GetBrandContentOnboardingRequest,
+  PreviewBrandContentGenerationAuthorizationRequest,
+  PreviewBrandContentGenerationAuthorizationResult,
   PublicBrandContentOnboardingCreatorAttribution,
   PublicBrandContentOnboardingRun,
   ResumeBrandContentOnboardingRequest,
@@ -1163,6 +1165,112 @@ function reconcileAcceptedMatrixChild(
   };
 }
 
+function authorizableMatrixId(run: BrandContentOnboardingRun): string {
+  const matrixIds = new Set(run.inputs.matrixSelection.map(selection => selection.matrixId));
+  if (matrixIds.size !== 1) {
+    throw new BrandContentOnboardingServiceError(
+      'precondition_failed',
+      'One onboarding content run must select cells from exactly one matrix',
+      422,
+    );
+  }
+  return run.inputs.matrixSelection[0].matrixId;
+}
+
+async function prepareFreshContentAuthorization(
+  deps: BrandContentOnboardingDependencies,
+  run: BrandContentOnboardingRun,
+  matrixId: string,
+) {
+  const previewSelections = run.inputs.matrixSelection.map(selection => ({
+    cellId: selection.cellId,
+    expectedSourceRevision: selection.sourceRevision,
+  }));
+  const [firstPreview, ...remainingPreview] = previewSelections;
+  const preview = await deps.previewMatrixGeneration({
+    workspaceId: run.workspaceId,
+    matrixId,
+    selections: [firstPreview, ...remainingPreview],
+  });
+  if (preview.results.length !== run.inputs.matrixSelection.length) {
+    throw new BrandContentOnboardingServiceError(
+      'authority_changed',
+      'The selected matrix preview is incomplete',
+      409,
+    );
+  }
+  const startSelections = preview.results.map((result, index) => {
+    const selected = run.inputs.matrixSelection[index];
+    if (!selected
+      || result.status !== 'ready'
+      || result.cellId !== selected.cellId
+      || canonicalGenerationFingerprint(result.sourceRevision)
+        !== canonicalGenerationFingerprint(selected.sourceRevision)
+      || result.target.structuralFingerprint !== selected.structuralFingerprint
+      || canonicalGenerationFingerprint(result.target.voiceSnapshot)
+        !== canonicalGenerationFingerprint(run.finalizedVoice)
+      || canonicalGenerationFingerprint(result.target.identitySnapshot)
+        !== canonicalGenerationFingerprint(
+          frozenIdentityForPageType(run, result.target.pageType),
+        )) {
+      throw new BrandContentOnboardingServiceError(
+        'authority_changed',
+        'A selected matrix cell or frozen brand authority changed before authorization',
+        409,
+      );
+    }
+    return {
+      cellId: selected.cellId,
+      expectedSourceRevision: selected.sourceRevision,
+      expectedPreviewFingerprint: result.target.effectiveInputFingerprint,
+    };
+  });
+  if (!preview.estimatedBatchBudget) {
+    throw new BrandContentOnboardingServiceError(
+      'precondition_failed',
+      'Every selected matrix page must be ready before content authorization',
+      422,
+    );
+  }
+  return {
+    startSelections,
+    selectionFingerprint: canonicalGenerationFingerprint({ matrixId, selections: startSelections }),
+    estimatedBudget: preview.estimatedBatchBudget,
+  };
+}
+
+async function previewBrandContentGenerationAuthorizationInternal(
+  request: PreviewBrandContentGenerationAuthorizationRequest,
+  overrides?: Partial<BrandContentOnboardingDependencies>,
+): Promise<PreviewBrandContentGenerationAuthorizationResult> {
+  const deps = dependencies(overrides);
+  assertEnabled(request.workspaceId, deps);
+  const run = getPersistedRun(request.workspaceId, request.runId);
+  if (!run) {
+    throw new BrandContentOnboardingServiceError('not_found', 'Onboarding run not found', 404);
+  }
+  if (run.revision !== request.expectedRevision || run.status !== request.expectedStatus) {
+    throw new BrandContentOnboardingServiceError(
+      'precondition_failed',
+      'The onboarding run changed before content authorization preview',
+      409,
+    );
+  }
+  const matrixId = authorizableMatrixId(run);
+  if (!brandAuthorityIsCurrent(deps, run)) {
+    throw new BrandContentOnboardingServiceError(
+      'authority_changed',
+      'The frozen brand authority changed before content authorization preview',
+      409,
+    );
+  }
+  const prepared = await prepareFreshContentAuthorization(deps, run, matrixId);
+  return {
+    matrixSelectionFingerprint: prepared.selectionFingerprint,
+    estimatedBudget: prepared.estimatedBudget,
+  };
+}
+
 async function authorizeBrandContentGenerationInternal(
   request: AuthorizeBrandContentGenerationRequest,
   overrides?: Partial<BrandContentOnboardingDependencies>,
@@ -1194,15 +1302,7 @@ async function authorizeBrandContentGenerationInternal(
       409,
     );
   }
-  const matrixIds = new Set(run.inputs.matrixSelection.map(selection => selection.matrixId));
-  if (matrixIds.size !== 1) {
-    throw new BrandContentOnboardingServiceError(
-      'precondition_failed',
-      'One onboarding content run must select cells from exactly one matrix',
-      422,
-    );
-  }
-  const matrixId = run.inputs.matrixSelection[0].matrixId;
+  const matrixId = authorizableMatrixId(run);
   const recovered = reconcileAcceptedMatrixChild(deps, run, request, matrixId);
   if (recovered) {
     return attachAuthorizedMatrixChild(
@@ -1233,43 +1333,8 @@ async function authorizeBrandContentGenerationInternal(
       paidJobId: null,
     }, request.authorizedBy);
   }
-  const previewSelections = run.inputs.matrixSelection.map(selection => ({
-    cellId: selection.cellId,
-    expectedSourceRevision: selection.sourceRevision,
-  }));
-  const [firstPreview, ...remainingPreview] = previewSelections;
-  const preview = await deps.previewMatrixGeneration({
-    workspaceId: run.workspaceId,
-    matrixId,
-    selections: [firstPreview, ...remainingPreview],
-  });
-  const startSelections = preview.results.map((result, index) => {
-    const selected = run.inputs.matrixSelection[index];
-    if (!selected
-      || result.status !== 'ready'
-      || result.cellId !== selected.cellId
-      || canonicalGenerationFingerprint(result.sourceRevision)
-        !== canonicalGenerationFingerprint(selected.sourceRevision)
-      || result.target.structuralFingerprint !== selected.structuralFingerprint
-      || canonicalGenerationFingerprint(result.target.voiceSnapshot)
-        !== canonicalGenerationFingerprint(run.finalizedVoice)
-      || canonicalGenerationFingerprint(result.target.identitySnapshot)
-        !== canonicalGenerationFingerprint(
-          frozenIdentityForPageType(run, result.target.pageType),
-        )) {
-      throw new BrandContentOnboardingServiceError(
-        'authority_changed',
-        'A selected matrix cell or frozen brand authority changed before authorization',
-        409,
-      );
-    }
-    return {
-      cellId: selected.cellId,
-      expectedSourceRevision: selected.sourceRevision,
-      expectedPreviewFingerprint: result.target.effectiveInputFingerprint,
-    };
-  });
-  const selectionFingerprint = canonicalGenerationFingerprint({ matrixId, selections: startSelections });
+  const prepared = await prepareFreshContentAuthorization(deps, run, matrixId);
+  const { startSelections, selectionFingerprint } = prepared;
   if (selectionFingerprint !== request.expectedMatrixSelectionFingerprint) {
     throw new BrandContentOnboardingServiceError(
       'precondition_failed',
@@ -1331,6 +1396,17 @@ export async function authorizeBrandContentGeneration(
 ): Promise<AuthorizeBrandContentGenerationResult> {
   try {
     return await authorizeBrandContentGenerationInternal(request, overrides);
+  } catch (error) {
+    return translateExpectedChildError(error);
+  }
+}
+
+export async function previewBrandContentGenerationAuthorization(
+  request: PreviewBrandContentGenerationAuthorizationRequest,
+  overrides?: Partial<BrandContentOnboardingDependencies>,
+): Promise<PreviewBrandContentGenerationAuthorizationResult> {
+  try {
+    return await previewBrandContentGenerationAuthorizationInternal(request, overrides);
   } catch (error) {
     return translateExpectedChildError(error);
   }
