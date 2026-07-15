@@ -663,7 +663,7 @@ export type GetSearchPerformanceInput = z.infer<typeof getSearchPerformanceInput
 // entries in the `mcp` context of shared/types/action-catalog.ts (ACTION_CATALOG.mcp),
 // verified by tests/contract/action-catalog.test.ts. This schema is the source of
 // truth for the wire vocabulary — the catalog reads it and never redefines it.
-// ADDITIVE ONLY: 80 MCP tools + long-lived per-workspace API keys mean these verbs
+// ADDITIVE ONLY: 83 MCP tools + long-lived per-workspace API keys mean these verbs
 // must never be renamed once shipped. See docs/rules/action-catalog.md.
 export const applyRecommendationInputSchema = z.object({
   workspace_id: workspaceIdSchema,
