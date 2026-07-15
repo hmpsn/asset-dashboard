@@ -96,7 +96,7 @@ helpers inside its owned directory but may not rename or duplicate a locked seam
 | M2 | typed item audit/attempt snapshot in M0 ledger | `auditMatrixGenerationItem()`, `reviseMatrixGenerationItem()` | no new public route/tool |
 | M3 | M0 ledger extended with batch selection/set findings and page-review evidence | `startContentMatrixGenerationRun()`, `getContentMatrixGenerationRun()`, `retryContentMatrixGenerationRun()`, `auditMatrixGenerationSet()`, `approveMatrixPageForPublishReadiness()` | `POST /api/content-matrices/:workspaceId/:matrixId/generation-runs`; `GET .../generation-runs/:runId`; `POST .../:runId/retry`; `POST .../:runId/items/:itemId/review-approval`; matching start/get/retry MCP actions; approval remains human HTTP action |
 | B3 | `brand_generation` in `DELIVERABLE_TYPES`; `BRAND_REVIEW_CONTRACT_VERSION`; discriminated foundation/suite payloads; typed CAS decisions/receipts | `createBrandReviewDeliverable()`, `applyBrandReviewDecision()`, `getClientBrandSummary()` | existing deliverable send/respond routes; authenticated `GET /api/public/brand-summary/:workspaceId` |
-| M4 | existing blueprint/matrix source refs | `createMatrixFromPseoPlan()` | `POST /api/page-strategy/:workspaceId/:blueprintId/entries/:entryId/content-matrix`; MCP `create_content_matrix_from_pseo_plan`; generation stays separate |
+| M4 | existing blueprint/matrix source refs | `getPseoMatrixPlan()` + `createMatrixFromPseoPlan()` | `POST /api/page-strategy/:workspaceId/:blueprintId/entries/:entryId/content-matrix`; MCP read/create tools; generation stays separate |
 | O1 | `brand_content_onboarding_runs` | `startBrandContentOnboarding()`, `getBrandContentOnboarding()`, `resumeBrandContentOnboarding()` | `/api/brand-content-onboarding/:workspaceId/runs[/:runId]`; three matching MCP actions |
 
 Route modules remain thin HTTP adapters. MCP handlers call these domain exports
@@ -703,10 +703,15 @@ generation workers/audits, or hide a generation start inside matrix creation.
 - Require preflight evidence/uniqueness before allowing generation start.
 - Add idempotent blueprint-entry HTTP materialization at
   `POST /api/page-strategy/:workspaceId/:blueprintId/entries/:entryId/content-matrix`
-  plus `create_content_matrix_from_pseo_plan` on `/mcp`; both call
-  `createMatrixFromPseoPlan()` and return the same matrix/source identity.
+  plus bounded `get_pseo_matrix_plan` and
+  `create_content_matrix_from_pseo_plan` tools on `/mcp`. Creation requires the
+  exact entry timestamp/template ID/template revision returned by the read.
+  The entry's singleton `matrixId` plus exact definition fingerprint is the
+  resource-scoped idempotency authority; no redundant caller key is persisted.
+  HTTP and MCP creation both call `createMatrixFromPseoPlan()` and return the
+  same matrix/source identity.
 
-Red first: Cartesian count, stable rerun, source link, collisions, missing
+Red first: source discovery/authority, Cartesian count, stable rerun, source link, collisions, missing
 service/location evidence, cannibalization, rollback, MCP discovery/schema/
 workspace scope/caller attribution, and real `/mcp` idempotent replay.
 
@@ -825,7 +830,7 @@ observed.
 | M2 | `npx vitest run tests/unit/content-matrix-generation-audit.test.ts tests/integration/content-plan-review-routes.test.ts`; assert exactly one paid revision and human-required factual verdict |
 | M3 | `npx vitest run tests/integration/content-matrix-generation-batch.test.ts tests/contract/background-job-coverage-contract.test.ts tests/component/ContentPlanner.matrixGeneration.test.tsx`; browser: flag loading→ON, preview/start 10 cells concurrently without sibling staleness, cancel, retry, inspect mixed/set findings |
 | B3 | `npx vitest run tests/integration/brand-deliverable-review.test.ts tests/integration/public-brand-summary.test.ts tests/component/client/BrandGenerationReview.test.tsx`; approve one item/request changes on one, assert `partial` and no voice finalization/raw-data leakage |
-| M4 | `npx vitest run tests/integration/pseo-matrix-bridge.test.ts tests/integration/mcp-server-routing.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts`; create the same service×location plan through HTTP and `/mcp`, assert one linked matrix/exact Cartesian cell count |
+| M4 | `npx vitest run tests/integration/pseo-matrix-bridge.test.ts tests/unit/mcp-server-routing.test.ts tests/contract/mcp-tool-input-schema-properties.test.ts`; read exact authority, create the same service×location plan through HTTP and `/mcp`, assert one linked matrix/exact Cartesian cell count |
 | O1 | `npx vitest run tests/integration/brand-content-onboarding.test.ts tests/contract/brand-content-onboarding-lifecycle.test.ts`; restart at every gate, reject generation→publish-ready jump, and assert expected-revision/idempotent page-review resume |
 | R2 | Real MCP + browser canary: approved item reaches `ready_to_publish`; job list/CMS audit proves no publish call or live mutation; run `npm run verify:platform` |
 

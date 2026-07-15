@@ -1,8 +1,10 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
 import {
   acceptContentTemplateGenerationUpgradeInputSchema,
+  createContentMatrixFromPseoPlanInputSchema,
   getContentMatrixGenerationInputSchema,
   getContentMatrixInputSchema,
+  getPseoMatrixPlanInputSchema,
   listContentMatricesInputSchema,
   previewContentMatrixGenerationInputSchema,
   resolveContentMatrixEvidenceInputSchema,
@@ -52,6 +54,14 @@ import { recordPaidCallOnce } from '../paid-call-counter.js';
 import { mcpJsonV1Error } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
 import { WS_EVENTS } from '../../ws-events.js';
+import {
+  createMatrixFromPseoPlan,
+  getPseoMatrixPlan,
+  PseoMatrixBridgeError,
+} from '../../domains/content/matrix-generation/pseo-bridge.js';
+import { createLogger } from '../../logger.js';
+
+const log = createLogger('mcp-content-matrix-actions');
 
 export const contentMatrixActionTools: Tool[] = [
   {
@@ -108,6 +118,18 @@ export const contentMatrixActionTools: Tool[] = [
       '[Paid API] Resume explicitly selected failed or needs-attention matrix items from exact run, item, source, artifact, and reusable-checkpoint revisions. Does not replace approved work and never publishes.',
     inputSchema: toMcpJsonSchema(retryContentMatrixGenerationInputSchema),
   },
+  {
+    name: 'get_pseo_matrix_plan',
+    description:
+      'Read one collection blueprint entry, its linked template variables, and exact source authority for safe matrix materialization. Bounded and read-only; never creates a matrix or starts generation.',
+    inputSchema: toMcpJsonSchema(getPseoMatrixPlanInputSchema),
+  },
+  {
+    name: 'create_content_matrix_from_pseo_plan',
+    description:
+      'Idempotently materialize one collection blueprint entry into a validated content matrix from exact source authority plus explicit service/location or other template dimensions. Records the matrix source link. Never previews, starts AI generation, approves, sends, or publishes.',
+    inputSchema: toMcpJsonSchema(createContentMatrixFromPseoPlanInputSchema),
+  },
 ];
 
 type MaybePromise<T> = T | Promise<T>;
@@ -121,6 +143,8 @@ export interface ContentMatrixActionDependencies {
   startMatrixGeneration: typeof startMatrixGeneration;
   getMatrixGeneration: typeof getMatrixGeneration;
   retryMatrixGeneration: typeof retryMatrixGeneration;
+  getPseoMatrixPlan: typeof getPseoMatrixPlan;
+  createMatrixFromPseoPlan: typeof createMatrixFromPseoPlan;
   acceptTemplateGenerationUpgrade: (
     request: Parameters<typeof acceptTemplateGenerationUpgrade>[0],
   ) => MaybePromise<ReturnType<typeof acceptTemplateGenerationUpgrade>>;
@@ -139,6 +163,8 @@ const defaultDependencies: ContentMatrixActionDependencies = {
   startMatrixGeneration,
   getMatrixGeneration,
   retryMatrixGeneration,
+  getPseoMatrixPlan,
+  createMatrixFromPseoPlan,
   acceptTemplateGenerationUpgrade,
   addActivity,
   broadcastToWorkspace,
@@ -304,6 +330,37 @@ function generationSourceLimitError(): CallToolResult {
     message: 'The stored generation source exceeds the bounded generation contract.',
     retryable: false,
   });
+}
+
+function pseoBridgeError(error: PseoMatrixBridgeError): CallToolResult {
+  const code = error.code === 'not_found'
+    ? MCP_TOOL_ERROR_CODES.NOT_FOUND
+    : error.code === 'conflict'
+      ? MCP_TOOL_ERROR_CODES.CONFLICT
+      : MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED;
+  const message = error.code === 'not_found'
+    ? 'The requested pSEO blueprint source was not found.'
+    : error.code === 'conflict'
+      ? 'The linked pSEO matrix source changed. Re-read the blueprint entry and matrix before retrying.'
+      : 'The pSEO plan does not satisfy matrix materialization preflight.';
+  return mcpJsonV1Error({
+    code,
+    message,
+    retryable: error.code === 'conflict',
+    details: { reason: error.reason },
+  });
+}
+
+function runPseoPostCommitEffect(
+  workspaceId: string,
+  effect: string,
+  callback: () => void,
+): void {
+  try {
+    callback();
+  } catch (error) {
+    log.warn({ error, workspaceId, effect }, 'pSEO matrix post-commit effect failed');
+  }
 }
 
 function unknownToolError(): CallToolResult {
@@ -620,9 +677,95 @@ export function createContentMatrixActionHandler(
         return paidMatrixCommandSuccess(result, parsed.data.workspace_id, dependencies);
       }
 
+      if (name === 'get_pseo_matrix_plan') {
+        const parsed = getPseoMatrixPlanInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        return mcpSuccess(toMcpPayload(await dependencies.getPseoMatrixPlan({
+          workspaceId: parsed.data.workspace_id,
+          blueprintId: parsed.data.blueprint_id,
+          entryId: parsed.data.entry_id,
+        })));
+      }
+
+      if (name === 'create_content_matrix_from_pseo_plan') {
+        const parsed = createContentMatrixFromPseoPlanInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        const result = await dependencies.createMatrixFromPseoPlan({
+          workspaceId: parsed.data.workspace_id,
+          blueprintId: parsed.data.blueprint_id,
+          entryId: parsed.data.entry_id,
+          expectedSourceRevision: {
+            entryUpdatedAt: parsed.data.expected_source_revision.entry_updated_at,
+            templateId: parsed.data.expected_source_revision.template_id,
+            templateRevision: parsed.data.expected_source_revision.template_revision,
+          },
+          dimensions: parsed.data.dimensions.map(dimension => ({
+            variableName: dimension.variable_name,
+            values: dimension.values,
+          })),
+        });
+        if (!result.replayed) {
+          runPseoPostCommitEffect(
+            parsed.data.workspace_id,
+            'invalidate-content-pipeline-intelligence',
+            () => dependencies.invalidateContentPipelineIntelligence(parsed.data.workspace_id),
+          );
+          runPseoPostCommitEffect(
+            parsed.data.workspace_id,
+            'broadcast-content-updated',
+            () => dependencies.broadcastToWorkspace(
+              parsed.data.workspace_id,
+              WS_EVENTS.CONTENT_UPDATED,
+              {
+                domain: 'content-plan',
+                matrixId: result.matrix.id,
+                blueprintId: result.source.blueprintId,
+                entryId: result.source.entryId,
+                action: 'pseo_matrix_created',
+              },
+            ),
+          );
+          runPseoPostCommitEffect(
+            parsed.data.workspace_id,
+            'broadcast-blueprint-updated',
+            () => dependencies.broadcastToWorkspace(
+              parsed.data.workspace_id,
+              WS_EVENTS.BLUEPRINT_UPDATED,
+              {
+                blueprintId: result.source.blueprintId,
+                entryId: result.source.entryId,
+                matrixId: result.matrix.id,
+                action: 'entries_updated',
+              },
+            ),
+          );
+          runPseoPostCommitEffect(
+            parsed.data.workspace_id,
+            'record-activity',
+            () => {
+              dependencies.addActivity(
+                parsed.data.workspace_id,
+                'content_updated',
+                `Created content matrix "${result.matrix.name}" from the page blueprint`,
+                `${result.matrix.cellCount} planned page${result.matrix.cellCount === 1 ? '' : 's'}`,
+                {
+                  source: 'mcp-chat',
+                  blueprintId: result.source.blueprintId,
+                  entryId: result.source.entryId,
+                  matrixId: result.matrix.id,
+                  action: 'pseo_matrix_created',
+                },
+              );
+            },
+          );
+        }
+        return mcpSuccess(toMcpPayload(result));
+      }
+
       return unknownToolError();
     } catch (error) {
       if (error instanceof MatrixReadServiceError) return readServiceError(error);
+      if (error instanceof PseoMatrixBridgeError) return pseoBridgeError(error);
       if (error instanceof TemplateGenerationUpgradeError) return upgradeServiceError(error);
       if (error instanceof MatrixGenerationEvidenceError) {
         return mcpJsonV1Error({

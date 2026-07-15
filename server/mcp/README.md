@@ -257,6 +257,8 @@ Brand generation is a durable background workflow, not a synchronous copy endpoi
 | `start_content_matrix_generation` | W | **[Paid API]** Start one bounded, idempotent background batch from exact preview fingerprints and accepted budget ceilings. |
 | `get_content_matrix_generation` | R | Read one durable batch plus cursor-paged item outcomes, audit findings, artifact revisions, and approval evidence. |
 | `retry_content_matrix_generation` | W | **[Paid API]** Resume selected failed or needs-attention checkpoints from exact revisions. |
+| `get_pseo_matrix_plan` | R | Read one collection entry, linked template variables, and exact source authority for safe materialization. |
+| `create_content_matrix_from_pseo_plan` | W | Idempotently create and link one validated matrix from exact source authority plus explicit dimensions. Never starts generation. |
 
 ### schema-actions (`tools/schema-actions.ts`)
 | Tool | R/W | Purpose |

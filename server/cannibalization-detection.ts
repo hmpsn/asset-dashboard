@@ -58,6 +58,35 @@ function normalize(kw: string): string {
 }
 
 /**
+ * Fast exact-match guard for matrix creation. Unlike the advisory report below,
+ * this performs no pairwise comparison or conflict-object allocation.
+ */
+export function hasExactMatrixKeywordConflict(
+  workspaceId: string,
+  matrixId: string,
+): boolean {
+  const matrices = listMatrices(workspaceId);
+  const targetMatrix = matrices.find(matrix => matrix.id === matrixId);
+  if (!targetMatrix) return false;
+
+  const occupied = new Set<string>();
+  for (const page of listPageKeywords(workspaceId)) {
+    if (page.primaryKeyword) occupied.add(normalize(page.primaryKeyword));
+    for (const keyword of page.secondaryKeywords ?? []) occupied.add(normalize(keyword));
+  }
+  for (const matrix of matrices) {
+    if (matrix.id === matrixId) continue;
+    for (const cell of matrix.cells) occupied.add(normalize(cell.targetKeyword));
+  }
+  for (const cell of targetMatrix.cells) {
+    const keyword = normalize(cell.targetKeyword);
+    if (occupied.has(keyword)) return true;
+    occupied.add(keyword);
+  }
+  return false;
+}
+
+/**
  * Check if two keywords are an exact match (after normalization).
  */
 function isExactMatch(a: string, b: string): boolean {

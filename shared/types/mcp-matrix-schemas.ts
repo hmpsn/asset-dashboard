@@ -23,6 +23,61 @@ const sourceRevisionSchema = z.object({
   cell_revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
 });
 
+const pseoMatrixDimensionSchema = z.object({
+  variable_name: z.string().trim().min(1)
+    .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensionNameBytes)
+    .describe('Exact variable name declared by the blueprint entry\'s linked content template.'),
+  values: z.array(z.string().trim().min(1)
+    .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensionValueBytes))
+    .min(1)
+    .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxValuesPerDimension)
+    .describe('Ordered, unique, non-empty values for this matrix dimension.'),
+}).strict();
+
+const pseoMatrixPlanSourceRevisionSchema = z.object({
+  entry_updated_at: z.string().datetime({ offset: true })
+    .describe('Exact updated_at token returned by get_pseo_matrix_plan.'),
+  template_id: durableIdSchema
+    .describe('Exact linked template ID returned by get_pseo_matrix_plan.'),
+  template_revision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
+    .describe('Exact linked template revision returned by get_pseo_matrix_plan.'),
+}).strict();
+
+export const getPseoMatrixPlanInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  blueprint_id: durableIdSchema
+    .describe('Durable site-blueprint ID containing the collection entry.'),
+  entry_id: durableIdSchema
+    .describe('Durable collection blueprint-entry ID to inspect.'),
+}).strict();
+
+export const createContentMatrixFromPseoPlanInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  blueprint_id: durableIdSchema
+    .describe('Durable site-blueprint ID containing the collection entry.'),
+  entry_id: durableIdSchema
+    .describe('Durable collection blueprint-entry ID to link to the created matrix.'),
+  expected_source_revision: pseoMatrixPlanSourceRevisionSchema
+    .describe('Exact entry/template authority returned by get_pseo_matrix_plan.'),
+  dimensions: z.array(pseoMatrixDimensionSchema)
+    .min(1)
+    .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensions)
+    .describe('Explicit service/location or other template-variable dimensions for the Cartesian matrix.'),
+}).strict().superRefine((value, ctx) => {
+  let cellCount = 1;
+  for (const dimension of value.dimensions) {
+    cellCount *= dimension.values.length;
+    if (cellCount > MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxGeneratedCells) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dimensions'],
+        message: `Dimensions generate more than ${MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxGeneratedCells} cells`,
+      });
+      return;
+    }
+  }
+});
+
 export const listContentMatricesInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   template_id: durableIdSchema.optional()
