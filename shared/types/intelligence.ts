@@ -13,6 +13,7 @@ import type { EntityResolutionSlice } from './entity-resolution.js';
 import type { EeatAsset, EeatAssetType } from './eeat-assets.js';
 import type { StoredGenerationQuality } from './generation-quality.js';
 import type { BrandVoiceReadinessState } from './brand-generation.js';
+import type { BriefSourceEvidence } from './content.js';
 import type {
   TrackedAction,
   ActionOutcome,
@@ -135,6 +136,48 @@ export interface WorkspaceIntelligence {
   generationQuality?: GenerationQualitySlice;
   /** Unified brand voice (authority-resolved block) + approved identity. Read-only; non-formattable; assembled on request. */
   brand?: BrandSlice;
+}
+
+// ── Content generation context v2 ──────────────────────────────────────
+
+export type ContentGenerationContextV2Stage = 'brief' | 'draft' | 'voiceReview';
+export type ContentGenerationEvidenceKind = 'keyword_metrics' | 'serp' | 'references' | 'style_examples';
+
+export interface ContentGenerationPromptAuthority {
+  systemVoiceBlock: string;
+  userVoiceBlock: string;
+  identityPromptBlock: string;
+  customNotes: string | null;
+  voice: BrandSlice['voice'];
+}
+
+export interface ContentGenerationContextV2Options {
+  targetKeyword: string;
+  pagePath?: string;
+  sourceEvidence?: BriefSourceEvidence;
+  /** A real provider observation timestamp. Null/omitted means metrics are unavailable. */
+  providerMetricsObservedAt?: string | null;
+  /** Matrix generation may supply its already-frozen voice/identity through this input. */
+  authority?: ContentGenerationPromptAuthority;
+  budgets?: Partial<Record<ContentGenerationContextV2Stage, number>>;
+  includeLocalSeo?: boolean;
+}
+
+export interface ContentGenerationContextV2Result {
+  intelligence: WorkspaceIntelligence;
+  slices: readonly IntelligenceSlice[];
+  authority: ContentGenerationPromptAuthority;
+  projections: Record<ContentGenerationContextV2Stage, string>;
+  tokenEstimates: Record<ContentGenerationContextV2Stage, number>;
+  evidence: {
+    capturedAt: string;
+    freshThrough: string;
+    observedAt: readonly string[];
+    missing: readonly ContentGenerationEvidenceKind[];
+  };
+  matchedPagePath?: string;
+  learningsAvailability: LearningsSlice['availability'] | 'degraded';
+  effectiveInputFingerprint: string;
 }
 
 // ── Slice interfaces ────────────────────────────────────────────────────

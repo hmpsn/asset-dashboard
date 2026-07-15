@@ -14,6 +14,9 @@ export const FEATURE_FLAGS = {
   // any paid-run start gate or product UI is wired. Correctness, authorization, CAS, and failure
   // truth remain unflagged; these flags will gate only paid generation starts in their owner phases.
   'content-matrix-generation': false,
+  // C3 — one budgeted, exact-once context projection for brief/post/MCP generation.
+  // OFF preserves the current prompt/context call sequence byte-for-byte.
+  'content-generation-context-v2': false,
   'brand-deliverable-generation': false,
 
   // Client Insights Briefing (5-phase feature)
@@ -212,6 +215,20 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       linkedRoadmapItemId: 'mcp-content-matrix-generation',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-07-13',
+    },
+  },
+  'content-generation-context-v2': {
+    label: 'Content generation — budgeted context v2',
+    group: 'Platform Intelligence Enhancements',
+    lifecycle: {
+      owner: 'content-pipeline',
+      status: 'active',
+      createdAt: '2026-07-14',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Re-audit by 2026-08-11; retire after staging proves content quality parity plus lower prompt-token and p95 latency, and the v2 context path becomes the supported default.',
+      linkedRoadmapItemId: 'genq-content-context-v2',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-14',
     },
   },
   'brand-deliverable-generation': {
@@ -509,7 +526,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
   {
     label: 'Platform Intelligence Enhancements',
-    keys: ['content-matrix-generation', 'brand-deliverable-generation'],
+    keys: ['content-matrix-generation', 'content-generation-context-v2', 'brand-deliverable-generation'],
   },
   {
     label: 'Client Insights Briefing',

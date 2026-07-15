@@ -32,6 +32,11 @@ setupOpenAIMocks();
 
 vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
   buildContentGenerationContext: vi.fn(),
+  buildContentGenerationContextV2: vi.fn(),
+}));
+
+vi.mock('../../server/feature-flags.js', () => ({
+  isFeatureEnabled: vi.fn(() => false),
 }));
 
 // Mock workspace-intelligence to avoid needing a fully-populated workspace
@@ -84,7 +89,11 @@ import {
   getPageTypeConfig,
   type ContentBrief,
 } from '../../server/content-brief.js';
-import { buildContentGenerationContext } from '../../server/intelligence/generation-context-builders.js';
+import {
+  buildContentGenerationContext,
+  buildContentGenerationContextV2,
+} from '../../server/intelligence/generation-context-builders.js';
+import { isFeatureEnabled } from '../../server/feature-flags.js';
 
 // ── Test fixtures ───────────────────────────────────────────────────────────
 
@@ -223,7 +232,9 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  vi.clearAllMocks();
   resetOpenAIMocks();
+  vi.mocked(isFeatureEnabled).mockReturnValue(false);
   mockBuilderPromptContext = '';
   mockBuilderPageProfile = null;
   mockBuilderInsights = [];
@@ -256,6 +267,44 @@ beforeEach(() => {
       learningsDomain: opts.learningsDomain ?? 'content',
       learningsAvailability: includesLearnings ? 'ready' : 'not_requested',
     };
+  });
+  vi.mocked(buildContentGenerationContextV2).mockResolvedValue({
+    intelligence: {
+      version: 1,
+      workspaceId: TEST_WS_ID,
+      assembledAt: '2026-07-14T12:00:00.000Z',
+      seoContext: mockSeoContext,
+      brand: {
+        availability: 'ready',
+        identity: { mission: 'Help businesses grow' },
+        voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 4, voiceVersion: 2 },
+        voicePromptBlock: '[V2 user voice]',
+        voiceDnaBlock: '[V2 system voice]',
+        identityPromptBlock: '[V2 identity]',
+      },
+    },
+    slices: ['seoContext', 'brand', 'insights', 'learnings', 'eeatAssets'],
+    authority: {
+      systemVoiceBlock: '[V2 system voice]',
+      userVoiceBlock: '[V2 user voice]',
+      identityPromptBlock: '[V2 identity]',
+      customNotes: null,
+      voice: { status: 'calibrated', readiness: 'finalized', profileRevision: 4, voiceVersion: 2 },
+    },
+    projections: {
+      brief: '[V2 budgeted brief context]',
+      draft: '[V2 budgeted draft context]',
+      voiceReview: '[V2 voice review context]',
+    },
+    tokenEstimates: { brief: 700, draft: 300, voiceReview: 120 },
+    evidence: {
+      capturedAt: '2026-07-14T12:00:00.000Z',
+      freshThrough: '2026-07-14T11:00:00.000Z',
+      observedAt: ['2026-07-14T11:00:00.000Z', '2026-07-14T12:00:00.000Z'],
+      missing: ['keyword_metrics', 'serp'],
+    },
+    learningsAvailability: 'ready',
+    effectiveInputFingerprint: 'a'.repeat(64),
   });
 });
 
@@ -407,6 +456,34 @@ describe('generateBrief — happy path', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('generateBrief — prompt construction', () => {
+  it('uses one v2 context build and its captured system authority when the workspace flag is ON', async () => {
+    vi.mocked(isFeatureEnabled).mockReturnValue(true);
+    mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
+
+    await generateBrief(TEST_WS_ID, 'seo services', {
+      pageAnalysisContext: {
+        serpFeatures: ['featured_snippet', 'people_also_ask'],
+      },
+    }, { persist: false });
+
+    expect(buildContentGenerationContextV2).toHaveBeenCalledTimes(1);
+    expect(buildContentGenerationContextV2).toHaveBeenCalledWith(TEST_WS_ID, expect.objectContaining({
+      targetKeyword: 'seo services',
+    }));
+    expect(buildContentGenerationContext).not.toHaveBeenCalled();
+    const briefCall = getCapturedOpenAICalls().find(call => call.feature === 'content-brief');
+    const userPrompt = briefCall!.messages.find(message => message.role === 'user')!.content;
+    const systemPrompt = briefCall!.messages.find(message => message.role === 'system')!.content;
+    expect(userPrompt).toContain('[V2 budgeted brief context]');
+    expect(userPrompt).not.toContain('[V2 system voice]');
+    expect(userPrompt).toContain('return an empty array because no observed SERP evidence is available');
+    expect(userPrompt).toContain('Omit difficultyScore');
+    expect(userPrompt).not.toContain('"difficultyScore": 45');
+    expect(userPrompt).not.toContain('SERP FEATURE OPPORTUNITIES');
+    expect(userPrompt).not.toContain('data shows these are present');
+    expect(systemPrompt.match(/\[V2 system voice\]/g)).toHaveLength(1);
+  });
+
   it('uses the canonical content generation context once for SEO, voice, and knowledge data', async () => {
     mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
 

@@ -597,6 +597,24 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     notes: 'Protects the factual-review path from quietly treating provenance-sensitive checklist items as auto-verified.',
   },
   {
+    id: 'content-context-v2-grounding-and-authority',
+    pipelineId: 'content-brief-review',
+    title: 'Content context v2 keeps evidence grounded and voice authority exact-once',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/intelligence/generation-context-builders.ts',
+      'server/content-brief.ts',
+      'tests/unit/content-generation-context-v2.test.ts',
+      'tests/integration/content-brief-generation.test.ts',
+    ],
+    assertions: [
+      { allOf: ['buildContentGenerationContextV2', '<untrusted_user_content>', 'unknown / needs_research'] },
+      { allOf: ['buildSystemPromptFromAuthority', "not.toContain('[V2 system voice]')", 'toHaveLength(1)'] },
+    ],
+    notes: 'Pins target-only context, untrusted evidence, honest missing facts, and separate exact-once system voice authority for C3.',
+  },
+  {
     id: 'seo-editor-assist-format-sanitization',
     pipelineId: 'seo-editor-assist',
     title: 'SEO editor assist preserves insertion-safe rewrite and JSON contracts',

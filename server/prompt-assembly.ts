@@ -23,6 +23,32 @@ import { voiceDNAToPromptInstructions, guardrailsToPromptInstructions } from './
 // server/voice-dna-layer2.ts) so existing importers of prompt-assembly keep working.
 export { voiceDNAToPromptInstructions, guardrailsToPromptInstructions };
 
+export interface SystemPromptAuthority {
+  /** Already-rendered calibrated DNA + guardrails. Empty when no calibrated authority exists. */
+  systemVoiceBlock: string;
+  /** Workspace notes captured alongside the generation context. */
+  customNotes: string | null;
+}
+
+/**
+ * Render a system prompt from authority captured earlier in the same logical
+ * generation run. This avoids re-reading mutable voice state between stages.
+ */
+export function buildSystemPromptFromAuthority(
+  baseInstructions: string,
+  authority: SystemPromptAuthority,
+  opts?: { skipProseRules?: boolean },
+): string {
+  const parts = [baseInstructions];
+  const voiceBlock = authority.systemVoiceBlock.trim();
+  if (voiceBlock) parts.push(voiceBlock);
+  if (authority.customNotes) {
+    parts.push(`Additional context for this client:\n${authority.customNotes}`);
+  }
+  if (!opts?.skipProseRules) parts.push(PROSE_QUALITY_RULES);
+  return parts.join('\n\n');
+}
+
 
 const log = createLogger('prompt-assembly');
 // Statement cache (module-level lazy init via createStmtCache — never inside a function)

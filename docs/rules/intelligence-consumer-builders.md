@@ -83,6 +83,28 @@ Allowed examples:
 These are evidence or workflow-specific enrichments, not universal workspace
 intelligence.
 
+## Content generation context v2
+
+When the workspace-scoped `content-generation-context-v2` flag is ON, initial
+brief generation, staged post generation/voice review, and MCP brief/post context
+preparation use `buildContentGenerationContextV2()` once per logical generation
+run. The returned projections are authoritative for that run:
+
+- `brief` may contain only the target-matching page-map row, never the full map;
+- `draft` omits brief-only SEO/page-map material already carried by the brief;
+- `voiceReview` contains only the brand material needed to judge voice;
+- calibrated DNA/guardrails enter through the captured system-prompt authority
+  exactly once, while voice examples/legacy voice enter the user context exactly
+  once; and
+- external reference, SERP, and style text is wrapped as untrusted content with
+  real observed timestamps. Missing factual evidence stays explicitly
+  unknown/needs-research.
+
+The OFF path remains the legacy builder/call sequence. Do not add a second v2
+builder or re-read brand/voice intelligence inside a flag-ON consumer. Matrix
+generation may supply its already-frozen finalized voice and approved identity to
+this same builder; it must not create a competing prompt-authority format.
+
 ## Disallowed Drift
 
 Avoid introducing new high-value AI/recommendation consumers that:
