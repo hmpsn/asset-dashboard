@@ -9870,3 +9870,15 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Safety:** Missing intake facts remain empty, and caller-stable submission keys replay the original revision even after intervening intake edits. Voice writes use exact profile revisions, so stale chat state cannot overwrite newer operator work. Every MCP-added sample persists as `mcp_proposed` and is structurally ineligible for finalization until a human explicitly attests it in the platform; a human must still select and authorize exact anchors. MCP cannot mint its own operator authorization or finalize without the one-time human-issued token.
 
 **Files:** migration 194; MCP intake/voice/matrix schemas and action handlers; intake submission command ledger and voice concurrency contracts; pSEO blueprint discovery projection; MCP registry documentation and focused unit/contract tests; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 698. Chat-driven brand voice review and human approval 2026-07-15
+
+**Status:** Complete. MCP can draft the full mutable voice profile, while final authority remains an explicit authenticated human action in the platform or a one-time delegated completion.
+
+**What it does:** Makes `Review & approve` the first voice-calibration section and shows an always-visible warning until the current voice is finalized. The checklist exposes missing DNA, guardrails, authentic anchors, and chat-proposed samples. Operators can inspect the exact DNA, terminology rules, tone boundaries, context modifiers, and anchor examples before locking the revision. MCP-proposed samples remain ineligible until an operator confirms each one as authentic; that revision-safe attestation records human activity and reopens any stale finalized authority.
+
+**Approval boundary:** `Approve and lock voice` finalizes directly in the authenticated platform. As a chat-native alternative, the operator can create a plaintext bearer code that expires after 15 minutes, works once, and is cryptographically bound to the exact profile revision, DNA, guardrails, context rules, selected anchors, and idempotency key they reviewed. MCP can consume that code but cannot mint it, attest its own samples, or substitute a reusable password. The token is shown only at issuance and only its digest is stored.
+
+**Tests and delivery:** Unit, integration, contract, component, query-key, and workspace-event tests cover attestation provenance, anti-forgery, revision conflicts, finalization eligibility, exact approval payloads, token disclosure, and cache invalidation. Independent adversarial review found and closed omitted tone-spectrum review, an over-25-anchor rejection path, and snapshot-codec rollback drift by introducing frozen V2 writes alongside V1 reads. The existing brand/content generation gates remain unchanged.
+
+**Files:** `shared/types/brand-engine.ts`; voice calibration domain/schema/HTTP adapter; brand voice finalization read model; Brand Voice approval UI and API client; query/event invalidation; focused unit, integration, contract, and component tests; `BRAND_DESIGN_LANGUAGE.md`; `data/{roadmap,features}.json`; `FEATURE_AUDIT.md`.

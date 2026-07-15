@@ -65,6 +65,7 @@ const stmts = createStmtCache(() => ({
   // COALESCE handles the empty-table case where SQLite's MAX() returns NULL.
   maxSampleSortOrder: db.prepare(`SELECT COALESCE(MAX(sort_order), -1) AS max FROM voice_samples WHERE voice_profile_id = ?`),
   insertSample: db.prepare(`INSERT INTO voice_samples (id, voice_profile_id, content, context_tag, source, sort_order, created_at) VALUES (@id, @voice_profile_id, @content, @context_tag, @source, @sort_order, @created_at)`),
+  attestSample: db.prepare(`UPDATE voice_samples SET source = 'operator_attested' WHERE id = ? AND voice_profile_id = ? AND source = 'mcp_proposed'`),
   deleteSampleById: db.prepare(`DELETE FROM voice_samples WHERE id = ? AND voice_profile_id = ?`),
   listSessions: db.prepare(`SELECT * FROM voice_calibration_sessions WHERE voice_profile_id = ? ORDER BY created_at DESC`),
   getSession: db.prepare(`SELECT * FROM voice_calibration_sessions WHERE id = ? AND voice_profile_id = ?`),
@@ -168,6 +169,13 @@ export class VoiceSampleValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'VoiceSampleValidationError';
+  }
+}
+
+export class VoiceSampleAttestationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VoiceSampleAttestationError';
   }
 }
 
@@ -316,6 +324,11 @@ export function addVoiceSample(
     );
   }
   const normalized = parsed.data;
+  if (normalized.source === 'operator_attested') {
+    throw new VoiceSampleValidationError(
+      'Operator-attested samples must use the explicit attestation flow',
+    );
+  }
   const id = `vs_${randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
   const effectiveSource = normalized.source ?? 'manual';
@@ -360,6 +373,46 @@ export function addVoiceSample(
     sortOrder,
     createdAt: now,
   };
+}
+
+/** Human-only promotion of an MCP proposal into finalization-eligible evidence. */
+export function attestVoiceSample(
+  workspaceId: string,
+  sampleId: string,
+  expectedRevision: number,
+): VoiceSample {
+  const doAttest = db.transaction((): VoiceSample => {
+    const profile = getVoiceProfile(workspaceId);
+    if (!profile) throw new Error('No voice profile exists for this workspace');
+    if (profile.revision !== expectedRevision) {
+      throw new VoiceProfileRevisionConflictError(expectedRevision, profile.revision);
+    }
+    const sample = profile.samples.find(candidate => candidate.id === sampleId);
+    if (!sample) {
+      throw new VoiceSampleAttestationError('Voice sample not found');
+    }
+    if (sample.source !== 'mcp_proposed') {
+      throw new VoiceSampleAttestationError('Only MCP-proposed samples can be attested');
+    }
+    const updated = stmts().attestSample.run(sample.id, profile.id);
+    if (updated.changes !== 1) {
+      throw new VoiceSampleAttestationError('Voice sample could not be attested');
+    }
+    const touched = stmts().touchProfileAfterSampleMutation.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      updated_at: new Date().toISOString(),
+    });
+    if (touched.changes !== 1) {
+      throw new VoiceProfileRevisionConflictError(expectedRevision, profile.revision + 1);
+    }
+    return { ...sample, source: 'operator_attested' };
+  });
+  const sample = doAttest.immediate();
+  invalidateMonthlyDigestCache(workspaceId);
+  clearIntelligenceCache(workspaceId);
+  return sample;
 }
 
 export function deleteVoiceSample(workspaceId: string, sampleId: string): boolean {

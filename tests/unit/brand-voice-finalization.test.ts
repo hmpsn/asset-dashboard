@@ -25,6 +25,7 @@ import {
 import { submitBrandIntake } from '../../server/domains/brand/intake/service.js';
 import {
   addVoiceSample,
+  attestVoiceSample,
   createVoiceProfile,
   deleteVoiceSample,
   getVoiceProfile,
@@ -82,15 +83,20 @@ function workspace(): SeededFullWorkspace {
   return seeded;
 }
 
-function profileWithSample(source: 'manual' | 'transcript_extraction' | 'calibration_loop' = 'manual') {
+function profileWithSample(
+  source: 'manual' | 'transcript_extraction' | 'operator_attested' | 'calibration_loop' = 'manual',
+) {
   const seeded = workspace();
   const profile = createVoiceProfile(seeded.workspaceId);
-  const sample = addVoiceSample(
+  const addedSample = addVoiceSample(
     seeded.workspaceId,
     'We explain what matters, then let you decide.',
     'body',
-    source,
+    source === 'operator_attested' ? 'mcp_proposed' : source,
   );
+  const sample = source === 'operator_attested'
+    ? attestVoiceSample(seeded.workspaceId, addedSample.id, getVoiceProfile(seeded.workspaceId)!.revision)
+    : addedSample;
   return { seeded, profile: getVoiceProfile(seeded.workspaceId)!, sample };
 }
 
@@ -179,6 +185,27 @@ describe('brand voice finalization domain', () => {
       voiceDNA,
       guardrails,
     });
+  });
+
+  it('accepts a human-attested chat proposal as authentic anchor evidence', () => {
+    const { seeded, sample } = profileWithSample('operator_attested');
+
+    const result = finalizeBrandVoice(finalizationRequest(seeded.workspaceId, sample.id));
+
+    expect(result.snapshot.anchors[0]).toMatchObject({
+      content: sample.content,
+      evidenceRef: {
+        sourceType: 'voice_sample',
+        sourceId: sample.id,
+        voiceSampleSource: 'operator_attested',
+        selectedBy: operator,
+      },
+    });
+    expect(db.prepare(`
+      SELECT schema_version
+      FROM voice_profile_finalizations
+      WHERE id = ?
+    `).get(result.snapshot.id)).toEqual({ schema_version: 2 });
   });
 
   it('keeps direct finalization operator-only and delegated execution behind authorization', () => {

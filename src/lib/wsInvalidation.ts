@@ -531,6 +531,7 @@ function adminInvalidationKeys(
     case WS_EVENTS.VOICE_PROFILE_UPDATED:
       return [
         queryKeys.admin.voiceProfile(workspaceId),
+        queryKeys.admin.voiceReadiness(workspaceId),
         queryKeys.admin.intelligence(workspaceId),
         queryKeys.admin.intelligenceAll(workspaceId),
         queryKeys.client.monthlyDigest(workspaceId),

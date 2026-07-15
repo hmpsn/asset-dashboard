@@ -5,6 +5,8 @@ import {
   createVoiceFinalizationAuthorizationBodySchema,
   finalizeBrandVoiceBodySchema,
   finalizedVoiceSnapshotSchema,
+  finalizedVoiceSnapshotV1Schema,
+  finalizedVoiceSnapshotV2Schema,
   voiceGuardrailsSchema,
   voiceDNASchema,
 } from '../../shared/types/voice-finalization-schemas.js';
@@ -288,6 +290,26 @@ function authorizationFeedbackFields(
 }
 
 describe('voice finalization UTF-8 JSON storage limits', () => {
+  it('keeps V1 frozen while V2 accepts operator-attested anchor provenance', () => {
+    const base = makeSnapshot();
+    const anchor = {
+      ...base.anchors[0],
+      evidenceRef: {
+        ...base.anchors[0].evidenceRef,
+        voiceSampleSource: 'operator_attested',
+      },
+    };
+    const snapshot = {
+      ...base,
+      anchors: [anchor],
+      anchorEvidenceRefs: [anchor.evidenceRef],
+    };
+
+    expect(finalizedVoiceSnapshotV1Schema.safeParse(snapshot).success).toBe(false);
+    expect(finalizedVoiceSnapshotV2Schema.safeParse(snapshot).success).toBe(true);
+    expect(finalizedVoiceSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+
   it('matches the 128 KiB voice DNA column boundary after JSON escaping', () => {
     const dna = makeDNA();
     growJsonToExactBytes(

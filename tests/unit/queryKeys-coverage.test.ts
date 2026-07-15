@@ -215,6 +215,10 @@ describe('queryKeys.admin brand engine keys', () => {
     expect(queryKeys.admin.voiceProfile(WS)).toEqual(['admin-voice-profile', WS]);
   });
 
+  it('voiceReadiness key shape', () => {
+    expect(queryKeys.admin.voiceReadiness(WS)).toEqual(['admin-voice-readiness', WS]);
+  });
+
   it('blueprints key shape', () => {
     expect(queryKeys.admin.blueprints(WS)).toEqual(['admin-blueprints', WS]);
   });

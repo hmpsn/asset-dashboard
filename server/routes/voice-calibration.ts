@@ -21,7 +21,10 @@ import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
 import {
   getVoiceProfile, createVoiceProfile, updateVoiceProfileWithResult,
+  attestVoiceSample,
+  VoiceProfileRevisionConflictError,
   VoiceProfileStateTransitionError,
+  VoiceSampleAttestationError,
   addVoiceSample, deleteVoiceSample,
   listCalibrationSessions,
   generateCalibrationVariations, refineVariation,
@@ -35,6 +38,7 @@ import { computeEffectiveTier, getWorkspace } from '../workspaces.js';
 import {
   createVoiceFinalizationAuthorizationBodySchema,
   createVoiceProfileSchema,
+  attestVoiceSampleSchema,
   finalizeBrandVoiceBodySchema,
   getBrandVoiceReadinessQuerySchema,
   saveVariationFeedbackSchema,
@@ -340,6 +344,11 @@ router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspace
   const { content, contextTag, source } = req.body;
   const workspaceId = req.params.workspaceId;
   try {
+    if (source === 'operator_attested') {
+      return res.status(400).json({
+        error: 'Operator-attested samples must use the explicit attestation endpoint',
+      });
+    }
     const sample = addVoiceSample(workspaceId, content, contextTag, source);
     runVoicePostCommitEffect(workspaceId, 'activity', () => {
       addActivity(workspaceId, 'voice_sample_added', `Added voice sample${contextTag ? ` (${contextTag})` : ''}`);
@@ -358,6 +367,60 @@ router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspace
     throw err;
   }
 });
+
+// Human operator attestation is the only path that promotes an MCP proposal
+// into finalization-eligible voice evidence.
+router.post(
+  '/api/voice/:workspaceId/samples/:sampleId/attest',
+  requireWorkspaceAccess('workspaceId'),
+  validate(attestVoiceSampleSchema),
+  (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    try {
+      const sample = attestVoiceSample(
+        workspaceId,
+        req.params.sampleId,
+        req.body.expectedProfileRevision,
+      );
+      const operator = operatorFromRequest(req);
+      runVoicePostCommitEffect(workspaceId, 'activity', () => {
+        addActivity(
+          workspaceId,
+          'voice_profile_updated',
+          'Confirmed chat-proposed voice sample',
+          'A human operator confirmed a chat-proposed sample as authentic brand voice.',
+          { sampleId: sample.id, source: sample.source },
+          { id: operator.actorId, name: operator.actorLabel },
+        );
+      });
+      runVoicePostCommitEffect(workspaceId, 'broadcast', () => {
+        broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, {
+          sampleId: sample.id,
+          attested: true,
+        });
+      });
+      runVoicePostCommitEffect(workspaceId, 'intelligence-cache', () => {
+        invalidateIntelligenceCache(workspaceId);
+      });
+      res.json(sample);
+    } catch (err) {
+      if (err instanceof VoiceProfileRevisionConflictError) {
+        return res.status(409).json({
+          error: err.message,
+          expectedRevision: err.expectedRevision,
+          actualRevision: err.actualRevision,
+        });
+      }
+      if (err instanceof VoiceSampleAttestationError) {
+        return res.status(422).json({ error: err.message });
+      }
+      if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
+        return res.status(404).json({ error: 'Voice profile not found' });
+      }
+      throw err;
+    }
+  },
+);
 
 // Delete voice sample
 router.delete('/api/voice/:workspaceId/samples/:sampleId', requireWorkspaceAccess('workspaceId'), (req, res) => {

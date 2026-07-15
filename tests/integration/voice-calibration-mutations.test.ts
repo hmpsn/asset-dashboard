@@ -4,6 +4,7 @@
  * Covers:
  * - PATCH /api/voice/:workspaceId (update profile)
  * - POST /api/voice/:workspaceId/samples (add sample)
+ * - POST /api/voice/:workspaceId/samples/:sampleId/attest (human attestation)
  * - DELETE /api/voice/:workspaceId/samples/:sampleId (delete sample)
  * - Workspace isolation for profile mutations and samples
  * - Full mutation chain (create → add sample → delete sample)
@@ -489,6 +490,71 @@ describe('POST /api/voice/:workspaceId/samples — add sample', () => {
       workspaceId: wsId,
       event: WS_EVENTS.INTELLIGENCE_CACHE_UPDATED,
     }));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/voice/:workspaceId/samples/:sampleId/attest
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('POST /api/voice/:workspaceId/samples/:sampleId/attest', () => {
+  it('promotes a chat proposal with human attribution and invalidates readers', async () => {
+    const created = await postJson(`/api/voice/${wsId}/samples`, {
+      content: 'A chat-proposed sample awaiting a human decision.',
+      contextTag: 'body',
+      source: 'mcp_proposed',
+    });
+    expect(created.status).toBe(200);
+    const sample = await created.json() as { id: string };
+    const profileResponse = await api(`/api/voice/${wsId}`);
+    const profile = await profileResponse.json() as { revision: number };
+    broadcastState.calls = [];
+    cacheState.calls = [];
+
+    const attested = await postJson(`/api/voice/${wsId}/samples/${sample.id}/attest`, {
+      expectedProfileRevision: profile.revision,
+    });
+
+    expect(attested.status).toBe(200);
+    await expect(attested.json()).resolves.toMatchObject({
+      id: sample.id,
+      source: 'operator_attested',
+    });
+    expect(listActivity(wsId)).toContainEqual(expect.objectContaining({
+      title: 'Confirmed chat-proposed voice sample',
+    }));
+    expect(broadcastState.calls).toContainEqual({
+      workspaceId: wsId,
+      event: WS_EVENTS.VOICE_PROFILE_UPDATED,
+      payload: { sampleId: sample.id, attested: true },
+    });
+    expect(cacheState.calls).toContain(wsId);
+  });
+
+  it('rejects stale revisions and non-proposals', async () => {
+    const forgedAttestation = await postJson(`/api/voice/${wsId}/samples`, {
+      content: 'A caller cannot skip the human confirmation mutation.',
+      source: 'operator_attested',
+    });
+    expect(forgedAttestation.status).toBe(400);
+
+    const manual = await postJson(`/api/voice/${wsId}/samples`, {
+      content: 'An operator-entered sample is already authentic.',
+      source: 'manual',
+    });
+    const manualSample = await manual.json() as { id: string };
+    const profileResponse = await api(`/api/voice/${wsId}`);
+    const profile = await profileResponse.json() as { revision: number };
+
+    const stale = await postJson(`/api/voice/${wsId}/samples/${manualSample.id}/attest`, {
+      expectedProfileRevision: profile.revision - 1,
+    });
+    expect(stale.status).toBe(409);
+
+    const wrongSource = await postJson(`/api/voice/${wsId}/samples/${manualSample.id}/attest`, {
+      expectedProfileRevision: profile.revision,
+    });
+    expect(wrongSource.status).toBe(422);
   });
 });
 

@@ -31,11 +31,14 @@ import {
   updateVoiceProfile,
   updateVoiceProfileWithResult,
   addVoiceSample,
+  attestVoiceSample,
   deleteVoiceSample,
   listCalibrationSessions,
   VoiceProfileValidationError,
   VoiceProfileRevisionConflictError,
   VoiceProfileStateTransitionError,
+  VoiceSampleAttestationError,
+  VoiceSampleValidationError,
 } from '../../server/voice-calibration.js';
 import db from '../../server/db/index.js';
 import type { VoiceDNA, VoiceGuardrails, ContextModifier } from '../../shared/types/brand-engine.js';
@@ -494,6 +497,15 @@ describe('addVoiceSample', () => {
       .toBe('mcp_proposed');
   });
 
+  it('does not allow generic sample creation to forge operator attestation', () => {
+    expect(() => addVoiceSample(
+      ws.workspaceId,
+      'This did not pass through human confirmation.',
+      'body',
+      'operator_attested',
+    )).toThrow(VoiceSampleValidationError);
+  });
+
   it('rejects a sample prepared from a stale profile revision', () => {
     const current = getVoiceProfile(ws.workspaceId)!;
     expect(() => addVoiceSample(
@@ -539,6 +551,53 @@ describe('addVoiceSample', () => {
     } finally {
       ws2.cleanup();
     }
+  });
+});
+
+describe('attestVoiceSample', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeAll(() => {
+    ws = seedWorkspace({ tier: 'growth', clientPassword: '' });
+    createVoiceProfile(ws.workspaceId);
+  });
+  afterAll(() => { ws?.cleanup(); });
+
+  it('promotes only an MCP proposal and advances the profile revision', () => {
+    const proposed = addVoiceSample(
+      ws.workspaceId,
+      'A human-reviewed chat proposal.',
+      'body',
+      'mcp_proposed',
+    );
+    const before = getVoiceProfile(ws.workspaceId)!;
+
+    const attested = attestVoiceSample(ws.workspaceId, proposed.id, before.revision);
+
+    expect(attested.source).toBe('operator_attested');
+    const after = getVoiceProfile(ws.workspaceId)!;
+    expect(after.revision).toBe(before.revision + 1);
+    expect(after.samples.find(sample => sample.id === proposed.id)?.source)
+      .toBe('operator_attested');
+  });
+
+  it('rejects stale revisions and non-MCP samples without changing provenance', () => {
+    const proposed = addVoiceSample(
+      ws.workspaceId,
+      'A proposal addressed from a stale screen.',
+      'body',
+      'mcp_proposed',
+    );
+    const current = getVoiceProfile(ws.workspaceId)!;
+    expect(() => attestVoiceSample(ws.workspaceId, proposed.id, current.revision - 1))
+      .toThrow(VoiceProfileRevisionConflictError);
+
+    const manual = addVoiceSample(ws.workspaceId, 'Already authentic.', 'body', 'manual');
+    const latest = getVoiceProfile(ws.workspaceId)!;
+    expect(() => attestVoiceSample(ws.workspaceId, manual.id, latest.revision))
+      .toThrow(VoiceSampleAttestationError);
+    expect(getVoiceProfile(ws.workspaceId)!.samples.find(sample => sample.id === manual.id)?.source)
+      .toBe('manual');
   });
 });
 

@@ -439,8 +439,7 @@ export const voiceCalibrationSelectionsSnapshotSchema = z.array(voiceCalibration
     );
   });
 
-/** Frozen immutable snapshot codec for persisted schema_version=1. */
-export const finalizedVoiceSnapshotV1Schema = finalizedVoiceSnapshotRefSchema.extend({
+const finalizedVoiceSnapshotObjectSchema = finalizedVoiceSnapshotRefSchema.extend({
   id: boundedId,
   workspaceId: boundedId,
   profileRevision: z.number().int().min(2).max(Number.MAX_SAFE_INTEGER),
@@ -451,7 +450,12 @@ export const finalizedVoiceSnapshotV1Schema = finalizedVoiceSnapshotRefSchema.ex
   calibrationSelections: voiceCalibrationSelectionsSnapshotSchema,
   executionActor: voiceFinalizationExecutionAttributionSchema,
   createdAt: timestamp,
-}).strict().superRefine((value, ctx) => {
+}).strict();
+
+function refineFinalizedVoiceSnapshot(
+  value: z.infer<typeof finalizedVoiceSnapshotObjectSchema>,
+  ctx: z.RefinementCtx,
+): void {
   if (value.anchors.length !== value.anchorEvidenceRefs.length) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -489,10 +493,32 @@ export const finalizedVoiceSnapshotV1Schema = finalizedVoiceSnapshotRefSchema.ex
       });
     }
   });
-});
+}
+
+/** Frozen immutable snapshot codec for persisted schema_version=1. */
+export const finalizedVoiceSnapshotV1Schema = finalizedVoiceSnapshotObjectSchema
+  .superRefine((value, ctx) => {
+    refineFinalizedVoiceSnapshot(value, ctx);
+    value.anchors.forEach((anchor, index) => {
+      if (
+        anchor.evidenceRef.sourceType === 'voice_sample'
+        && anchor.evidenceRef.voiceSampleSource === 'operator_attested'
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['anchors', index, 'evidenceRef', 'voiceSampleSource'],
+          message: 'Operator-attested voice samples require snapshot schema version 2.',
+        });
+      }
+    });
+  });
+
+/** Frozen immutable snapshot codec for persisted schema_version=2. */
+export const finalizedVoiceSnapshotV2Schema = finalizedVoiceSnapshotObjectSchema
+  .superRefine(refineFinalizedVoiceSnapshot);
 
 /** Current snapshot codec; advance this alias only when a new frozen version exists. */
-export const finalizedVoiceSnapshotSchema = finalizedVoiceSnapshotV1Schema;
+export const finalizedVoiceSnapshotSchema = finalizedVoiceSnapshotV2Schema;
 
 export const voiceFinalizationAuthorizationRefSchema = z.object({
   authorizationId: boundedId,
