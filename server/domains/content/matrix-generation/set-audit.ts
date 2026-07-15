@@ -6,6 +6,7 @@ import { buildGenerationProvenance } from '../../../generation-provenance.js';
 import { stripHtmlToText } from '../../../utils/text.js';
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
 import type { PersistedGeneratedPost } from '../../../../shared/types/content.js';
+import { isBlockingMatrixGenerationSetAuditFinding } from '../../../../shared/types/matrix-generation.js';
 import type {
   MatrixGenerationItem,
   MatrixGenerationSetAuditFinding,
@@ -35,6 +36,14 @@ export interface MatrixGenerationSetAuditResult {
   proseRevisionItemIds: string[];
 }
 
+/** A partial census blocks run approval without invalidating pages that already passed item audit. */
+export function isItemBlockingMatrixGenerationSetAuditFinding(
+  item: MatrixGenerationSetAuditFinding,
+): boolean {
+  return item.code !== 'incomplete_candidate_census'
+    && isBlockingMatrixGenerationSetAuditFinding(item);
+}
+
 const DEFAULT_DEPENDENCIES: MatrixGenerationSetAuditDependencies = { callAI };
 
 function findingId(input: Omit<MatrixGenerationSetAuditFinding, 'id'>): string {
@@ -43,6 +52,17 @@ function findingId(input: Omit<MatrixGenerationSetAuditFinding, 'id'>): string {
 
 function finding(input: Omit<MatrixGenerationSetAuditFinding, 'id'>): MatrixGenerationSetAuditFinding {
   return { id: findingId(input), ...input };
+}
+
+function setAuditVerdict(
+  findings: readonly MatrixGenerationSetAuditFinding[],
+): MatrixGenerationSetAuditReport['verdict'] {
+  if (findings.some(item => item.kind === 'structural' && item.severity === 'error')) {
+    return 'source_correction_required';
+  }
+  return findings.some(isBlockingMatrixGenerationSetAuditFinding)
+    ? 'needs_attention'
+    : 'passed';
 }
 
 function normalizeUrl(value: string): string {
@@ -179,12 +199,52 @@ function validateModelOutput(
 export async function auditMatrixGenerationSet(input: {
   workspaceId: string;
   candidates: readonly MatrixGenerationSetAuditCandidate[];
+  expectedCandidateCount: number;
   passCount: 1 | 2;
   signal?: AbortSignal;
   beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void;
   dependencies?: Partial<MatrixGenerationSetAuditDependencies>;
 }): Promise<MatrixGenerationSetAuditResult> {
   const deterministic = runDeterministicMatrixGenerationSetAudit(input.candidates);
+  if (input.candidates.length !== input.expectedCandidateCount) {
+    const censusFinding = finding({
+      source: 'deterministic',
+      kind: 'provenance',
+      code: 'incomplete_candidate_census',
+      severity: 'error',
+      message: 'The generated candidate census does not match the selected page set.',
+      affectedItemIds: input.candidates.map(candidate => candidate.item.id),
+      affectedTargetIds: input.candidates.flatMap(candidate => (
+        candidate.item.previewTarget?.blockManifest.blocks.slice(0, 1).map(
+          block => `${candidate.item.id}:${block.id}`,
+        ) ?? []
+      )),
+      requiresHumanReview: false,
+    });
+    const findings = [...deterministic, censusFinding];
+    return {
+      report: {
+        verdict: setAuditVerdict(findings),
+        findings,
+        passCount: input.passCount,
+        modelProvenance: null,
+        auditedAt: new Date().toISOString(),
+      },
+      proseRevisionItemIds: [],
+    };
+  }
+  if (input.expectedCandidateCount === 1) {
+    return {
+      report: {
+        verdict: setAuditVerdict(deterministic),
+        findings: deterministic,
+        passCount: input.passCount,
+        modelProvenance: null,
+        auditedAt: new Date().toISOString(),
+      },
+      proseRevisionItemIds: [],
+    };
+  }
   const pages = input.candidates.map(candidate => ({
     itemId: candidate.item.id,
     plannedUrl: candidate.item.previewTarget?.plannedUrl,
@@ -246,11 +306,7 @@ export async function auditMatrixGenerationSet(input: {
   }));
   const findings = [...deterministic, ...modelFindings];
   const report: MatrixGenerationSetAuditReport = {
-    verdict: findings.some(item => item.kind === 'structural' && item.severity === 'error')
-      ? 'source_correction_required'
-      : findings.length > 0
-        ? 'needs_attention'
-        : 'passed',
+    verdict: setAuditVerdict(findings),
     findings,
     passCount: input.passCount,
     modelProvenance: buildGenerationProvenance({
@@ -269,7 +325,9 @@ export async function auditMatrixGenerationSet(input: {
   return {
     report,
     proseRevisionItemIds: modelOutput.findings
-      .filter(item => item.kind === 'prose' && item.revisionRecommended)
+      .filter(item => item.kind === 'prose'
+        && item.revisionRecommended
+        && !item.requiresHumanReview)
       .flatMap(item => item.affectedItemIds)
       .filter((id, index, values) => values.indexOf(id) === index),
   };

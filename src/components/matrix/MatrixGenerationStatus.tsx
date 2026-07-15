@@ -3,6 +3,7 @@ import type {
   GetMatrixGenerationResult,
   MatrixGenerationItemRead,
 } from '../../../shared/types/matrix-generation';
+import { isBlockingMatrixGenerationSetAuditFinding } from '../../../shared/types/matrix-generation';
 import {
   Badge,
   Button,
@@ -140,7 +141,7 @@ export function MatrixGenerationStatus({
               && !item.approvalEvidence
               && Boolean(item.postId)
               && item.currentArtifactRevisions.post.artifactId === item.postId
-              && item.setAuditFindings.length === 0;
+              && !item.setAuditFindings.some(isBlockingMatrixGenerationSetAuditFinding);
             return (
               <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
                 <div className="min-w-0 flex-1">

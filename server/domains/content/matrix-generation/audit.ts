@@ -251,11 +251,13 @@ function internalPathCheck(
     const canonical = canonicalizeMatrixPath(path);
     return canonical ? [canonical] : [];
   }));
+  let hasRelativeInternalPath = false;
   const invalid = extractLinks(pageHtml(post)).flatMap(link => {
     const href = link.href.trim();
     if (!href || href.startsWith('#') || /^(?:mailto|tel):/i.test(href)) return [];
     if (/^(?:https?:)?\/\//i.test(href)) return [];
     if (!href.startsWith('/')) return [href];
+    hasRelativeInternalPath = true;
     const path = href.split(/[?#]/, 1)[0] ?? '';
     const canonical = canonicalizeMatrixPath(path);
     return canonical && known.has(canonical) ? [] : [href];
@@ -263,9 +265,9 @@ function internalPathCheck(
   return check(
     'internal-paths',
     'seo',
-    censusComplete && invalid.length === 0,
+    invalid.length === 0 && (!hasRelativeInternalPath || censusComplete),
     'Every relative internal link resolves to an authoritative workspace path.',
-    'The draft contains a malformed or nonexistent relative internal path.',
+    'The draft contains a malformed or unverified relative internal path.',
   );
 }
 
@@ -592,8 +594,10 @@ export function mergeMatrixGenerationAudit(
 
   const deterministicFailed = input.deterministicReport.deterministicChecks
     .some(item => item.result === 'failed');
-  const modelNeedsAttention = input.modelOutput.revisionRecommended
-    || input.modelOutput.findings.some(finding => finding.severity !== 'info');
+  const modelNeedsAttention = input.modelOutput.findings.some(finding => (
+    finding.severity === 'error'
+    || (finding.severity === 'warning' && !finding.requiresHumanReview)
+  ));
   const reportBase = {
     ...input.deterministicReport,
     modelFindings: input.modelOutput.findings,

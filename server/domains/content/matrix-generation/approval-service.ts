@@ -3,6 +3,7 @@ import type {
   ApproveMatrixPageForPublishReadinessResult,
   MatrixPageApprovalEvidence,
 } from '../../../../shared/types/matrix-generation.js';
+import { isBlockingMatrixGenerationSetAuditFinding } from '../../../../shared/types/matrix-generation.js';
 import db from '../../../db/index.js';
 import { getMatrix, updateMatrixCell } from '../../../content-matrices.js';
 import { getPost, updatePostField } from '../../../content-posts-db.js';
@@ -44,7 +45,10 @@ export function approveMatrixPageForPublishReadiness(
       || !item.previewTarget
       || !item.postId
       || !run.setAuditReport
-      || run.setAuditReport.findings.some(finding => finding.affectedItemIds.includes(item.id))
+      || run.setAuditReport.findings.some(finding => (
+        isBlockingMatrixGenerationSetAuditFinding(finding)
+        && finding.affectedItemIds.includes(item.id)
+      ))
     ) {
       throw new MatrixPageApprovalPreconditionError('This page is not ready for human approval');
     }

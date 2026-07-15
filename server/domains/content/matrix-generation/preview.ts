@@ -258,12 +258,7 @@ function generatedOutputBytes(tokens: number): number {
   return tokens * GENERATED_OUTPUT_BYTES_PER_TOKEN;
 }
 
-export function estimateMatrixGenerationCellBudget(
-  target: ResolvedMatrixStructuralTarget,
-  context: ContentGenerationContextV2Result,
-  requirements: readonly GenerationEvidenceRequirement[],
-  resolutions: readonly MatrixGenerationEvidenceResolution[],
-): MatrixGenerationCostEstimate {
+function matrixPostOutputEstimate(target: ResolvedMatrixStructuralTarget) {
   const bodyBlocks = target.blockManifest.blocks.filter(block => block.source === 'template');
   const sectionOutputTokens = bodyBlocks.map(
     block => Math.max(800, (block.wordCountTarget ?? 250) * 2),
@@ -279,7 +274,25 @@ export function estimateMatrixGenerationCellBudget(
   const rawPostBytes = generatedOutputBytes(
     600 + sectionOutputTokens.reduce((sum, value) => sum + value, 0) + 800,
   );
-  const adoptedPostBytes = Math.max(rawPostBytes, generatedOutputBytes(unificationOutputTokens));
+  return {
+    bodyBlocks,
+    sectionOutputTokens,
+    unificationOutputTokens,
+    creativeOutputTokens,
+    adoptedPostBytes: Math.max(rawPostBytes, generatedOutputBytes(unificationOutputTokens)),
+  };
+}
+
+export function estimateMatrixGenerationCellBudget(
+  target: ResolvedMatrixStructuralTarget,
+  context: ContentGenerationContextV2Result,
+  resolutions: readonly MatrixGenerationEvidenceResolution[],
+): MatrixGenerationCostEstimate {
+  const {
+    bodyBlocks,
+    creativeOutputTokens,
+    adoptedPostBytes,
+  } = matrixPostOutputEstimate(target);
   const auditPostBytes = Math.max(
     adoptedPostBytes,
     generatedOutputBytes(ITEM_REVISION_OUTPUT_TOKENS),
@@ -320,30 +333,21 @@ export function estimateMatrixGenerationCellBudget(
     targetBytes,
     authorityBytes,
     auditPostBytes,
-  ) * 5;
-  const setCandidateBytes = serializedUtf8Bytes({
-    plannedUrl: target.plannedUrl,
-    targetKeyword: target.targetKeyword.value,
-    variableValues: target.variableValues,
-    evidenceRequirements: requirements,
-    allowedTargetIds: target.blockManifest.blocks.map(block => block.id),
-  }) + Math.min(adoptedPostBytes, SET_AUDIT_PAGE_TEXT_BYTES);
-  const setAuditCandidateInput = matrixGenerationInputReservationCeiling(setCandidateBytes) * 2;
+  ) * 3;
   const inputTokens = briefInput
     + proseStageInput
     + unificationInput
     + seoInput
-    + itemOperationInput
-    + setAuditCandidateInput;
+    + itemOperationInput;
 
   // Creative prose may reserve both Anthropic and OpenAI when fallback is needed.
-  // Five item-level calls cover audit→revision→audit plus set-revision→audit.
-  const providerCalls = 1 + (2 * (bodyBlocks.length + 3)) + 1 + 5;
+  // Three item-level calls cover the reachable audit→revision→audit ceiling.
+  const providerCalls = 1 + (2 * (bodyBlocks.length + 3)) + 1 + 3;
   const outputTokens = BRIEF_OUTPUT_TOKENS
     + (creativeOutputTokens * 2)
     + 200
-    + (ITEM_AUDIT_OUTPUT_TOKENS * 3)
-    + (ITEM_REVISION_OUTPUT_TOKENS * 2);
+    + (ITEM_AUDIT_OUTPUT_TOKENS * 2)
+    + ITEM_REVISION_OUTPUT_TOKENS;
   return {
     providerCalls,
     inputTokens,
@@ -354,19 +358,35 @@ export function estimateMatrixGenerationCellBudget(
 }
 
 export function estimateMatrixGenerationBatchBudget(
-  estimates: readonly MatrixGenerationCostEstimate[],
+  targets: readonly MatrixGenerationPreviewTarget[],
 ): MatrixGenerationCostEstimate {
+  const estimates = targets.map(target => target.estimatedPaidBudget);
   const generationInput = estimates.reduce((sum, estimate) => sum + estimate.inputTokens, 0);
   const generationOutput = estimates.reduce((sum, estimate) => sum + estimate.outputTokens, 0);
-  const setAuditFramingInput = promptInputCeiling() * 2;
-  const inputTokens = generationInput + setAuditFramingInput;
-  const outputTokens = generationOutput + (SET_AUDIT_OUTPUT_TOKENS * 2);
+  const setAuditPasses = targets.length >= 2 ? 2 : 0;
+  const setAuditCandidateInput = setAuditPasses === 0
+    ? 0
+    : targets.reduce((sum, target) => {
+        const { adoptedPostBytes } = matrixPostOutputEstimate(target);
+        const candidateBytes = serializedUtf8Bytes({
+          plannedUrl: target.plannedUrl,
+          targetKeyword: target.targetKeyword.value,
+          variableValues: target.variableValues,
+          evidenceRequirements: target.evidenceRequirements,
+          allowedTargetIds: target.blockManifest.blocks.map(block => block.id),
+        }) + Math.min(adoptedPostBytes, SET_AUDIT_PAGE_TEXT_BYTES);
+        return sum + matrixGenerationInputReservationCeiling(candidateBytes);
+      }, 0) * setAuditPasses;
+  const setAuditFramingInput = promptInputCeiling() * setAuditPasses;
+  const inputTokens = generationInput + setAuditCandidateInput + setAuditFramingInput;
+  const outputTokens = generationOutput + (SET_AUDIT_OUTPUT_TOKENS * setAuditPasses);
   return {
-    providerCalls: estimates.reduce((sum, estimate) => sum + estimate.providerCalls, 0) + 2,
+    providerCalls: estimates.reduce((sum, estimate) => sum + estimate.providerCalls, 0)
+      + setAuditPasses,
     inputTokens,
     outputTokens,
     estimatedUsd: matrixGenerationEstimatedUsdCeiling(inputTokens, outputTokens),
-    maxConcurrency: Math.min(MATRIX_GENERATION_BATCH_LIMITS.maxConcurrency, estimates.length),
+    maxConcurrency: Math.min(MATRIX_GENERATION_BATCH_LIMITS.maxConcurrency, targets.length),
   };
 }
 
@@ -477,7 +497,6 @@ export async function prepareMatrixGenerationCell(
   const estimatedPaidBudget = estimateMatrixGenerationCellBudget(
     target,
     context,
-    requirements,
     resolutions,
   );
   const evidence = evidenceRange([
@@ -576,7 +595,7 @@ export async function previewMatrixGeneration(
     results,
     estimatedBatchBudget: readyResults.length === results.length
       ? estimateMatrixGenerationBatchBudget(
-          readyResults.map(result => result.target.estimatedPaidBudget),
+          readyResults.map(result => result.target),
         )
       : null,
   };

@@ -20,6 +20,7 @@ import {
   getPost,
 } from '../../../content-posts-db.js';
 import { GenerationRevisionConflictError } from '../../../generation-provenance.js';
+import { createLogger } from '../../../logger.js';
 import { getFinalizedVoiceSnapshotForGeneration } from '../../brand/voice-finalization.js';
 import {
   brandGenerationApprovalFingerprint,
@@ -49,6 +50,8 @@ import {
   startMatrixGenerationAttempt,
   transitionMatrixGenerationItem,
 } from './repository.js';
+
+const log = createLogger('content-matrix-generation-audit');
 
 export interface AuditMatrixGenerationItemRequest {
   workspaceId: string;
@@ -365,8 +368,7 @@ export async function auditMatrixGenerationItem(
     const deterministicNextStatus: MatrixGenerationItemStatus =
       deterministicReport.verdict === 'blocked_missing_evidence'
         ? 'blocked_missing_evidence'
-        : !pageCensus.complete
-          || (loaded.item.automaticRevisionCount === 1 && deterministicFailed)
+        : loaded.item.automaticRevisionCount === 1 && deterministicFailed
           ? 'needs_attention'
           : 'auditing_model';
     loaded = {
@@ -538,6 +540,10 @@ export async function auditMatrixGenerationItem(
     } catch (error) {
       const cancelled = request.signal?.aborted === true;
       const conflict = isRevisionConflict(error);
+      log.warn(
+        { err: error, itemId: loaded.item.id, stage: 'revision' },
+        'matrix generation automatic revision failed',
+      );
       const revisionError = stageError(
         'revision',
         cancelled

@@ -7,6 +7,7 @@ import {
   getPersistedMatrixGenerationRun,
   listMatrixGenerationAttempts,
   listMatrixGenerationItems,
+  saveMatrixGenerationSetAuditReport,
   startMatrixGenerationAttempt,
   transitionMatrixGenerationItem,
   transitionMatrixGenerationRun,
@@ -126,5 +127,163 @@ describe('content matrix generation restart recovery', () => {
     });
     expect(getPersistedMatrixGenerationRun(workspaceId, run.id)?.status)
       .toBe('completed_with_errors');
+  });
+
+  it('preserves an audited page while a failed peer is retried to restore the set census', () => {
+    const workspaceId = createWorkspace(`Matrix partial recovery ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    let run = createMatrixGenerationRun({
+      workspaceId,
+      matrixId: 'matrix-partial-recovery',
+      templateId: 'template-partial-recovery',
+      idempotencyKey: `run-${randomUUID()}`,
+      selectionFingerprint: '1'.repeat(64),
+      selections: [
+        {
+          matrixId: 'matrix-partial-recovery',
+          cellId: 'cell-ready',
+          sourceRevision: { matrixRevision: 1, templateRevision: 1, cellRevision: 1 },
+          structuralFingerprint: '2'.repeat(64),
+          previewFingerprint: '3'.repeat(64),
+        },
+        {
+          matrixId: 'matrix-partial-recovery',
+          cellId: 'cell-failed',
+          sourceRevision: { matrixRevision: 1, templateRevision: 1, cellRevision: 1 },
+          structuralFingerprint: '4'.repeat(64),
+          previewFingerprint: '5'.repeat(64),
+        },
+      ],
+      createdBy: { actorType: 'operator', actorId: 'operator-1' },
+      mcpExecutionContext: null,
+    }).run;
+    run = transitionMatrixGenerationRun({
+      workspaceId,
+      runId: run.id,
+      expectedRevision: run.revision,
+      nextStatus: 'running',
+    });
+    let [readyItem, failedItem] = listMatrixGenerationItems(workspaceId, run.id);
+    for (const nextStatus of [
+      'preflighting',
+      'preflighted',
+      'generating_brief',
+      'generating_post',
+      'auditing_deterministic',
+      'ready_for_human_review',
+    ] as const) {
+      readyItem = transitionMatrixGenerationItem({
+        workspaceId,
+        itemId: readyItem.id,
+        expectedRevision: readyItem.revision,
+        nextStatus,
+      });
+    }
+    failedItem = transitionMatrixGenerationItem({
+      workspaceId,
+      itemId: failedItem.id,
+      expectedRevision: failedItem.revision,
+      nextStatus: 'failed',
+    });
+    saveMatrixGenerationSetAuditReport({
+      workspaceId,
+      runId: run.id,
+      expectedRunRevision: run.revision,
+      report: {
+        verdict: 'needs_attention',
+        findings: [{
+          id: 'partial-census',
+          source: 'deterministic',
+          kind: 'provenance',
+          code: 'incomplete_candidate_census',
+          severity: 'error',
+          message: 'One selected page has not reached set review.',
+          affectedItemIds: [readyItem.id],
+          affectedTargetIds: [`${readyItem.id}:template:body`],
+          requiresHumanReview: false,
+        }],
+        passCount: 1,
+        modelProvenance: null,
+        auditedAt: new Date().toISOString(),
+      },
+    });
+
+    expect(reconcileMatrixGenerationRunsAfterRestart()).toBe(1);
+    expect(listMatrixGenerationItems(workspaceId, run.id)).toEqual([
+      expect.objectContaining({ id: readyItem.id, status: 'ready_for_human_review' }),
+      expect.objectContaining({ id: failedItem.id, status: 'failed' }),
+    ]);
+    expect(getPersistedMatrixGenerationRun(workspaceId, run.id)?.status)
+      .toBe('completed_with_errors');
+  });
+
+  it('completes a recovered run when every page and its human-only set review are ready', () => {
+    const workspaceId = createWorkspace(`Matrix ready recovery ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    let run = createMatrixGenerationRun({
+      workspaceId,
+      matrixId: 'matrix-ready-recovery',
+      templateId: 'template-ready-recovery',
+      idempotencyKey: `run-${randomUUID()}`,
+      selectionFingerprint: 'b'.repeat(64),
+      selections: [{
+        matrixId: 'matrix-ready-recovery',
+        cellId: 'cell-ready-recovery',
+        sourceRevision: { matrixRevision: 1, templateRevision: 1, cellRevision: 1 },
+        structuralFingerprint: 'c'.repeat(64),
+        previewFingerprint: 'd'.repeat(64),
+      }],
+      createdBy: { actorType: 'operator', actorId: 'operator-1' },
+      mcpExecutionContext: null,
+    }).run;
+    run = transitionMatrixGenerationRun({
+      workspaceId,
+      runId: run.id,
+      expectedRevision: run.revision,
+      nextStatus: 'running',
+    });
+    let item = listMatrixGenerationItems(workspaceId, run.id)[0];
+    for (const nextStatus of [
+      'preflighting',
+      'preflighted',
+      'generating_brief',
+      'generating_post',
+      'auditing_deterministic',
+      'ready_for_human_review',
+    ] as const) {
+      item = transitionMatrixGenerationItem({
+        workspaceId,
+        itemId: item.id,
+        expectedRevision: item.revision,
+        nextStatus,
+      });
+    }
+    saveMatrixGenerationSetAuditReport({
+      workspaceId,
+      runId: run.id,
+      expectedRunRevision: run.revision,
+      report: {
+        verdict: 'passed',
+        findings: [{
+          id: 'human-only-set-warning',
+          source: 'model',
+          kind: 'provenance',
+          code: 'human_confirmation',
+          severity: 'warning',
+          message: 'A human should confirm this implication during review.',
+          affectedItemIds: [item.id],
+          affectedTargetIds: [`${item.id}:template:body`],
+          requiresHumanReview: true,
+        }],
+        passCount: 1,
+        modelProvenance: null,
+        auditedAt: new Date().toISOString(),
+      },
+    });
+
+    expect(reconcileMatrixGenerationRunsAfterRestart()).toBe(1);
+    expect(listMatrixGenerationItems(workspaceId, run.id)[0]?.status)
+      .toBe('ready_for_human_review');
+    expect(getPersistedMatrixGenerationRun(workspaceId, run.id)?.status).toBe('completed');
   });
 });

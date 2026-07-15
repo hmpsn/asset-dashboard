@@ -1061,6 +1061,12 @@ export interface MatrixGenerationSetAuditFinding {
   requiresHumanReview: boolean;
 }
 
+export function isBlockingMatrixGenerationSetAuditFinding(
+  finding: MatrixGenerationSetAuditFinding,
+): boolean {
+  return finding.severity === 'error' || !finding.requiresHumanReview;
+}
+
 export const MATRIX_GENERATION_SET_AUDIT_VERDICTS = [
   'passed',
   'needs_attention',

@@ -202,6 +202,9 @@ never sufficient to dispatch paid work.
   but its generic job was left as the exact restart tombstone, reconciliation
   restores the bounded job result from the durable run without changing an
   artifact or dispatching paid work.
+- Restart reconciliation uses the normal run terminal-status mapping after it
+  settles interrupted items; an all-ready run remains `completed` rather than
+  being mislabeled as `completed_with_errors`.
 - Revision acceptance clears the prior audit/provenance lineage. Cancellation
   or restart interruption therefore preserves the existing content/version
   but restores the item to `changes_requested`, never to an unaudited
@@ -323,24 +326,52 @@ never sufficient to dispatch paid work.
 ## 8. Audit and revision limits
 
 - Deterministic checks run before model review and again after revision.
+- A cold or incomplete internal-page census blocks only a draft that actually
+  contains relative internal links. A page with no relative links still runs
+  the remaining deterministic and model audit stages.
 - A ready audit report has zero unresolved requirements and no failed
   deterministic result. A missing-evidence verdict carries a non-empty
   requirement tuple. Human-required checks may remain human-required or be
   inapplicable; automated paths cannot mark them passed.
 - Model review uses a named operation and a validated structured output. It may
   assess voice, persona fit, SEO, AEO, CTA clarity, and cross-item consistency.
+- A non-revisionable warning that explicitly requires human judgment advances
+  to `ready_for_human_review`; that state is the review gate, not a claim that
+  the warning is resolved. Errors, revision recommendations, and actionable
+  warnings that do not require human judgment remain `needs_attention`.
+- The same disposition applies to set audit: a human-only warning remains
+  visible on the set and affected page but does not block that page's explicit
+  human approval. Any error or actionable non-human warning still blocks. The
+  server approval gate and review UI use the same shared blocking predicate.
 - Automatic revision is bounded to one pass total per item across item-level and
   set-level audits; the shared audit, brand-item, and matrix-item counter type is
   exactly `0|1`. Continued failures become actionable findings instead of an
   unbounded AI loop.
+- Matrix revision output cannot introduce or retarget links. Any new or changed
+  anchor is unwrapped to plain text before the revised draft is validated. Link
+  identity is its decoded href plus normalized anchor text within the frozen
+  block, so a same-URL replacement cannot consume the accepted anchor's
+  allowance. An accepted link cannot move between blocks, and encoded query
+  parameters survive unchanged.
 - Batch generation runs deterministic set checks after item audits for URL
   duplication, typed keyword overlap/cannibalization, block-manifest coverage,
-  structured claim/evidence conflicts, and configured overlap thresholds. A
-  separate named, schema-validated model audit assesses factual consistency and
-  substantive uniqueness but cannot certify truth; provenance-sensitive
-  verdicts remain human-required. Structural conflicts require matrix/template
-  correction and retry; prose-only consistency findings may use the item's
-  still-unused single revision allowance.
+  structured claim/evidence conflicts, and configured overlap thresholds. The
+  auditable candidate census must equal the original selected-page census; a
+  partial multi-page result fails closed instead of masquerading as a one-page
+  run. That run-level census error blocks approval but does not demote pages that
+  already passed item audit; retrying only failed peers preserves those pages so
+  the restored full set is audited together instead of alternating failures.
+  A separate named, schema-validated model audit assesses cross-page factual
+  consistency and substantive uniqueness only when at least two pages are in
+  the set; a one-page run retains the deterministic set checks without spending
+  a cross-page model call or reserving that call's input, output, or cost in its
+  batch preview. The model audit cannot certify truth;
+  provenance-sensitive verdicts remain human-required. Structural conflicts
+  require matrix/template correction and retry; prose-only consistency findings
+  may use the item's still-unused single revision allowance.
+- Previewed item-level audit cost reserves only the reachable three-call ceiling:
+  audit, at most one automatic revision, and re-audit. Set-level reservation is
+  added separately only for multi-page runs.
 - All attempts retain run/provider/model correlation without storing raw
   prompts, secrets, or client-only evidence in logs.
 
