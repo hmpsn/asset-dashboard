@@ -178,6 +178,18 @@ export class VoiceProfileValidationError extends Error {
   }
 }
 
+export class VoiceProfileRevisionConflictError extends Error {
+  readonly expectedRevision: number;
+  readonly actualRevision: number;
+
+  constructor(expectedRevision: number, actualRevision: number) {
+    super(`Voice profile revision conflict: expected ${expectedRevision}, actual ${actualRevision}`);
+    this.name = 'VoiceProfileRevisionConflictError';
+    this.expectedRevision = expectedRevision;
+    this.actualRevision = actualRevision;
+  }
+}
+
 export interface UpdateVoiceProfileResult {
   profile: VoiceProfile & { samples: VoiceSample[] };
   changed: boolean;
@@ -186,6 +198,7 @@ export interface UpdateVoiceProfileResult {
 export function updateVoiceProfileWithResult(
   workspaceId: string,
   updates: { status?: VoiceProfileStatus; voiceDNA?: VoiceDNA; guardrails?: VoiceGuardrails; contextModifiers?: ContextModifier[] },
+  expectedRevision?: number,
 ): UpdateVoiceProfileResult {
   const parsedUpdates = updateVoiceProfileSchema.safeParse(updates);
   if (!parsedUpdates.success) {
@@ -200,6 +213,9 @@ export function updateVoiceProfileWithResult(
   } => {
     const profile = getVoiceProfile(workspaceId);
     if (!profile) throw new Error('No voice profile exists for this workspace');
+    if (expectedRevision !== undefined && profile.revision !== expectedRevision) {
+      throw new VoiceProfileRevisionConflictError(expectedRevision, profile.revision);
+    }
 
     // Finalized authority is created only by finalizeBrandVoice(). The generic
     // editor may reopen/revise a profile, but can never label a mutable draft as
@@ -291,6 +307,7 @@ export function updateVoiceProfile(
 export function addVoiceSample(
   workspaceId: string, content: string,
   contextTag?: VoiceSampleContext, source?: VoiceSampleSource,
+  expectedRevision?: number,
 ): VoiceSample {
   const parsed = voiceSampleInputSchema.safeParse({ content, contextTag, source });
   if (!parsed.success) {
@@ -306,6 +323,9 @@ export function addVoiceSample(
   const doAdd = db.transaction((): { voiceProfileId: string; sortOrder: number } => {
     const profile = getVoiceProfile(workspaceId);
     if (!profile) throw new Error('No voice profile exists for this workspace');
+    if (expectedRevision !== undefined && profile.revision !== expectedRevision) {
+      throw new VoiceProfileRevisionConflictError(expectedRevision, profile.revision);
+    }
     // Read MAX(sort_order)+1 inside the transaction so concurrent adds can't
     // assign duplicate sort_orders. `profile.samples.length` from the in-memory
     // snapshot is stale as soon as another request commits between read and write.

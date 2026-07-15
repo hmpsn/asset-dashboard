@@ -2116,6 +2116,18 @@
           "shippedAt": "2026-07-14",
           "owner": "platform-foundation",
           "notes": "After the independent brand and matrix lanes are staging-verified, add the shared BrandContentOnboardingRun lifecycle, durable versioned record, and MCP start/get/resume surface. The workflow pauses at voice review/finalization, operator review, client review, content authorization, and a distinct page-review gate after content generation; no generic job stays open and no human gate is bypassed. It freezes the approved brand snapshot for the page run. Automatic output stops at ready_for_human_review; every selected page needs version-safe review-only approval that satisfies export/publish preconditions but never invokes auto-publish/CMS, even when configured. Only then may awaiting_content_review advance to ready_to_publish; publication remains separate. Requires both underlying rollout flags rather than a composite flag. || [P0 CONTRACTS 2026-07-13] The shared run/status/gate vocabulary and discriminated durable gate evidence now exist, including non-empty matrix selection, operator/client content authorization proof, and page approval refs frozen to matrix run/item/cell and post revisions with a human approver. || [O1 RESUMABLE ORCHESTRATION 2026-07-14] One monotonic coordinator now references the existing brand, review, voice, matrix, and post authorities without duplicating child state. Three json_v1 MCP tools and matching authenticated HTTP start/get/resume adapters advance at most one durable gate; human content authorization remains HTTP-only. Both underlying flags, exact revisions, immutable historical command replay, pre-paid-work matrix source checks, canonical page-type identity freezing, accepted-child crash reconciliation, partial/cancelled child outcomes, all-page M3 approval evidence, and read-only publish preflight are enforced. Voice changes-requested terminalizes honestly because the foundation child has no revision path. Waiting gates keep no generic job open, and the coordinator never sends, decides, approves, or publishes. || [R2 CANARY READINESS 2026-07-15] A read-only authenticated preview now returns the exact current matrix-selection fingerprint and aggregate accepted budget required by the existing human-only authorization command; authorization recomputes the same authority immediately before paid work."
+        },
+        {
+          "id": "mcp-chat-control-plane",
+          "title": "MCP chat control plane — intake submission, pSEO discovery, and voice drafting",
+          "source": "2026-07-15 MCP reachability dry-run",
+          "est": "M",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-15",
+          "shippedAt": "2026-07-15",
+          "owner": "platform-foundation",
+          "notes": "Adds the missing chat entry points without weakening human approval: immutable MCP intake submission with durable caller-key replay, bounded collection blueprint/entry discovery, and revision-safe voice profile/DNA/guardrail/context/sample writes. MCP-added samples remain proposed and cannot enter the authentic anchor pool until a human attests them in the platform. The separate follow-up owns that attestation, the clear approval surface, and one-time MCP authorization handoff."
         }
       ],
       "shippedAt": "2026-07-14"

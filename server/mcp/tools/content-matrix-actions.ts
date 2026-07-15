@@ -6,6 +6,7 @@ import {
   getContentMatrixInputSchema,
   getPseoMatrixPlanInputSchema,
   listContentMatricesInputSchema,
+  listPseoBlueprintEntriesInputSchema,
   previewContentMatrixGenerationInputSchema,
   resolveContentMatrixEvidenceInputSchema,
   resolveContentMatrixCellsInputSchema,
@@ -57,6 +58,7 @@ import { WS_EVENTS } from '../../ws-events.js';
 import {
   createMatrixFromPseoPlan,
   getPseoMatrixPlan,
+  listPseoBlueprintEntries,
   PseoMatrixBridgeError,
 } from '../../domains/content/matrix-generation/pseo-bridge.js';
 import { createLogger } from '../../logger.js';
@@ -64,6 +66,12 @@ import { createLogger } from '../../logger.js';
 const log = createLogger('mcp-content-matrix-actions');
 
 export const contentMatrixActionTools: Tool[] = [
+  {
+    name: 'list_pseo_blueprint_entries',
+    description:
+      'List bounded collection blueprint entries with their durable blueprint_id, entry_id, linked template_id, and linked matrix_id. Read-only; get_pseo_matrix_plan performs authoritative readiness validation.',
+    inputSchema: toMcpJsonSchema(listPseoBlueprintEntriesInputSchema),
+  },
   {
     name: 'list_content_matrices',
     description:
@@ -135,6 +143,7 @@ export const contentMatrixActionTools: Tool[] = [
 type MaybePromise<T> = T | Promise<T>;
 
 export interface ContentMatrixActionDependencies {
+  listPseoBlueprintEntries: typeof listPseoBlueprintEntries;
   listContentMatrices: typeof listContentMatrices;
   getContentMatrix: typeof getContentMatrix;
   resolveMatrixStructures: typeof resolveMatrixStructures;
@@ -155,6 +164,7 @@ export interface ContentMatrixActionDependencies {
 }
 
 const defaultDependencies: ContentMatrixActionDependencies = {
+  listPseoBlueprintEntries,
   listContentMatrices,
   getContentMatrix,
   resolveMatrixStructures,
@@ -380,6 +390,17 @@ export function createContentMatrixActionHandler(
     context: McpToolExecutionContext,
   ): Promise<CallToolResult> {
     try {
+      if (name === 'list_pseo_blueprint_entries') {
+        const parsed = listPseoBlueprintEntriesInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        const result = dependencies.listPseoBlueprintEntries({
+          workspaceId: parsed.data.workspace_id,
+          cursor: parsed.data.cursor,
+          limit: parsed.data.limit,
+        });
+        return mcpSuccess(toMcpPayload(result));
+      }
+
       if (name === 'list_content_matrices') {
         const parsed = listContentMatricesInputSchema.safeParse(args);
         if (!parsed.success) return validationError();
