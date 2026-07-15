@@ -190,11 +190,35 @@ describe('Content Requests — brief generation includes strategy context', () =
     const res = await api(`/api/content-requests/${testWsId}/nonexistent/generate-brief`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ expectedRequestUpdatedAt: new Date().toISOString() }),
     });
     // Should get 404 for nonexistent request (verifies route handler is wired)
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.error).toBe('Request not found');
+  });
+
+  it('rejects an unpaid request before accepting a generation job', async () => {
+    const request = createContentRequest(testWsId, {
+      topic: 'Unpaid route guard',
+      targetKeyword: `unpaid route guard ${Date.now()} ${Math.random()}`,
+      intent: 'informational',
+      priority: 'high',
+      rationale: 'Generation requires a valid parent lifecycle',
+      initialStatus: 'pending_payment',
+      dedupe: false,
+    });
+
+    const res = await api(`/api/content-requests/${testWsId}/${request.id}/generate-brief`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedRequestUpdatedAt: request.updatedAt }),
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      code: 'content_request_generation_lifecycle_invalid',
+      status: 'pending_payment',
+    });
   });
 });

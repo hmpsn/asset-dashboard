@@ -206,6 +206,8 @@ describe('Public copy review reads', () => {
       expect(section).not.toHaveProperty('aiReasoning');
       expect(section).not.toHaveProperty('steeringHistory');
       expect(section).not.toHaveProperty('qualityFlags');
+      expect(section).not.toHaveProperty('generationRevision');
+      expect(section).not.toHaveProperty('generationProvenance');
     }
   });
 });
@@ -230,6 +232,7 @@ describe('Public copy review suggestions', () => {
     const sectionId = insertSection('client_review');
 
     const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, {
+      expectedUpdatedAt: now,
       originalText: { text: 'Original copy for client review' },
       suggestedText: 'Better copy from the client',
     });
@@ -244,6 +247,7 @@ describe('Public copy review suggestions', () => {
     const sectionId = insertSection('client_review');
 
     const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, {
+      expectedUpdatedAt: now,
       originalText: 'Original copy for client review',
       suggestedText: 'Better copy from the client',
     });
@@ -261,12 +265,32 @@ describe('Public copy review suggestions', () => {
     expect(body.section).not.toHaveProperty('aiReasoning');
     expect(body.section).not.toHaveProperty('steeringHistory');
     expect(body.section).not.toHaveProperty('qualityFlags');
+    expect(body.section).not.toHaveProperty('generationRevision');
+    expect(body.section).not.toHaveProperty('generationProvenance');
+  });
+
+  it('rejects false original text at the current review token without mutating', async () => {
+    const sectionId = insertSection('client_review');
+
+    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, {
+      expectedUpdatedAt: now,
+      originalText: 'Copy this section never contained',
+      suggestedText: 'Better copy from the client',
+    });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'copy_suggestion_original_mismatch' });
+    expect(getSectionRow(sectionId)).toEqual({
+      status: 'client_review',
+      client_suggestions: null,
+    });
   });
 
   it('does not add suggestions to sections outside client review', async () => {
     const sectionId = insertSection('draft');
 
     const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, {
+      expectedUpdatedAt: now,
       originalText: 'Original copy for client review',
       suggestedText: 'Better copy from the client',
     });
@@ -282,7 +306,9 @@ describe('Public copy review approval', () => {
   it('does not approve sections outside client review', async () => {
     const sectionId = insertSection('draft');
 
-    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/approve`, {});
+    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/approve`, {
+      expectedUpdatedAt: now,
+    });
 
     expect(res.status).toBe(400);
     const row = getSectionRow(sectionId);
@@ -294,7 +320,7 @@ describe('Public copy review approval', () => {
 
     const res = await clientPostJson(
       `/api/public/copy/${otherWsId}/section/${sectionId}/approve`,
-      {},
+      { expectedUpdatedAt: now },
       otherWsId,
       otherClientToken,
     );
@@ -302,5 +328,16 @@ describe('Public copy review approval', () => {
     expect(res.status).toBe(400);
     const row = getSectionRow(sectionId);
     expect(row.status).toBe('client_review');
+  });
+
+  it('rejects a stale approval token without changing the section', async () => {
+    const sectionId = insertSection('client_review');
+
+    const res = await clientPostJson(`/api/public/copy/${wsId}/section/${sectionId}/approve`, {
+      expectedUpdatedAt: '2020-01-01T00:00:00.000Z',
+    });
+
+    expect(res.status).toBe(409);
+    expect(getSectionRow(sectionId).status).toBe('client_review');
   });
 });

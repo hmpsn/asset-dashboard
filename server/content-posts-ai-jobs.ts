@@ -18,17 +18,29 @@
  * the worker owns the heavy AI bodies (background-generation.md §Worker Module Contract).
  */
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 
 import { addActivity } from './activity-log.js';
 import { broadcastToWorkspace } from './broadcast.js';
-import { callAI } from './ai.js';
-import { callCreativeAI, scoreVoiceMatch } from './content-posts-ai.js';
+import { callAI, renderAIProviderInput } from './ai.js';
+import { callCreativeAIWithMetadata, countHtmlWords, scoreVoiceMatch } from './content-posts-ai.js';
 import { getBrief } from './content-brief.js';
 import { buildClaimEvidenceLedger } from './content-review-evidence-ledger.js';
-import { getPost, updatePostField } from './content-posts-db.js';
+import {
+  assertPostGenerationRevision,
+  getPost,
+  replacePostWithSnapshot,
+  updatePostField,
+} from './content-posts-db.js';
 import { notifyContentUpdated } from './content-posts.js';
 import { sanitizeRichText, sanitizePlainText } from './html-sanitize.js';
-import { createJob, updateJob } from './jobs.js';
+import {
+  createResourceScopedJob,
+  getJob,
+  getJobResourceClaims,
+  runResourceScopedJobWorker,
+  updateJob,
+} from './jobs.js';
 import { createLogger } from './logger.js';
 import { parseAIJson } from './openai-helpers.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
@@ -37,7 +49,15 @@ import { invalidateContentPipelineIntelligence } from './intelligence-freshness.
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import { getWorkspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
-import { BACKGROUND_JOB_TYPES } from '../shared/types/background-jobs.js';
+import { BACKGROUND_JOB_TYPES, JOB_RESOURCE_TYPES } from '../shared/types/background-jobs.js';
+import type { GenerationProvenance } from '../shared/types/ai-execution.js';
+import { canonicalGenerationProvenanceSchema } from './schemas/generation-provenance.js';
+import {
+  buildGenerationProvenance,
+  fingerprintRenderedAIInput,
+  GenerationRevisionConflictError,
+  type AcceptedGenerationExecution,
+} from './generation-provenance.js';
 import {
   AI_FEEDBACK_TARGETS,
   ISSUE_KEYS,
@@ -45,17 +65,33 @@ import {
 } from '../shared/types/content.js';
 import type {
   AIReviewMap,
+  AiFixJobResult,
   AiFixRequest,
   AiFixResult,
   ContentReviewEvidence,
   IssueKey,
+  PersistedGeneratedPost,
   StoredAIReview,
 } from '../shared/types/content.js';
 
 const log = createLogger('content-posts-ai-jobs');
 
-// Model used for AI review — also recorded on the persisted StoredAIReview blob.
-const AI_REVIEW_MODEL = 'gpt-5.4-mini';
+function runPostAIWorkerPostCommitEffect(
+  workspaceId: string,
+  postId: string,
+  operation: 'ai_review' | 'voice_score',
+  effect: string,
+  callback: () => void,
+): void {
+  try {
+    callback();
+  } catch (err) {
+    log.warn(
+      { err, workspaceId, postId, operation, effect },
+      'Post AI worker post-commit effect failed',
+    );
+  }
+}
 
 // ── Response schemas (moved from routes/content-posts.ts) ───────────────────
 
@@ -87,6 +123,31 @@ const aiPostFeedbackResponseSchema = z.object({
   })).min(1),
   conclusion: z.string().trim().min(1),
 }).strip();
+
+const storedAiFixJobResultSchema = z.object({
+  field: z.enum(['introduction', 'section', 'conclusion', 'meta', 'post']),
+  sectionIndex: z.number().int().nonnegative().optional(),
+  originalText: z.string(),
+  suggestedText: z.string(),
+  explanation: z.string(),
+  sourceRevision: z.number().int().nonnegative(),
+  provenance: canonicalGenerationProvenanceSchema,
+}).strict().superRefine((result, ctx) => {
+  if (result.field === 'section' && result.sectionIndex === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['sectionIndex'],
+      message: 'sectionIndex is required for section fixes',
+    });
+  }
+  if (result.field !== 'section' && result.sectionIndex !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['sectionIndex'],
+      message: 'sectionIndex is only valid for section fixes',
+    });
+  }
+});
 
 // ── ai-fix request schema (shared by route validate() + /api/jobs dispatcher) ──
 
@@ -176,25 +237,65 @@ function buildReviewEvidence(workspaceId: string, briefId: string): ContentRevie
 export interface AiReviewJobParams {
   workspaceId: string;
   postId: string;
+  expectedRevision?: number;
+  executionChainId?: string;
+  signal?: AbortSignal;
 }
 
 export interface AiReviewJobResult {
   review: AIReviewMap;
   evidence?: ContentReviewEvidence;
+  sourceRevision: number;
+  postRevision: number;
+  provenance: GenerationProvenance;
+}
+
+interface CommittedAiReview {
+  result: AiReviewJobResult;
+  postCommit: {
+    postId: string;
+    targetKeyword: string;
+    title: string;
+  };
+}
+
+function emitAiReviewPostCommitEffects(
+  workspaceId: string,
+  context: CommittedAiReview['postCommit'],
+): void {
+  runPostAIWorkerPostCommitEffect(workspaceId, context.postId, 'ai_review', 'activity', () => {
+    addActivity(
+      workspaceId,
+      'post_ai_review',
+      `AI review completed for "${context.targetKeyword}"`,
+      context.title,
+      { postId: context.postId, action: 'ai_review_completed' },
+    );
+  });
+  runPostAIWorkerPostCommitEffect(workspaceId, context.postId, 'ai_review', 'content-updated', () => {
+    notifyContentUpdated(workspaceId, { postId: context.postId, action: 'ai_review_completed' });
+  });
+  runPostAIWorkerPostCommitEffect(workspaceId, context.postId, 'ai_review', 'success-log', () => {
+    log.info(`AI review completed for post ${context.postId}`);
+  });
 }
 
 /**
  * Executes the AI review against a post and persists the verdicts. Throws on
  * not-found or AI/schema failure so the worker marks the job 'error'.
  */
-export async function runAiReview(params: AiReviewJobParams): Promise<AiReviewJobResult> {
+export async function runAiReview(params: AiReviewJobParams): Promise<CommittedAiReview> {
   const { workspaceId, postId } = params;
   const post = getPost(workspaceId, postId);
   if (!post) throw new Error('Post not found');
+  const sourceRevision = params.expectedRevision ?? post.generationRevision;
+  assertPostGenerationRevision(workspaceId, postId, sourceRevision);
+  const executionChainId = params.executionChainId ?? randomUUID();
 
   const ws = getWorkspace(workspaceId);
 
   const fullContext = await buildIntelPrompt(workspaceId, ['seoContext', 'learnings'], { verbosity: 'detailed' });
+  assertPostGenerationRevision(workspaceId, postId, sourceRevision);
 
   const allContent = [
     post.introduction || '',
@@ -235,16 +336,18 @@ Return ONLY valid JSON like:
     workspaceId,
     'You are a strict content QA reviewer. Return only valid JSON matching the requested checklist schema.',
   );
+  const messages = [{ role: 'user' as const, content: prompt }];
   const result = await callAI({
-    model: AI_REVIEW_MODEL,
+    operation: 'content-post-review',
     system: systemPrompt,
-    messages: [{ role: 'user', content: prompt }],
+    messages,
     maxTokens: 1000,
     temperature: 0.3,
     researchMode: true,
     responseFormat: { type: 'json_object' },
-    feature: 'content-review',
     workspaceId,
+    executionChainId,
+    signal: params.signal,
   });
 
   const parsed = parseAIJson<unknown>(result.text);
@@ -256,25 +359,51 @@ Return ONLY valid JSON like:
 
   const evidence = buildReviewEvidence(workspaceId, post.briefId);
   const review = markProvenanceItemsForHumanReview(reviewResult.data, claimsToVerify, evidence);
+  const acceptedExecution: AcceptedGenerationExecution = {
+    execution: result.execution,
+    inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+      provider: result.execution.provider,
+      system: systemPrompt,
+      messages,
+      researchMode: true,
+    })),
+  };
+  const provenance = buildGenerationProvenance({
+    accepted: acceptedExecution,
+    executionChainId,
+    evidenceCapturedAt: getBrief(workspaceId, post.briefId)?.sourceEvidence?.capturedAt,
+    authorityInputs: {
+      postId,
+      sourceRevision,
+      sourceGenerationFingerprint: post.generationProvenance?.inputFingerprint ?? null,
+      briefId: post.briefId,
+    },
+  });
 
   const aiReview: StoredAIReview = {
     review,
     evidence,
     reviewedAt: new Date().toISOString(),
-    model: AI_REVIEW_MODEL,
+    model: result.execution.model,
   };
-  updatePostField(workspaceId, post.id, { aiReview });
-  addActivity(
-    workspaceId,
-    'post_ai_review',
-    `AI review completed for "${post.targetKeyword}"`,
-    post.title,
-    { postId: post.id, action: 'ai_review_completed' },
-  );
-  notifyContentUpdated(workspaceId, { postId: post.id, action: 'ai_review_completed' });
-  log.info(`AI review completed for post ${post.id}`);
-
-  return { review, evidence };
+  const updated = updatePostField(workspaceId, post.id, { aiReview }, sourceRevision);
+  if (!updated) {
+    throw new GenerationRevisionConflictError('content_post', post.id, sourceRevision);
+  }
+  return {
+    result: {
+      review,
+      evidence,
+      sourceRevision,
+      postRevision: updated.generationRevision,
+      provenance,
+    },
+    postCommit: {
+      postId: post.id,
+      targetKeyword: post.targetKeyword,
+      title: post.title,
+    },
+  };
 }
 
 // ── AI Fix worker ───────────────────────────────────────────────────────────
@@ -283,6 +412,9 @@ export interface AiFixJobParams {
   workspaceId: string;
   postId: string;
   body: AiFixRequest;
+  expectedRevision?: number;
+  executionChainId?: string;
+  signal?: AbortSignal;
 }
 
 /**
@@ -499,10 +631,13 @@ ${targetSection.content}`,
  * user applies the suggestion explicitly via the post PATCH path (review-before-save).
  * Throws on AI/schema failure so the worker marks the job 'error'.
  */
-export async function runAiFix(params: AiFixJobParams): Promise<AiFixResult> {
+export async function runAiFix(params: AiFixJobParams): Promise<AiFixJobResult> {
   const { workspaceId, postId, body } = params;
   const post = getPost(workspaceId, postId);
   if (!post) throw new Error('Post not found');
+  const sourceRevision = params.expectedRevision ?? post.generationRevision;
+  assertPostGenerationRevision(workspaceId, postId, sourceRevision);
+  const executionChainId = params.executionChainId ?? randomUUID();
 
   const promptTarget = aiFixPromptAndTarget(workspaceId, post, body);
   if ('error' in promptTarget) {
@@ -516,17 +651,33 @@ export async function runAiFix(params: AiFixJobParams): Promise<AiFixResult> {
     workspaceId,
     'You are an SEO content editor. Follow the requested field constraints exactly and return only the requested output format.',
   );
-  const rawSuggested = field === 'meta'
-    ? (await callAI({
+  let acceptedExecution: AcceptedGenerationExecution | undefined;
+  let rawSuggested: string;
+  if (field === 'meta') {
+    const messages = [{ role: 'user' as const, content: userPrompt }];
+    const result = await callAI({
       operation: 'content-post-feedback-fix-structured',
       system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
+      messages,
       workspaceId,
       maxTokens: 2000,
       temperature: 0.3,
       researchMode,
-    })).text.trim()
-    : (await callCreativeAI({
+      executionChainId,
+      signal: params.signal,
+    });
+    rawSuggested = result.text.trim();
+    acceptedExecution = {
+      execution: result.execution,
+      inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+        provider: result.execution.provider,
+        system: systemPrompt,
+        messages,
+        researchMode,
+      })),
+    };
+  } else {
+    const result = await callCreativeAIWithMetadata({
       operation: field === 'post'
         ? 'content-post-feedback-fix-structured'
         : 'content-post-feedback-fix',
@@ -536,8 +687,13 @@ export async function runAiFix(params: AiFixJobParams): Promise<AiFixResult> {
       maxTokens: field === 'post' ? 8000 : 2000,
       temperature: 0.3,
       researchMode,
+      executionChainId,
+      signal: params.signal,
+      onExecution: execution => { acceptedExecution = execution; },
       ...(field === 'post' ? { json: true } : {}),
-    })).trim();
+    });
+    rawSuggested = result.text.trim();
+  }
   let suggestedText: string;
 
   if (field === 'meta') {
@@ -594,9 +750,17 @@ export async function runAiFix(params: AiFixJobParams): Promise<AiFixResult> {
       log.warn({ issues: reparsed.error.issues }, 'AI post feedback response sanitized to invalid fields');
       throw new Error('Failed to parse AI post response');
     }
+    if (countHtmlWords(reparsed.data.introduction) === 0
+      || reparsed.data.sections.some(section => countHtmlWords(section.content) === 0)
+      || countHtmlWords(reparsed.data.conclusion) === 0) {
+      throw new Error('AI post fix produced empty content after sanitization');
+    }
     suggestedText = JSON.stringify(reparsed.data);
   } else {
     suggestedText = sanitizeRichText(rawSuggested);
+    if (countHtmlWords(suggestedText) === 0) {
+      throw new Error('AI fix produced empty content after sanitization');
+    }
   }
 
   const targetSection = field === 'section' && sectionIndex !== undefined
@@ -604,8 +768,275 @@ export async function runAiFix(params: AiFixJobParams): Promise<AiFixResult> {
     : undefined;
   const sectionLabel = targetSection ? `section "${targetSection.heading}"` : field;
   const explanation = `AI revised the ${sectionLabel} to address: ${sanitizePlainText(requestReason).slice(0, 120)}`;
+  if (!acceptedExecution) {
+    throw new Error('AI fix completed without execution metadata');
+  }
+  const provenance = buildGenerationProvenance({
+    accepted: acceptedExecution,
+    executionChainId,
+    evidenceCapturedAt: getBrief(workspaceId, post.briefId)?.sourceEvidence?.capturedAt,
+    authorityInputs: {
+      postId,
+      sourceRevision,
+      sourceGenerationFingerprint: post.generationProvenance?.inputFingerprint ?? null,
+      field,
+      sectionIndex: sectionIndex ?? null,
+    },
+  });
 
-  return { field, sectionIndex, originalText, suggestedText, explanation };
+  return {
+    field,
+    sectionIndex,
+    originalText,
+    suggestedText,
+    explanation,
+    sourceRevision,
+    provenance,
+  };
+}
+
+export type AiFixApplyErrorCode =
+  | 'ai_fix_job_not_found'
+  | 'ai_fix_job_not_ready'
+  | 'ai_fix_job_result_invalid'
+  | 'ai_fix_target_mismatch';
+
+export class AiFixApplyError extends Error {
+  readonly code: AiFixApplyErrorCode;
+  readonly statusCode: 404 | 409;
+
+  constructor(code: AiFixApplyErrorCode, message: string, statusCode: 404 | 409) {
+    super(message);
+    this.name = 'AiFixApplyError';
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
+
+function currentAiFixTargetText(
+  post: PersistedGeneratedPost,
+  result: AiFixJobResult,
+): string | null {
+  switch (result.field) {
+    case 'introduction':
+      return post.introduction;
+    case 'section':
+      return post.sections.find(section => section.index === result.sectionIndex)?.content ?? null;
+    case 'conclusion':
+      return post.conclusion;
+    case 'meta':
+      return JSON.stringify({
+        seoTitle: post.seoTitle || post.title,
+        seoMetaDescription: post.seoMetaDescription || post.metaDescription,
+      });
+    case 'post':
+      return JSON.stringify({
+        introduction: post.introduction,
+        sections: post.sections.map(section => ({ index: section.index, content: section.content })),
+        conclusion: post.conclusion,
+      });
+  }
+}
+
+function invalidStoredFix(jobId: string, message: string): AiFixApplyError {
+  log.error({ jobId }, message);
+  return new AiFixApplyError(
+    'ai_fix_job_result_invalid',
+    'This AI fix can no longer be applied safely. Generate a new suggestion.',
+    409,
+  );
+}
+
+function requireStoredFixHtml(raw: string, jobId: string): string {
+  const sanitized = sanitizeRichText(raw);
+  if (countHtmlWords(sanitized) === 0) {
+    throw invalidStoredFix(jobId, 'Stored AI fix produced empty content after sanitization');
+  }
+  return sanitized;
+}
+
+function buildAiFixReplacement(
+  post: PersistedGeneratedPost,
+  result: AiFixJobResult,
+  jobId: string,
+): PersistedGeneratedPost {
+  const currentTarget = currentAiFixTargetText(post, result);
+  if (currentTarget === null || currentTarget !== result.originalText) {
+    throw new AiFixApplyError(
+      'ai_fix_target_mismatch',
+      'The suggested field no longer matches the source content. Generate a new suggestion.',
+      409,
+    );
+  }
+
+  const replacement: PersistedGeneratedPost = {
+    ...post,
+    sections: post.sections.map(section => ({ ...section })),
+  };
+
+  switch (result.field) {
+    case 'introduction':
+      replacement.introduction = requireStoredFixHtml(result.suggestedText, jobId);
+      break;
+    case 'section': {
+      const sectionIndex = result.sectionIndex;
+      const targetIndex = replacement.sections.findIndex(section => section.index === sectionIndex);
+      if (targetIndex === -1) {
+        throw new AiFixApplyError(
+          'ai_fix_target_mismatch',
+          'The suggested section no longer exists. Generate a new suggestion.',
+          409,
+        );
+      }
+      replacement.sections[targetIndex].content = requireStoredFixHtml(result.suggestedText, jobId);
+      break;
+    }
+    case 'conclusion':
+      replacement.conclusion = requireStoredFixHtml(result.suggestedText, jobId);
+      break;
+    case 'meta': {
+      let parsed: unknown;
+      try {
+        parsed = parseAIJson<unknown>(result.suggestedText);
+      } catch { // catch-ok: persisted worker JSON is validated before adoption
+        throw invalidStoredFix(jobId, 'Stored AI meta fix was not valid JSON at adoption');
+      }
+      const meta = aiMetaFixResponseSchema.safeParse(parsed);
+      if (!meta.success) {
+        throw invalidStoredFix(jobId, 'Stored AI meta fix failed schema validation at adoption');
+      }
+      replacement.seoTitle = sanitizePlainText(meta.data.seoTitle);
+      replacement.seoMetaDescription = sanitizePlainText(meta.data.seoMetaDescription);
+      break;
+    }
+    case 'post': {
+      let parsed: unknown;
+      try {
+        parsed = parseAIJson<unknown>(result.suggestedText);
+      } catch { // catch-ok: persisted worker JSON is validated before adoption
+        throw invalidStoredFix(jobId, 'Stored full-post AI fix was not valid JSON at adoption');
+      }
+      const postFix = aiPostFeedbackResponseSchema.safeParse(parsed);
+      if (!postFix.success) {
+        throw invalidStoredFix(jobId, 'Stored full-post AI fix failed schema validation at adoption');
+      }
+      const sanitizedIntroduction = requireStoredFixHtml(postFix.data.introduction, jobId);
+      const sanitizedConclusion = requireStoredFixHtml(postFix.data.conclusion, jobId);
+      const contentByIndex = new Map(postFix.data.sections.map(section => [
+        section.index,
+        requireStoredFixHtml(section.content, jobId),
+      ]));
+      if (contentByIndex.size !== replacement.sections.length
+        || replacement.sections.some(section => !contentByIndex.has(section.index))) {
+        throw invalidStoredFix(jobId, 'Stored full-post AI fix no longer matched the post section shape');
+      }
+      replacement.introduction = sanitizedIntroduction;
+      replacement.sections = replacement.sections.map(section => ({
+        ...section,
+        content: contentByIndex.get(section.index)!,
+      }));
+      replacement.conclusion = sanitizedConclusion;
+      break;
+    }
+  }
+
+  replacement.sections = replacement.sections.map(section => ({
+    ...section,
+    wordCount: countHtmlWords(section.content),
+  }));
+  replacement.totalWordCount = countHtmlWords(replacement.introduction)
+    + replacement.sections.reduce((total, section) => total + section.wordCount, 0)
+    + countHtmlWords(replacement.conclusion);
+  return replacement;
+}
+
+/**
+ * Adopts a reviewed AI suggestion by durable job identity. The client supplies
+ * only the job id; target content, source revision, and provenance are loaded
+ * from the server-owned result before one revision-conditional row commit.
+ */
+export function applyAiFixJobResult(
+  workspaceId: string,
+  postId: string,
+  jobId: string,
+): PersistedGeneratedPost {
+  const job = getJob(jobId);
+  if (!job
+    || job.workspaceId !== workspaceId
+    || job.type !== BACKGROUND_JOB_TYPES.CONTENT_POST_FIX) {
+    throw new AiFixApplyError('ai_fix_job_not_found', 'AI fix job not found', 404);
+  }
+
+  const ownsPost = getJobResourceClaims(jobId).some(claim => (
+    claim.resourceType === JOB_RESOURCE_TYPES.CONTENT_POST
+    && claim.resourceId === postId
+  ));
+  if (!ownsPost) {
+    throw new AiFixApplyError('ai_fix_job_not_found', 'AI fix job not found', 404);
+  }
+  if (job.status !== 'done') {
+    throw new AiFixApplyError(
+      'ai_fix_job_not_ready',
+      'This AI fix is not ready to apply.',
+      409,
+    );
+  }
+
+  const parsedResult = storedAiFixJobResultSchema.safeParse(job.result);
+  if (!parsedResult.success) {
+    log.error({ jobId, issues: parsedResult.error.issues }, 'Stored AI fix job result failed adoption validation');
+    throw new AiFixApplyError(
+      'ai_fix_job_result_invalid',
+      'This AI fix can no longer be applied safely. Generate a new suggestion.',
+      409,
+    );
+  }
+  const result = parsedResult.data as AiFixJobResult;
+  if (result.provenance.executionChainId !== jobId) {
+    throw invalidStoredFix(jobId, 'Stored AI fix provenance did not match its worker job');
+  }
+
+  const post = getPost(workspaceId, postId);
+  if (!post) {
+    throw new AiFixApplyError('ai_fix_job_not_found', 'Post not found', 404);
+  }
+  if (post.generationRevision !== result.sourceRevision) {
+    throw new GenerationRevisionConflictError('content_post', postId, result.sourceRevision);
+  }
+
+  const replacement = buildAiFixReplacement(post, result, jobId);
+  const updated = replacePostWithSnapshot(
+    workspaceId,
+    replacement,
+    result.sourceRevision,
+    'manual_edit',
+    `ai_fix_job:${jobId}`,
+    result.provenance,
+  );
+
+  const runPostCommitEffect = (effect: string, callback: () => void) => {
+    try {
+      callback();
+    } catch (err) {
+      log.warn({ err, workspaceId, postId, jobId, effect }, 'AI fix adoption post-commit effect failed');
+    }
+  };
+  runPostCommitEffect('activity', () => {
+    addActivity(
+      workspaceId,
+      'content_updated',
+      `Applied AI fix to "${updated.title}"`,
+      'An AI-assisted content edit was reviewed and applied.',
+      { postId, action: 'ai_fix_applied' },
+    );
+  });
+  runPostCommitEffect('content_updated', () => {
+    notifyContentUpdated(workspaceId, { postId, action: 'ai_fix_applied' });
+  });
+  runPostCommitEffect('post_updated', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, { postId });
+  });
+  return updated;
 }
 
 // ── Voice scoring worker ────────────────────────────────────────────────────
@@ -613,126 +1044,277 @@ export async function runAiFix(params: AiFixJobParams): Promise<AiFixResult> {
 export interface VoiceScoreJobParams {
   workspaceId: string;
   postId: string;
+  expectedRevision?: number;
+  executionChainId?: string;
+  signal?: AbortSignal;
+}
+
+export interface VoiceScoreJobResult {
+  post: NonNullable<ReturnType<typeof getPost>>;
+  sourceRevision: number;
+  provenance: GenerationProvenance;
+}
+
+interface CommittedVoiceScore {
+  result: VoiceScoreJobResult;
+  postCommit: {
+    postId: string;
+    targetKeyword: string;
+    voiceScore: number;
+  };
+}
+
+function emitVoiceScorePostCommitEffects(
+  workspaceId: string,
+  context: CommittedVoiceScore['postCommit'],
+): void {
+  runPostAIWorkerPostCommitEffect(workspaceId, context.postId, 'voice_score', 'intelligence-cache', () => {
+    invalidateContentPipelineIntelligence(workspaceId);
+  });
+  runPostAIWorkerPostCommitEffect(workspaceId, context.postId, 'voice_score', 'post-updated', () => {
+    broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, { postId: context.postId });
+  });
+  runPostAIWorkerPostCommitEffect(workspaceId, context.postId, 'voice_score', 'activity', () => {
+    addActivity(
+      workspaceId,
+      'post_voice_scored',
+      `Voice score recorded for "${context.targetKeyword}"`,
+      `Score: ${context.voiceScore}`,
+      {
+        postId: context.postId,
+        voiceScore: context.voiceScore,
+        action: 'voice_score_completed',
+      },
+    );
+  });
 }
 
 /**
  * Scores the post's brand voice and persists voiceScore/voiceFeedback. Returns
  * the updated post. Throws on not-found or a null score so the job is marked error.
  */
-export async function runVoiceScore(params: VoiceScoreJobParams) {
+export async function runVoiceScore(params: VoiceScoreJobParams): Promise<CommittedVoiceScore> {
   const { workspaceId, postId } = params;
   const post = getPost(workspaceId, postId);
   if (!post) throw new Error('Post not found');
+  const sourceRevision = params.expectedRevision ?? post.generationRevision;
+  assertPostGenerationRevision(workspaceId, postId, sourceRevision);
+  const executionChainId = params.executionChainId ?? randomUUID();
   const brief = getBrief(workspaceId, post.briefId);
   if (!brief) throw new Error('Brief not found');
 
-  const { voiceScore, voiceFeedback } = await scoreVoiceMatch(post, brief, workspaceId);
+  let acceptedExecution: AcceptedGenerationExecution | undefined;
+  const { voiceScore, voiceFeedback } = await scoreVoiceMatch(post, brief, workspaceId, {
+    executionChainId,
+    signal: params.signal,
+    onExecution: execution => { acceptedExecution = execution; },
+  });
   if (voiceScore == null) {
     throw new Error(voiceFeedback || 'Voice scoring failed');
   }
-  const updated = updatePostField(workspaceId, postId, { voiceScore, voiceFeedback });
-  invalidateContentPipelineIntelligence(workspaceId);
-  broadcastToWorkspace(workspaceId, WS_EVENTS.POST_UPDATED, { postId });
-  addActivity(
+  if (!acceptedExecution) {
+    throw new Error('Voice scoring completed without execution metadata');
+  }
+  const provenance = buildGenerationProvenance({
+    accepted: acceptedExecution,
+    executionChainId,
+    evidenceCapturedAt: brief.sourceEvidence?.capturedAt,
+    authorityInputs: {
+      postId,
+      sourceRevision,
+      sourceGenerationFingerprint: post.generationProvenance?.inputFingerprint ?? null,
+      briefId: brief.id,
+    },
+  });
+  const updated = updatePostField(
     workspaceId,
-    'post_voice_scored',
-    `Voice score recorded for "${post.targetKeyword}"`,
-    `Score: ${voiceScore}`,
-    { postId: post.id, voiceScore, action: 'voice_score_completed' },
+    postId,
+    { voiceScore, voiceFeedback },
+    sourceRevision,
   );
-  return updated;
+  if (!updated) {
+    throw new GenerationRevisionConflictError('content_post', postId, sourceRevision);
+  }
+  return {
+    result: { post: updated, sourceRevision, provenance },
+    postCommit: { postId: post.id, targetKeyword: post.targetKeyword, voiceScore },
+  };
 }
 
 // ── Job runners ─────────────────────────────────────────────────────────────
 
-export function startAiReviewJob(params: AiReviewJobParams): { jobId: string } {
-  const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW, {
-    workspaceId: params.workspaceId,
-    total: 1,
-    message: 'Running AI content review...',
-  });
-  setTimeout(() => {
-    void (async () => {
-      try {
-        updateJob(job.id, { status: 'running', progress: 0, total: 1, message: 'Running AI content review...' });
-        const result = await runAiReview(params);
-        updateJob(job.id, {
-          status: 'done',
-          progress: 1,
-          total: 1,
-          result,
-          message: 'AI review complete',
-        });
-      } catch (err) {
-        updateJob(job.id, {
-          status: 'error',
-          error: err instanceof Error ? err.message : String(err),
-          message: 'AI review failed',
-        });
-      }
-    })();
-  }, 100);
-  return { jobId: job.id };
+interface PostAIJobStart {
+  jobId: string;
+  sourceRevision: number;
 }
 
-export function startAiFixJob(params: AiFixJobParams): { jobId: string } {
-  const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_POST_FIX, {
+interface PostAIJobAcceptance {
+  expectedRevision: number;
+  executionChainId: string;
+}
+
+function createPostAIJob(
+  type: typeof BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW
+    | typeof BACKGROUND_JOB_TYPES.CONTENT_POST_FIX
+    | typeof BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE,
+  message: string,
+  params: AiReviewJobParams | AiFixJobParams | VoiceScoreJobParams,
+) {
+  return createResourceScopedJob<PostAIJobAcceptance>(type, {
     workspaceId: params.workspaceId,
     total: 1,
-    message: 'Generating AI fix...',
+    message,
+    resources: [{ resourceType: JOB_RESOURCE_TYPES.CONTENT_POST, resourceId: params.postId }],
+    accept: (job) => {
+      const post = getPost(params.workspaceId, params.postId);
+      if (!post) throw new Error('Post not found');
+      const expectedRevision = params.expectedRevision ?? post.generationRevision;
+      assertPostGenerationRevision(params.workspaceId, params.postId, expectedRevision);
+      return {
+        expectedRevision,
+        executionChainId: job.id,
+      };
+    },
   });
+}
+
+function schedulePostAIWorker(
+  jobId: string,
+  runningMessage: string,
+  errorMessage: string,
+  worker: (signal: AbortSignal) => Promise<void>,
+): void {
   setTimeout(() => {
-    void (async () => {
+    void runResourceScopedJobWorker(jobId, async (signal) => {
       try {
-        updateJob(job.id, { status: 'running', progress: 0, total: 1, message: 'Generating AI fix...' });
-        const result = await runAiFix(params);
-        updateJob(job.id, {
+        updateJob(jobId, { status: 'running', progress: 0, total: 1, message: runningMessage });
+        await worker(signal);
+      } catch (err) {
+        updateJob(jobId, {
+          status: 'error',
+          error: err instanceof Error ? err.message : String(err),
+          message: errorMessage,
+        });
+      }
+    }).catch(err => {
+      log.error({ err, jobId }, 'Post AI job worker exited unexpectedly');
+    });
+  }, 100);
+}
+
+function persistCommittedPostAICompletion(
+  jobId: string,
+  completedMessage: string,
+  committedResult: object,
+): boolean {
+  try {
+    updateJob(jobId, {
+      status: 'done',
+      progress: 1,
+      total: 1,
+      result: committedResult,
+      message: completedMessage,
+    });
+    if (getJob(jobId)?.status !== 'done') {
+      throw new Error('Committed post AI completion was not persisted');
+    }
+    return true;
+  } catch (err) {
+    // updateJob can throw after the SQLite transaction (for example, a failed
+    // observer). The durable terminal remains authoritative in that case.
+    if (getJob(jobId)?.status === 'done') return true;
+    const error = err instanceof Error ? err.message : String(err);
+    try {
+      updateJob(jobId, {
+        status: 'error',
+        error,
+        message: `${completedMessage}, but completion tracking failed`,
+        result: {
+          ...committedResult,
+          code: 'completion_tracking_failed',
+          artifactCommitted: true,
+        },
+      });
+    } catch (fallbackErr) {
+      // The generic drained-worker guard will make one last infrastructure
+      // terminal attempt and release the claim. Never let this fall through to
+      // the generation-failure catch after the artifact already committed.
+      log.error({ err: fallbackErr, jobId }, 'Committed post AI completion could not be recorded');
+    }
+    return false;
+  }
+}
+
+export function startAiReviewJob(params: AiReviewJobParams): PostAIJobStart {
+  const started = createPostAIJob(
+    BACKGROUND_JOB_TYPES.CONTENT_POST_REVIEW,
+    'Running AI content review...',
+    params,
+  );
+  schedulePostAIWorker(
+    started.job.id,
+    'Running AI content review...',
+    'AI review failed',
+    async (signal) => {
+      const committed = await runAiReview({ ...params, ...started.accepted, signal });
+      const completionPersisted = persistCommittedPostAICompletion(
+        started.job.id,
+        'AI review complete',
+        committed.result,
+      );
+      if (!completionPersisted) return;
+      emitAiReviewPostCommitEffects(params.workspaceId, committed.postCommit);
+    },
+  );
+  return { jobId: started.job.id, sourceRevision: started.accepted.expectedRevision };
+}
+
+export function startAiFixJob(params: AiFixJobParams): PostAIJobStart {
+  const started = createPostAIJob(
+    BACKGROUND_JOB_TYPES.CONTENT_POST_FIX,
+    'Generating AI fix...',
+    params,
+  );
+  schedulePostAIWorker(
+    started.job.id,
+    'Generating AI fix...',
+    'AI fix failed',
+    async (signal) => {
+      const result = await runAiFix({ ...params, ...started.accepted, signal });
+      updateJob(started.job.id, {
           status: 'done',
           progress: 1,
           total: 1,
           result,
           message: 'AI fix ready for review',
-        });
-      } catch (err) {
-        updateJob(job.id, {
-          status: 'error',
-          error: err instanceof Error ? err.message : String(err),
-          message: 'AI fix failed',
-        });
-      }
-    })();
-  }, 100);
-  return { jobId: job.id };
+      });
+    },
+  );
+  return { jobId: started.job.id, sourceRevision: started.accepted.expectedRevision };
 }
 
-export function startVoiceScoreJob(params: VoiceScoreJobParams): { jobId: string } {
-  const job = createJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, {
-    workspaceId: params.workspaceId,
-    total: 1,
-    message: 'Scoring brand voice...',
-  });
-  setTimeout(() => {
-    void (async () => {
-      try {
-        updateJob(job.id, { status: 'running', progress: 0, total: 1, message: 'Scoring brand voice...' });
-        const updated = await runVoiceScore(params);
-        updateJob(job.id, {
-          status: 'done',
-          progress: 1,
-          total: 1,
-          result: { post: updated, postId: params.postId },
-          message: 'Brand voice scored',
-        });
-      } catch (err) {
-        updateJob(job.id, {
-          status: 'error',
-          error: err instanceof Error ? err.message : String(err),
-          message: 'Voice scoring failed',
-        });
-      }
-    })();
-  }, 100);
-  return { jobId: job.id };
+export function startVoiceScoreJob(params: VoiceScoreJobParams): PostAIJobStart {
+  const started = createPostAIJob(
+    BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE,
+    'Scoring brand voice...',
+    params,
+  );
+  schedulePostAIWorker(
+    started.job.id,
+    'Scoring brand voice...',
+    'Voice scoring failed',
+    async (signal) => {
+      const committed = await runVoiceScore({ ...params, ...started.accepted, signal });
+      const completionPersisted = persistCommittedPostAICompletion(
+        started.job.id,
+        'Brand voice scored',
+        { ...committed.result, postId: params.postId },
+      );
+      if (!completionPersisted) return;
+      emitVoiceScorePostCommitEffects(params.workspaceId, committed.postCommit);
+    },
+  );
+  return { jobId: started.job.id, sourceRevision: started.accepted.expectedRevision };
 }
 
 // Re-export for tests + route validation convenience.

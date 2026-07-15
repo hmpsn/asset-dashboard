@@ -305,54 +305,70 @@ describe('extractPatternsSchema', () => {
 
 describe('regenerateSectionSchema', () => {
   it('accepts valid note', () => {
-    const result = regenerateSectionSchema.safeParse({ note: 'Make it more concise' });
+    const result = regenerateSectionSchema.safeParse({ note: 'Make it more concise', expectedRevision: 2 });
     expect(result.success).toBe(true);
   });
 
   it('rejects empty note', () => {
-    const result = regenerateSectionSchema.safeParse({ note: '' });
+    const result = regenerateSectionSchema.safeParse({ note: '', expectedRevision: 2 });
     expect(result.success).toBe(false);
   });
 
   it('accepts optional highlight', () => {
-    const result = regenerateSectionSchema.safeParse({ note: 'Rewrite this', highlight: 'old text' });
+    const result = regenerateSectionSchema.safeParse({
+      note: 'Rewrite this',
+      highlight: 'old text',
+      expectedRevision: 2,
+    });
     expect(result.success).toBe(true);
   });
 });
 
 describe('updateSectionStatusSchema', () => {
   it('accepts valid status', () => {
-    const result = updateSectionStatusSchema.safeParse({ status: 'approved' });
+    const result = updateSectionStatusSchema.safeParse({ status: 'approved', expectedRevision: 2 });
     expect(result.success).toBe(true);
   });
 
   it('rejects invalid status', () => {
-    const result = updateSectionStatusSchema.safeParse({ status: 'deleted' });
+    const result = updateSectionStatusSchema.safeParse({ status: 'deleted', expectedRevision: 2 });
     expect(result.success).toBe(false);
   });
 });
 
 describe('updateSectionTextSchema', () => {
   it('accepts non-empty copy', () => {
-    const result = updateSectionTextSchema.safeParse({ copy: '<p>New content</p>' });
+    const result = updateSectionTextSchema.safeParse({ copy: '<p>New content</p>', expectedRevision: 2 });
     expect(result.success).toBe(true);
   });
 
   it('rejects empty copy', () => {
-    const result = updateSectionTextSchema.safeParse({ copy: '' });
+    const result = updateSectionTextSchema.safeParse({ copy: '', expectedRevision: 2 });
     expect(result.success).toBe(false);
   });
 });
 
 describe('addSuggestionSchema', () => {
   it('accepts valid suggestion pair', () => {
-    const result = addSuggestionSchema.safeParse({ originalText: 'old', suggestedText: 'new' });
+    const result = addSuggestionSchema.safeParse({
+      originalText: 'old',
+      suggestedText: 'new',
+      expectedRevision: 2,
+    });
     expect(result.success).toBe(true);
   });
 
   it('rejects empty fields', () => {
-    expect(addSuggestionSchema.safeParse({ originalText: '', suggestedText: 'new' }).success).toBe(false);
-    expect(addSuggestionSchema.safeParse({ originalText: 'old', suggestedText: '' }).success).toBe(false);
+    expect(addSuggestionSchema.safeParse({
+      originalText: '',
+      suggestedText: 'new',
+      expectedRevision: 2,
+    }).success).toBe(false);
+    expect(addSuggestionSchema.safeParse({
+      originalText: 'old',
+      suggestedText: '',
+      expectedRevision: 2,
+    }).success).toBe(false);
   });
 });
 

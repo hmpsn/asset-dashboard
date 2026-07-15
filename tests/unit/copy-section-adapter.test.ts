@@ -112,7 +112,7 @@ describe('copy_section adapter — registration', () => {
 // ── projectFromSource: the real path ──
 
 describe('copy_section adapter — projectFromSource (the projected read path)', () => {
-  it('produces a faithful ClientDeliverable from a copy entry + sections', () => {
+  it('produces an explicit client-safe ClientDeliverable from a copy entry + sections', () => {
     const adapter = getAdapter('copy_section');
     const s1 = makeSection({
       version: 3,
@@ -146,18 +146,22 @@ describe('copy_section adapter — projectFromSource (the projected read path)',
     expect(payload.sections[0].version).toBe(3);
     expect(payload.sections[1].version).toBe(1);
 
-    // append-only review artifacts survive verbatim (NO fallback)
+    // Client-authored review artifacts survive verbatim.
     expect(payload.sections[0].clientSuggestions).toEqual([SUGGESTION]);
-    expect(payload.sections[0].qualityFlags).toEqual([QUALITY_FLAG]);
-    expect(payload.sections[0].steeringHistory).toEqual([STEERING]);
-    // a section with null suggestions/flags keeps null (not coerced to [])
+    // A section with null suggestions keeps null (not coerced to []).
     expect(payload.sections[1].clientSuggestions).toBeNull();
-    expect(payload.sections[1].qualityFlags).toBeNull();
 
-    // sibling copy_metadata carried through
+    const projectedSection = payload.sections[0] as unknown as Record<string, unknown>;
+    expect(projectedSection).not.toHaveProperty('aiReasoning');
+    expect(projectedSection).not.toHaveProperty('qualityFlags');
+    expect(projectedSection).not.toHaveProperty('steeringHistory');
+    expect(projectedSection).not.toHaveProperty('workspaceId');
+
+    // Client-safe sibling copy_metadata is carried through without operator steering/workspace.
     expect(payload.copyMetadata).not.toBeNull();
     expect(payload.copyMetadata!.seoTitle).toBe('SEO Title');
-    expect(payload.copyMetadata!.steeringHistory).toEqual([STEERING]);
+    expect(payload.copyMetadata).not.toHaveProperty('steeringHistory');
+    expect(payload.copyMetadata).not.toHaveProperty('workspaceId');
   });
 
   it('carries copy_metadata = null when the entry has no metadata row', () => {
@@ -165,6 +169,36 @@ describe('copy_section adapter — projectFromSource (the projected read path)',
     const deliverable = adapter.projectFromSource!(makeInput({ metadata: null }));
     const payload = deliverable.payload as unknown as ProjectedCopyEntryPayload;
     expect(payload.copyMetadata).toBeNull();
+  });
+
+  it('omits every internal generation and operator-only field from unified projections', () => {
+    const section = makeSection({
+      generationRevision: 7,
+      generationProvenance: {
+        runId: 'private-run',
+        operation: 'copy-generation',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        inputFingerprint: 'a'.repeat(64),
+        startedAt: '2026-07-14T00:00:00.000Z',
+        completedAt: '2026-07-14T00:00:01.000Z',
+      },
+    });
+    const deliverable = getAdapter('copy_section').projectFromSource!(
+      makeInput({ sections: [section] }),
+    );
+    const projected = (
+      (deliverable.payload as unknown as ProjectedCopyEntryPayload).sections[0]
+    ) as unknown as Record<string, unknown>;
+    expect(projected).not.toHaveProperty('generationRevision');
+    expect(projected).not.toHaveProperty('generationProvenance');
+    expect(projected).not.toHaveProperty('aiReasoning');
+    expect(projected).not.toHaveProperty('qualityFlags');
+    expect(projected).not.toHaveProperty('steeringHistory');
+    expect(projected).not.toHaveProperty('workspaceId');
+    expect(JSON.stringify(deliverable)).not.toContain('private-run');
+    expect(JSON.stringify(deliverable)).not.toContain('reasoning');
+    expect(JSON.stringify(deliverable)).not.toContain('make it punchier');
   });
 
   it('carries the entry generatedAt = most-recent section update (not "now")', () => {
@@ -296,11 +330,11 @@ describe('copy_section adapter — apply stays disabled (terminal approve)', () 
 
 // ── optional: prove the projected shape survives a store round-trip ──
 // Projection is normally read-time-only (no physical row for a projected type). This case only
-// proves the payload SHAPE persists losslessly through upsertDeliverable, mirroring the
-// no-fallback discipline of the migrated adapters — it does NOT imply copy dual-writes.
+// proves the explicit safe payload SHAPE persists through upsertDeliverable — it does NOT imply
+// copy dual-writes or authorize persisting internal source fields.
 
 describe('copy_section adapter — projected payload survives a store round-trip (shape only)', () => {
-  it('round-trips the projected payload through upsertDeliverable with no fallback', () => {
+  it('round-trips the projected client-safe payload through upsertDeliverable', () => {
     const adapter = getAdapter('copy_section');
     const s1 = makeSection({
       version: 4,
@@ -336,8 +370,11 @@ describe('copy_section adapter — projected payload survives a store round-trip
     expect(payload.entryId).toBe(ENTRY);
     expect(payload.sections[0].version).toBe(4);
     expect(payload.sections[0].clientSuggestions).toEqual([SUGGESTION]);
-    expect(payload.sections[0].qualityFlags).toEqual([QUALITY_FLAG]);
-    expect(payload.sections[0].steeringHistory).toEqual([STEERING]);
+    expect(payload.sections[0]).not.toHaveProperty('qualityFlags');
+    expect(payload.sections[0]).not.toHaveProperty('steeringHistory');
+    expect(payload.sections[0]).not.toHaveProperty('aiReasoning');
+    expect(payload.copyMetadata).not.toHaveProperty('steeringHistory');
+    expect(JSON.stringify(payload)).not.toContain('make it punchier');
     // no typed child items written for this projected review type
     expect(got.items ?? []).toHaveLength(0);
   });

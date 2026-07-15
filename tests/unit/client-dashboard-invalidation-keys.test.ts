@@ -63,6 +63,18 @@ describe('clientDashboardInvalidationKeys leak coverage', () => {
     ]);
   });
 
+  it('CONTENT_REQUEST_UPDATE refreshes linked post authority and review surfaces', () => {
+    const keys = keysFor(WS_EVENTS.CONTENT_REQUEST_UPDATE);
+
+    expect(keys).toEqual([
+      queryKeys.client.contentRequests(WS),
+      queryKeys.client.contentPlan(WS),
+      queryKeys.client.unifiedInbox(WS),
+      queryKeys.client.postPreviewAll(WS),
+      queryKeys.client.intelligence(WS),
+    ]);
+  });
+
   it('OUTCOME_ACTION_RECORDED invalidates client outcome summary and intelligence', () => {
     const keys = keysFor(WS_EVENTS.OUTCOME_ACTION_RECORDED);
     expect(keys).toEqual([

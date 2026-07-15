@@ -1,6 +1,6 @@
 # C2 Content Edit Safety and Provenance — Implementation Plan
 
-**Status:** approved for implementation after the foundation checkpoint commit
+**Status:** implementation and adversarial reconciliation in progress on `codex/content-edit-safety-c2`; PR, required CI, staging merge, and post-merge staging verification remain pending
 **Phase owner:** `content-pipeline`
 **Secondary owner:** `platform-foundation` for background-job claims
 **Program:** `genq-content-generation-integrity`
@@ -72,12 +72,116 @@ The distrust triggers are silent overwrites, false success events, orphan replac
 - Done/error releases claims transactionally. Cancellation retains claims until the worker abort path drains and unregisters. Restart recovery marks unreachable jobs terminal and releases their claims.
 - Conflict surfaces return deterministic HTTP 409/MCP conflict information with the active job ID and start no provider work.
 - Resource claims remain server-internal on public/client job payloads.
+- Manually managed workers release claims idempotently only after their provider,
+  artifact, and terminal-bookkeeping paths have fully drained. If both the
+  intended terminal job write and its fallback tracking write fail, final drain
+  still releases the claim without relabeling an already-committed artifact or
+  domain outcome.
 
 ### 5. Public privacy
 
 - Admin and MCP boundaries may expose revision/provenance where their typed contract requires it.
-- Public brief/post JSON, client mutation responses, copy review payloads, unified deliverables, and exports omit `generationRevision`, `generationProvenance`, `runId`, and `inputFingerprint`.
+- Public brief/post JSON, client mutation responses, copy review payloads,
+  unified deliverables, and authenticated exports omit `generationRevision`,
+  `generationProvenance`, `runId`, and `inputFingerprint`. Public briefs also
+  omit raw `sourceEvidence`; authenticated brief exports intentionally retain
+  that evidence while stripping generation authority.
+- Public content-request reads and mutation receipts use the explicit
+  `PublicContentTopicRequest` projection. It omits workspace identity, rationale,
+  client/internal notes, decline reason, target page IDs/slugs, recommendation
+  identity/context, and preserves the established status-gated visibility of
+  brief, post, and delivery fields.
 - Public serializers use explicit safe projections; spread-based serializers must explicitly strip internal fields.
+
+### 6. External MCP provenance and source authority
+
+- Server-prepared external prose is attributed honestly: the exact complete
+  prepared context is fingerprinted before it leaves the server, while adopted
+  output records `provider: 'external'` and `model: 'unreported'`. Caller text
+  never supplies or upgrades provider/model attribution.
+- One-time brief/post preparation handles retain that frozen preparation. Post
+  adoption re-reads and requires the exact source brief generation revision in
+  the same transaction as handle consumption, artifact creation, and any linked
+  content-request update. Validation, link, or authority failure rolls back the
+  handle deletion and every write.
+- An optional parent content request is selected only by
+  `prepare_brief_context` / `prepare_post_context`. Its `{id, updatedAt}`
+  authority is included in the exact prepared fingerprint and handle, alongside
+  target-keyword and brief-lineage constraints. `save_brief` / `save_post`
+  cannot adopt a free parent id; a repeated save-time id must exactly match the
+  prepared parent, which is re-read and conditionally linked inside the atomic
+  adoption transaction. Parent drift rolls back every write and preserves the
+  one-time handle. Parent lifecycle is also preflighted before context assembly,
+  rechecked in the final prepared snapshot, and checked again during adoption:
+  the selected request must be able to advance to `brief_generated` or
+  `in_progress` for the producing tool. Correctable payload validation or a
+  transient write failure may retry the preserved handle; source, parent,
+  lifecycle, or durable-link authority drift leaves that frozen handle stale and
+  requires a fresh `prepare_*_context` call.
+- Migration 191 adds provenance to `content_post_versions`. A revert adopts the
+  snapshot's original attribution (or null for a legacy snapshot) and cannot
+  borrow the current post's newer provenance.
+- A send command that carries an explicit content-request ID is pinned to that
+  exact workspace-scoped request. Missing and cross-workspace identities abort
+  atomically; send never retargets to an implicit request or creates a replacement.
+- Saved brief/post handles are inspected without deletion, then consumed as the
+  final DB-only authorization step inside the durable send transaction. Failed
+  sends preserve the handle; successful sends consume it exactly once before
+  post-commit notification effects run.
+
+### 7. Serialized editor authority
+
+- Independent rich-text debouncers for one mounted post share one
+  artifact-scoped `useSerializedArtifactSave` queue. Only an accepted response
+  advances its private revision/review-token authority; external authority
+  changes invalidate stale queued or in-flight edits instead of rebasing them.
+- Debounced edits bind a one-shot serializer attempt at schedule time, freezing
+  both their target payload and authority epoch before the timer begins. A newer
+  canonical revision observed before timer fire or flush rejects without a PATCH.
+- Save conflicts and failures propagate without a hidden retry.
+  `useAutoSave.flush()` drains in order, returns `{ ok: false }` after a failure,
+  and lifecycle decisions or editor-context switches stop until the user
+  explicitly retries or resets.
+- Explicit retry replays the retained payload as a distinct attempt pinned to the
+  authority used by the failed request. A newer canonical authority rejects the
+  retry locally without a PATCH; it is never silently rebased.
+- Copy suggestion `originalText` is a frozen source claim. Adoption compares it
+  to the authoritative section copy inside the revision-conditional mutation;
+  mismatch creates no suggestion, status transition, or revision.
+
+### 8. Post-commit truthfulness and publish reconciliation
+
+- Required artifact transitions and terminal job state commit before optional
+  activity, broadcast, cache, notification, outcome, reconciliation-cleanup, or
+  follow-on effects. Each effect is independently guarded, so a later failure
+  cannot rewrite committed status, produce an HTTP/job failure, or suppress the
+  remaining effects.
+- Migration 190 adds `content_publish_reconciliations`. When Webflow create,
+  update, or publish succeeds but the local post CAS loses, the ledger retains
+  the external item identity and state; retry reuses that item rather than
+  creating a duplicate, then resolves the row after the local stamp succeeds.
+- Publish acceptance also freezes the effective site/collection/field-map,
+  one-way token identity, and exact brief-summary revision. Every external
+  boundary revalidates that authority. Partial local stamps, stamps belonging to
+  another collection, and unresolved identity in any collection fail closed
+  before create, so configuration drift cannot fork one post into two Webflow
+  items.
+- A committed artifact/domain outcome is never relabeled as generation failure
+  because generic terminal-job bookkeeping failed. The job records an explicit
+  `completion_tracking_failed` result when possible, optional completion effects
+  wait for a verified durable terminal, and final worker drain releases manual
+  claims without rewriting the outcome.
+- Detached brief, post, and copy workers attach an outer rejection observer with
+  job/resource context, so even a terminal-finalizer failure cannot become an
+  unhandled process rejection.
+- Post deletion is blocked while a resource-scoped post/publish job is active or
+  a publish-reconciliation row remains unresolved. Deletion becomes eligible
+  only after the worker drains and reconciliation resolves.
+- Because any content-request mutation advances its previously linked artifact
+  revisions, `CONTENT_REQUEST_CREATED` / `CONTENT_REQUEST_UPDATE` invalidation
+  refreshes admin brief/post lists and detail authorities plus client content,
+  Inbox, preview, and intelligence readers. MCP reuses that shared event instead
+  of emitting a duplicate post event.
 
 ## Dependency graph
 
@@ -190,10 +294,10 @@ Acceptance:
 Tasks:
 
 1. Replace workspace-wide guards with resource-scoped acceptance across direct routes and `/api/jobs`; map typed conflicts to consistent 409/MCP results.
-2. Require expected revisions for admin/client/MCP edit, regeneration, revert, delete, and suggestion-application paths. Convert the MCP SHA precheck to an atomic durable revision contract without a TOCTOU window.
+2. Require expected revisions for admin/client/MCP edit, regeneration, revert, delete, and suggestion-application paths. Convert the MCP SHA precheck to an atomic durable revision contract without a TOCTOU window; freeze optional content-request parent authority and preflight its legal lifecycle transition during prepare rather than accepting adoption-time parent selection.
 3. Bump linked artifact revisions in the same transaction as send/review/approve/change-request transitions.
 4. Consolidate double-write routes so one logical mutation produces one revision.
-5. Add explicit public-safe projections and negative raw-response assertions for all forbidden provenance fields.
+5. Add explicit public-safe projections and negative raw-response assertions for all forbidden provenance fields and operator-only content-request fields, while preserving authenticated brief-export evidence.
 6. Update `FEATURE_AUDIT.md`, `data/roadmap.json`, and `data/features.json` if the shipped safety is sales-relevant; sort roadmap.
 7. Run an independent adversarial review, fix every actionable finding, then execute full PR gates.
 
@@ -206,14 +310,54 @@ Focused gates run during each lane; the controller reruns integrated suites afte
 - `npm run lint:hooks`
 - `npx vite build`
 - Migration preservation and mapper completeness tests
+- Migration 190 publish-reconciliation and migration 191 version-provenance tests
 - Job claim/recovery/cancellation/status-transition unit tests
 - Brief/post/copy generation mutation-safety integration tests
+- External MCP prepared-context fingerprint, source/parent-revision,
+  parent-keyword/brief-lineage/lifecycle preflight, correctable same-handle retry,
+  stale-authority reprepare, and atomic handle-adoption tests
+- Explicit send-request tests proving missing and cross-workspace IDs create no
+  fallback request, artifact revision, email, broadcast, or activity
+- MCP brief/post send tests proving a failed durable send retains its one-time
+  handle and a successful retry consumes it exactly once
+- Serialized autosave authority/flush failure component and hook tests
+- Admin and public copy-suggestion tests proving current authority plus false
+  original text is rejected without a suggestion or revision
+- Terminal-bookkeeping and post-commit effect-injection tests proving committed
+  artifacts/domain outcomes remain truthful, optional effects wait for verified
+  durable terminal state, and manually drained workers release claims after both
+  terminal writes fail
+- Detached-worker source contract proving every C2 fire-and-forget launch
+  observes its outer rejection
 - Direct-route and `/api/jobs` parity tests
 - MCP content generation/action contract tests
-- Public content, copy review, unified deliverable, and export privacy tests
+- Public content/request, copy review, unified deliverable, and export privacy
+  tests, including authenticated export evidence retention
+- Fresh `origin/staging` versus C2 manifest builds with an exact-delta bundle
+  ratchet (1,809,882 → 1,815,469 gzip bytes, +5,587) limited to C2-owned
+  serialization/content-editor/review entries
 - `npx vitest run` using repository worker limits when broad verification is required
 
-Adversarial injection points include every post stage, brief research/full/outline/finalization, copy context/main/repair/section/metadata finalization, client decisions, publish, cancellation, duplicate starts, overlapping batches, malformed provenance, and retry after terminal failure.
+### Local closeout evidence — 2026-07-14
+
+- Static/platform gates passed: typecheck, pr-check, hooks lint, lexicon,
+  feature-flag and deferred-ledger verification, diff check, Vite production and
+  manifest builds, and the exact-delta bundle-budget ratchet.
+- Contract: 164 files / 1,906 tests passed.
+- Component: 392 files / 5,083 tests passed, with one skipped and three todo.
+- Unit: 1,008 files / 15,697 tests passed.
+- Integration: the three CI-equivalent 198-file shards passed 2,754, 2,487, and
+  2,444 tests respectively (594 files / 7,685 tests total) at the CI runner's
+  effective three-worker concurrency. The local machine's unbounded 13-worker
+  default caused systemic server-startup contention and is not the CI topology.
+- The first shard-3 run found a real authority-precedence/lifecycle-response bug
+  and invalid Promise mocks. The fix makes stale request authority win before
+  lifecycle validation inside atomic job acceptance, maps a fresh invalid
+  lifecycle to typed HTTP 409, and keeps detached-worker mocks honest. The
+  affected 12-test cluster, typecheck, independent adversarial remediation
+  review, and the complete 2,444-test shard rerun passed.
+
+Adversarial injection points include every post stage, brief research/full/outline/finalization, copy context/main/repair/section/metadata finalization, client decisions, serialized field saves, MCP handle consumption, source/parent lifecycle adoption, external publish/local reconciliation and deletion, each terminal bookkeeping write and post-commit effect, cancellation/drain, duplicate starts, overlapping batches, malformed provenance, and retry after terminal failure.
 
 ## PR and release gates
 

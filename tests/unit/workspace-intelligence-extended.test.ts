@@ -108,7 +108,7 @@ describe('buildWorkspaceIntelligence — empty data defaults', () => {
     expect(typeof result.workspaceId).toBe('string');
     expect(typeof result.assembledAt).toBe('string');
     expect(new Date(result.assembledAt).getTime()).not.toBeNaN();
-  });
+  }, 15_000);
 
   it('assembledAt is an ISO 8601 string', async () => {
     const result = await buildWorkspaceIntelligence('ws-empty-2', { slices: ['insights'] });

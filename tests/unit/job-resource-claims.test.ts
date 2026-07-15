@@ -277,4 +277,38 @@ describe('resource-scoped job acceptance', () => {
     expect(getJob(started.job.id)?.status).toBe('error');
     expect(getJobResourceClaims(started.job.id)[0].active).toBe(false);
   });
+
+  it('releases a drained worker claim even when its fallback terminal write fails', async () => {
+    const wsId = workspaceId('terminal_write_failure');
+    const resource = copyEntry('entry_terminal_write_failure');
+    const jobId = `job_claim_terminal_write_failure_${Date.now()}`;
+    const started = createResourceScopedJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, {
+      id: jobId,
+      workspaceId: wsId,
+      resources: [resource],
+    });
+    db.exec(`
+      CREATE TEMP TRIGGER fail_claim_terminal_write
+      BEFORE UPDATE ON jobs
+      WHEN OLD.id = '${jobId}' AND NEW.status = 'error'
+      BEGIN
+        SELECT RAISE(FAIL, 'injected terminal write failure');
+      END
+    `);
+
+    try {
+      await expect(runResourceScopedJobWorker(started.job.id, async () => (
+        'returned before terminalizing'
+      ))).rejects.toThrow('injected terminal write failure');
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS fail_claim_terminal_write');
+    }
+
+    expect(getJob(started.job.id)?.status).toBe('pending');
+    expect(getJobResourceClaims(started.job.id)[0].active).toBe(false);
+    expect(createResourceScopedJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, {
+      workspaceId: wsId,
+      resources: [resource],
+    }).job.status).toBe('pending');
+  });
 });

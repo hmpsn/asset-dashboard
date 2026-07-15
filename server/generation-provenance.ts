@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type {
   AIExecutionMetadata,
   GenerationExecutionProvenance,
@@ -59,6 +59,46 @@ export function fingerprintRenderedAIInput(input: AIRenderedProviderInput): stri
 export interface AcceptedGenerationExecution {
   execution: AIExecutionMetadata;
   inputFingerprint: string;
+}
+
+/**
+ * Server-issued authority for prose generated outside callAI (for example by an MCP client).
+ * The platform can attest the exact prepared context and lifecycle timestamps, but not the
+ * external model, so the durable provider/model values remain explicitly unreported.
+ */
+export interface ExternalGenerationPreparation {
+  runId: string;
+  operation: string;
+  inputFingerprint: string;
+  startedAt: string;
+}
+
+export function prepareExternalGeneration(
+  operation: string,
+  effectiveInput: unknown,
+): ExternalGenerationPreparation {
+  return {
+    runId: `external_${randomUUID()}`,
+    operation,
+    inputFingerprint: canonicalGenerationFingerprint(effectiveInput),
+    startedAt: new Date().toISOString(),
+  };
+}
+
+export function completeExternalGeneration(
+  preparation: ExternalGenerationPreparation,
+  completedAt = new Date().toISOString(),
+): GenerationProvenance {
+  return canonicalGenerationProvenanceSchema.parse({
+    runId: preparation.runId,
+    executionChainId: preparation.runId,
+    operation: preparation.operation,
+    provider: 'external',
+    model: 'unreported',
+    inputFingerprint: preparation.inputFingerprint,
+    startedAt: preparation.startedAt,
+    completedAt,
+  }) as GenerationProvenance;
 }
 
 export function toGenerationExecutionProvenance(

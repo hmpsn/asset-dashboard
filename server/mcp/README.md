@@ -312,7 +312,9 @@ prepare_post_context  → post_request_handle ─┐        │
   minutes (`.unref()`'d; off under `NODE_ENV=test`).
 - **`MAX_HANDLES`:** capped at 10,000 (override via `MCP_MAX_HANDLES`); the oldest rows are evicted
   by insertion order when the cap is exceeded.
-- **Single-use:** a successful `consumeHandle` deletes the row.
+- **Single-use:** a successful `consumeHandle` deletes the row. Saved-artifact
+  handles used by `send_to_client` are consumed inside the same transaction as
+  the durable send, so a failed send leaves the handle available for retry.
 - **Scoped:** each handle is bound to one **workspace** and one **kind**; a kind or workspace
   mismatch is rejected.
 

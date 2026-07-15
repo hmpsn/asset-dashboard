@@ -4,21 +4,80 @@ import type { AddressInfo } from 'net';
 
 const broadcastState = vi.hoisted(() => ({
   calls: [] as Array<{ workspaceId: string; event: string; payload: Record<string, unknown> }>,
+  throwEvents: new Set<string>(),
+}));
+
+const activityState = vi.hoisted(() => ({
+  calls: [] as Array<{ workspaceId: string; type: string }>,
+  throwTypes: new Set<string>(),
+}));
+
+const onLiveState = vi.hoisted(() => ({
+  calls: [] as Array<{ workspaceId: string; requestId: string }>,
+  shouldThrow: false,
+}));
+
+const intelligenceState = vi.hoisted(() => ({
+  calls: [] as string[],
+  shouldThrow: false,
 }));
 
 const emailState = vi.hoisted(() => ({
   teamContentRequests: [] as unknown[],
+  teamActionApproved: [] as unknown[],
   teamChangesRequested: [] as unknown[],
   clientBriefReady: [] as Array<{ dashboardUrl?: string }>,
   clientPostReady: [] as Array<{ dashboardUrl?: string }>,
   clientContentPublished: [] as Array<{ dashboardUrl?: string }>,
+  throwTeamActionApproved: false,
+  throwTeamChangesRequested: false,
+  throwClientContentPublished: false,
 }));
+
+vi.mock('../../server/activity-log.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/activity-log.js')>();
+  return {
+    ...actual,
+    addActivity: vi.fn((...args: Parameters<typeof actual.addActivity>) => {
+      activityState.calls.push({ workspaceId: args[0], type: args[1] });
+      if (activityState.throwTypes.has(args[1])) {
+        throw new Error(`Injected ${args[1]} activity failure`);
+      }
+      return actual.addActivity(...args);
+    }),
+  };
+});
+
+vi.mock('../../server/domains/content/on-content-request-live.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/domains/content/on-content-request-live.js')>();
+  return {
+    ...actual,
+    onContentRequestLive: vi.fn((...args: Parameters<typeof actual.onContentRequestLive>) => {
+      onLiveState.calls.push({ workspaceId: args[0], requestId: args[1].id });
+      if (onLiveState.shouldThrow) throw new Error('Injected content-live failure');
+      return actual.onContentRequestLive(...args);
+    }),
+  };
+});
+
+vi.mock('../../server/intelligence-freshness.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/intelligence-freshness.js')>();
+  return {
+    ...actual,
+    invalidateContentPipelineIntelligence: vi.fn((workspaceId: string) => {
+      intelligenceState.calls.push(workspaceId);
+      if (intelligenceState.shouldThrow) throw new Error('Injected content intelligence invalidation failure');
+      return actual.invalidateContentPipelineIntelligence(workspaceId);
+    }),
+  };
+});
 
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
   broadcastToWorkspace: vi.fn((workspaceId: string, event: string, payload: Record<string, unknown>) => {
     broadcastState.calls.push({ workspaceId, event, payload });
+    if (broadcastState.throwEvents.has(event)) throw new Error(`Injected ${event} broadcast failure`);
   }),
 }));
 
@@ -27,18 +86,28 @@ vi.mock('../../server/email.js', () => ({
   notifyClientAuditComplete: vi.fn(),
   notifyClientBriefingReady: vi.fn(),
   notifyClientBriefReady: vi.fn((payload: unknown) => emailState.clientBriefReady.push(payload)),
-  notifyClientContentPublished: vi.fn((payload: unknown) => emailState.clientContentPublished.push(payload)),
+  notifyClientContentPublished: vi.fn((payload: unknown) => {
+    emailState.clientContentPublished.push(payload);
+    if (emailState.throwClientContentPublished) throw new Error('Injected content-published email failure');
+  }),
   notifyClientFixesApplied: vi.fn(),
   notifyClientPostReady: vi.fn((payload: unknown) => emailState.clientPostReady.push(payload)),
   notifyClientRecommendationsReady: vi.fn(),
   notifyClientStatusChange: vi.fn(),
   notifyClientTeamResponse: vi.fn(),
   notifyClientWelcome: vi.fn(),
-  notifyTeamActionApproved: vi.fn(),
-  notifyTeamChangesRequested: vi.fn((payload: unknown) => emailState.teamChangesRequested.push(payload)),
+  notifyTeamActionApproved: vi.fn((payload: unknown) => {
+    emailState.teamActionApproved.push(payload);
+    if (emailState.throwTeamActionApproved) throw new Error('Injected action-approved email failure');
+  }),
+  notifyTeamChangesRequested: vi.fn((payload: unknown) => {
+    emailState.teamChangesRequested.push(payload);
+    if (emailState.throwTeamChangesRequested) throw new Error('Injected changes-requested email failure');
+  }),
   notifyTeamChurnSignal: vi.fn(),
   notifyTeamClientSignal: vi.fn(),
   notifyTeamContentRequest: vi.fn((payload: unknown) => emailState.teamContentRequests.push(payload)),
+  notifyTeamWorkOrderComment: vi.fn(),
   notifyTeamNewRequest: vi.fn(),
   notifyTeamPaymentReceived: vi.fn(),
   isEmailConfigured: vi.fn(() => false),
@@ -51,8 +120,8 @@ import {
   listContentRequests,
   updateContentRequest,
 } from '../../server/content-requests.js';
-import { upsertBrief } from '../../server/content-brief.js';
-import { savePost } from '../../server/content-posts-db.js';
+import { getBrief, upsertBrief } from '../../server/content-brief.js';
+import { getPost, savePost } from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import { createWorkspace, deleteWorkspace, getPageState, updateWorkspace } from '../../server/workspaces.js';
@@ -65,6 +134,7 @@ let server: http.Server | undefined;
 let wsAId = '';
 let wsBId = '';
 const originalAppPassword = process.env.APP_PASSWORD;
+const originalAppUrl = process.env.APP_URL;
 
 async function startTestServer(): Promise<void> {
   delete process.env.APP_PASSWORD;
@@ -239,6 +309,7 @@ async function publicActivity(workspaceId: string) {
 }
 
 beforeAll(async () => {
+  process.env.APP_URL = 'https://dashboard.example.test';
   await startTestServer();
   wsAId = createWorkspace('Content Request Mutation Safety A').id;
   wsBId = createWorkspace('Content Request Mutation Safety B').id;
@@ -247,11 +318,22 @@ beforeAll(async () => {
 
 beforeEach(() => {
   broadcastState.calls = [];
+  broadcastState.throwEvents.clear();
+  activityState.calls = [];
+  activityState.throwTypes.clear();
+  onLiveState.calls = [];
+  onLiveState.shouldThrow = false;
+  intelligenceState.calls = [];
+  intelligenceState.shouldThrow = false;
   emailState.teamContentRequests = [];
+  emailState.teamActionApproved = [];
   emailState.teamChangesRequested = [];
   emailState.clientBriefReady = [];
   emailState.clientPostReady = [];
   emailState.clientContentPublished = [];
+  emailState.throwTeamActionApproved = false;
+  emailState.throwTeamChangesRequested = false;
+  emailState.throwClientContentPublished = false;
   db.prepare('DELETE FROM activity_log WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   db.prepare('DELETE FROM page_edit_states WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
   db.prepare('DELETE FROM content_post_versions WHERE workspace_id IN (?, ?)').run(wsAId, wsBId);
@@ -274,6 +356,11 @@ afterAll(async () => {
     delete process.env.APP_PASSWORD;
   } else {
     process.env.APP_PASSWORD = originalAppPassword;
+  }
+  if (originalAppUrl === undefined) {
+    delete process.env.APP_URL;
+  } else {
+    process.env.APP_URL = originalAppUrl;
   }
 });
 
@@ -349,7 +436,10 @@ describe('content request mutation safety', () => {
     expect(progressRes.status).toBe(200);
     broadcastState.calls = [];
 
-    const reviewRes = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, { status: 'post_review' });
+    const reviewRes = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, {
+      status: 'post_review',
+      expectedPostRevision: getPost(wsAId, post.id)!.generationRevision,
+    });
     expect(reviewRes.status).toBe(200);
     expect(getContentRequest(wsAId, request.id)).toMatchObject({ status: 'post_review', postId: post.id });
     expect(countActivities(wsAId, 'post_sent_for_review', request.id)).toBe(1);
@@ -390,10 +480,57 @@ describe('content request mutation safety', () => {
     });
   });
 
+  it('admin patch reports an exact brief-review lifecycle conflict without changing authority', async () => {
+    const request = createRequest(wsAId, 'approved');
+    const brief = {
+      ...makeStubBrief(wsAId),
+      id: request.briefId!,
+    };
+    upsertBrief(wsAId, brief);
+
+    const res = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, {
+      status: 'client_review',
+      expectedBriefRevision: getBrief(wsAId, brief.id)!.generationRevision,
+    });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'brief_review_request_lifecycle_conflict',
+    });
+    expect(getContentRequest(wsAId, request.id)?.status).toBe('approved');
+    expect(emailState.clientBriefReady).toHaveLength(0);
+    expect(contentRequestBroadcasts()).toHaveLength(0);
+  });
+
+  it('admin patch reports an exact post-review lifecycle conflict without switching requests', async () => {
+    const request = createRequest(wsAId, 'approved', { serviceType: 'full_post' });
+    const post = makeStubPost(wsAId, request.briefId!);
+    savePost(wsAId, post);
+
+    const res = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, {
+      status: 'post_review',
+      expectedPostRevision: getPost(wsAId, post.id)!.generationRevision,
+    });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'post_review_request_lifecycle_conflict',
+    });
+    expect(getContentRequest(wsAId, request.id)?.status).toBe('approved');
+    expect(emailState.clientPostReady).toHaveLength(0);
+    expect(contentRequestBroadcasts()).toHaveLength(0);
+  });
+
   it('admin patch brief-ready and published emails link to Inbox Reviews', async () => {
     const request = createRequest(wsAId, 'requested');
+    const brief = makeStubBrief(wsAId);
+    upsertBrief(wsAId, brief);
+    updateContentRequest(wsAId, request.id, { briefId: brief.id });
 
-    const reviewRes = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, { status: 'client_review' });
+    const reviewRes = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, {
+      status: 'client_review',
+      expectedBriefRevision: getBrief(wsAId, brief.id)!.generationRevision,
+    });
     expect(reviewRes.status).toBe(200);
     expect(emailState.clientBriefReady).toHaveLength(1);
     expect(emailState.clientBriefReady[0].dashboardUrl).toBe(`https://dashboard.example.test/client/${wsAId}/inbox?tab=reviews`);
@@ -411,7 +548,7 @@ describe('content request mutation safety', () => {
     const res = await api(`/api/content-briefs/${wsAId}/${brief.id}/send-to-client`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'https://dashboard.example.test' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ expectedRevision: getBrief(wsAId, brief.id)!.generationRevision }),
     });
 
     expect(res.status).toBe(200);
@@ -438,6 +575,60 @@ describe('content request mutation safety', () => {
     expect(listContentRequests(wsAId).some(stored => stored.id === request.id)).toBe(false);
     expect(await publicRequest(wsAId, request.id)).toBeUndefined();
     expect((await publicActivity(wsAId)).some(entry => entry.type === 'content_request_deleted')).toBe(false);
+  });
+
+  it('keeps a committed admin patch successful when every optional post-commit effect fails', async () => {
+    const request = createRequest(wsAId, 'client_review', { targetPageId: 'page_post_commit_failure' });
+    onLiveState.shouldThrow = true;
+    emailState.throwClientContentPublished = true;
+    activityState.throwTypes.add('content_upgraded');
+    broadcastState.throwEvents.add(WS_EVENTS.CONTENT_REQUEST_UPDATE);
+
+    const res = await patchJson(`/api/content-requests/${wsAId}/${request.id}`, {
+      status: 'published',
+      serviceType: 'full_post',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      id: request.id,
+      status: 'published',
+      serviceType: 'full_post',
+    });
+    expect(getContentRequest(wsAId, request.id)).toMatchObject({
+      status: 'published',
+      serviceType: 'full_post',
+    });
+    expect(onLiveState.calls).toEqual([{ workspaceId: wsAId, requestId: request.id }]);
+    expect(emailState.clientContentPublished).toHaveLength(1);
+    expect(activityState.calls).toContainEqual({ workspaceId: wsAId, type: 'content_upgraded' });
+    expect(contentRequestBroadcasts()).toEqual([
+      {
+        workspaceId: wsAId,
+        event: WS_EVENTS.CONTENT_REQUEST_UPDATE,
+        payload: { id: request.id, status: 'published' },
+      },
+    ]);
+  });
+
+  it('keeps a committed admin delete successful and attempts broadcast after activity failure', async () => {
+    const request = createRequest(wsAId);
+    activityState.throwTypes.add('content_request_deleted');
+    broadcastState.throwEvents.add(WS_EVENTS.CONTENT_REQUEST_UPDATE);
+
+    const res = await deleteJson(`/api/content-requests/${wsAId}/${request.id}`);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(getContentRequest(wsAId, request.id)).toBeUndefined();
+    expect(activityState.calls).toContainEqual({ workspaceId: wsAId, type: 'content_request_deleted' });
+    expect(contentRequestBroadcasts()).toEqual([
+      {
+        workspaceId: wsAId,
+        event: WS_EVENTS.CONTENT_REQUEST_UPDATE,
+        payload: { id: request.id, deleted: true },
+      },
+    ]);
   });
 
   it('client brief actions mutate once with activity, broadcasts, and read-path coverage', async () => {
@@ -530,6 +721,39 @@ describe('content request mutation safety', () => {
     ]);
   });
 
+  it('returns the same explicit public request projection from mutations and GET', async () => {
+    const request = createRequest(wsAId, 'client_review');
+    const internalNote = `operator-only-${unique('sentinel')}`;
+    updateContentRequest(wsAId, request.id, {
+      internalNote,
+      clientNote: 'stored client context',
+      targetPageId: 'operator-target-page',
+      targetPageSlug: '/operator-target-page',
+      recommendationId: 'operator-recommendation',
+      strategyCardContext: { rationale: 'operator strategy rationale', volume: 900 },
+    });
+
+    const res = await postJson(`/api/public/content-request/${wsAId}/${request.id}/approve`, {});
+    expect(res.status).toBe(200);
+    const raw = await res.text();
+    expect(raw).not.toContain(internalNote);
+    expect(raw).not.toContain('operator-target-page');
+    expect(raw).not.toContain('operator-recommendation');
+    expect(raw).not.toContain('operator strategy rationale');
+
+    const body = JSON.parse(raw) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('workspaceId');
+    expect(body).not.toHaveProperty('rationale');
+    expect(body).not.toHaveProperty('clientNote');
+    expect(body).not.toHaveProperty('internalNote');
+    expect(body).not.toHaveProperty('declineReason');
+    expect(body).not.toHaveProperty('targetPageId');
+    expect(body).not.toHaveProperty('targetPageSlug');
+    expect(body).not.toHaveProperty('recommendationId');
+    expect(body).not.toHaveProperty('strategyCardContext');
+    expect(await publicRequest(wsAId, request.id)).toEqual(body);
+  });
+
   it('client post review actions mutate once with activity, broadcasts, and read-path coverage', async () => {
     const approve = createPostReviewRequest(wsAId);
 
@@ -565,6 +789,134 @@ describe('content request mutation safety', () => {
       },
     ]);
     expect(await adminRequest(wsAId, changes.requestId)).toMatchObject({ status: 'changes_requested' });
+  });
+
+  it('keeps every committed public review transition successful when optional effects fail', async () => {
+    const cases = [
+      {
+        label: 'decline',
+        phase: 'brief' as const,
+        initialStatus: 'requested' as const,
+        endpoint: 'decline',
+        body: { reason: 'Not a current priority.' },
+        expectedStatus: 'declined' as const,
+        activityType: 'content_declined',
+        email: 'none' as const,
+      },
+      {
+        label: 'brief approval',
+        phase: 'brief' as const,
+        initialStatus: 'client_review' as const,
+        endpoint: 'approve',
+        body: {},
+        expectedStatus: 'approved' as const,
+        activityType: 'brief_approved',
+        email: 'approval' as const,
+      },
+      {
+        label: 'brief changes',
+        phase: 'brief' as const,
+        initialStatus: 'client_review' as const,
+        endpoint: 'request-changes',
+        body: { feedback: 'Add a clearer example.' },
+        expectedStatus: 'changes_requested' as const,
+        activityType: 'changes_requested',
+        email: 'changes' as const,
+      },
+      {
+        label: 'post approval',
+        phase: 'post' as const,
+        endpoint: 'approve-post',
+        body: {},
+        expectedStatus: 'delivered' as const,
+        activityType: 'post_approved',
+        email: 'approval' as const,
+      },
+      {
+        label: 'post changes',
+        phase: 'post' as const,
+        endpoint: 'request-post-changes',
+        body: { feedback: 'Strengthen the conclusion.' },
+        expectedStatus: 'changes_requested' as const,
+        activityType: 'post_changes_requested',
+        email: 'changes' as const,
+      },
+    ];
+
+    for (const testCase of cases) {
+      broadcastState.calls = [];
+      broadcastState.throwEvents.clear();
+      activityState.calls = [];
+      activityState.throwTypes.clear();
+      emailState.teamActionApproved = [];
+      emailState.teamChangesRequested = [];
+      emailState.throwTeamActionApproved = testCase.email === 'approval';
+      emailState.throwTeamChangesRequested = testCase.email === 'changes';
+
+      const target = testCase.phase === 'post'
+        ? createPostReviewRequest(wsAId)
+        : { requestId: createRequest(wsAId, testCase.initialStatus).id };
+      const internalNote = `${testCase.label}-operator-only`;
+      updateContentRequest(wsAId, target.requestId, { internalNote });
+      activityState.throwTypes.add(testCase.activityType);
+      broadcastState.throwEvents.add(WS_EVENTS.CONTENT_REQUEST_UPDATE);
+
+      const res = await postJson(
+        `/api/public/content-request/${wsAId}/${target.requestId}/${testCase.endpoint}`,
+        testCase.body,
+      );
+      expect(res.status, testCase.label).toBe(200);
+      const raw = await res.text();
+      expect(raw, testCase.label).not.toContain(internalNote);
+      expect(JSON.parse(raw), testCase.label).toMatchObject({
+        id: target.requestId,
+        status: testCase.expectedStatus,
+      });
+      expect(getContentRequest(wsAId, target.requestId)?.status, testCase.label)
+        .toBe(testCase.expectedStatus);
+      expect(activityState.calls, testCase.label).toContainEqual({
+        workspaceId: wsAId,
+        type: testCase.activityType,
+      });
+      expect(contentRequestBroadcasts(), testCase.label).toEqual([{
+        workspaceId: wsAId,
+        event: WS_EVENTS.CONTENT_REQUEST_UPDATE,
+        payload: { id: target.requestId, status: testCase.expectedStatus },
+      }]);
+      if (testCase.email === 'approval') {
+        expect(emailState.teamActionApproved, testCase.label).toHaveLength(1);
+      }
+      if (testCase.email === 'changes') {
+        expect(emailState.teamChangesRequested, testCase.label).toHaveLength(1);
+      }
+    }
+  });
+
+  it('keeps a committed public post edit successful and attempts every later effect', async () => {
+    const target = createPostReviewRequest(wsAId);
+    const before = getPost(wsAId, target.postId)!;
+    activityState.throwTypes.add('post_client_edit');
+    intelligenceState.shouldThrow = true;
+    broadcastState.throwEvents.add(WS_EVENTS.POST_UPDATED);
+
+    const res = await patchJson(`/api/public/content-posts/${wsAId}/${target.postId}/client-edit`, {
+      expectedUpdatedAt: before.updatedAt,
+      title: 'Committed Client Edit',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body).toMatchObject({ id: target.postId, title: 'Committed Client Edit' });
+    expect(body).not.toHaveProperty('generationRevision');
+    expect(body).not.toHaveProperty('generationProvenance');
+    expect(getPost(wsAId, target.postId)?.title).toBe('Committed Client Edit');
+    expect(activityState.calls).toContainEqual({ workspaceId: wsAId, type: 'post_client_edit' });
+    expect(intelligenceState.calls).toContain(wsAId);
+    expect(broadcastState.calls).toContainEqual({
+      workspaceId: wsAId,
+      event: WS_EVENTS.POST_UPDATED,
+      payload: { postId: target.postId, status: 'review' },
+    });
   });
 
   it('rejects malformed and missing public mutations without DB, activity, or broadcast side effects', async () => {

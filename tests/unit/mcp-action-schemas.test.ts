@@ -104,6 +104,7 @@ describe('mcp-action-schemas', () => {
       expect(prepareBriefContextInputSchema.safeParse({
         workspace_id: 'ws-1',
         topic: 'Best CRM tools',
+        parent_request_id: 'creq-1',
         target_keyword: 'best crm for solopreneurs',
         target_page_path: '/blog/best-crm',
         layout: {
@@ -114,6 +115,15 @@ describe('mcp-action-schemas', () => {
     });
 
     it('rejects blank optional target fields when provided', () => {
+      expect(prepareBriefContextInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        topic: 'Best CRM tools',
+        parent_request_id: '',
+        layout: {
+          type: 'outline',
+          structure: { sections: [{ heading: { level: 1, text: 'H1' } }] },
+        },
+      }).success).toBe(false);
       expect(prepareBriefContextInputSchema.safeParse({
         workspace_id: 'ws-1',
         topic: 'Best CRM tools',
@@ -230,8 +240,15 @@ describe('mcp-action-schemas', () => {
     it('accepts post_handle with note', () => {
       expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', post_handle: validPostHandle, note: 'ready' }).success).toBe(true);
     });
-    it('accepts brief_id', () => {
-      expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', brief_id: 'brief_1' }).success).toBe(true);
+    it('accepts brief_id with revision authority', () => {
+      expect(sendToClientInputSchema.safeParse({
+        workspace_id: 'ws-1',
+        brief_id: 'brief_1',
+        expected_revision: 0,
+      }).success).toBe(true);
+    });
+    it('rejects brief_id without revision authority', () => {
+      expect(sendToClientInputSchema.safeParse({ workspace_id: 'ws-1', brief_id: 'brief_1' }).success).toBe(false);
     });
     it('accepts an exact brand-generation review target', () => {
       expect(sendToClientInputSchema.safeParse({

@@ -7,8 +7,9 @@ import {
   briefSourceEvidenceSchema,
 } from './schemas/content-schemas.js';
 import { resolveContentGenerationStyle } from './page-type-copy-contract.js';
+import { generationProvenanceSchema } from './schemas/generation-provenance.js';
 import { z } from 'zod';
-import type { ContentBrief } from '../shared/types/content.js';
+import type { ContentBrief, PersistedContentBrief } from '../shared/types/content.js';
 
 interface BriefRow {
   id: string;
@@ -49,6 +50,8 @@ interface BriefRow {
   generation_style: string | null;
   source_evidence: string | null;
   superseded_by: string | null;
+  generation_revision: number;
+  generation_provenance: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -63,7 +66,7 @@ const stmts = createStmtCache(() => ({
   ),
 }));
 
-function rowToBrief(row: BriefRow): ContentBrief {
+function rowToBrief(row: BriefRow): PersistedContentBrief {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -115,17 +118,30 @@ function rowToBrief(row: BriefRow): ContentBrief {
       ? parseJsonSafe(row.source_evidence, briefSourceEvidenceSchema, null, { workspaceId: row.workspace_id, field: 'source_evidence', table: 'content_briefs' }) ?? undefined
       : undefined,
     supersededBy: row.superseded_by ?? undefined,
+    generationRevision: row.generation_revision,
+    generationProvenance: row.generation_provenance
+      ? parseJsonSafe(
+          row.generation_provenance,
+          generationProvenanceSchema,
+          null,
+          {
+            workspaceId: row.workspace_id,
+            field: 'generation_provenance',
+            table: 'content_briefs',
+          },
+        )
+      : null,
   };
 }
 
-export function listBriefs(workspaceId: string, opts?: { includeSuperseded?: boolean }): ContentBrief[] {
+export function listBriefs(workspaceId: string, opts?: { includeSuperseded?: boolean }): PersistedContentBrief[] {
   const rows = (opts?.includeSuperseded
     ? stmts().selectByWorkspaceAll.all(workspaceId)
     : stmts().selectByWorkspace.all(workspaceId)) as BriefRow[];
   return rows.map(rowToBrief);
 }
 
-export function getBrief(workspaceId: string, briefId: string): ContentBrief | undefined {
+export function getBrief(workspaceId: string, briefId: string): PersistedContentBrief | undefined {
   const row = stmts().selectById.get(briefId, workspaceId) as BriefRow | undefined;
   return row ? rowToBrief(row) : undefined;
 }

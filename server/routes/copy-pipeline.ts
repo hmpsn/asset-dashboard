@@ -6,7 +6,7 @@ import { Router } from 'express';
 import { requireWorkspaceAccess } from '../auth.js';
 import { aiLimiter } from '../middleware.js';
 import { getWorkspace } from '../workspaces.js';
-import { validate, z } from '../middleware/validate.js';
+import { validate } from '../middleware/validate.js';
 import { addActivity } from '../activity-log.js';
 import { broadcastToWorkspace } from '../broadcast.js';
 import { WS_EVENTS } from '../ws-events.js';
@@ -18,6 +18,7 @@ import {
   updateSectionStatusSchema,
   updateSectionTextSchema,
   addSuggestionSchema,
+  sendEntryToClientReviewSchema,
   updatePatternSchema,
   extractPatternsSchema,
   startBatchSchema,
@@ -25,10 +26,12 @@ import {
 } from '../schemas/copy-pipeline.js';
 import {
   getSectionsForEntry,
+  getSection,
   getMetadata,
   updateSectionStatus,
   updateCopyText,
   addClientSuggestion,
+  CopySuggestionOriginalMismatchError,
   getEntryCopyStatus,
 } from '../copy-review.js';
 import { regenerateSection } from '../copy-generation.js';
@@ -42,21 +45,64 @@ import {
 } from '../copy-intelligence.js';
 import { exportCsv, exportCopyDeck, exportToWebflow } from '../copy-export.js';
 import { invalidateContentPipelineIntelligence } from '../intelligence-freshness.js';
-import { getBlueprint } from '../page-strategy.js';
+import { getBlueprint, getEntry } from '../page-strategy.js';
 import {
   createCopyBatchGenerationJob,
   getCopyBatchJob,
   runCopyBatchGenerationJob,
 } from '../copy-batch-jobs.js';
-import { hasActiveJob, createJob } from '../jobs.js';
-import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
+import {
+  ActiveJobResourceConflict,
+  createResourceScopedJob,
+  getJob,
+  runResourceScopedJobWorker,
+  updateJob,
+} from '../jobs.js';
+import {
+  BACKGROUND_JOB_TYPES,
+  JOB_RESOURCE_TYPES,
+} from '../../shared/types/background-jobs.js';
 import { runCopyEntryGenerationJob } from '../copy-entry-generation-job.js';
+import { GenerationRevisionConflictError } from '../generation-provenance.js';
 
 const router = Router();
 const log = createLogger('copy-pipeline-routes');
 
+class CopyEntryRevisionConflictError extends Error {
+  readonly code = 'generation_revision_conflict';
+
+  constructor(entryId: string) {
+    super(`Copy entry ${entryId} changed after it was read`);
+    this.name = 'CopyEntryRevisionConflictError';
+  }
+}
+
+class NoDraftCopySectionsError extends Error {
+  constructor() {
+    super('No draft sections to send');
+    this.name = 'NoDraftCopySectionsError';
+  }
+}
+
 function notifyCopyPipelineUpdated(workspaceId: string): void {
   invalidateContentPipelineIntelligence(workspaceId);
+}
+
+function runCopyPostCommitEffect(
+  workspaceId: string,
+  entryId: string,
+  sectionId: string | undefined,
+  effect: string,
+  run: () => void,
+): void {
+  try {
+    run();
+  } catch (err) {
+    log.warn(
+      { err, workspaceId, entryId, sectionId, effect },
+      'copy pipeline post-commit effect failed',
+    );
+  }
 }
 
 // ── Generation routes ────────────────────────────────────────────────────────
@@ -72,8 +118,23 @@ router.post(
   (req, res) => {
     const { workspaceId, blueprintId, entryId } = req.params;
     if (!getWorkspace(workspaceId)) return res.status(404).json({ error: 'Workspace not found' });
+    if (!getEntry(workspaceId, blueprintId, entryId)) return res.status(404).json({ error: 'Entry not found' });
     const { accumulatedSteering } = req.body as { accumulatedSteering?: string[] };
-    const job = createJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, { workspaceId });
+    let job: ReturnType<typeof createResourceScopedJob>['job'];
+    try {
+      ({ job } = createResourceScopedJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, {
+        workspaceId,
+        resources: [{ resourceType: JOB_RESOURCE_TYPES.COPY_ENTRY, resourceId: entryId }],
+      }));
+    } catch (err) {
+      if (err instanceof ActiveJobResourceConflict) {
+        return res.status(409).json({
+          error: 'Copy generation is already running for this entry',
+          jobId: err.jobId,
+        });
+      }
+      throw err;
+    }
     setImmediate(() => {
       void runCopyEntryGenerationJob({
         jobId: job.id,
@@ -81,6 +142,8 @@ router.post(
         blueprintId,
         entryId,
         accumulatedSteering,
+      }).catch(err => {
+        log.error({ err, jobId: job.id, workspaceId, blueprintId, entryId }, 'copy entry worker rejected after launch');
       });
     });
     return res.json({ jobId: job.id });
@@ -96,24 +159,221 @@ router.post(
   validate(regenerateSectionSchema),
   async (req, res) => {
     const { workspaceId, blueprintId, entryId, sectionId } = req.params;
-    const { note, highlight } = req.body as { note: string; highlight?: string };
+    const { note, highlight, expectedRevision } = req.body as {
+      note: string;
+      highlight?: string;
+      expectedRevision: number;
+    };
+    const targetSection = getSection(sectionId, workspaceId);
+    const entry = getEntry(workspaceId, blueprintId, entryId);
+    if (!targetSection || targetSection.entryId !== entryId || !entry) {
+      return res.status(404).json({ error: 'Section not found or regeneration failed' });
+    }
+    let jobId: string | undefined;
+    let steeringAccepted = false;
+    const committedState: { section: ReturnType<typeof getSection> } = { section: null };
+    let completionTrackingError: unknown;
     try {
-      const section = await regenerateSection(
+      const started = createResourceScopedJob(BACKGROUND_JOB_TYPES.COPY_ENTRY_GENERATION, {
         workspaceId,
-        blueprintId,
-        entryId,
-        sectionId,
-        note,
-        highlight,
-      );
-      if (!section) return res.status(404).json({ error: 'Section not found or regeneration failed' });
-      notifyCopyPipelineUpdated(workspaceId);
-      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
-      addActivity(workspaceId, 'copy_generated', `Regenerated copy section`);
+        message: 'Regenerating copy section...',
+        resources: [{ resourceType: JOB_RESOURCE_TYPES.COPY_ENTRY, resourceId: entryId }],
+        accept: () => {
+          const current = getSection(sectionId, workspaceId);
+          if (!current || current.generationRevision !== expectedRevision) {
+            throw new GenerationRevisionConflictError('copy_section', sectionId, expectedRevision);
+          }
+          return current;
+        },
+      });
+      jobId = started.job.id;
+      const section = await runResourceScopedJobWorker(started.job.id, async () => {
+        updateJob(started.job.id, { status: 'running', message: 'Regenerating copy section...' });
+        let result: Awaited<ReturnType<typeof regenerateSection>>;
+        try {
+          result = await regenerateSection(
+            workspaceId,
+            blueprintId,
+            entryId,
+            sectionId,
+            note,
+            highlight,
+            {
+              expectedRevision,
+              onSteeringAccepted: steered => {
+                steeringAccepted = true;
+                runCopyPostCommitEffect(workspaceId, entryId, sectionId, 'steering-intelligence-cache', () => {
+                  notifyCopyPipelineUpdated(workspaceId);
+                });
+                runCopyPostCommitEffect(workspaceId, entryId, sectionId, 'steering-broadcast', () => {
+                  broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
+                    sectionId,
+                    status: steered.status,
+                    generationRevision: steered.generationRevision,
+                    action: 'regeneration_steering_saved',
+                  });
+                });
+                runCopyPostCommitEffect(workspaceId, entryId, sectionId, 'steering-activity', () => {
+                  addActivity(
+                    workspaceId,
+                    'copy_section_edited',
+                    'Saved copy regeneration steering',
+                    undefined,
+                    { entryId, sectionId, action: 'regeneration_steering_saved' },
+                  );
+                });
+              },
+            },
+          );
+          if (!result) {
+            updateJob(started.job.id, {
+              status: 'error',
+              message: 'Copy section regeneration failed',
+              error: 'Section not found or regeneration failed',
+              result: { entryId, sectionId, status: 'error' },
+            });
+            return null;
+          }
+        } catch (err) {
+          updateJob(started.job.id, {
+            status: 'error',
+            message: 'Copy section regeneration failed',
+            error: err instanceof Error ? err.message : String(err),
+            result: { entryId, sectionId, status: 'error' },
+          });
+          throw err;
+        }
+
+        // regenerateSection returns only after the section CAS commit. From
+        // this point onward, terminal bookkeeping failures are infrastructure
+        // failures and must never be presented as another paid-generation
+        // failure or trigger the success-semantic post-commit effects below.
+        committedState.section = result;
+        try {
+          updateJob(started.job.id, {
+            status: 'done',
+            message: 'Copy section regenerated',
+            result: { entryId, sectionId },
+          });
+          if (getJob(started.job.id)?.status !== 'done') {
+            throw new Error('Copy section completion state was not persisted');
+          }
+        } catch (err) {
+          completionTrackingError = err;
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          log.error(
+            {
+              err,
+              workspaceId,
+              entryId,
+              sectionId,
+              jobId: started.job.id,
+              artifactCommitted: true,
+              generationRevision: result.generationRevision,
+            },
+            'copy section artifact committed but completion tracking failed',
+          );
+          try {
+            updateJob(started.job.id, {
+              status: 'error',
+              message: 'Copy section committed, but completion tracking failed',
+              error: errorMessage,
+              result: {
+                entryId,
+                sectionId,
+                status: result.status,
+                code: 'completion_tracking_failed',
+                artifactCommitted: true,
+                generationRevision: result.generationRevision,
+              },
+            });
+          } catch (trackingErr) {
+            log.error(
+              { err: trackingErr, workspaceId, entryId, sectionId, jobId: started.job.id },
+              'copy section completion-tracking failure could not be recorded',
+            );
+          }
+        }
+        return result;
+      });
+      if (!section) {
+        return res.status(502).json({
+          error: 'Copy regeneration failed after the steering note was saved',
+          code: 'generation_failed_after_steering',
+          section: getSection(sectionId, workspaceId),
+          ...(jobId ? { jobId } : {}),
+        });
+      }
+      if (completionTrackingError) {
+        const errorMessage = completionTrackingError instanceof Error
+          ? completionTrackingError.message
+          : String(completionTrackingError);
+        return res.json({
+          ...section,
+          completionTracking: {
+            status: 'failed',
+            code: 'completion_tracking_failed',
+            artifactCommitted: true,
+            message: 'The copy was saved, but completion tracking failed',
+            error: errorMessage,
+            ...(jobId ? { jobId } : {}),
+          },
+        });
+      }
+      runCopyPostCommitEffect(workspaceId, entryId, sectionId, 'intelligence-cache', () => {
+        notifyCopyPipelineUpdated(workspaceId);
+      });
+      runCopyPostCommitEffect(workspaceId, entryId, sectionId, 'section-updated-broadcast', () => {
+        broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
+          sectionId,
+          status: section.status,
+        });
+      });
+      runCopyPostCommitEffect(workspaceId, entryId, sectionId, 'activity', () => {
+        addActivity(workspaceId, 'copy_generated', 'Regenerated copy section');
+      });
       return res.json(section);
     } catch (err) {
+      if (err instanceof GenerationRevisionConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof ActiveJobResourceConflict) {
+        return res.status(409).json({
+          error: 'Copy generation is already running for this entry',
+          code: err.code,
+          jobId: err.jobId,
+        });
+      }
+      const committedSection = committedState.section;
+      if (committedSection) {
+        const errorMessage = completionTrackingError instanceof Error
+          ? completionTrackingError.message
+          : String(completionTrackingError ?? err);
+        return res.json({
+          ...committedSection,
+          completionTracking: {
+            status: 'failed',
+            code: 'completion_tracking_failed',
+            artifactCommitted: true,
+            message: 'The copy was saved, but completion tracking failed',
+            error: errorMessage,
+            ...(jobId ? { jobId } : {}),
+          },
+        });
+      }
+      if (steeringAccepted) {
+        return res.status(502).json({
+          error: 'Copy regeneration failed after the steering note was saved',
+          code: 'generation_failed_after_steering',
+          section: getSection(sectionId, workspaceId),
+          ...(jobId ? { jobId } : {}),
+        });
+      }
       log.error({ err, workspaceId, sectionId }, 'Section regeneration failed');
-      return res.status(500).json({ error: 'Section regeneration failed' });
+      return res.status(500).json({
+        error: 'Section regeneration failed',
+        ...(jobId ? { jobId } : {}),
+      });
     }
   },
 );
@@ -165,13 +425,35 @@ router.patch(
   validate(updateSectionStatusSchema),
   (req, res) => {
     const { workspaceId, sectionId } = req.params;
-    const { status } = req.body as { status: string };
-    const section = updateSectionStatus(sectionId, workspaceId, status as Parameters<typeof updateSectionStatus>[2]);
+    const { status, expectedRevision } = req.body as { status: string; expectedRevision: number };
+    let section: ReturnType<typeof updateSectionStatus>;
+    try {
+      section = updateSectionStatus(
+        sectionId,
+        workspaceId,
+        status as Parameters<typeof updateSectionStatus>[2],
+        expectedRevision,
+      );
+    } catch (err) {
+      if (err instanceof GenerationRevisionConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      throw err;
+    }
     if (!section) return res.status(404).json({ error: 'Section not found or invalid status transition' });
-    notifyCopyPipelineUpdated(workspaceId);
-    broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
+    runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'intelligence-cache', () => {
+      notifyCopyPipelineUpdated(workspaceId);
+    });
+    runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'section-updated-broadcast', () => {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
+        sectionId,
+        status: section.status,
+      });
+    });
     if (status === 'approved') {
-      addActivity(workspaceId, 'copy_approved', `Approved copy section`);
+      runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'activity', () => {
+        addActivity(workspaceId, 'copy_approved', 'Approved copy section');
+      });
     }
     return res.json(section);
   },
@@ -184,12 +466,32 @@ router.patch(
   validate(updateSectionTextSchema),
   (req, res) => {
     const { workspaceId, sectionId } = req.params;
-    const { copy } = req.body as { copy: string };
-    const section = updateCopyText(sectionId, workspaceId, copy);
+    const { copy, expectedRevision } = req.body as { copy: string; expectedRevision: number };
+    let section: ReturnType<typeof updateCopyText>;
+    try {
+      section = updateCopyText(sectionId, workspaceId, copy, expectedRevision);
+    } catch (err) {
+      if (err instanceof GenerationRevisionConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      throw err;
+    }
     if (!section) return res.status(404).json({ error: 'Section not found' });
-    notifyCopyPipelineUpdated(workspaceId);
-    broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
-    addActivity(workspaceId, 'copy_section_edited', `Edited copy section text`);
+    if (section.generationRevision === expectedRevision) {
+      return res.json(section);
+    }
+    runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'intelligence-cache', () => {
+      notifyCopyPipelineUpdated(workspaceId);
+    });
+    runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'section-updated-broadcast', () => {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
+        sectionId,
+        status: section.status,
+      });
+    });
+    runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'activity', () => {
+      addActivity(workspaceId, 'copy_section_edited', 'Edited copy section text');
+    });
     return res.json(section);
   },
 );
@@ -201,12 +503,41 @@ router.post(
   validate(addSuggestionSchema),
   (req, res) => {
     const { workspaceId, sectionId } = req.params;
-    const { originalText, suggestedText } = req.body as { originalText: string; suggestedText: string };
-    const section = addClientSuggestion(sectionId, workspaceId, { originalText, suggestedText });
+    const { originalText, suggestedText, expectedRevision } = req.body as {
+      originalText: string;
+      suggestedText: string;
+      expectedRevision: number;
+    };
+    let section: ReturnType<typeof addClientSuggestion>;
+    try {
+      section = addClientSuggestion(
+        sectionId,
+        workspaceId,
+        { originalText, suggestedText },
+        expectedRevision,
+      );
+    } catch (err) {
+      if (err instanceof GenerationRevisionConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      if (err instanceof CopySuggestionOriginalMismatchError) {
+        return res.status(409).json({ error: err.message, code: err.code });
+      }
+      throw err;
+    }
     if (!section) return res.status(404).json({ error: 'Section not found' });
-    notifyCopyPipelineUpdated(workspaceId);
-    broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { sectionId, status: section.status });
-    addActivity(workspaceId, 'copy_suggestion_added', `Client suggestion added to section`);
+    runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'intelligence-cache', () => {
+      notifyCopyPipelineUpdated(workspaceId);
+    });
+    runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'section-updated-broadcast', () => {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
+        sectionId,
+        status: section.status,
+      });
+    });
+    runCopyPostCommitEffect(workspaceId, section.entryId, sectionId, 'activity', () => {
+      addActivity(workspaceId, 'copy_suggestion_added', 'Client suggestion added to section');
+    });
     return res.json(section);
   },
 );
@@ -216,25 +547,75 @@ router.post(
 router.post(
   '/api/copy/:workspaceId/:blueprintId/:entryId/send-to-client',
   requireWorkspaceAccess('workspaceId'),
-  validate(z.object({})),
+  validate(sendEntryToClientReviewSchema),
   (req, res) => {
-    const { workspaceId, entryId } = req.params;
-    const sections = getSectionsForEntry(entryId, workspaceId);
-    const draftSections = sections.filter(s => s.status === 'draft');
-    if (draftSections.length === 0) return res.status(400).json({ error: 'No draft sections to send' });
-    // blueprintId is in the URL for API consistency with other entry-scoped routes but is
-    // not needed here — sections are scoped by entryId + workspaceId.
+    const { workspaceId, blueprintId, entryId } = req.params;
+    const { sectionRevisions } = req.body as {
+      sectionRevisions: Array<{ sectionId: string; expectedRevision: number }>;
+    };
+    if (!getEntry(workspaceId, blueprintId, entryId)) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
+
+    const expectedById = new Map(
+      sectionRevisions.map(section => [section.sectionId, section.expectedRevision]),
+    );
     const bulkTransition = db.transaction((): number => {
-      let count = 0;
-      for (const s of draftSections) {
-        if (updateSectionStatus(s.id, workspaceId, 'client_review')) count++;
+      const draftSections = getSectionsForEntry(entryId, workspaceId)
+        .filter(section => section.status === 'draft');
+      if (draftSections.length === 0) {
+        if (expectedById.size === 0) throw new NoDraftCopySectionsError();
+        throw new CopyEntryRevisionConflictError(entryId);
       }
-      return count;
+      const exactCensus = draftSections.length === expectedById.size
+        && draftSections.every(section => (
+          section.generationRevision !== undefined
+          && expectedById.get(section.id) === section.generationRevision
+        ));
+      if (!exactCensus) throw new CopyEntryRevisionConflictError(entryId);
+
+      for (const section of draftSections) {
+        const expectedRevision = expectedById.get(section.id);
+        if (expectedRevision === undefined
+          || !updateSectionStatus(section.id, workspaceId, 'client_review', expectedRevision)) {
+          throw new CopyEntryRevisionConflictError(entryId);
+        }
+      }
+      return draftSections.length;
     });
-    const sent = bulkTransition();
-    notifyCopyPipelineUpdated(workspaceId);
-    broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, { entryId, action: 'sent_to_client' });
-    addActivity(workspaceId, 'copy_sent_to_client', `Sent ${sent} section${sent !== 1 ? 's' : ''} for client review`);
+
+    let sent: number;
+    try {
+      sent = bulkTransition.immediate();
+    } catch (err) {
+      if (err instanceof NoDraftCopySectionsError) {
+        return res.status(400).json({ error: err.message });
+      }
+      if (err instanceof CopyEntryRevisionConflictError
+        || err instanceof GenerationRevisionConflictError) {
+        return res.status(409).json({
+          error: err.message,
+          code: 'generation_revision_conflict',
+        });
+      }
+      throw err;
+    }
+    runCopyPostCommitEffect(workspaceId, entryId, undefined, 'intelligence-cache', () => {
+      notifyCopyPipelineUpdated(workspaceId);
+    });
+    runCopyPostCommitEffect(workspaceId, entryId, undefined, 'entry-sent-broadcast', () => {
+      broadcastToWorkspace(workspaceId, WS_EVENTS.COPY_SECTION_UPDATED, {
+        entryId,
+        action: 'sent_to_client',
+      });
+    });
+    runCopyPostCommitEffect(workspaceId, entryId, undefined, 'activity', () => {
+      addActivity(
+        workspaceId,
+        'copy_sent_to_client',
+        `Sent ${sent} section${sent !== 1 ? 's' : ''} for client review`,
+      );
+    });
     return res.json({ sent });
   },
 );
@@ -254,20 +635,24 @@ router.post(
     if (!blueprint) {
       return res.status(404).json({ error: 'Blueprint not found' });
     }
-    const activeCopyBatchJob = hasActiveJob(BACKGROUND_JOB_TYPES.COPY_BATCH_GENERATION, workspaceId);
-    if (activeCopyBatchJob) {
-      return res.status(409).json({ error: 'Copy batch generation is already running for this workspace', jobId: activeCopyBatchJob.id });
-    }
-
     try {
       const started = createCopyBatchGenerationJob({ workspaceId, blueprintId, entryIds, mode, batchSize });
       res.json(started);
       setTimeout(() => {
-        void runCopyBatchGenerationJob({ workspaceId, blueprintId, entryIds, mode, batchSize, ...started });
+        void runCopyBatchGenerationJob({ workspaceId, blueprintId, entryIds, mode, batchSize, ...started }).catch(err => {
+          log.error({ err, jobId: started.jobId, batchId: started.batchId, workspaceId, blueprintId }, 'copy batch worker rejected after launch');
+        });
       }, 100);
     } catch (err) {
       if (err instanceof Error && err.message === 'Blueprint not found') {
         return res.status(404).json({ error: 'Blueprint not found' });
+      }
+      if (err instanceof ActiveJobResourceConflict) {
+        return res.status(409).json({
+          error: 'Copy generation is already running for one or more entries',
+          jobId: err.jobId,
+          conflicts: err.conflicts,
+        });
       }
       log.error({ err, workspaceId, blueprintId }, 'Failed to start batch job');
       return res.status(500).json({ error: 'Failed to start batch job' });

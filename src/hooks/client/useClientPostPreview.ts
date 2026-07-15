@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { publicPostReview } from '../../api/content';
 import { queryKeys } from '../../lib/queryKeys';
-import type { GeneratedPost } from '../../../shared/types/content';
+import type { PublicContentPost } from '../../../shared/types/content';
 
 /**
  * Fetches a GeneratedPost for client review.
@@ -12,7 +12,7 @@ export function useClientPostPreview(
   postId: string | undefined,
   enabled: boolean,
 ) {
-  return useQuery<GeneratedPost>({
+  return useQuery<PublicContentPost>({
     queryKey: queryKeys.client.postPreview(workspaceId, postId),
     queryFn: () => publicPostReview.getPost(workspaceId, postId!),
     enabled: !!postId && enabled,

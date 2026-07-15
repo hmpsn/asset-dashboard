@@ -34,6 +34,12 @@ export const batchProgressSchema = z.object({
   approved: z.number().int(),
 });
 
+/** Minimal authoritative blueprint-section identity used by generation census CAS. */
+export const copySectionPlanIdentitySchema = z.object({
+  id: z.string().trim().min(1),
+  order: z.number().int(),
+}).passthrough();
+
 export const copySectionStatusSchema = z.enum([
   'pending', 'draft', 'client_review', 'approved', 'revision_requested',
 ]);
@@ -41,6 +47,8 @@ export const copySectionStatusSchema = z.enum([
 export const intelligencePatternTypeSchema = z.enum([
   'terminology', 'tone', 'structure', 'keyword_usage',
 ]);
+
+const generationRevisionSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 
 // ── Route body validation schemas ──
 
@@ -51,19 +59,39 @@ export const generateCopySchema = z.object({
 export const regenerateSectionSchema = z.object({
   note: z.string().min(1),
   highlight: z.string().optional(),
+  expectedRevision: generationRevisionSchema,
 });
 
 export const updateSectionStatusSchema = z.object({
   status: copySectionStatusSchema,
+  expectedRevision: generationRevisionSchema,
 });
 
 export const updateSectionTextSchema = z.object({
   copy: z.string().min(1),
+  expectedRevision: generationRevisionSchema,
 });
 
 export const addSuggestionSchema = z.object({
   originalText: z.string().min(1),
   suggestedText: z.string().min(1),
+  expectedRevision: generationRevisionSchema,
+});
+
+export const sendEntryToClientReviewSchema = z.object({
+  sectionRevisions: z.array(z.object({
+    sectionId: z.string().trim().min(1),
+    expectedRevision: generationRevisionSchema,
+  })).max(200),
+}).superRefine((data, ctx) => {
+  const sectionIds = data.sectionRevisions.map(section => section.sectionId);
+  if (new Set(sectionIds).size !== sectionIds.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['sectionRevisions'],
+      message: 'sectionRevisions must contain each section exactly once',
+    });
+  }
 });
 
 export const updatePatternSchema = z.object({
@@ -77,9 +105,17 @@ export const extractPatternsSchema = z.object({
 });
 
 export const startBatchSchema = z.object({
-  entryIds: z.array(z.string()).min(1).max(100),
+  entryIds: z.array(z.string().trim().min(1)).min(1).max(100),
   mode: z.enum(['review_inbox', 'iterative']).optional(),
   batchSize: z.number().int().positive().optional(),
+}).superRefine((data, ctx) => {
+  if (new Set(data.entryIds).size !== data.entryIds.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['entryIds'],
+      message: 'entryIds must not contain duplicates',
+    });
+  }
 });
 
 export const exportCopySchema = z.object({

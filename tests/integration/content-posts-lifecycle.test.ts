@@ -46,7 +46,16 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { savePost, getPost, listPosts } from '../../server/content-posts-db.js';
 import db from '../../server/db/index.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
-import type { GeneratedPost, PostSection } from '../../shared/types/content.js';
+import type {
+  ContentCalendarDateSuggestionsResponse,
+  GeneratedPost,
+  PostSection,
+} from '../../shared/types/content.js';
+import {
+  getUnresolvedContentPublishReconciliationForPost,
+  recordContentPublishReconciliation,
+  resolveContentPublishReconciliation,
+} from '../../server/content-publish-reconciliation.js';
 
 // ── Test server helpers ────────────────────────────────────────────────────────
 
@@ -90,15 +99,29 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 }
 
 async function patchJson(path: string, body: unknown): Promise<Response> {
+  const match = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)/);
+  const requestBody = match && body && typeof body === 'object' && !('expectedRevision' in body)
+    ? {
+        ...body,
+        expectedRevision: getPost(match[1], match[2])?.generationRevision ?? 0,
+      }
+    : body;
   return api(path, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
 }
 
 async function del(path: string): Promise<Response> {
-  return api(path, { method: 'DELETE' });
+  const match = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)$/);
+  return api(path, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      expectedRevision: match ? getPost(match[1], match[2])?.generationRevision ?? 0 : 0,
+    }),
+  });
 }
 
 // ── Test data helpers ──────────────────────────────────────────────────────────
@@ -297,6 +320,41 @@ describe('DELETE /api/content-posts/:workspaceId/:postId', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body).toHaveProperty('error');
+  });
+
+  it('returns an actionable 409 and preserves the post when external publish reconciliation is unresolved', async () => {
+    const post = seedPost(wsId);
+    const persisted = getPost(wsId, post.id)!;
+    const reconciliation = recordContentPublishReconciliation({
+      workspaceId: wsId,
+      postId: post.id,
+      collectionId: 'collection-route-delete-guard',
+      itemId: 'item-route-delete-guard',
+      externalState: 'published',
+      sourceGenerationRevision: persisted.generationRevision,
+    });
+
+    const blocked = await del(`/api/content-posts/${wsId}/${post.id}`);
+
+    expect(blocked.status).toBe(409);
+    expect(await blocked.json()).toEqual({
+      error: 'This post cannot be deleted because its external publish state is unresolved. '
+        + 'Retry the publish reconciliation or resolve the external item, then try deleting again.',
+      code: 'CONTENT_PUBLISH_RECONCILIATION_REQUIRED',
+    });
+    expect(getPost(wsId, post.id)).toBeDefined();
+    expect(getUnresolvedContentPublishReconciliationForPost(wsId, post.id))
+      .toMatchObject({ id: reconciliation.id });
+
+    expect(resolveContentPublishReconciliation({
+      workspaceId: wsId,
+      postId: post.id,
+      collectionId: 'collection-route-delete-guard',
+      itemId: 'item-route-delete-guard',
+    })).toBe(true);
+    const deleted = await del(`/api/content-posts/${wsId}/${post.id}`);
+    expect(deleted.status).toBe(200);
+    expect(getPost(wsId, post.id)).toBeUndefined();
   });
 });
 
@@ -522,8 +580,16 @@ describe('GET /api/content-posts/:workspaceId/suggest-dates', () => {
   it('proposes one date per unscheduled draft and skips already-scheduled/published posts', async () => {
     const freshWs = createWorkspace('Suggest Dates Workspace');
     try {
-      const draftA = makePost(freshWs.id, { title: 'Unscheduled A', status: 'draft' });
-      const draftB = makePost(freshWs.id, { title: 'Unscheduled B', status: 'draft' });
+      const draftA = makePost(freshWs.id, {
+        title: 'Unscheduled A',
+        status: 'draft',
+        generationRevision: 7,
+      });
+      const draftB = makePost(freshWs.id, {
+        title: 'Unscheduled B',
+        status: 'draft',
+        generationRevision: 12,
+      });
       const scheduled = makePost(freshWs.id, { title: 'Already Scheduled', status: 'draft', plannedPublishAt: '2026-09-01T00:00:00.000Z' });
       savePost(freshWs.id, draftA);
       savePost(freshWs.id, draftB);
@@ -531,12 +597,14 @@ describe('GET /api/content-posts/:workspaceId/suggest-dates', () => {
 
       const res = await getJson(`/api/content-posts/${freshWs.id}/suggest-dates`);
       expect(res.status).toBe(200);
-      const body = await res.json() as { suggestions: Array<{ draftId: string; suggestedDate: string }>; unscheduledCount: number };
+      const body = await res.json() as ContentCalendarDateSuggestionsResponse;
       expect(body.unscheduledCount).toBe(2);
       const ids = body.suggestions.map(s => s.draftId);
       expect(ids).toContain(draftA.id);
       expect(ids).toContain(draftB.id);
       expect(ids).not.toContain(scheduled.id);
+      expect(body.suggestions.find(suggestion => suggestion.draftId === draftA.id)?.generationRevision).toBe(7);
+      expect(body.suggestions.find(suggestion => suggestion.draftId === draftB.id)?.generationRevision).toBe(12);
       // Each suggested date is a valid ISO string in the future.
       for (const s of body.suggestions) {
         expect(Number.isNaN(new Date(s.suggestedDate).getTime())).toBe(false);

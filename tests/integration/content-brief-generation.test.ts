@@ -36,6 +36,20 @@ vi.mock('../../server/intelligence/generation-context-builders.js', () => ({
 
 // Mock workspace-intelligence to avoid needing a fully-populated workspace
 vi.mock('../../server/workspace-intelligence.js', () => ({
+  buildWorkspaceIntelligence: vi.fn(async (workspaceId: string) => ({
+    version: 1,
+    workspaceId,
+    assembledAt: new Date().toISOString(),
+    seoContext: {
+      strategy: null,
+      brandVoice: null,
+      effectiveBrandVoiceBlock: '',
+      knowledgeBase: null,
+      businessContext: null,
+      personas: null,
+      pageKeywords: null,
+    },
+  })),
   formatForPrompt: vi.fn(() => ''),
   formatKeywordsForPrompt: vi.fn(() => '\n\nKEYWORD STRATEGY (incorporate these naturally):\nSite target keywords: seo, web design'),
   formatPersonasForPrompt: vi.fn(() => ''),
@@ -66,6 +80,7 @@ import {
   regenerateOutline,
   getBrief,
   listBriefs,
+  updateBrief,
   getPageTypeConfig,
   type ContentBrief,
 } from '../../server/content-brief.js';
@@ -318,6 +333,13 @@ describe('generateBrief — happy path', () => {
     // v7 title/meta variants
     expect(brief.titleVariants!.length).toBeGreaterThan(0);
     expect(brief.metaDescVariants!.length).toBeGreaterThan(0);
+    expect(brief.generationRevision).toBe(1);
+    expect(brief.generationProvenance).toMatchObject({
+      operation: 'content-brief-generate',
+      provider: 'openai',
+      model: 'gpt-5.4',
+    });
+    expect(brief.generationProvenance?.inputFingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('persists generated brief to the database', async () => {
@@ -791,6 +813,11 @@ describe('regenerateBrief — refinement with feedback', () => {
     const fetched = getBrief(TEST_WS_ID, newBrief.id);
     expect(fetched).toBeDefined();
     expect(fetched!.suggestedTitle).toBe(newBrief.suggestedTitle);
+    expect(fetched!.generationRevision).toBe(1);
+    expect(fetched!.generationProvenance?.operation).toBe('content-brief-regenerate');
+    const superseded = getBrief(TEST_WS_ID, originalBrief.id)!;
+    expect(superseded.supersededBy).toBe(newBrief.id);
+    expect(superseded.generationRevision).toBe(originalBrief.generationRevision! + 1);
   });
 
   it('includes the previous brief and feedback in the prompt', async () => {
@@ -857,6 +884,56 @@ describe('regenerateBrief — refinement with feedback', () => {
       regenerateBrief(TEST_WS_ID, originalBrief, 'Make it better.'),
     ).rejects.toThrow('Service unavailable');
   });
+
+  it('preserves an edit made during full regeneration and creates no orphan successor', async () => {
+    mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
+    const original = await generateBrief(TEST_WS_ID, 'full regen race', {});
+    resetOpenAIMocks();
+    mockOpenAIJsonResponse('content-brief-regenerate', makeMockBriefResponse({
+      suggestedTitle: 'Stale generated replacement',
+    }));
+    const beforeIds = new Set(listBriefs(TEST_WS_ID, { includeSuperseded: true }).map(brief => brief.id));
+
+    const pending = regenerateBrief(TEST_WS_ID, original, 'Replace everything');
+    const human = updateBrief(TEST_WS_ID, original.id, { suggestedTitle: 'Human wins' })!;
+    await expect(pending).rejects.toMatchObject({ code: 'generation_revision_conflict' });
+
+    const after = getBrief(TEST_WS_ID, original.id)!;
+    expect(after.suggestedTitle).toBe('Human wins');
+    expect(after.supersededBy).toBeUndefined();
+    expect(after.generationRevision).toBe(human.generationRevision);
+    const added = listBriefs(TEST_WS_ID, { includeSuperseded: true })
+      .filter(brief => !beforeIds.has(brief.id));
+    expect(added).toEqual([]);
+  });
+
+  it('allows only one successor when two full regenerations race', async () => {
+    mockOpenAIJsonResponse('content-brief', makeMockBriefResponse());
+    const original = await generateBrief(TEST_WS_ID, 'concurrent full regen', {});
+    resetOpenAIMocks();
+    mockOpenAIJsonResponse('content-brief-regenerate', makeMockBriefResponse({
+      suggestedTitle: 'Concurrent replacement',
+    }));
+    const beforeIds = new Set(
+      listBriefs(TEST_WS_ID, { includeSuperseded: true }).map(brief => brief.id),
+    );
+
+    const outcomes = await Promise.allSettled([
+      regenerateBrief(TEST_WS_ID, original, 'First concurrent attempt'),
+      regenerateBrief(TEST_WS_ID, original, 'Second concurrent attempt'),
+    ]);
+
+    expect(outcomes.filter(outcome => outcome.status === 'fulfilled')).toHaveLength(1);
+    const rejected = outcomes.filter(
+      (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
+    );
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toMatchObject({ code: 'generation_revision_conflict' });
+    const added = listBriefs(TEST_WS_ID, { includeSuperseded: true })
+      .filter(brief => !beforeIds.has(brief.id));
+    expect(added).toHaveLength(1);
+    expect(getBrief(TEST_WS_ID, original.id)?.supersededBy).toBe(added[0].id);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -911,6 +988,8 @@ describe('regenerateOutline — outline-only regeneration', () => {
     expect(updated!.executiveSummary).toBe(original!.executiveSummary);
     expect(updated!.intent).toBe(original!.intent);
     expect(updated!.id).toBe(existingBriefId); // Same brief, just updated outline
+    expect(updated!.generationRevision).toBe(original!.generationRevision + 1);
+    expect(updated!.generationProvenance?.operation).toBe('content-brief-outline');
   });
 
   it('includes feedback in the outline regeneration prompt when provided', async () => {
@@ -982,6 +1061,24 @@ describe('regenerateOutline — outline-only regeneration', () => {
 
     const after = getBrief(TEST_WS_ID, existingBriefId);
     expect(after?.outline).toEqual(before?.outline);
+  });
+
+  it('preserves an edit made while outline generation is in flight', async () => {
+    const before = getBrief(TEST_WS_ID, existingBriefId)!;
+    mockOpenAIJsonResponse('content-brief-outline', [
+      { heading: 'Stale outline', notes: 'Must not land', wordCount: 300, keywords: [] },
+    ]);
+
+    const pending = regenerateOutline(TEST_WS_ID, existingBriefId, 'Fresh approach', {
+      expectedRevision: before.generationRevision,
+    });
+    const human = updateBrief(TEST_WS_ID, existingBriefId, { audience: 'Operator-edited audience' })!;
+    await expect(pending).rejects.toMatchObject({ code: 'generation_revision_conflict' });
+
+    const after = getBrief(TEST_WS_ID, existingBriefId)!;
+    expect(after.audience).toBe('Operator-edited audience');
+    expect(after.generationRevision).toBe(human.generationRevision);
+    expect(after.outline).toEqual(before.outline);
   });
 });
 

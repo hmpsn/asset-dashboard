@@ -1,9 +1,10 @@
 // tests/component/ContentCalendar.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { ContentCalendar } from '../../src/components/ContentCalendar';
+import { contentPosts } from '../../src/api/content';
 
 // ── Router mocks ──────────────────────────────────────────────────────────────
 const navigateMock = vi.fn();
@@ -33,7 +34,7 @@ vi.mock('../../src/components/Toast', () => ({
 vi.mock('../../src/api/content', () => ({
   contentPosts: {
     setPlannedDate: vi.fn().mockResolvedValue(undefined),
-    suggestDates: vi.fn().mockResolvedValue({ suggestions: [] }),
+    suggestDates: vi.fn().mockResolvedValue({ suggestions: [], unscheduledCount: 0 }),
   },
 }));
 
@@ -323,5 +324,70 @@ describe('ContentCalendar', () => {
     // Calendar chrome is still present; ErrorState is NOT shown.
     expect(screen.getByText('Content Calendar')).toBeInTheDocument();
     expect(screen.queryByText("Couldn't load calendar data")).not.toBeInTheDocument();
+  });
+
+  it('applies the server proposal revision when the posts cache is one revision behind', async () => {
+    const hooks = await getAdminHooks();
+    const queryClient = makeQueryClient();
+    const postAtRevision = (generationRevision: number) => ({
+      id: 'draft-1',
+      workspaceId: 'ws1',
+      briefId: 'brief-1',
+      targetKeyword: 'content authority',
+      title: 'Pinned authority draft',
+      metaDescription: '',
+      introduction: '',
+      sections: [],
+      conclusion: '',
+      totalWordCount: 0,
+      targetWordCount: 1_000,
+      status: 'draft' as const,
+      generationRevision,
+      createdAt: todayIso,
+      updatedAt: todayIso,
+    });
+
+    vi.mocked(hooks.useAdminPostsList).mockReturnValue({
+      data: [postAtRevision(7)],
+    } as unknown as ReturnType<typeof hooks.useAdminPostsList>);
+    vi.mocked(contentPosts.suggestDates).mockResolvedValueOnce({
+      suggestions: [{
+        draftId: 'draft-1',
+        suggestedDate: '2030-01-15T12:00:00.000Z',
+        reason: 'Balances the publishing cadence',
+        title: 'Pinned authority draft',
+        generationRevision: 8,
+      }],
+      unscheduledCount: 1,
+    });
+
+    const calendar = () => (
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/ws/ws1']}>
+          <ContentCalendar workspaceId="ws1" />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    render(calendar());
+
+    fireEvent.click(screen.getByRole('button', { name: /suggest dates/i }));
+    await screen.findByText('1 suggested publish date');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
+
+    await waitFor(() => {
+      expect(contentPosts.setPlannedDate).toHaveBeenCalledWith(
+        'ws1',
+        'draft-1',
+        8,
+        '2030-01-15T12:00:00.000Z',
+      );
+    });
+    expect(contentPosts.setPlannedDate).not.toHaveBeenCalledWith(
+      'ws1',
+      'draft-1',
+      7,
+      expect.any(String),
+    );
   });
 });

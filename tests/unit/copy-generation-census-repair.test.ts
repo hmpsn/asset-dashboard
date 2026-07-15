@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ responses: [] as string[] }));
+const state = vi.hoisted(() => ({ responses: [] as string[], call: 0 }));
 const mocks = vi.hoisted(() => ({
-  initializeSections: vi.fn(),
+  snapshotCopyEntryGeneration: vi.fn(),
+  commitGeneratedEntryCopy: vi.fn(),
+  addSteeringEntry: vi.fn(),
   saveGeneratedCopy: vi.fn(),
-  saveMetadata: vi.fn(),
+  getSectionsForEntry: vi.fn(),
 }));
 
 vi.mock('../../server/logger.js', () => ({
@@ -48,22 +50,38 @@ vi.mock('../../server/page-type-copy-contract.js', () => ({
 }));
 vi.mock('../../server/prompt-assembly.js', () => ({ buildSystemPrompt: vi.fn((_ws: string, prompt: string) => prompt) }));
 vi.mock('../../server/ai.js', () => ({
-  callAI: vi.fn(async () => ({ text: state.responses.shift() ?? '{}' })),
-}));
-vi.mock('../../server/db/index.js', () => ({
-  default: { transaction: vi.fn((fn: () => unknown) => fn) },
+  renderAIProviderInput: vi.fn((input: unknown) => input),
+  callAI: vi.fn(async (options: { executionChainId?: string; operation?: string }) => {
+    state.call += 1;
+    return {
+      text: state.responses.shift() ?? '{}',
+      tokens: { prompt: 1, completion: 1, total: 2 },
+      execution: {
+        runId: `run-${state.call}`,
+        executionChainId: options.executionChainId,
+        operation: options.operation ?? 'copy-generation',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        attempts: 1,
+        cacheOutcome: 'miss',
+        startedAt: '2026-07-14T00:00:00.000Z',
+        completedAt: '2026-07-14T00:00:01.000Z',
+        durationMs: 1000,
+      },
+    };
+  }),
 }));
 vi.mock('../../server/copy-review.js', () => ({
-  initializeSections: mocks.initializeSections,
+  snapshotCopyEntryGeneration: mocks.snapshotCopyEntryGeneration,
+  commitGeneratedEntryCopy: mocks.commitGeneratedEntryCopy,
   saveGeneratedCopy: mocks.saveGeneratedCopy,
-  saveMetadata: mocks.saveMetadata,
-  addSteeringEntry: vi.fn(),
-  getSectionsForEntry: vi.fn(() => []),
+  addSteeringEntry: mocks.addSteeringEntry,
+  getSectionsForEntry: mocks.getSectionsForEntry,
 }));
 vi.mock('../../server/errors.js', () => ({ isProgrammingError: vi.fn(() => false) }));
 
 import { callAI } from '../../server/ai.js';
-import { generateCopyForEntry } from '../../server/copy-generation.js';
+import { generateCopyForEntry, regenerateSection } from '../../server/copy-generation.js';
 
 function pageCopy(sectionIds: string[]): string {
   return JSON.stringify({
@@ -83,12 +101,69 @@ function pageCopy(sectionIds: string[]): string {
 beforeEach(() => {
   vi.clearAllMocks();
   state.responses = [];
-  mocks.initializeSections.mockReturnValue([
-    { id: 'section-hero', sectionPlanItemId: 'plan-hero' },
-    { id: 'section-proof', sectionPlanItemId: 'plan-proof' },
-  ]);
-  mocks.saveGeneratedCopy.mockImplementation((id: string) => ({ id }));
-  mocks.saveMetadata.mockReturnValue({ seoTitle: 'SEO title' });
+  state.call = 0;
+  mocks.snapshotCopyEntryGeneration.mockReturnValue({
+    workspaceId: 'ws-1',
+    entryId: 'entry-1',
+    sectionPlanJson: '[]',
+    entryUpdatedAt: '2026-07-14T00:00:00.000Z',
+    plannedSections: [{ id: 'plan-hero', order: 0 }, { id: 'plan-proof', order: 1 }],
+    sections: [],
+  });
+  mocks.commitGeneratedEntryCopy.mockImplementation((_snapshot, sections) => ({
+    sections: sections.map((section: { sectionPlanItemId: string }) => ({
+      id: `section-${section.sectionPlanItemId.replace('plan-', '')}`,
+      sectionPlanItemId: section.sectionPlanItemId,
+    })),
+    metadata: { seoTitle: 'SEO title' },
+  }));
+  mocks.getSectionsForEntry.mockReturnValue([]);
+  mocks.addSteeringEntry.mockReturnValue(null);
+  mocks.saveGeneratedCopy.mockReturnValue(null);
+});
+
+describe('regenerateSection edit safety', () => {
+  it('carries the post-steering revision through the provider call and final CAS', async () => {
+    state.responses = [JSON.stringify({ copy: 'Revised copy', annotation: 'Sharper', reasoning: 'Steered' })];
+    mocks.getSectionsForEntry.mockReturnValue([{
+      id: 'section-hero',
+      sectionPlanItemId: 'plan-hero',
+      status: 'draft',
+      generatedCopy: 'Current copy',
+      version: 1,
+      generationRevision: 4,
+    }]);
+    mocks.addSteeringEntry.mockReturnValue({
+      id: 'section-hero',
+      sectionPlanItemId: 'plan-hero',
+      status: 'draft',
+      generatedCopy: 'Current copy',
+      version: 1,
+      generationRevision: 5,
+    });
+    mocks.saveGeneratedCopy.mockReturnValue({ id: 'section-hero', generationRevision: 6 });
+
+    const result = await regenerateSection(
+      'ws-1', 'bp-1', 'entry-1', 'section-hero', 'Make it sharper', undefined,
+      { expectedRevision: 4, executionChainId: 'regen-chain' },
+    );
+
+    expect(result).toMatchObject({ generationRevision: 6 });
+    expect(mocks.addSteeringEntry).toHaveBeenCalledWith(
+      'section-hero', 'ws-1', expect.any(Object), 4,
+    );
+    expect(mocks.saveGeneratedCopy).toHaveBeenCalledWith(
+      'section-hero',
+      'ws-1',
+      expect.objectContaining({
+        expectedRevision: 5,
+        generationProvenance: expect.objectContaining({
+          runId: 'run-1',
+          executionChainId: 'regen-chain',
+        }),
+      }),
+    );
+  });
 });
 
 describe('generateCopyForEntry exact section census repair', () => {
@@ -98,8 +173,15 @@ describe('generateCopyForEntry exact section census repair', () => {
     const result = await generateCopyForEntry('ws-1', 'bp-1', 'entry-1');
 
     expect(callAI).toHaveBeenCalledTimes(2);
-    expect(mocks.initializeSections).toHaveBeenCalledTimes(1);
-    expect(mocks.saveGeneratedCopy.mock.calls.map(call => call[0])).toEqual(['section-hero', 'section-proof']);
+    expect(mocks.snapshotCopyEntryGeneration).toHaveBeenCalledTimes(1);
+    expect(mocks.commitGeneratedEntryCopy).toHaveBeenCalledTimes(1);
+    expect(mocks.commitGeneratedEntryCopy.mock.calls[0][1].map((section: { sectionPlanItemId: string }) => section.sectionPlanItemId))
+      .toEqual(['plan-hero', 'plan-proof']);
+    expect(mocks.commitGeneratedEntryCopy.mock.calls[0][3]).toMatchObject({
+      runId: 'run-2',
+      executions: [{ runId: 'run-2' }],
+    });
+    expect(JSON.stringify(mocks.commitGeneratedEntryCopy.mock.calls[0][3])).not.toContain('run-1');
     expect(result.sections).toHaveLength(2);
   });
 
@@ -109,8 +191,7 @@ describe('generateCopyForEntry exact section census repair', () => {
     await expect(generateCopyForEntry('ws-1', 'bp-1', 'entry-1')).rejects.toThrow(/after one repair/i);
 
     expect(callAI).toHaveBeenCalledTimes(2);
-    expect(mocks.initializeSections).not.toHaveBeenCalled();
-    expect(mocks.saveGeneratedCopy).not.toHaveBeenCalled();
-    expect(mocks.saveMetadata).not.toHaveBeenCalled();
+    expect(mocks.snapshotCopyEntryGeneration).toHaveBeenCalledTimes(1);
+    expect(mocks.commitGeneratedEntryCopy).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@ import { listMatrices } from '../content-matrices.js';
 import { listTemplates } from '../content-templates.js';
 import { listPageKeywords } from '../page-keywords.js';
 import { createLogger } from '../logger.js';
+import { toExportedContentBrief } from '../domains/content/public-projections.js';
 
 const log = createLogger('data-export');
 import { requireWorkspaceAccess } from '../auth.js';
@@ -75,7 +76,13 @@ router.get('/api/export/:workspaceId/briefs', requireWorkspaceAccess('workspaceI
   const briefs = listBriefs(req.params.workspaceId);
   log.info(`EXPORT briefs ${req.params.workspaceId}: ${briefs.length} items as ${format}`);
   const headers = ['id', 'targetKeyword', 'suggestedTitle', 'wordCountTarget', 'intent', 'contentFormat', 'pageType', 'difficultyScore', 'trafficPotential', 'createdAt'];
-  sendExport(res, briefs, headers, `briefs-${req.params.workspaceId}`, format);
+  sendExport(
+    res,
+    briefs.map(toExportedContentBrief),
+    headers,
+    `briefs-${req.params.workspaceId}`,
+    format,
+  );
 });
 
 // --- Content Requests Export ---

@@ -244,6 +244,11 @@ never sufficient to dispatch paid work.
   invalidation are at-least-once.
 - Dedupe is resource-scoped. Independent cells may run concurrently; the same
   source revision and idempotency key may not create duplicate paid work.
+- Resource-claim lifetime follows the actual worker lifetime, not an optimistic
+  job-row write. A manually managed worker releases its claims idempotently only
+  after it has fully drained, including when both its intended terminal write and
+  fallback tracking write fail. Releasing a drained claim never rewrites the
+  already-committed artifact or domain outcome.
 - Free structural matrix reads do not create a generation run. The first run
   repository accepts only an already-previewed non-empty selection; structural
   code must never manufacture a preview fingerprint to exercise the ledger.
@@ -275,6 +280,19 @@ never sufficient to dispatch paid work.
   remains `pending|running|done|error|cancelled`; its bounded result reports the
   durable run ID and rich terminal domain status. Partial work is never reported
   as success.
+- The primary artifact transition and terminal job state commit before optional
+  effects. Activity, broadcasts, cache invalidation, notifications, outcome
+  tracking, reconciliation cleanup, and follow-on scheduling are independently
+  guarded; one failed effect cannot turn committed work into a route/job failure
+  or suppress the effects that follow it.
+- A committed artifact/domain outcome remains authoritative if generic terminal
+  bookkeeping fails. Record an explicit `completion_tracking_failed` result when
+  possible; never route that condition through generation-failure logic. Optional
+  completion effects wait until the intended durable terminal state is verified.
+- Deleting a generated post is forbidden while a resource-scoped post/publish
+  job is active or an external publish reconciliation remains unresolved. The
+  worker must drain and the reconciliation must resolve before deletion can
+  proceed.
 - `ready_for_human_review` is an audit verdict, not an approval or publication
   state. After explicit human approval and existing export/publish preconditions
   pass, the workflow may become `ready_to_publish`; it still never auto-publishes.
@@ -317,6 +335,41 @@ never sufficient to dispatch paid work.
 
 - New action tools use snake_case inputs, stable JSON error codes, authoritative
   IDs, bounded selections, explicit revisions, and idempotency keys.
+- Legacy external-prose tools follow the same truth contract. The
+  `prepare_brief_context` and `prepare_post_context` responses freeze the exact
+  complete server-prepared context after authority resolution—including output
+  schemas, prompt context, brand/voice authority, and the post's source-brief
+  revision. When generation fulfills a content request, the optional parent
+  request is selected here too: its durable identity plus `updatedAt` authority,
+  target keyword, and brief lineage are resolved before the handle is issued and
+  included in that exact prepared-context fingerprint. Their one-time handles
+  retain that preparation; caller-supplied prose cannot replace or redefine the
+  fingerprint.
+- Parent lifecycle is part of deterministic preflight. Before returning prepared
+  context, `prepare_brief_context` proves the selected request can advance to
+  `brief_generated`, while `prepare_post_context` proves it can advance to
+  `in_progress`. Each tool repeats that check in its final authoritative snapshot,
+  and adoption repeats it inside the save transaction before any link/status
+  mutation. An impossible transition therefore fails before external paid work,
+  and later lifecycle drift cannot be adopted.
+- `save_brief` and `save_post` record the prepared external run as
+  `provider: 'external'` and `model: 'unreported'` under
+  `mcp-external-brief-generation` or `mcp-external-post-generation`. The
+  platform never infers a provider/model from caller text. A post save re-reads
+  and requires the exact prepared brief generation revision inside the adoption
+  transaction. A save cannot introduce or replace a parent request: an optional
+  save-time `parent_request_id` is only a redundant equality assertion against
+  the parent frozen by `prepare_*_context`. Adoption re-reads that request inside
+  the same IMMEDIATE transaction and requires its exact prepared `updatedAt`,
+  target keyword, and brief lineage before linking the artifact.
+- Consuming an external-prose handle, inserting the artifact, and updating any
+  optional parent-request link are atomic. Validation, workspace/link failure,
+  or source-revision conflict rolls back the artifact/link writes and the handle
+  deletion, so no orphan or consumed authorization remains. Correctable
+  save-payload validation or transient write failure may retry the preserved
+  handle. A source, parent, lifecycle, or durable-link authority drift makes that
+  frozen handle intentionally stale; the caller must rerun `prepare_*_context`
+  rather than repeatedly retrying or rebasing the old authorization.
 - Matrix list/detail cursors bind their filter/source revision and use hard
   page limits. List cursors also bind the workspace, and list summaries expose
   bounded counts rather than unbounded nested dimension values. A changed matrix

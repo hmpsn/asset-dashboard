@@ -7,11 +7,12 @@
 //
 //   1. Section save failure → retry banner visible under the FAILED section.
 //   2. Retry success → Done exits edit mode (the Critical's regression test).
-//   3. Retry replays the originally-failed payload.
-//   4. Switching sections after a failure does not lose the retry affordance.
+//   3. Retry replays the originally-failed payload against its original authority.
+//   4. A newer canonical revision blocks stale retry without a PATCH.
+//   5. Switching sections after a failure does not lose the retry affordance.
 //
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act, cleanup } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { PostEditor } from '../../src/components/PostEditor';
@@ -106,9 +107,20 @@ const POST = {
   totalWordCount: 100,
   targetWordCount: 200,
   status: 'draft' as const,
+  generationRevision: 2,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-05-01T00:00:00.000Z',
 };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 function renderEditor() {
   const queryClient = new QueryClient({
@@ -117,24 +129,34 @@ function renderEditor() {
   mocks.useAdminPost.mockReturnValue({ data: POST, isLoading: false, error: null });
   mocks.useAdminPostVersions.mockReturnValue({ data: [], isLoading: false });
   mocks.usePublishTarget.mockReturnValue({ data: false });
-  return render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <PostEditor workspaceId="ws-1" postId="post-1" onClose={vi.fn()} onDelete={vi.fn()} />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const rendered = render(tree());
+  return {
+    ...rendered,
+    rerenderPost: (post: typeof POST) => {
+      mocks.useAdminPost.mockReturnValue({ data: post, isLoading: false, error: null });
+      rendered.rerender(tree());
+    },
+  };
 }
 
 // Walk up from a heading text node to the SectionEditor's SectionCard root, then
 // click the Edit button scoped INSIDE that card (so we don't pick up the
 // Introduction/Conclusion "Edit" buttons, which share the same label).
 function sectionCardFor(heading: string): HTMLElement {
-  let el: HTMLElement | null = screen.getByText(heading);
-  // The section card is the nearest ancestor that also contains an "Edit" button.
-  while (el && el.parentElement) {
-    el = el.parentElement;
-    if (within(el).queryByRole('button', { name: /^edit$/i })) return el;
+  for (const candidate of screen.getAllByText(heading)) {
+    let el: HTMLElement | null = candidate;
+    // The section card is the nearest ancestor that also contains an "Edit" button.
+    while (el && el.parentElement) {
+      el = el.parentElement;
+      if (within(el).queryByRole('button', { name: /^edit$/i })) return el;
+    }
   }
   throw new Error(`Could not find section card for "${heading}"`);
 }
@@ -142,17 +164,49 @@ function sectionCardFor(heading: string): HTMLElement {
 async function openSectionEditor(heading: string): Promise<HTMLTextAreaElement> {
   const card = sectionCardFor(heading);
   fireEvent.click(within(card).getByRole('button', { name: /^edit$/i }));
-  const textarea = await within(card).findByTestId('rich-text-editor');
+  // Introduction/conclusion put the Edit button in a header sibling of the
+  // editor body, while body sections nest both under one card. Only one editor
+  // can be active, so the global query is the stable contract for all three.
+  const textarea = await screen.findByTestId('rich-text-editor');
   return textarea as HTMLTextAreaElement;
 }
 
 describe('PostEditor — section save retry (real useAutoSave + real SectionEditor)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mocks.contentBriefs.getById.mockResolvedValue({
+      id: 'brief-1',
+      generationRevision: 11,
+    });
     vi.useFakeTimers({ shouldAdvanceTime: true });
   });
-  afterEach(() => {
+  afterEach(async () => {
+    cleanup();
+    await Promise.resolve();
+    vi.clearAllTimers();
     vi.useRealTimers();
+  });
+
+  it('pins the loaded source-brief revision when regenerating a section', async () => {
+    mocks.contentPosts.regenerateSection.mockResolvedValue({
+      ...POST,
+      generationRevision: 3,
+    });
+    renderEditor();
+    await waitFor(() => expect(mocks.contentBriefs.getById).toHaveBeenCalledWith('ws-1', 'brief-1'));
+
+    const card = sectionCardFor('Section A');
+    fireEvent.click(within(card).getByRole('button', { name: /^regenerate$/i }));
+
+    await waitFor(() => {
+      expect(mocks.contentPosts.regenerateSection).toHaveBeenCalledWith(
+        'ws-1',
+        'post-1',
+        2,
+        11,
+        0,
+      );
+    });
   });
 
   it('section save failure shows a retry affordance under the failed section', async () => {
@@ -218,12 +272,115 @@ describe('PostEditor — section save retry (real useAutoSave + real SectionEdit
     // update call whose payload includes a `sections` array (the section save path);
     // other autosave paths (intro/conclusion) would send different keys.
     const sectionCall = mocks.contentPosts.update.mock.calls.find(
-      (c) => Array.isArray((c[2] as { sections?: unknown[] })?.sections),
+      (c) => Array.isArray((c[3] as { sections?: unknown[] })?.sections),
     )!;
     expect(sectionCall).toBeDefined();
-    const payload = sectionCall[2] as { sections: Array<{ index: number; content: string }> };
+    expect(sectionCall[2]).toBe(2);
+    const payload = sectionCall[3] as { sections: Array<{ index: number; content: string }> };
     const sectionA = payload.sections.find(s => s.index === 0)!;
     expect(sectionA.content).toBe('<p>FAILED PAYLOAD</p>');
+  });
+
+  it('does not rebase a failed section payload onto a newer canonical revision', async () => {
+    mocks.contentPosts.update.mockRejectedValueOnce(new Error('save failed'));
+    const rendered = renderEditor();
+
+    const textarea = await openSectionEditor('Section A');
+    fireEvent.change(textarea, { target: { value: '<p>STALE LOCAL PAYLOAD</p>' } });
+    await act(async () => { vi.advanceTimersByTime(2000); });
+    const retryBtn = await screen.findByRole('button', { name: /save failed — retry/i });
+    mocks.contentPosts.update.mockClear();
+
+    rendered.rerenderPost({
+      ...POST,
+      generationRevision: 3,
+      updatedAt: '2026-05-01T00:00:01.000Z',
+      sections: POST.sections.map(section => section.index === 0
+        ? { ...section, content: '<p>NEWER EXTERNAL EDIT</p>' }
+        : section),
+    });
+    await act(async () => { fireEvent.click(retryBtn); });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /save failed — retry/i })).toBeInTheDocument();
+    });
+    expect(mocks.contentPosts.update).not.toHaveBeenCalled();
+  });
+
+  it('starts a fresh same-authority request when introduction retry is explicit', async () => {
+    mocks.contentPosts.update
+      .mockRejectedValueOnce(new Error('transient failure'))
+      .mockResolvedValueOnce({
+        ...POST,
+        generationRevision: 3,
+        introduction: '<p>Recovered intro</p>',
+      });
+    renderEditor();
+
+    const textarea = await openSectionEditor('Introduction');
+    fireEvent.change(textarea, { target: { value: '<p>Recovered intro</p>' } });
+    await act(async () => { vi.advanceTimersByTime(2000); });
+    const retryBtn = await screen.findByRole('button', { name: /save failed — retry/i });
+
+    await act(async () => { fireEvent.click(retryBtn); });
+    await waitFor(() => expect(mocks.contentPosts.update).toHaveBeenCalledTimes(2));
+    expect(mocks.contentPosts.update).toHaveBeenNthCalledWith(
+      2,
+      'ws-1',
+      'post-1',
+      2,
+      { introduction: '<p>Recovered intro</p>' },
+    );
+  });
+
+  it('does not rebase an open title buffer onto a refetched post revision', async () => {
+    const rendered = renderEditor();
+
+    fireEvent.click(screen.getByLabelText('Edit title'));
+    fireEvent.change(screen.getByDisplayValue('Test Post'), {
+      target: { value: 'Operator title opened at revision two' },
+    });
+
+    rendered.rerenderPost({
+      ...POST,
+      title: 'External title at revision three',
+      generationRevision: 3,
+      updatedAt: '2026-05-01T00:00:01.000Z',
+    });
+    fireEvent.click(screen.getByLabelText('Save title'));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(mocks.contentPosts.update).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('Operator title opened at revision two')).toBeInTheDocument();
+    expect(screen.getByLabelText('Save title')).toBeEnabled();
+  });
+
+  it.each([
+    ['Introduction', '<p>Stale introduction buffer</p>'],
+    ['Section A', '<p>Stale section buffer</p>'],
+    ['Conclusion', '<p>Stale conclusion buffer</p>'],
+  ])('does not rebase an open %s editor onto a refetched post revision', async (editorLabel, staleHtml) => {
+    const rendered = renderEditor();
+    const textarea = await openSectionEditor(editorLabel);
+
+    rendered.rerenderPost({
+      ...POST,
+      introduction: '<p>External introduction</p>',
+      sections: POST.sections.map(section => section.index === 0
+        ? { ...section, content: '<p>External section</p>' }
+        : section),
+      conclusion: '<p>External conclusion</p>',
+      generationRevision: 3,
+      updatedAt: '2026-05-01T00:00:01.000Z',
+    });
+    fireEvent.change(textarea, { target: { value: staleHtml } });
+    await act(async () => { vi.advanceTimersByTime(2000); });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /save failed — retry/i })).toBeInTheDocument();
+    });
+    expect(mocks.contentPosts.update).not.toHaveBeenCalled();
+    expect(textarea).toHaveValue(staleHtml);
   });
 
   it('switching sections after a failure keeps the retry affordance for the failed section', async () => {
@@ -245,5 +402,121 @@ describe('PostEditor — section save retry (real useAutoSave + real SectionEdit
 
     // The retry affordance for the failed section is still present (not lost on switch).
     expect(screen.getByRole('button', { name: /save failed — retry/i })).toBeInTheDocument();
+  });
+
+  it('serializes a newer autosave behind the in-flight save and advances its revision', async () => {
+    const firstSave = deferred<typeof POST>();
+    const secondSave = deferred<typeof POST>();
+    mocks.contentPosts.update
+      .mockImplementationOnce(() => firstSave.promise)
+      .mockImplementationOnce(() => secondSave.promise);
+    renderEditor();
+
+    const textarea = await openSectionEditor('Section A');
+    fireEvent.change(textarea, { target: { value: '<p>First edit</p>' } });
+    await act(async () => { vi.advanceTimersByTime(2000); });
+    expect(mocks.contentPosts.update).toHaveBeenCalledTimes(1);
+    expect(mocks.contentPosts.update).toHaveBeenNthCalledWith(
+      1,
+      'ws-1',
+      'post-1',
+      2,
+      expect.any(Object),
+    );
+
+    fireEvent.change(textarea, { target: { value: '<p>Latest edit</p>' } });
+    await act(async () => { vi.advanceTimersByTime(2000); });
+
+    // A slow first PATCH must not let the second debounce tick issue another
+    // request with the same revision.
+    expect(mocks.contentPosts.update).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      firstSave.resolve({
+        ...POST,
+        generationRevision: 3,
+        updatedAt: '2026-05-01T00:00:01.000Z',
+      });
+      await firstSave.promise;
+    });
+
+    await waitFor(() => expect(mocks.contentPosts.update).toHaveBeenCalledTimes(2));
+    expect(mocks.contentPosts.update).toHaveBeenNthCalledWith(
+      2,
+      'ws-1',
+      'post-1',
+      3,
+      expect.objectContaining({
+        sections: expect.arrayContaining([
+          expect.objectContaining({ index: 0, content: '<p>Latest edit</p>' }),
+        ]),
+      }),
+    );
+
+    await act(async () => {
+      secondSave.resolve({
+        ...POST,
+        generationRevision: 4,
+        updatedAt: '2026-05-01T00:00:02.000Z',
+      });
+      await secondSave.promise;
+    });
+  });
+
+  it('queues a second open-editor save when revision catch-up renders before the first response', async () => {
+    const firstSave = deferred<typeof POST>();
+    const secondSave = deferred<typeof POST>();
+    mocks.contentPosts.update
+      .mockImplementationOnce(() => firstSave.promise)
+      .mockImplementationOnce(() => secondSave.promise);
+    const rendered = renderEditor();
+
+    const textarea = await openSectionEditor('Section A');
+    fireEvent.change(textarea, { target: { value: '<p>First edit</p>' } });
+    await act(async () => { vi.advanceTimersByTime(2000); });
+    expect(mocks.contentPosts.update).toHaveBeenCalledTimes(1);
+
+    rendered.rerenderPost({
+      ...POST,
+      generationRevision: 3,
+      updatedAt: '2026-05-01T00:00:01.000Z',
+      sections: POST.sections.map(section => section.index === 0
+        ? { ...section, content: '<p>First edit</p>' }
+        : section),
+    });
+    fireEvent.change(textarea, { target: { value: '<p>Second edit after catch-up</p>' } });
+    await act(async () => { vi.advanceTimersByTime(2000); });
+
+    expect(mocks.contentPosts.update).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      firstSave.resolve({
+        ...POST,
+        generationRevision: 3,
+        updatedAt: '2026-05-01T00:00:01.000Z',
+      });
+      await firstSave.promise;
+    });
+
+    await waitFor(() => expect(mocks.contentPosts.update).toHaveBeenCalledTimes(2));
+    expect(mocks.contentPosts.update).toHaveBeenNthCalledWith(
+      2,
+      'ws-1',
+      'post-1',
+      3,
+      expect.objectContaining({
+        sections: expect.arrayContaining([
+          expect.objectContaining({ index: 0, content: '<p>Second edit after catch-up</p>' }),
+        ]),
+      }),
+    );
+
+    await act(async () => {
+      secondSave.resolve({
+        ...POST,
+        generationRevision: 4,
+        updatedAt: '2026-05-01T00:00:02.000Z',
+      });
+      await secondSave.promise;
+    });
   });
 });

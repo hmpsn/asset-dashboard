@@ -68,10 +68,25 @@ async function postJson(
   path: string,
   body: unknown,
 ): Promise<{ status: number; body: unknown }> {
+  const publishMatch = path.match(
+    /^\/api\/content-posts\/([^/]+)\/([^/]+)\/publish-to-webflow$/,
+  );
+  let requestBody = body;
+  if (
+    publishMatch
+    && body
+    && typeof body === 'object'
+    && !('expectedRevision' in body)
+  ) {
+    requestBody = {
+      ...body,
+      expectedRevision: getPost(publishMatch[1], publishMatch[2])?.generationRevision ?? 0,
+    };
+  }
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
   const responseBody = await res.json().catch(() => ({}));
   return { status: res.status, body: responseBody };

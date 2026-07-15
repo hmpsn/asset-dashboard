@@ -8,11 +8,12 @@
  *  - the existing internal "Review" button is untouched (still present for draft posts)
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 import type { GeneratedPost } from '../../shared/types/content';
+import { queryKeys } from '../../src/lib/queryKeys';
 
 // ── Module mocks (hoisted before component import) ────────────────────────────
 const listMock = vi.fn();
@@ -38,8 +39,7 @@ vi.mock('../../src/api/workspaces', () => ({
 import { ContentManager } from '../../src/components/ContentManager';
 import { ToastProvider } from '../../src/components/Toast';
 
-function makeWrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function makeWrapper(qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={qc}>
       <ToastProvider>
@@ -64,6 +64,7 @@ function makePost(overrides: Partial<GeneratedPost> = {}): GeneratedPost {
     totalWordCount: 50,
     targetWordCount: 1000,
     status: 'draft',
+    generationRevision: 5,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -100,7 +101,7 @@ describe('ContentManager — Send to client (POST-C1)', () => {
     fireEvent.click(confirmButtons[confirmButtons.length - 1]);
 
     await waitFor(() => {
-      expect(sendToClientMock).toHaveBeenCalledWith('ws-1', 'post-1', 'Please review the intro');
+      expect(sendToClientMock).toHaveBeenCalledWith('ws-1', 'post-1', 5, 'Please review the intro');
     });
   });
 
@@ -115,7 +116,35 @@ describe('ContentManager — Send to client (POST-C1)', () => {
     fireEvent.click(confirmButtons[confirmButtons.length - 1]);
 
     await waitFor(() => {
-      expect(sendToClientMock).toHaveBeenCalledWith('ws-1', 'post-1', undefined);
+      expect(sendToClientMock).toHaveBeenCalledWith('ws-1', 'post-1', 5, undefined);
     });
+  });
+
+  it('closes and rejects a delayed send when the reviewed post revision changes', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const Wrapper = makeWrapper(qc);
+    render(<Wrapper><ContentManager workspaceId="ws-1" /></Wrapper>);
+
+    fireEvent.click(await screen.findByText('Send to client'));
+    const noteInput = await screen.findByLabelText('Optional note for the client');
+    fireEvent.change(noteInput, { target: { value: 'This note was authored against revision five.' } });
+
+    act(() => {
+      qc.setQueryData(queryKeys.admin.posts('ws-1'), [
+        makePost({
+          title: 'Externally updated post',
+          generationRevision: 6,
+          updatedAt: '2026-01-01T00:00:01.000Z',
+        }),
+      ]);
+    });
+    await screen.findByText('Externally updated post');
+    const confirmButtons = screen.getAllByText('Send to client');
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Optional note for the client')).not.toBeInTheDocument();
+    });
+    expect(sendToClientMock).not.toHaveBeenCalled();
   });
 });

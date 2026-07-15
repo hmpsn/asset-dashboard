@@ -88,6 +88,7 @@ export function useAdminPostWorkflow(workspaceId: string) {
   const [statusFilter, setStatusFilter] = useState<ContentPostStatusFilter>('all');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [sendToClientPost, setSendToClientPost] = useState<string | null>(null);
+  const [sendToClientRevision, setSendToClientRevision] = useState<number | null>(null);
   const [sendNote, setSendNote] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [publishingPost, setPublishingPost] = useState<string | null>(null);
@@ -95,6 +96,8 @@ export function useAdminPostWorkflow(workspaceId: string) {
   const [expandedVoice, setExpandedVoice] = useState<string | null>(null);
 
   const invalidatePosts = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.posts(workspaceId) });
+  const observedRevision = (postId: string): number =>
+    posts.find(post => post.id === postId)?.generationRevision ?? 0;
 
   const awaitVoiceJob = (jobId: string, timeoutMs = 150_000): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
@@ -125,7 +128,11 @@ export function useAdminPostWorkflow(workspaceId: string) {
   const publishPost = async (postId: string) => {
     setPublishingPost(postId);
     try {
-      const result = await contentPosts.publishToWebflow(workspaceId, postId, {});
+      const result = await contentPosts.publishToWebflow(
+        workspaceId,
+        postId,
+        observedRevision(postId),
+      );
       if (result.success) {
         invalidatePosts();
       } else {
@@ -141,7 +148,7 @@ export function useAdminPostWorkflow(workspaceId: string) {
   const updateStatus = async (postId: string, status: string) => {
     setUpdatingStatus(postId);
     try {
-      await contentPosts.update(workspaceId, postId, { status });
+      await contentPosts.update(workspaceId, postId, observedRevision(postId), { status });
       invalidatePosts();
     } catch (err) {
       console.error('ContentManager status update failed:', err);
@@ -151,26 +158,43 @@ export function useAdminPostWorkflow(workspaceId: string) {
   };
 
   const beginSendToClient = (postId: string) => {
+    const post = posts.find(candidate => candidate.id === postId);
+    if (!post) {
+      toast('Refresh the content list before sending this post.', 'error');
+      return;
+    }
     setSendToClientPost(postId);
+    setSendToClientRevision(post.generationRevision ?? 0);
     setSendNote('');
   };
 
   const cancelSendToClient = () => {
     setSendToClientPost(null);
+    setSendToClientRevision(null);
     setSendNote('');
   };
 
   const confirmSendToClient = (postId: string) => {
+    const currentPost = posts.find(post => post.id === postId);
+    const currentRevision = currentPost ? currentPost.generationRevision ?? 0 : null;
+    if (sendToClientPost !== postId
+      || sendToClientRevision === null
+      || currentRevision === null
+      || currentRevision !== sendToClientRevision) {
+      cancelSendToClient();
+      toast('This post changed while the send form was open. Review it again before sending to the client.', 'error');
+      return;
+    }
     const note = sendNote.trim();
     sendPostToClient.mutate(
-      { postId, note: note || undefined },
+      { postId, expectedRevision: sendToClientRevision, note: note || undefined },
       { onSuccess: cancelSendToClient },
     );
   };
 
   const deletePost = async (postId: string) => {
     try {
-      await contentPosts.remove(workspaceId, postId);
+      await contentPosts.remove(workspaceId, postId, observedRevision(postId));
       invalidatePosts();
       setDeleteConfirm(null);
     } catch (err) {
@@ -182,7 +206,11 @@ export function useAdminPostWorkflow(workspaceId: string) {
   const scoreVoice = async (postId: string) => {
     setScoringVoice(postId);
     try {
-      const { jobId } = await contentPosts.scoreVoice(workspaceId, postId);
+      const { jobId } = await contentPosts.scoreVoice(
+        workspaceId,
+        postId,
+        observedRevision(postId),
+      );
       tasks.trackJob(BACKGROUND_JOB_TYPES.CONTENT_POST_VOICE_SCORE, jobId, { workspaceId });
       await awaitVoiceJob(jobId);
       invalidatePosts();

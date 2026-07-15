@@ -19,6 +19,7 @@ const broadcastState = vi.hoisted(() => ({
 }));
 const emailState = vi.hoisted(() => ({
   clientPostReady: [] as Array<Record<string, unknown>>,
+  failNext: false,
 }));
 
 vi.mock('../../server/broadcast.js', () => ({
@@ -31,6 +32,10 @@ vi.mock('../../server/broadcast.js', () => ({
 
 vi.mock('../../server/email.js', () => ({
   notifyClientPostReady: vi.fn((opts: Record<string, unknown>) => {
+    if (emailState.failNext) {
+      emailState.failNext = false;
+      throw new Error('injected client email failure');
+    }
     emailState.clientPostReady.push(opts);
   }),
   isEmailConfigured: vi.fn(() => true),
@@ -39,9 +44,10 @@ vi.mock('../../server/email.js', () => ({
 // ── Server imports (after mocks) ────────────────────────────────────────────
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { savePost } from '../../server/content-posts-db.js';
+import { getPost, savePost, updatePostField } from '../../server/content-posts-db.js';
 import {
   createContentRequest,
+  ExplicitContentRequestNotFoundError,
   getContentRequest,
   listContentRequests,
 } from '../../server/content-requests.js';
@@ -50,6 +56,7 @@ import { WS_EVENTS } from '../../server/ws-events.js';
 import {
   sendPostToClientForReview,
   PostNotFoundError,
+  PostReviewRequestLifecycleConflictError,
 } from '../../server/domains/content/send-post-to-client.js';
 import { IncompleteContentPostError } from '../../server/domains/content/generation-integrity.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
@@ -105,6 +112,7 @@ beforeEach(() => {
   updateWorkspace(wsId, { clientEmail: 'client@example.com' });
   broadcastState.calls = [];
   emailState.clientPostReady = [];
+  emailState.failNext = false;
 });
 
 afterAll(() => {
@@ -127,6 +135,97 @@ describe('sendPostToClientForReview', () => {
     expect(request.briefId).toBe(post.briefId);
     // Persisted, not just returned
     expect(getContentRequest(wsId, request.id)?.status).toBe('post_review');
+    expect(getPost(wsId, post.id)?.generationRevision).toBe(1);
+  });
+
+  it('rejects a stale send atomically without creating or notifying', () => {
+    const post = seedPost(wsId);
+    const observed = getPost(wsId, post.id)!;
+    updatePostField(wsId, post.id, { title: 'Newer operator edit' }, observed.generationRevision);
+
+    expect(() => sendPostToClientForReview(wsId, post.id, {
+      expectedRevision: observed.generationRevision,
+    })).toThrow('changed while generation was running');
+
+    expect(listContentRequests(wsId)).toHaveLength(0);
+    expect(emailState.clientPostReady).toHaveLength(0);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(activityCount(wsId, 'post_sent_for_review')).toBe(0);
+  });
+
+  it('treats an unchanged re-send as idempotent without duplicate side effects', () => {
+    const post = seedPost(wsId);
+    const first = sendPostToClientForReview(wsId, post.id, { expectedRevision: 0 });
+    expect(first.changed).toBe(true);
+    broadcastState.calls = [];
+    emailState.clientPostReady = [];
+    const activitiesBefore = activityCount(wsId, 'post_sent_for_review');
+
+    const current = getPost(wsId, post.id)!;
+    const second = sendPostToClientForReview(wsId, post.id, {
+      expectedRevision: current.generationRevision,
+    });
+
+    expect(second.changed).toBe(false);
+    expect(getPost(wsId, post.id)?.generationRevision).toBe(current.generationRevision);
+    expect(emailState.clientPostReady).toHaveLength(0);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(activityCount(wsId, 'post_sent_for_review')).toBe(activitiesBefore);
+  });
+
+  it('stores client-visible notes on create and re-send, then preserves a same-note no-op', () => {
+    const post = seedPost(wsId);
+    const first = sendPostToClientForReview(wsId, post.id, {
+      expectedRevision: 0,
+      note: 'Initial client review context',
+    });
+
+    expect(first.request.clientNote).toBe('Initial client review context');
+    expect(first.request.internalNote).toBeUndefined();
+
+    const changed = sendPostToClientForReview(wsId, post.id, {
+      expectedRevision: first.post.generationRevision,
+      note: 'Please review the proof section closely.',
+    });
+
+    expect(changed.changed).toBe(true);
+    expect(changed.created).toBe(false);
+    expect(changed.request.clientNote).toBe('Please review the proof section closely.');
+    expect(changed.request.internalNote).toBeUndefined();
+    expect(getContentRequest(wsId, changed.request.id)?.clientNote)
+      .toBe('Please review the proof section closely.');
+
+    const unchanged = sendPostToClientForReview(wsId, post.id, {
+      expectedRevision: changed.post.generationRevision,
+      note: 'Please review the proof section closely.',
+    });
+
+    expect(unchanged.changed).toBe(false);
+    expect(unchanged.request.updatedAt).toBe(changed.request.updatedAt);
+    expect(getPost(wsId, post.id)?.generationRevision).toBe(changed.post.generationRevision);
+  });
+
+  it('returns committed success after email failure and still broadcasts and logs activity', () => {
+    const post = seedPost(wsId);
+    emailState.failNext = true;
+
+    const result = sendPostToClientForReview(wsId, post.id, {
+      expectedRevision: 0,
+      note: 'This send must remain committed.',
+    });
+
+    expect(result.changed).toBe(true);
+    expect(getContentRequest(wsId, result.request.id)).toMatchObject({
+      status: 'post_review',
+      clientNote: 'This send must remain committed.',
+    });
+    expect(getPost(wsId, post.id)?.generationRevision).toBe(1);
+    expect(emailState.clientPostReady).toHaveLength(0);
+    expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+      event: WS_EVENTS.CONTENT_REQUEST_CREATED,
+      payload: { id: result.request.id, status: 'post_review' },
+    }));
+    expect(activityCount(wsId, 'post_sent_for_review', result.request.id)).toBe(1);
   });
 
   it('emails the client via notifyClientPostReady', () => {
@@ -209,6 +308,162 @@ describe('sendPostToClientForReview', () => {
     expect(request.id).toBe(parent.id);
     expect(request.status).toBe('post_review');
     expect(request.postId).toBe(post.id);
+  });
+
+  it('rejects a missing explicit request without retargeting or side effects', () => {
+    const post = seedPost(wsId);
+    const revisionBefore = getPost(wsId, post.id)!.generationRevision;
+
+    expect(() => sendPostToClientForReview(wsId, post.id, {
+      requestId: 'creq_missing_explicit_post',
+      expectedRevision: revisionBefore,
+    })).toThrow(ExplicitContentRequestNotFoundError);
+
+    expect(listContentRequests(wsId)).toHaveLength(0);
+    expect(getPost(wsId, post.id)?.generationRevision).toBe(revisionBefore);
+    expect(emailState.clientPostReady).toHaveLength(0);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(activityCount(wsId, 'post_sent_for_review')).toBe(0);
+  });
+
+  it('rejects a cross-workspace explicit request without retargeting or side effects', () => {
+    const post = seedPost(wsId);
+    const otherWorkspaceId = createWorkspace(`Other send target ${unique('ws')}`).id;
+    const foreign = createContentRequest(otherWorkspaceId, {
+      topic: 'Foreign request',
+      targetKeyword: 'foreign request',
+      intent: 'informational',
+      priority: 'medium',
+      rationale: 'foreign',
+      initialStatus: 'in_progress',
+      dedupe: false,
+    });
+    const revisionBefore = getPost(wsId, post.id)!.generationRevision;
+    broadcastState.calls = [];
+
+    try {
+      expect(() => sendPostToClientForReview(wsId, post.id, {
+        requestId: foreign.id,
+        expectedRevision: revisionBefore,
+      })).toThrow(ExplicitContentRequestNotFoundError);
+
+      expect(listContentRequests(wsId)).toHaveLength(0);
+      expect(getContentRequest(otherWorkspaceId, foreign.id)?.status).toBe('in_progress');
+      expect(getPost(wsId, post.id)?.generationRevision).toBe(revisionBefore);
+      expect(emailState.clientPostReady).toHaveLength(0);
+      expect(broadcastState.calls).toHaveLength(0);
+      expect(activityCount(wsId, 'post_sent_for_review')).toBe(0);
+    } finally {
+      deleteWorkspace(otherWorkspaceId);
+    }
+  });
+
+  it.each(['delivered', 'published', 'declined'] as const)(
+    'creates a fresh review instead of resurrecting a %s request',
+    (status) => {
+      const post = seedPost(wsId);
+      const concluded = createContentRequest(wsId, {
+        topic: 'Historical request',
+        targetKeyword: 'historical keyword',
+        intent: 'informational',
+        priority: 'medium',
+        rationale: 'historical',
+        serviceType: 'full_post',
+        initialStatus: 'in_progress',
+        dedupe: false,
+      });
+      db.prepare(`
+        UPDATE content_topic_requests
+        SET status = ?, brief_id = ?, post_id = ?
+        WHERE id = ? AND workspace_id = ?
+      `).run(status, post.briefId, post.id, concluded.id, wsId);
+      broadcastState.calls = [];
+
+      const revisionBefore = getPost(wsId, post.id)!.generationRevision;
+      const result = sendPostToClientForReview(wsId, post.id, {
+        expectedRevision: revisionBefore,
+      });
+
+      expect(result.created).toBe(true);
+      expect(result.request.id).not.toBe(concluded.id);
+      expect(result.request.status).toBe('post_review');
+      expect(getContentRequest(wsId, concluded.id)?.status).toBe(status);
+      expect(getPost(wsId, post.id)?.generationRevision).toBe(revisionBefore + 1);
+      expect(broadcastState.calls).toContainEqual(expect.objectContaining({
+        event: WS_EVENTS.CONTENT_REQUEST_CREATED,
+        payload: { id: result.request.id, status: 'post_review' },
+      }));
+    },
+  );
+
+  it('creates a fresh review when an implicitly linked request is approved', () => {
+    const post = seedPost(wsId);
+    const approved = createContentRequest(wsId, {
+      topic: 'Approved brief request',
+      targetKeyword: 'approved keyword',
+      intent: 'informational',
+      priority: 'medium',
+      rationale: 'approved brief',
+      serviceType: 'full_post',
+      dedupe: false,
+    });
+    db.prepare(`
+      UPDATE content_topic_requests
+      SET status = 'approved', brief_id = ?, post_id = ?
+      WHERE id = ? AND workspace_id = ?
+    `).run(post.briefId, post.id, approved.id, wsId);
+
+    const revisionBefore = getPost(wsId, post.id)!.generationRevision;
+    const result = sendPostToClientForReview(wsId, post.id, {
+      expectedRevision: revisionBefore,
+    });
+
+    expect(result.created).toBe(true);
+    expect(result.request.id).not.toBe(approved.id);
+    expect(result.request.status).toBe('post_review');
+    expect(getContentRequest(wsId, approved.id)?.status).toBe('approved');
+    expect(getPost(wsId, post.id)?.generationRevision).toBe(revisionBefore + 1);
+  });
+
+  it('returns a clear conflict for an explicitly selected approved request', () => {
+    const post = seedPost(wsId);
+    const approved = createContentRequest(wsId, {
+      topic: 'Explicit approved parent',
+      targetKeyword: 'explicit approved keyword',
+      intent: 'informational',
+      priority: 'medium',
+      rationale: 'approved parent',
+      serviceType: 'full_post',
+      dedupe: false,
+    });
+    db.prepare(`
+      UPDATE content_topic_requests
+      SET status = 'approved', brief_id = ?, post_id = ?
+      WHERE id = ? AND workspace_id = ?
+    `).run(post.briefId, post.id, approved.id, wsId);
+    const revisionBefore = getPost(wsId, post.id)!.generationRevision;
+    broadcastState.calls = [];
+
+    let thrown: unknown;
+    try {
+      sendPostToClientForReview(wsId, post.id, {
+        requestId: approved.id,
+        expectedRevision: revisionBefore,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(PostReviewRequestLifecycleConflictError);
+    expect(thrown).toMatchObject({
+      requestId: approved.id,
+      status: 'approved',
+    });
+    expect((thrown as Error).message).toContain('cannot enter post review from status "approved"');
+    expect(getContentRequest(wsId, approved.id)?.status).toBe('approved');
+    expect(getPost(wsId, post.id)?.generationRevision).toBe(revisionBefore);
+    expect(emailState.clientPostReady).toHaveLength(0);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(activityCount(wsId, 'post_sent_for_review')).toBe(0);
   });
 
   it('logs a post_sent_for_review activity with the requestId', () => {

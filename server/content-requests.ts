@@ -5,9 +5,28 @@ import { validateTransition, CONTENT_REQUEST_TRANSITIONS } from './state-machine
 import { invalidateContentPipelineCache } from './workspace-data.js';
 import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 import { z } from './middleware/validate.js';
+import { GenerationRevisionConflictError } from './generation-provenance.js';
 
 export type { ContentRequestComment, ContentTopicRequest } from '../shared/types/content.ts';
 import type { ContentTopicRequest, StrategyCardContext } from '../shared/types/content.ts';
+
+/**
+ * An explicitly selected request is part of a send command's authority, not a
+ * best-effort reuse hint. Callers must surface this conflict instead of
+ * retargeting the send to another request or creating a replacement.
+ */
+export class ExplicitContentRequestNotFoundError extends Error {
+  readonly code = 'explicit_content_request_not_found' as const;
+  readonly workspaceId: string;
+  readonly requestId: string;
+
+  constructor(workspaceId: string, requestId: string) {
+    super(`Explicit content request not found in workspace: ${requestId}`);
+    this.name = 'ExplicitContentRequestNotFoundError';
+    this.workspaceId = workspaceId;
+    this.requestId = requestId;
+  }
+}
 
 /** Zod schema for the `strategy_card_context` JSON column.
  *  All fields optional — mirrors StrategyCardContext exactly.
@@ -115,10 +134,106 @@ const stmts = createStmtCache(() => ({
            delivery_notes = @delivery_notes, comments = @comments, updated_at = @updated_at
          WHERE id = @id AND workspace_id = @workspace_id`,
   ),
+  bumpBriefGenerationRevision: db.prepare(`
+    UPDATE content_briefs
+    SET generation_revision = generation_revision + 1
+    WHERE id = @artifactId AND workspace_id = @workspaceId
+  `),
+  bumpBriefGenerationRevisionAtRevision: db.prepare(`
+    UPDATE content_briefs
+    SET generation_revision = generation_revision + 1
+    WHERE id = @artifactId
+      AND workspace_id = @workspaceId
+      AND generation_revision = @expectedRevision
+  `),
+  bumpPostGenerationRevision: db.prepare(`
+    UPDATE content_posts
+    SET generation_revision = generation_revision + 1,
+        updated_at = CASE
+          WHEN julianday(updated_at) >= julianday(@updatedAt)
+            THEN strftime('%Y-%m-%dT%H:%M:%fZ', julianday(updated_at) + (1.0 / 86400000.0))
+          ELSE @updatedAt
+        END
+    WHERE id = @artifactId AND workspace_id = @workspaceId
+  `),
+  bumpPostGenerationRevisionAtRevision: db.prepare(`
+    UPDATE content_posts
+    SET generation_revision = generation_revision + 1,
+        updated_at = CASE
+          WHEN julianday(updated_at) >= julianday(@updatedAt)
+            THEN strftime('%Y-%m-%dT%H:%M:%fZ', julianday(updated_at) + (1.0 / 86400000.0))
+          ELSE @updatedAt
+        END
+    WHERE id = @artifactId
+      AND workspace_id = @workspaceId
+      AND generation_revision = @expectedRevision
+  `),
   deleteById: db.prepare(
     `DELETE FROM content_topic_requests WHERE id = ? AND workspace_id = ?`,
   ),
 }));
+
+export interface ContentRequestLinkedArtifactAuthority {
+  artifactType: 'content_brief' | 'content_post';
+  artifactId: string;
+  expectedRevision: number;
+}
+
+export interface UpdateContentRequestOptions {
+  /**
+   * A newly linked send/review target that must be invalidated with the request
+   * transition. The conditional bump and request write share one transaction.
+   */
+  linkedArtifactAuthority?: ContentRequestLinkedArtifactAuthority;
+}
+
+function bumpLinkedArtifactRevisions(
+  request: ContentTopicRequest,
+  exclude?: Pick<ContentRequestLinkedArtifactAuthority, 'artifactType' | 'artifactId'>,
+): void {
+  const updatedAt = new Date().toISOString();
+  if (request.briefId && !(exclude?.artifactType === 'content_brief' && exclude.artifactId === request.briefId)) {
+    stmts().bumpBriefGenerationRevision.run({
+      artifactId: request.briefId,
+      workspaceId: request.workspaceId,
+    });
+  }
+  if (request.postId && !(exclude?.artifactType === 'content_post' && exclude.artifactId === request.postId)) {
+    stmts().bumpPostGenerationRevision.run({
+      artifactId: request.postId,
+      workspaceId: request.workspaceId,
+      updatedAt,
+    });
+  }
+}
+
+function bumpLinkedArtifactAtRevision(
+  workspaceId: string,
+  authority: ContentRequestLinkedArtifactAuthority,
+): void {
+  const params = {
+    artifactId: authority.artifactId,
+    workspaceId,
+    expectedRevision: authority.expectedRevision,
+    updatedAt: new Date().toISOString(),
+  };
+  const info = authority.artifactType === 'content_brief'
+    ? stmts().bumpBriefGenerationRevisionAtRevision.run(params)
+    : stmts().bumpPostGenerationRevisionAtRevision.run(params);
+  if (info.changes !== 1) {
+    throw new GenerationRevisionConflictError(
+      authority.artifactType,
+      authority.artifactId,
+      authority.expectedRevision,
+    );
+  }
+}
+
+function nextRequestUpdatedAt(previous: string): string {
+  const previousMs = Date.parse(previous);
+  const minimum = Number.isFinite(previousMs) ? previousMs + 1 : 0;
+  return new Date(Math.max(Date.now(), minimum)).toISOString();
+}
 
 function rowToRequest(row: RequestRow): ContentTopicRequest {
   return {
@@ -294,48 +409,70 @@ export function createContentRequest(
 export function updateContentRequest(
   workspaceId: string,
   id: string,
-  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'postId' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>
+  updates: Partial<Pick<ContentTopicRequest, 'status' | 'briefId' | 'postId' | 'clientNote' | 'internalNote' | 'declineReason' | 'clientFeedback' | 'serviceType' | 'upgradedAt' | 'deliveryUrl' | 'deliveryNotes'>>,
+  options: UpdateContentRequestOptions = {},
 ): ContentTopicRequest | null {
-  const existing = getContentRequest(workspaceId, id);
-  if (!existing) return null;
+  const result = db.transaction(() => {
+    const row = stmts().selectById.get(id, workspaceId) as RequestRow | undefined;
+    if (!row) return { request: null, changed: false } as const;
+    const existing = rowToRequest(row);
 
-  // Validate status transition if status is being changed
-  if (updates.status !== undefined && updates.status !== existing.status) {
-    validateTransition('content_request', CONTENT_REQUEST_TRANSITIONS, existing.status, updates.status);
-  }
+    if (updates.status !== undefined && updates.status !== existing.status) {
+      validateTransition('content_request', CONTENT_REQUEST_TRANSITIONS, existing.status, updates.status);
+    }
 
-  // Filter undefined values to avoid overwriting existing fields
-  const cleanUpdates: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(updates)) {
-    if (v !== undefined) cleanUpdates[k] = v;
-  }
-  Object.assign(existing, cleanUpdates, { updatedAt: new Date().toISOString() });
+    // Revision authority belongs to artifacts linked before this request mutation.
+    // A generation finalizer can atomically create + link a fresh artifact here;
+    // treating that new link as a competing edit would immediately stale its own
+    // successful generation commit (revision 1 -> 2).
+    const linkedArtifactsBefore = { ...existing };
 
-  stmts().update.run({
-    id: existing.id,
-    workspace_id: workspaceId,
-    status: existing.status,
-    brief_id: existing.briefId ?? null,
-    post_id: existing.postId ?? null,
-    client_note: existing.clientNote ?? null,
-    internal_note: existing.internalNote ?? null,
-    decline_reason: existing.declineReason ?? null,
-    client_feedback: existing.clientFeedback ?? null,
-    service_type: existing.serviceType ?? null,
-    upgraded_at: existing.upgradedAt ?? null,
-    delivery_url: existing.deliveryUrl ?? null,
-    delivery_notes: existing.deliveryNotes ?? null,
-    comments: JSON.stringify(existing.comments || []),
-    updated_at: existing.updatedAt,
-  });
-  invalidateContentRequestCaches(workspaceId);
-  return existing;
+    const changedUpdates = Object.entries(updates).filter(([key, value]) => (
+      value !== undefined && existing[key as keyof ContentTopicRequest] !== value
+    ));
+    if (changedUpdates.length === 0) return { request: existing, changed: false } as const;
+
+    Object.assign(existing, Object.fromEntries(changedUpdates), {
+      updatedAt: nextRequestUpdatedAt(existing.updatedAt),
+    });
+    stmts().update.run({
+      id: existing.id,
+      workspace_id: workspaceId,
+      status: existing.status,
+      brief_id: existing.briefId ?? null,
+      post_id: existing.postId ?? null,
+      client_note: existing.clientNote ?? null,
+      internal_note: existing.internalNote ?? null,
+      decline_reason: existing.declineReason ?? null,
+      client_feedback: existing.clientFeedback ?? null,
+      service_type: existing.serviceType ?? null,
+      upgraded_at: existing.upgradedAt ?? null,
+      delivery_url: existing.deliveryUrl ?? null,
+      delivery_notes: existing.deliveryNotes ?? null,
+      comments: JSON.stringify(existing.comments || []),
+      updated_at: existing.updatedAt,
+    });
+    const authority = options.linkedArtifactAuthority;
+    bumpLinkedArtifactRevisions(linkedArtifactsBefore, authority);
+    if (authority) bumpLinkedArtifactAtRevision(workspaceId, authority);
+    return { request: existing, changed: true } as const;
+  }).immediate();
+  if (result.changed) invalidateContentRequestCaches(workspaceId);
+  return result.request;
 }
 
 export function deleteContentRequest(workspaceId: string, id: string): boolean {
-  const info = stmts().deleteById.run(id, workspaceId);
-  if (info.changes > 0) invalidateContentRequestCaches(workspaceId);
-  return info.changes > 0;
+  const deleted = db.transaction(() => {
+    const row = stmts().selectById.get(id, workspaceId) as RequestRow | undefined;
+    if (!row) return false;
+    const existing = rowToRequest(row);
+    const info = stmts().deleteById.run(id, workspaceId);
+    if (info.changes === 0) return false;
+    bumpLinkedArtifactRevisions(existing);
+    return true;
+  }).immediate();
+  if (deleted) invalidateContentRequestCaches(workspaceId);
+  return deleted;
 }
 
 export function addComment(
@@ -344,36 +481,41 @@ export function addComment(
   author: 'client' | 'team',
   content: string
 ): ContentTopicRequest | null {
-  const existing = getContentRequest(workspaceId, requestId);
-  if (!existing) return null;
-  if (!existing.comments) existing.comments = [];
-  existing.comments.push({
-    id: `cmt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    author,
-    content,
-    createdAt: new Date().toISOString(),
-  });
-  existing.updatedAt = new Date().toISOString();
+  const updated = db.transaction(() => {
+    const row = stmts().selectById.get(requestId, workspaceId) as RequestRow | undefined;
+    if (!row) return null;
+    const existing = rowToRequest(row);
+    if (!existing.comments) existing.comments = [];
+    existing.comments.push({
+      id: `cmt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      author,
+      content,
+      createdAt: new Date().toISOString(),
+    });
+    existing.updatedAt = nextRequestUpdatedAt(existing.updatedAt);
 
-  stmts().update.run({
-    id: existing.id,
-    workspace_id: workspaceId,
-    status: existing.status,
-    brief_id: existing.briefId ?? null,
-    post_id: existing.postId ?? null,
-    client_note: existing.clientNote ?? null,
-    internal_note: existing.internalNote ?? null,
-    decline_reason: existing.declineReason ?? null,
-    client_feedback: existing.clientFeedback ?? null,
-    service_type: existing.serviceType ?? null,
-    upgraded_at: existing.upgradedAt ?? null,
-    delivery_url: existing.deliveryUrl ?? null,
-    delivery_notes: existing.deliveryNotes ?? null,
-    comments: JSON.stringify(existing.comments),
-    updated_at: existing.updatedAt,
-  });
-  invalidateContentRequestCaches(workspaceId);
-  return existing;
+    stmts().update.run({
+      id: existing.id,
+      workspace_id: workspaceId,
+      status: existing.status,
+      brief_id: existing.briefId ?? null,
+      post_id: existing.postId ?? null,
+      client_note: existing.clientNote ?? null,
+      internal_note: existing.internalNote ?? null,
+      decline_reason: existing.declineReason ?? null,
+      client_feedback: existing.clientFeedback ?? null,
+      service_type: existing.serviceType ?? null,
+      upgraded_at: existing.upgradedAt ?? null,
+      delivery_url: existing.deliveryUrl ?? null,
+      delivery_notes: existing.deliveryNotes ?? null,
+      comments: JSON.stringify(existing.comments),
+      updated_at: existing.updatedAt,
+    });
+    bumpLinkedArtifactRevisions(existing);
+    return existing;
+  }).immediate();
+  if (updated) invalidateContentRequestCaches(workspaceId);
+  return updated;
 }
 
 function invalidateContentRequestCaches(workspaceId: string): void {

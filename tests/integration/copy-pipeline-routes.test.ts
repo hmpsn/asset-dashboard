@@ -80,6 +80,29 @@ function getSectionStatus(sectionId: string): string | undefined {
   return row?.status;
 }
 
+function withSectionRevision<T extends object>(sectionId: string, body: T): T & { expectedRevision: number } {
+  const row = db.prepare('SELECT generation_revision FROM copy_sections WHERE id = ?')
+    .get(sectionId) as { generation_revision: number } | undefined;
+  return { ...body, expectedRevision: row?.generation_revision ?? 0 };
+}
+
+function sectionRevisionCensus(entryId: string): {
+  sectionRevisions: Array<{ sectionId: string; expectedRevision: number }>;
+} {
+  const rows = db.prepare(`
+    SELECT id, generation_revision
+    FROM copy_sections
+    WHERE entry_id = ? AND status = 'draft'
+    ORDER BY rowid ASC
+  `).all(entryId) as Array<{ id: string; generation_revision: number }>;
+  return {
+    sectionRevisions: rows.map(row => ({
+      sectionId: row.id,
+      expectedRevision: row.generation_revision,
+    })),
+  };
+}
+
 /** Insert a batch job row directly without triggering the fire-and-forget loop. */
 function insertBatchJob(workspaceId: string, blueprintId: string, status = 'running'): string {
   const id = `bj_${randomUUID()}`;
@@ -312,7 +335,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     const sId = insertSection(wsA.workspaceId, entryAId, 'draft');
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/status`,
-      { status: 'client_review' },
+      withSectionRevision(sId, { status: 'client_review' }),
     );
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -324,7 +347,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     const sId = insertSection(wsA.workspaceId, entryAId, 'pending');
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/status`,
-      { status: 'approved' },
+      withSectionRevision(sId, { status: 'approved' }),
     );
     // updateSectionStatus returns null on invalid transition; route responds 404
     expect(res.status).toBe(404);
@@ -339,12 +362,12 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     // First do a valid transition to client_review
     await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/status`,
-      { status: 'client_review' },
+      withSectionRevision(sId, { status: 'client_review' }),
     );
     // Now try the invalid back-transition
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/status`,
-      { status: 'draft' },
+      withSectionRevision(sId, { status: 'draft' }),
     );
     expect(res.status).toBe(404);
     expect(getSectionStatus(sId)).toBe('client_review'); // unchanged
@@ -354,7 +377,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     const sId = insertSection(wsA.workspaceId, entryAId, 'draft');
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/status`,
-      { status: 'not_a_valid_status' },
+      withSectionRevision(sId, { status: 'not_a_valid_status' }),
     );
     expect(res.status).toBe(400);
     expect(getSectionStatus(sId)).toBe('draft');
@@ -372,7 +395,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
   it('non-existent sectionId returns 404', async () => {
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/cs_totally_nonexistent/status`,
-      { status: 'client_review' },
+      { status: 'client_review', expectedRevision: 0 },
     );
     expect(res.status).toBe(404);
   });
@@ -383,7 +406,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/status', () => {
     const sIdB = insertSection(wsB.workspaceId, entryBId, 'draft');
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sIdB}/status`,
-      { status: 'client_review' },
+      { status: 'client_review', expectedRevision: 0 },
     );
     expect(res.status).toBe(404);
     // wsB section must remain unchanged
@@ -398,7 +421,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
     const sId = insertSection(wsA.workspaceId, entryAId, 'draft', 'Original copy');
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/text`,
-      { copy: 'Updated copy text from edit' },
+      withSectionRevision(sId, { copy: 'Updated copy text from edit' }),
     );
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -420,7 +443,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
     const sId = insertSection(wsA.workspaceId, entryAId, 'draft');
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/text`,
-      { copy: '' },
+      withSectionRevision(sId, { copy: '' }),
     );
     expect(res.status).toBe(400);
   });
@@ -430,7 +453,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
     const sId = insertSection(wsA.workspaceId, entryAId, 'approved', 'Approved copy');
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/text`,
-      { copy: 'Attempted edit on approved section' },
+      withSectionRevision(sId, { copy: 'Attempted edit on approved section' }),
     );
     expect(res.status).toBe(404);
     // Status must remain approved, copy unchanged
@@ -444,7 +467,7 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
     const sIdB = insertSection(wsB.workspaceId, entryBId, 'draft', 'WS-B original copy');
     const res = await patchJson(
       `/api/copy/${wsA.workspaceId}/section/${sIdB}/text`,
-      { copy: 'Cross-workspace hijack attempt' },
+      { copy: 'Cross-workspace hijack attempt', expectedRevision: 0 },
     );
     expect(res.status).toBe(404);
     // wsB section copy must be unchanged
@@ -458,12 +481,18 @@ describe('PATCH /api/copy/:workspaceId/section/:sectionId/text', () => {
 
 describe('POST /api/copy/:workspaceId/section/:sectionId/suggest', () => {
   it('adds a suggestion and transitions client_review → revision_requested', async () => {
-    const sId = insertSection(wsA.workspaceId, entryAId, 'client_review');
+    const sId = insertSection(
+      wsA.workspaceId,
+      entryAId,
+      'client_review',
+      'Original client review copy',
+    );
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/suggest`,
       {
         originalText: 'Original client review copy',
         suggestedText: 'Improved copy from client',
+        expectedRevision: 0,
       },
     );
     expect(res.status).toBe(200);
@@ -479,12 +508,13 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest', () => {
 
   it('suggestion on draft section does NOT change status (stays draft)', async () => {
     // addClientSuggestion only transitions to revision_requested from client_review
-    const sId = insertSection(wsA.workspaceId, entryAId, 'draft');
+    const sId = insertSection(wsA.workspaceId, entryAId, 'draft', 'Draft copy');
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/suggest`,
       {
         originalText: 'Draft copy',
         suggestedText: 'Suggested improvement',
+        expectedRevision: 0,
       },
     );
     expect(res.status).toBe(200);
@@ -493,11 +523,34 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest', () => {
     expect(body.status).toBe('draft');
   });
 
+  it('rejects a current-revision suggestion with false original text without mutating', async () => {
+    const sId = insertSection(wsA.workspaceId, entryAId, 'client_review', 'Canonical section copy');
+    const res = await postJson(
+      `/api/copy/${wsA.workspaceId}/section/${sId}/suggest`,
+      {
+        originalText: 'Copy this section never contained',
+        suggestedText: 'Suggested improvement',
+        expectedRevision: 0,
+      },
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'copy_suggestion_original_mismatch' });
+    const row = db.prepare(
+      'SELECT status, generation_revision, client_suggestions FROM copy_sections WHERE id = ?',
+    ).get(sId) as { status: string; generation_revision: number; client_suggestions: string | null };
+    expect(row).toEqual({
+      status: 'client_review',
+      generation_revision: 0,
+      client_suggestions: null,
+    });
+  });
+
   it('returns 400 when originalText is missing', async () => {
     const sId = insertSection(wsA.workspaceId, entryAId, 'client_review');
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/suggest`,
-      { suggestedText: 'Only suggested text' },
+      withSectionRevision(sId, { suggestedText: 'Only suggested text' }),
     );
     expect(res.status).toBe(400);
   });
@@ -506,7 +559,7 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest', () => {
     const sId = insertSection(wsA.workspaceId, entryAId, 'client_review');
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/section/${sId}/suggest`,
-      { originalText: 'Only original text' },
+      withSectionRevision(sId, { originalText: 'Only original text' }),
     );
     expect(res.status).toBe(400);
   });
@@ -514,7 +567,7 @@ describe('POST /api/copy/:workspaceId/section/:sectionId/suggest', () => {
   it('returns 404 when section does not exist', async () => {
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/section/cs_totally_missing/suggest`,
-      { originalText: 'Text', suggestedText: 'Better text' },
+      { originalText: 'Text', suggestedText: 'Better text', expectedRevision: 0 },
     );
     expect(res.status).toBe(404);
   });
@@ -533,7 +586,7 @@ describe('POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client', () 
 
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/${blueprintAId}/${freshEntryId}/send-to-client`,
-      {},
+      { sectionRevisions: [] },
     );
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -552,7 +605,7 @@ describe('POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client', () 
 
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/${blueprintAId}/${entryId}/send-to-client`,
-      {},
+      { sectionRevisions: [] },
     );
     expect(res.status).toBe(400);
   });
@@ -570,7 +623,7 @@ describe('POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client', () 
 
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/${blueprintAId}/${entryId}/send-to-client`,
-      {},
+      sectionRevisionCensus(entryId),
     );
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -599,7 +652,7 @@ describe('POST /api/copy/:workspaceId/:blueprintId/:entryId/send-to-client', () 
 
     const res = await postJson(
       `/api/copy/${wsA.workspaceId}/${blueprintAId}/${entryId}/send-to-client`,
-      {},
+      sectionRevisionCensus(entryId),
     );
     expect(res.status).toBe(200);
     expect((await res.json()).sent).toBe(3);

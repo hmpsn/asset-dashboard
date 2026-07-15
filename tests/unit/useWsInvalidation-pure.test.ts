@@ -145,10 +145,14 @@ describe('useWsInvalidation registry parity (pure)', () => {
     expect(keys).toContainEqual(queryKeys.admin.notifications());
   });
 
-  it('CONTENT_REQUEST_UPDATE also refreshes the notification bell', () => {
+  it('CONTENT_REQUEST_UPDATE refreshes linked artifact authority and the notification bell', () => {
     const keys = adminKeys(WS_EVENTS.CONTENT_REQUEST_UPDATE);
 
     expect(keys).toContainEqual(queryKeys.client.contentRequests(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.briefs(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.briefsDetailAll(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.posts(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.postsDetailAll(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.notifications());
   });
 

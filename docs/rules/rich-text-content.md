@@ -1,6 +1,6 @@
 # Rich-Text Content Invariants
 
-The blog/content editor (PR #356, April 2026) migrated post body fields from plain-text textareas to a TipTap rich-text editor. This shifted the data shape on several fields and introduced four content-handling patterns that every consumer of post content must respect.
+The blog/content editor (PR #356, April 2026) migrated post body fields from plain-text textareas to a TipTap rich-text editor. This shifted the data shape on several fields and introduced content-handling patterns that every consumer of post content must respect.
 
 ## What changed
 
@@ -34,9 +34,9 @@ The trust model is asymmetric **on purpose**:
 
 If you add a new route that accepts HTML, decide which side of this boundary it sits on and sanitize accordingly. Don't introduce a third tier.
 
-## Rule 3 — `useAutoSave` saveFn closures: flush before changing the closed-over context
+## Rule 3 — Bind debounced saves before changing the closed-over context
 
-`useAutoSave` keeps the latest `saveFn` reference in `saveFnRef.current` (updated on every render). When the debounce timer fires, it calls the latest closure with the latest state — but the **HTML it carries** was queued under whatever state existed when `scheduleAutoSave(html)` was called.
+`useAutoSave` keeps the latest `saveFn` reference in `saveFnRef.current` (updated on every render). Without a prepared-save callback, the debounce timer calls that latest closure with the latest state — but the **HTML it carries** was queued under whatever state existed when `scheduleAutoSave(html)` was called.
 
 If a single `useAutoSave` instance is shared across multiple logical contexts (e.g. one section editor used for many sections, where the saveFn reads `editingSection` from state), switching contexts without flushing causes the queued HTML for context A to be written to context B's record.
 
@@ -46,13 +46,23 @@ If a single `useAutoSave` instance is shared across multiple logical contexts (e
 // ❌ Wrong — pending save for section A overwrites section B
 onClick={() => setEditingSection(section.index)}
 
-// ✅ Right — drain the prior section's pending save before switching
-onClick={async () => { await flushSection(); setEditingSection(section.index); }}
+// ✅ Right — switch only after the prior section's save was accepted
+onClick={async () => {
+  const { ok } = await flushSection();
+  if (ok) setEditingSection(section.index);
+}}
 ```
 
 Same applies to the "Done" button (already correct) and any other state change that affects which record the saveFn writes to.
 
-For independent contexts (e.g. intro and conclusion in the same component), use **separate `useAutoSave` instances** — each gets its own timer and `pendingHtml` ref, so they don't interfere.
+Revision-conditional editors must additionally pass `useAutoSave` a prepared-save
+callback. It runs when `scheduleAutoSave(html)` is called and freezes both the
+logical target and `useSerializedArtifactSave.prepare(...)` authority epoch.
+An external revision that arrives before the timer fires then rejects the stale
+attempt without issuing a PATCH; it must never silently rebase old HTML onto the
+new revision.
+
+For independent contexts (e.g. intro and conclusion in the same component), use **separate `useAutoSave` instances** — each gets its own timer and pending prepared-attempt buffer, so they don't interfere.
 
 ## Rule 4 — Don't sync external prop state into a focused editor
 
@@ -103,10 +113,48 @@ Multiple routes emit the same `WS_EVENTS.X` event but write different payload sh
 
 **When emitting an existing event from a new code path**, grep all existing emitters and match the shape. If you genuinely need a different shape, deliberately union the payload type in `shared/types/` and update the handler to accept both.
 
+## Rule 7 — Serialize revision-based autosaves per artifact
+
+Independent rich-text fields may keep separate debounce timers, but they must
+not issue concurrent revision-based PATCHes from the same artifact revision.
+Route every field's `saveFn` through one `useSerializedArtifactSave` instance
+for the mounted artifact.
+
+The serializer owns a private authority token and processes writes in order:
+
+- Only an accepted save response advances its private authority. Never predict
+  the next revision or rebase a rejected edit onto a newer revision.
+- Every queued write captures the authority epoch under which it was authored.
+  A different externally observed revision/review token invalidates stale queued
+  and in-flight work; a matching accepted response may be treated only as
+  read-model catch-up.
+- Debounced work captures that epoch at `scheduleAutoSave(...)` time through
+  `useSerializedArtifactSave.prepare(...)`, not when the timer later invokes the
+  queue. The prepared first attempt is one-shot across timer, flush, and unmount
+  paths. An explicit `useAutoSave.retry()` creates a distinct attempt for the
+  same retained payload; when backed by a serialized prepared save, it is pinned
+  to the exact authority used by the failed request. If canonical authority has
+  changed, retry rejects locally without issuing a PATCH.
+- Conflict, validation, and transport failures propagate to the originating
+  field. The serializer performs no hidden retry.
+- One serializer exists per mounted artifact. Switching artifacts creates a new
+  authority boundary instead of carrying a queue across records.
+- Unmount cleanup never duplicates an in-flight payload or retries a completed
+  failure. After an accepted in-flight save, it may attempt only a genuinely
+  newer pending buffer; failed content remains an explicit-recovery concern.
+
+`useAutoSave.flush()` must await an in-flight write before considering pending
+content, return `{ ok: false }` after any failed write, and never immediately
+retry the same failed payload during that flush. Lifecycle decisions (Done,
+approve, request changes) and editor-context switches must stop when flush
+returns false. Recovery is an explicit retry or reset action so a stale or
+duplicated save cannot occur behind the user's back.
+
 ## Read-list
 
 - [`server/html-sanitize.ts`](../../server/html-sanitize.ts) — the canonical HTML allowlist
 - [`src/components/post-editor/RichTextEditor.tsx`](../../src/components/post-editor/RichTextEditor.tsx) — focus-guard sync pattern
 - [`src/hooks/useAutoSave.ts`](../../src/hooks/useAutoSave.ts) — the shared-timer contract
+- [`src/hooks/useSerializedArtifactSave.ts`](../../src/hooks/useSerializedArtifactSave.ts) — artifact-scoped revision serialization and authority invalidation
 - [`server/routes/public-content.ts`](../../server/routes/public-content.ts) — the public-side sanitize + coalesce reference
 - [`server/routes/content-posts.ts`](../../server/routes/content-posts.ts) — the admin-side trust + coalesce reference

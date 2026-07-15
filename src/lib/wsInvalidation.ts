@@ -160,6 +160,13 @@ function adminInvalidationKeys(
       return [
         queryKeys.client.contentRequests(workspaceId),
         queryKeys.admin.requests(workspaceId),
+        // C2 request mutations advance every previously linked artifact revision
+        // in the same transaction. Refresh those authorities even when the event
+        // carries only the request id (the established broadcast contract).
+        queryKeys.admin.briefs(workspaceId),
+        queryKeys.admin.briefsDetailAll(workspaceId),
+        queryKeys.admin.posts(workspaceId),
+        queryKeys.admin.postsDetailAll(workspaceId),
         queryKeys.admin.workspaceBadges(workspaceId),
         ...contentPipelineKeys(workspaceId),
         queryKeys.admin.notifications(),
@@ -634,7 +641,13 @@ function clientDashboardInvalidationKeys(
       return [queryKeys.client.requests(workspaceId)] as const;
     case WS_EVENTS.CONTENT_REQUEST_CREATED:
     case WS_EVENTS.CONTENT_REQUEST_UPDATE:
-      return [queryKeys.client.contentRequests(workspaceId)] as const;
+      return [
+        queryKeys.client.contentRequests(workspaceId),
+        queryKeys.client.contentPlan(workspaceId),
+        queryKeys.client.unifiedInbox(workspaceId),
+        queryKeys.client.postPreviewAll(workspaceId),
+        queryKeys.client.intelligence(workspaceId),
+      ] as const;
     case WS_EVENTS.BRIEF_UPDATED:
       return [
         queryKeys.client.contentRequests(workspaceId),

@@ -3,6 +3,8 @@ import type { AIExecutionMetadata } from '../../shared/types/ai-execution.js';
 import {
   buildGenerationProvenance,
   canonicalGenerationFingerprint,
+  completeExternalGeneration,
+  prepareExternalGeneration,
 } from '../../server/generation-provenance.js';
 import {
   canonicalGenerationProvenanceSchema,
@@ -93,5 +95,31 @@ describe('generation provenance', () => {
     };
     expect(() => buildGenerationProvenance({ accepted, executions: [intro] }))
       .toThrow('accepted top-level execution');
+  });
+
+  it('records externally executed MCP generation without fabricating a provider or model', () => {
+    const effectiveInput = {
+      prompt_context: 'private prepared context',
+      source_revision: 7,
+    };
+    const preparation = prepareExternalGeneration(
+      'mcp-external-post-generation',
+      effectiveInput,
+    );
+    const provenance = completeExternalGeneration(
+      preparation,
+      preparation.startedAt,
+    );
+
+    expect(provenance).toMatchObject({
+      runId: preparation.runId,
+      executionChainId: preparation.runId,
+      operation: 'mcp-external-post-generation',
+      provider: 'external',
+      model: 'unreported',
+      inputFingerprint: canonicalGenerationFingerprint(effectiveInput),
+    });
+    expect(canonicalGenerationProvenanceSchema.safeParse(provenance).success).toBe(true);
+    expect(JSON.stringify(provenance)).not.toContain('private prepared context');
   });
 });

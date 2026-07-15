@@ -11,8 +11,8 @@ import { hasVisibleHtmlContent } from '../content-post-integrity.js';
 
 const workspaceIdSchema = z.string().min(1, 'workspace_id is required')
   .describe('The workspace (client) ID this operation targets. Get IDs from list_workspaces.');
-const revisionSchema = z.string().trim().min(1, 'expected_revision is required')
-  .describe('Optimistic-concurrency token from the matching get_brief/get_post call. The write is rejected with a conflict if the stored record changed since you read it — re-fetch and retry.');
+const revisionSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
+  .describe('Durable numeric revision from the matching get_brief/get_post call. The write is rejected with a conflict if the stored record changed since you read it — re-fetch and retry.');
 const pageTypeSchema = z.enum(['blog', 'landing', 'service', 'location', 'product', 'pillar', 'resource'])
   .describe('Page type: one of blog, landing, service, location, product, pillar, resource.');
 const contentRequestStatusSchema = z.enum([
@@ -118,6 +118,8 @@ export const prepareBriefContextInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   topic: z.string().min(1)
     .describe('The subject/topic of the brief to write context for.'),
+  parent_request_id: z.string().min(1).optional()
+    .describe('Optional content request to fulfill. Its id and current revision are frozen into the prepared handle; it cannot be selected later by save_brief.'),
   target_keyword: z.string().trim().min(1).optional()
     .describe('Optional primary keyword the brief should target.'),
   target_page_path: z.string().trim().min(1).optional()
@@ -241,14 +243,16 @@ export const saveBriefInputSchema = z.object({
     .describe('The brief-request handle returned by prepare_brief_context. Persists the brief against that prepared context.'),
   content: briefContentSchema
     .describe('The full brief content payload — build it from the structured context returned by prepare_brief_context (targetKeyword, suggestedTitle, outline, wordCountTarget, intent, audience, etc.).'),
-  parent_request_id: z.string().optional()
-    .describe('Optional id of an existing content request this brief fulfills (links the brief to the request pipeline).'),
+  parent_request_id: z.string().min(1).optional()
+    .describe('Optional redundant assertion of the parent selected by prepare_brief_context. It must exactly match the prepared parent and cannot select or override one at save time.'),
 });
 
 export const preparePostContextInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   brief_id: z.string().min(1)
     .describe('The id of the saved brief to draft a post from. Returns structured drafting context plus a handle for save_post.'),
+  parent_request_id: z.string().min(1).optional()
+    .describe('Optional content request already linked to brief_id. Its id and current revision are frozen into the prepared handle; it cannot be selected later by save_post.'),
 });
 
 const visiblePostHtmlSchema = z.string().refine(
@@ -293,8 +297,8 @@ export const savePostInputSchema = z.object({
     .describe('The post-request handle returned by prepare_post_context. Persists the generated post against that prepared context.'),
   content: postContentSchema
     .describe('The full generated post payload — build it from the structured context returned by prepare_post_context (briefId, title, metaDescription, introduction, sections, conclusion, word counts).'),
-  parent_request_id: z.string().optional()
-    .describe('Optional id of an existing content request this post fulfills (links the post to the request pipeline).'),
+  parent_request_id: z.string().min(1).optional()
+    .describe('Optional redundant assertion of the parent selected by prepare_post_context. It must exactly match the prepared parent and cannot select or override one at save time.'),
 });
 
 const briefPatchContentSchema = z.object({
@@ -529,20 +533,39 @@ export const sendToClientInputSchema = z.object({
       .describe("Send either the provisional 'voice_foundation' gate or the durable 'brand_suite' review; they are separate bundles."),
   }).strict().optional()
     .describe('Target a completed brand-generation review set with exact revision authority.'),
+  expected_revision: revisionSchema.optional()
+    .describe('Required when targeting an already-saved brief_id or post_id. Handle targets carry the revision captured when they were saved.'),
   note: z.string().optional()
     .describe('Optional note to the client included with the review request.'),
-}).refine(
-  (data) => [
+}).superRefine((data, ctx) => {
+  const targetCount = [
     data.brief_handle,
     data.post_handle,
     data.brief_id,
     data.post_id,
     data.brand_generation,
-  ].filter(Boolean).length === 1,
-  {
-    message: 'must provide exactly one target: brief_handle, post_handle, brief_id, post_id, or brand_generation',
-  },
-);
+  ].filter(Boolean).length;
+  if (targetCount !== 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'must provide exactly one target: brief_handle, post_handle, brief_id, post_id, or brand_generation',
+    });
+  }
+  if ((data.brief_id || data.post_id) && data.expected_revision === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expected_revision'],
+      message: 'expected_revision is required for saved brief_id/post_id targets',
+    });
+  }
+  if ((data.brief_handle || data.post_handle || data.brand_generation) && data.expected_revision !== undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expected_revision'],
+      message: 'expected_revision is carried by handle targets and is not accepted here',
+    });
+  }
+});
 
 export const listContentRequestsInputSchema = z.object({
   workspace_id: workspaceIdSchema,
@@ -571,6 +594,7 @@ export const publishPostInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   post_id: z.string().min(1)
     .describe("The id of the post to publish to the live Webflow site (from list_posts / get_post). The post must be status 'approved' — un-reviewed drafts cannot be published via MCP."),
+  expected_revision: revisionSchema,
   generate_image: z.boolean().optional()
     .describe('Generate + attach the featured image during publish (only has an effect when the publish target maps a featuredImage field). Default false.'),
 });
@@ -788,12 +812,14 @@ export const deleteBriefInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   brief_id: z.string().min(1)
     .describe('The id of the content brief to permanently delete.'),
+  expected_revision: revisionSchema,
 }).strict();
 
 export const deletePostInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   post_id: z.string().min(1)
     .describe('The id of the generated post to permanently delete.'),
+  expected_revision: revisionSchema,
 }).strict();
 
 export const listPostVersionsInputSchema = z.object({
@@ -810,6 +836,7 @@ export const revertPostVersionInputSchema = z.object({
     .describe('The id of the post to revert.'),
   version_id: z.string().min(1)
     .describe('The id of the historical version to revert the post back to (from list_post_versions).'),
+  expected_revision: revisionSchema,
 }).strict();
 
 export const getUnresolvedInsightsInputSchema = z.object({
@@ -1004,6 +1031,8 @@ export const startBriefGenerationInputSchema = z.object({
     .describe('[Paid API] The primary keyword to build the brief around. Required for a standalone brief; omit only when request_id is supplied (the brief is then keyed off that content request\'s keyword).'),
   request_id: z.string().trim().min(1).optional()
     .describe('Optional id of an existing content request to generate the brief for. When supplied, the brief is generated from that request (pulling its keyword, intent, and page type) and the request is advanced to brief_generated. Omit for a standalone brief driven by target_keyword.'),
+  expected_request_updated_at: z.string().datetime().optional()
+    .describe('Required with request_id. Echo the request updatedAt value so a newer client/operator decision defeats stale generation.'),
   business_context: z.string().trim().max(4000).optional()
     .describe('Optional extra business context to ground the brief (services, audience, differentiators). Ignored on the request path. Falls back to the workspace strategy business context when omitted.'),
   page_type: pageTypeSchema.optional()
@@ -1012,12 +1041,35 @@ export const startBriefGenerationInputSchema = z.object({
     .describe('Optional list of up to 5 reference URLs (http/https) to scrape for grounding evidence. Standalone path only.'),
   generation_style: z.enum(CONTENT_GENERATION_STYLES).optional()
     .describe('Optional writing style for the brief and downstream post: standard, concise, or hybrid.'),
-}).strict();
+}).strict().superRefine((data, ctx) => {
+  if (Boolean(data.request_id) === Boolean(data.target_keyword)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'provide exactly one of target_keyword or request_id',
+    });
+  }
+  if (data.request_id && !data.expected_request_updated_at) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expected_request_updated_at'],
+      message: 'expected_request_updated_at is required with request_id',
+    });
+  }
+  if (!data.request_id && data.expected_request_updated_at) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expected_request_updated_at'],
+      message: 'expected_request_updated_at is only valid with request_id',
+    });
+  }
+});
 
 export const startPostGenerationInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   brief_id: z.string().trim().min(1)
     .describe('[Paid API] The id of the saved content brief to generate a full post from. The brief\'s outline, keyword, and target word count drive grounded section-by-section generation. Required.'),
+  expected_brief_revision: revisionSchema
+    .describe('The durable revision returned by get_brief. Post generation is rejected if the brief changed before job acceptance.'),
   generation_style: z.enum(CONTENT_GENERATION_STYLES).optional()
     .describe('Optional writing style override for the post: standard, concise, or hybrid. Defaults to the brief\'s own style.'),
 }).strict();

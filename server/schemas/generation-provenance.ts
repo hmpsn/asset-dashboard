@@ -1,6 +1,6 @@
 import { z } from '../middleware/validate.js';
 
-const generationProviderSchema = z.enum(['openai', 'anthropic', 'deterministic']);
+const generationProviderSchema = z.enum(['openai', 'anthropic', 'deterministic', 'external']);
 /** Read compatibility for pre-G1 recommendation/keyword rows with descriptive tokens. */
 export const storedGenerationFingerprintSchema = z.string().min(1).max(512);
 export const canonicalGenerationFingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/);

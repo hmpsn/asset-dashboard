@@ -16,7 +16,8 @@
  * sections; the entry-level "send to client" —
  * `server/routes/copy-pipeline.ts:/:blueprintId/:entryId/send-to-client` — bulk-transitions ALL
  * draft sections of an entry to client_review at once). The per-section detail rides in
- * `payload.sections[]`; nothing from the source is dropped.
+ * `payload.sections[]`; the projection is explicit so internal generation and operator-only
+ * fields never cross the client boundary.
  *
  * kind = 'review' (design §4.1): an entry's copy is a single review artifact (its sections are
  * reviewed together), not a per-item approval batch (kind 'batch') and not an inline decision.
@@ -135,11 +136,9 @@ export function deriveEntryOverallStatus(sections: CopySection[]): CopySectionSt
 }
 
 /**
- * The faithful per-section shape carried in `payload.sections[]`. Every field of the source
- * `copy_sections` row is preserved (id, sectionPlanItemId, version, generatedCopy, the two AI
- * annotation fields, the append-only `clientSuggestions[]` / `qualityFlags[]` / `steeringHistory[]`,
- * and timestamps). `status` is the RAW copy status; `deliverableStatus` is the canonical mapping
- * alongside it, so a reader gets both without re-deriving. Nothing from the source is dropped.
+ * The client-safe per-section shape carried in `payload.sections[]`. Review fields are
+ * preserved, while internal generation revision/provenance is deliberately omitted.
+ * `status` is the RAW copy status; `deliverableStatus` is the canonical mapping alongside it.
  */
 export interface ProjectedCopySectionPayload {
   id: string;
@@ -151,10 +150,20 @@ export interface ProjectedCopySectionPayload {
   deliverableStatus: DeliverableStatus;
   generatedCopy: string | null;
   aiAnnotation: string | null;
-  aiReasoning: string | null;
   clientSuggestions: CopySection['clientSuggestions'];
-  qualityFlags: CopySection['qualityFlags'];
-  steeringHistory: CopySection['steeringHistory'];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Explicit client-safe projection of the sibling copy_metadata row. */
+export interface ProjectedCopyMetadataPayload {
+  id: string;
+  entryId: string;
+  seoTitle: string | null;
+  metaDescription: string | null;
+  ogTitle: string | null;
+  ogDescription: string | null;
+  status: CopySectionStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -164,10 +173,10 @@ export interface ProjectedCopyEntryPayload {
   family: 'copy_section';
   blueprintId: string;
   entryId: string;
-  /** Every section, faithfully — nothing dropped (design §13-D1). */
+  /** Every reviewable section in an explicit client-safe shape. */
   sections: ProjectedCopySectionPayload[];
-  /** The sibling copy_metadata row (SEO/OG fields + its own steering history), or null. */
-  copyMetadata: CopyMetadata | null;
+  /** Client-safe SEO/OG metadata, without workspace identity or operator steering. */
+  copyMetadata: ProjectedCopyMetadataPayload | null;
   [key: string]: unknown;
 }
 
@@ -175,7 +184,7 @@ function stableSourceRef(entryId: string): string | null {
   return entryId ? `copy:${entryId}` : null;
 }
 
-/** Map one source CopySection → its faithful projected payload shape (no data loss). */
+/** Map one source CopySection → its explicit client-safe projected payload shape. */
 function projectSection(section: CopySection): ProjectedCopySectionPayload {
   return {
     id: section.id,
@@ -185,13 +194,26 @@ function projectSection(section: CopySection): ProjectedCopySectionPayload {
     deliverableStatus: mapCopyStatusToDeliverableStatus(section.status),
     generatedCopy: section.generatedCopy,
     aiAnnotation: section.aiAnnotation,
-    aiReasoning: section.aiReasoning,
-    // Append-only review artifacts — carried through verbatim (no fallback substitution).
+    // Client-authored suggestions remain reviewable; operator-only reasoning, quality flags,
+    // steering history, generation revision, and provenance are deliberately omitted.
     clientSuggestions: section.clientSuggestions,
-    qualityFlags: section.qualityFlags,
-    steeringHistory: section.steeringHistory,
     createdAt: section.createdAt,
     updatedAt: section.updatedAt,
+  };
+}
+
+function projectMetadata(metadata: CopyMetadata | null): ProjectedCopyMetadataPayload | null {
+  if (!metadata) return null;
+  return {
+    id: metadata.id,
+    entryId: metadata.entryId,
+    seoTitle: metadata.seoTitle,
+    metaDescription: metadata.metaDescription,
+    ogTitle: metadata.ogTitle,
+    ogDescription: metadata.ogDescription,
+    status: metadata.status,
+    createdAt: metadata.createdAt,
+    updatedAt: metadata.updatedAt,
   };
 }
 
@@ -202,7 +224,7 @@ function buildEntryPayload(input: CopyEntryProjectionInput): ProjectedCopyEntryP
     blueprintId: input.blueprintId,
     entryId: input.entryId,
     sections: input.sections.map(projectSection),
-    copyMetadata: input.metadata,
+    copyMetadata: projectMetadata(input.metadata),
   };
 }
 
@@ -273,10 +295,11 @@ export const copySectionAdapter: DeliverableAdapter<CopyEntryProjectionInput, Co
   /**
    * THE method for a projected type. Expose a copy ENTRY through the unified ClientDeliverable
    * interface at read time (design §13-D1). The deliverable id + workspace/timestamps come from
-   * the source entry; the per-section detail (version, clientSuggestions[], qualityFlags[],
-   * steeringHistory[]) and the sibling copy_metadata ride in `payload`. The entry-level status is
-   * the rollup of its section statuses, mapped to canonical. This is a PURE read projection: it
-   * writes nothing and is normally consumed only by the Phase-2 inbox/rollup.
+   * the source entry; client-review detail and client-safe copy metadata ride in `payload`.
+   * Operator reasoning, quality flags, steering history, workspace identity, and generation
+   * lineage never cross this boundary. The entry-level status is the rollup of its section
+   * statuses, mapped to canonical. This is a PURE read projection: it writes nothing and is
+   * normally consumed only by the Phase-2 inbox/rollup.
    */
   projectFromSource: (input): ClientDeliverable => {
     const overall = deriveEntryOverallStatus(input.sections);

@@ -519,7 +519,8 @@ describe('ContentBriefs', () => {
       await Promise.resolve();
     });
     expect(mocks.delFn).toHaveBeenCalledWith(
-      expect.stringContaining('/api/content-briefs/ws-1/brief-1')
+      expect.stringContaining('/api/content-briefs/ws-1/brief-1'),
+      { expectedRevision: 0 },
     );
     vi.useRealTimers();
   });

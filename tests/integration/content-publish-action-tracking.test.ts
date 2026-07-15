@@ -72,10 +72,18 @@ async function postJson(
   path: string,
   body: unknown,
 ): Promise<{ status: number; body: unknown }> {
+  const match = path.match(/^\/api\/content-posts\/([^/]+)\/([^/]+)\/publish-to-webflow$/);
+  const row = match
+    ? db.prepare('SELECT generation_revision FROM content_posts WHERE workspace_id = ? AND id = ?')
+        .get(match[1], match[2]) as { generation_revision: number } | undefined
+    : undefined;
+  const requestBody = match && body && typeof body === 'object' && !('expectedRevision' in body)
+    ? { ...body, expectedRevision: row?.generation_revision ?? 0 }
+    : body;
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
   return { status: res.status, body: await res.json().catch(() => ({})) };
 }

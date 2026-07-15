@@ -83,8 +83,8 @@ function clientHeaders(): Record<string, string> {
   };
 }
 
-/** Insert a reviewable copy section under a fresh entry; returns { entryId, sectionId }. */
-function seedCopySection(): { entryId: string; sectionId: string } {
+/** Insert a reviewable copy section under a fresh entry. */
+function seedCopySection(): { entryId: string; sectionId: string; updatedAt: string } {
   const blueprint = createBlueprint({ workspaceId: wsId, name: `R4 Copy Blueprint ${randomUUID().slice(0, 8)}` });
   const entry = addEntry(wsId, blueprint.id, {
     name: `R4 Copy Page ${randomUUID().slice(0, 8)}`,
@@ -112,7 +112,7 @@ function seedCopySection(): { entryId: string; sectionId: string } {
     now,
     now,
   );
-  return { entryId: entry.id, sectionId };
+  return { entryId: entry.id, sectionId, updatedAt: now };
 }
 
 beforeAll(async () => {
@@ -181,12 +181,12 @@ describe('R4 projected review respond routes', () => {
   });
 
   it('copy section approve emits COPY_SECTION_UPDATED (drives unified-inbox invalidation)', async () => {
-    const { sectionId } = seedCopySection();
+    const { sectionId, updatedAt } = seedCopySection();
 
     const res = await fetch(`${baseUrl}/api/public/copy/${wsId}/section/${sectionId}/approve`, {
       method: 'POST',
       headers: clientHeaders(),
-      body: JSON.stringify({}),
+      body: JSON.stringify({ expectedUpdatedAt: updatedAt }),
     });
     expect(res.status).toBe(200);
 

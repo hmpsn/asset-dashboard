@@ -10,7 +10,10 @@ import {
   listBriefs,
   getBrief,
   updateBrief,
+  updateBriefAtRevision,
+  bumpBriefGenerationRevision,
   deleteBrief,
+  deleteBriefAtRevision,
   buildStrategyCardBlock,
   getPageTypeConfig,
   normalizeOutlineForPageType,
@@ -180,6 +183,85 @@ describe('updateBrief', () => {
     expect(updated!.outline).toHaveLength(1);
     expect(updated!.outline[0].heading).toBe('New Section');
   });
+
+  it('increments generation revision once for a real edit and not for a no-op', () => {
+    seedBrief(wsId, makeBrief('brief_revision_edit', wsId));
+    const initial = getBrief(wsId, 'brief_revision_edit')!;
+    expect(initial.generationRevision).toBe(0);
+
+    const changed = updateBrief(wsId, initial.id, { suggestedTitle: 'Human title' })!;
+    expect(changed.generationRevision).toBe(1);
+    const noOp = updateBrief(wsId, initial.id, {
+      suggestedTitle: 'Human title',
+      outline: changed.outline.map(section => ({ ...section })),
+    })!;
+    expect(noOp.generationRevision).toBe(1);
+  });
+
+  it('applies expected-revision edits atomically and rejects stale callers', () => {
+    seedBrief(wsId, makeBrief('brief_expected_edit', wsId));
+    const changed = updateBriefAtRevision(
+      wsId,
+      'brief_expected_edit',
+      0,
+      { suggestedTitle: 'First writer' },
+    )!;
+    expect(changed.generationRevision).toBe(1);
+    expect(() => updateBriefAtRevision(
+      wsId,
+      'brief_expected_edit',
+      0,
+      { suggestedTitle: 'Stale writer' },
+    )).toThrow('changed while generation was running');
+    expect(getBrief(wsId, 'brief_expected_edit')?.suggestedTitle).toBe('First writer');
+  });
+
+  it('supports a revision-only authority bump for linked request decisions', () => {
+    seedBrief(wsId, makeBrief('brief_linked_authority', wsId));
+    const bumped = bumpBriefGenerationRevision(wsId, 'brief_linked_authority', 0)!;
+    expect(bumped.generationRevision).toBe(1);
+    expect(bumped.suggestedTitle).toBe('Test Brief Title');
+  });
+
+  it('preserves read-compatible legacy provenance during a human edit', () => {
+    seedBrief(wsId, makeBrief('brief_legacy_provenance', wsId));
+    const legacyProvenance = {
+      runId: 'legacy-run',
+      operation: 'legacy-content-brief',
+      provider: 'openai',
+      model: 'legacy-model',
+      inputFingerprint: 'legacy descriptive fingerprint',
+      startedAt: '2025-01-01T00:00:00.000Z',
+      completedAt: '2025-01-01T00:00:01.000Z',
+    };
+    db.prepare(
+      `UPDATE content_briefs
+       SET generation_provenance = ?
+       WHERE id = ? AND workspace_id = ?`,
+    ).run(JSON.stringify(legacyProvenance), 'brief_legacy_provenance', wsId);
+
+    const updated = updateBrief(wsId, 'brief_legacy_provenance', {
+      suggestedTitle: 'Human edit over legacy row',
+    });
+
+    expect(updated?.generationRevision).toBe(1);
+    expect(updated?.generationProvenance).toEqual(legacyProvenance);
+  });
+
+  it('does not clear optional fields supplied as undefined beside a real edit', () => {
+    seedBrief(wsId, makeBrief('brief_undefined_update', wsId, {
+      executiveSummary: 'Keep this summary',
+    }));
+
+    const updated = updateBrief(wsId, 'brief_undefined_update', {
+      suggestedTitle: 'Only this field changes',
+      executiveSummary: undefined,
+    });
+
+    expect(updated?.suggestedTitle).toBe('Only this field changes');
+    expect(updated?.executiveSummary).toBe('Keep this summary');
+    expect(updated?.generationRevision).toBe(1);
+  });
 });
 
 // ── deleteBrief ──
@@ -197,6 +279,19 @@ describe('deleteBrief', () => {
 
   it('returns false for non-existent brief', () => {
     expect(deleteBrief(wsId, 'brief_nonexistent')).toBe(false);
+  });
+
+  it('deletes only at the current revision', () => {
+    seedBrief(wsId, makeBrief('brief_delete_revision', wsId));
+    const updated = updateBrief(wsId, 'brief_delete_revision', {
+      suggestedTitle: 'Revision one',
+    })!;
+
+    expect(() => deleteBriefAtRevision(wsId, updated.id, 0))
+      .toThrow('changed while generation was running');
+    expect(getBrief(wsId, updated.id)).toBeDefined();
+    expect(deleteBriefAtRevision(wsId, updated.id, updated.generationRevision)).toBe(true);
+    expect(getBrief(wsId, updated.id)).toBeUndefined();
   });
 });
 

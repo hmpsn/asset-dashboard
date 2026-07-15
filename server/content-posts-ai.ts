@@ -252,8 +252,10 @@ const PAGE_TYPE_WRITER_ROLE: Record<string, string> = {
   resource: 'You are an educational content writer creating actionable guides and resources that establish thought leadership.',
 };
 
-interface ContentAIGenerationOptions {
+export interface ContentAIGenerationOptions {
   signal?: AbortSignal;
+  executionChainId?: string;
+  onExecution?: (execution: AcceptedGenerationExecution) => void;
 }
 
 const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
@@ -470,6 +472,7 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-introduction',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: 600,
@@ -477,6 +480,8 @@ Return ONLY the opening HTML. No headings, no labels, no meta-commentary, no mar
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -570,6 +575,7 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-section',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: Math.max(800, sectionTarget * 2),
@@ -577,6 +583,8 @@ Return ONLY the section content in clean HTML (starting with <h2>). No labels, n
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -638,6 +646,7 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     { skipProseRules: true },
   );
   return callCreativeAI({
+    operation: 'content-post-conclusion',
     systemPrompt,
     userPrompt: prompt.replace(role + '\n\n', ''),
     maxTokens: 800,
@@ -645,6 +654,8 @@ Return ONLY the closing section in clean HTML (starting with <h2>). No labels, n
     workspaceId,
     researchMode: true,
     signal: options.signal,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 }
 
@@ -723,9 +734,21 @@ Return valid JSON only:
       temperature: 0.5,
       workspaceId,
       signal: options.signal,
+      executionChainId: options.executionChainId,
     });
     const parsed = parseStructuredAIOutput(result.text, seoMetaResponseSchema, 'content-post-seo-meta');
-    if (parsed.seoTitle && parsed.seoMetaDescription) return parsed;
+    if (parsed.seoTitle && parsed.seoMetaDescription) {
+      options.onExecution?.({
+        execution: result.execution,
+        inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+          provider: result.execution.provider,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: prompt }],
+          researchMode: false,
+        })),
+      });
+      return parsed;
+    }
     return null;
   } catch (err) {
     log.warn({ err: err }, 'SEO meta generation failed');
@@ -848,6 +871,8 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     json: true,
     researchMode: true,
     signal: options.signal,
+    executionChainId: options.executionChainId,
+    onExecution: options.onExecution,
   });
 
   try {
@@ -877,6 +902,7 @@ export async function scoreVoiceMatch(
   post: GeneratedPost,
   brief: ContentBrief,
   workspaceId: string,
+  options: ContentAIGenerationOptions = {},
 ): Promise<{ voiceScore: number | null; voiceFeedback: string }> {
   const voiceCtx = await buildVoiceContext(workspaceId);
 
@@ -931,6 +957,8 @@ Return ONLY valid JSON in this exact format:
     maxTokens: 500,
     temperature: 0.3,
     workspaceId,
+    executionChainId: options.executionChainId,
+    signal: options.signal,
   });
 
   try {
@@ -939,6 +967,15 @@ Return ONLY valid JSON in this exact format:
     const feedback = typeof parsed.voiceFeedback === 'string' && parsed.voiceFeedback.trim()
       ? parsed.voiceFeedback
       : 'No feedback provided.';
+    options.onExecution?.({
+      execution: result.execution,
+      inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+        provider: result.execution.provider,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }],
+        researchMode: false,
+      })),
+    });
     log.info(`Voice score for post ${post.id}: ${score}/100`);
     return { voiceScore: score, voiceFeedback: feedback };
   } catch (err) {

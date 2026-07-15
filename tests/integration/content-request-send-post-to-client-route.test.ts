@@ -4,7 +4,7 @@
  * The SEPARATE "Send to client" action (POST-C1) — distinct from ContentManager's internal "Review"
  * button. Covers:
  *  - happy path: 200, returns a content_request in post_review with postId/briefId set
- *  - optional note is stored on the request (internalNote)
+ *  - optional note is stored on the client-facing request field (`clientNote`)
  *  - client email + broadcast + activity side-effects
  *  - 404 for a missing post
  *  - workspace isolation
@@ -46,7 +46,7 @@ vi.mock('../../server/email.js', () => ({
 // ── Server imports (after mocks) ────────────────────────────────────────────
 import db from '../../server/db/index.js';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
-import { savePost } from '../../server/content-posts-db.js';
+import { getPost, savePost, updatePostField } from '../../server/content-posts-db.js';
 import { listClientFacingDeliverables } from '../../server/domains/inbox/unified-inbox-read.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import type { GeneratedPost } from '../../shared/types/content.js';
@@ -118,6 +118,10 @@ function activityCount(workspaceId: string, type: string): number {
   return row.count;
 }
 
+function observedRevision(workspaceId: string, postId: string): number {
+  return getPost(workspaceId, postId)!.generationRevision;
+}
+
 beforeAll(async () => {
   process.env.APP_URL = 'https://dashboard.example.test';
   await startTestServer();
@@ -151,7 +155,9 @@ describe('POST /api/content-requests/:workspaceId/posts/:postId/send-to-client',
   it('returns 200 with a content_request in post_review linked to the post', async () => {
     const post = seedPost(wsAId);
 
-    const res = await postJson(`/api/content-requests/${wsAId}/posts/${post.id}/send-to-client`, {});
+    const res = await postJson(`/api/content-requests/${wsAId}/posts/${post.id}/send-to-client`, {
+      expectedRevision: observedRevision(wsAId, post.id),
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json() as { id: string; status: string; postId?: string; briefId?: string };
@@ -164,18 +170,22 @@ describe('POST /api/content-requests/:workspaceId/posts/:postId/send-to-client',
     const post = seedPost(wsAId);
 
     const res = await postJson(`/api/content-requests/${wsAId}/posts/${post.id}/send-to-client`, {
+      expectedRevision: observedRevision(wsAId, post.id),
       note: 'Take a look at the intro please.',
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json() as { internalNote?: string };
-    expect(body.internalNote).toBe('Take a look at the intro please.');
+    const body = await res.json() as { clientNote?: string; internalNote?: string };
+    expect(body.clientNote).toBe('Take a look at the intro please.');
+    expect(body.internalNote).toBeUndefined();
   });
 
   it('emails the client, broadcasts, and logs an activity', async () => {
     const post = seedPost(wsAId);
 
-    await postJson(`/api/content-requests/${wsAId}/posts/${post.id}/send-to-client`, {});
+    await postJson(`/api/content-requests/${wsAId}/posts/${post.id}/send-to-client`, {
+      expectedRevision: observedRevision(wsAId, post.id),
+    });
 
     expect(emailState.clientPostReady).toHaveLength(1);
     expect(emailState.clientPostReady[0]).toMatchObject({ clientEmail: 'client-a@example.com', topic: post.title });
@@ -185,7 +195,9 @@ describe('POST /api/content-requests/:workspaceId/posts/:postId/send-to-client',
   });
 
   it('returns 404 for a missing post', async () => {
-    const res = await postJson(`/api/content-requests/${wsAId}/posts/post_missing/send-to-client`, {});
+    const res = await postJson(`/api/content-requests/${wsAId}/posts/post_missing/send-to-client`, {
+      expectedRevision: 0,
+    });
 
     expect(res.status).toBe(404);
     const body = await res.json() as { error: string };
@@ -196,7 +208,9 @@ describe('POST /api/content-requests/:workspaceId/posts/:postId/send-to-client',
     const post = seedPost(wsAId);
 
     // wsB does not own this post — the service looks it up under wsB and finds nothing.
-    const res = await postJson(`/api/content-requests/${wsBId}/posts/${post.id}/send-to-client`, {});
+    const res = await postJson(`/api/content-requests/${wsBId}/posts/${post.id}/send-to-client`, {
+      expectedRevision: 0,
+    });
 
     expect(res.status).toBe(404);
     expect(emailState.clientPostReady).toHaveLength(0);
@@ -206,7 +220,9 @@ describe('POST /api/content-requests/:workspaceId/posts/:postId/send-to-client',
   it('makes the sent post reach the unified inbox as awaiting_client', async () => {
     const post = seedPost(wsAId);
 
-    const res = await postJson(`/api/content-requests/${wsAId}/posts/${post.id}/send-to-client`, {});
+    const res = await postJson(`/api/content-requests/${wsAId}/posts/${post.id}/send-to-client`, {
+      expectedRevision: observedRevision(wsAId, post.id),
+    });
     const body = await res.json() as { id: string };
 
     const deliverables = listClientFacingDeliverables(wsAId);
@@ -214,5 +230,24 @@ describe('POST /api/content-requests/:workspaceId/posts/:postId/send-to-client',
     expect(projected).toBeDefined();
     expect(projected?.status).toBe('awaiting_client');
     expect(projected?.type).toBe('content_request');
+  });
+
+  it('rejects a stale send without creating a request or emitting side effects', async () => {
+    const post = seedPost(wsAId);
+    const staleRevision = observedRevision(wsAId, post.id);
+    updatePostField(wsAId, post.id, { title: 'Newer operator title' }, staleRevision);
+
+    const res = await postJson(`/api/content-requests/${wsAId}/posts/${post.id}/send-to-client`, {
+      expectedRevision: staleRevision,
+    });
+
+    expect(res.status).toBe(409);
+    expect(db.prepare(
+      'SELECT COUNT(*) AS count FROM content_topic_requests WHERE workspace_id = ?',
+    ).get(wsAId)).toEqual({ count: 0 });
+    expect(emailState.clientPostReady).toHaveLength(0);
+    expect(broadcastState.calls).toHaveLength(0);
+    expect(activityCount(wsAId, 'post_sent_for_review')).toBe(0);
+    expect(getPost(wsAId, post.id)?.title).toBe('Newer operator title');
   });
 });

@@ -6,7 +6,7 @@ import {
   listBriefs as readBriefs,
 } from './content-brief-read-model.js';
 import type { KeywordMetrics, RelatedKeyword } from './seo-data-provider.js';
-import { callAI } from './ai.js';
+import { callAI, renderAIProviderInput, type AICallResult } from './ai.js';
 import { buildReferenceContext, buildSerpContext, buildStyleExampleContext } from './web-scraper.js';
 import type { ScrapedPage } from './web-scraper.js';
 import type { AnalyticsInsight } from '../shared/types/analytics.js';
@@ -15,7 +15,13 @@ import { buildSystemPrompt } from './prompt-assembly.js';
 import { sanitizeQueryForPrompt } from './utils/text.js';
 
 export type { ContentBrief } from '../shared/types/content.ts';
-import type { ContentBrief, ContentGenerationStyle, StrategyCardContext } from '../shared/types/content.ts';
+import type {
+  ContentBrief,
+  ContentGenerationStyle,
+  PersistedContentBrief,
+  StrategyCardContext,
+} from '../shared/types/content.ts';
+import type { GenerationProvenance } from '../shared/types/ai-execution.js';
 import { outlineItemSchema } from './schemas/content-schemas.js';
 import {
   parseContentBriefOutline,
@@ -33,8 +39,16 @@ import {
   resolveContentGenerationStyle,
 } from './page-type-copy-contract.js';
 import type { EeatAssetRecommendation } from '../shared/types/eeat-assets.js';
+import {
+  buildGenerationProvenance,
+  fingerprintRenderedAIInput,
+  GenerationRevisionConflictError,
+} from './generation-provenance.js';
+import { canonicalGenerationProvenanceSchema } from './schemas/generation-provenance.js';
+import { throwIfSignalAborted } from './abort-helpers.js';
 
 const log = createLogger('content-brief');
+const BRIEF_GENERATION_CANCELLED_MESSAGE = 'Content brief generation cancelled';
 
 type ContentGenerationLearningsDomain = NonNullable<IntelligenceOptions['learningsDomain']>;
 
@@ -168,7 +182,7 @@ const stmts = createStmtCache(() => ({
             page_type, reference_urls, real_people_also_ask, real_top_results,
             keyword_locked, keyword_source, keyword_validation, template_id,
             title_variants, meta_desc_variants, generation_style, source_evidence,
-            superseded_by)
+            superseded_by, generation_revision, generation_provenance)
          VALUES
            (@id, @workspace_id, @target_keyword, @secondary_keywords, @suggested_title,
             @suggested_meta_desc, @outline, @word_count_target, @intent, @audience,
@@ -179,9 +193,9 @@ const stmts = createStmtCache(() => ({
             @page_type, @reference_urls, @real_people_also_ask, @real_top_results,
             @keyword_locked, @keyword_source, @keyword_validation, @template_id,
             @title_variants, @meta_desc_variants, @generation_style, @source_evidence,
-            @superseded_by)`,
+            @superseded_by, @generation_revision, @generation_provenance)`,
   ),
-  update: db.prepare(
+  updateHuman: db.prepare(
     `UPDATE content_briefs SET
            target_keyword = @target_keyword, secondary_keywords = @secondary_keywords,
            suggested_title = @suggested_title, suggested_meta_desc = @suggested_meta_desc,
@@ -200,15 +214,106 @@ const stmts = createStmtCache(() => ({
            keyword_validation = @keyword_validation, template_id = @template_id,
            title_variants = @title_variants, meta_desc_variants = @meta_desc_variants,
            generation_style = @generation_style, source_evidence = @source_evidence,
-           superseded_by = @superseded_by
+           superseded_by = @superseded_by,
+           generation_revision = generation_revision + 1
          WHERE id = @id AND workspace_id = @workspace_id`,
+  ),
+  updateHumanExpected: db.prepare(
+    `UPDATE content_briefs SET
+           target_keyword = @target_keyword, secondary_keywords = @secondary_keywords,
+           suggested_title = @suggested_title, suggested_meta_desc = @suggested_meta_desc,
+           outline = @outline, word_count_target = @word_count_target, intent = @intent,
+           audience = @audience, competitor_insights = @competitor_insights,
+           internal_link_suggestions = @internal_link_suggestions,
+           executive_summary = @executive_summary, content_format = @content_format,
+           tone_and_style = @tone_and_style, people_also_ask = @people_also_ask,
+           topical_entities = @topical_entities, serp_analysis = @serp_analysis,
+           difficulty_score = @difficulty_score, traffic_potential = @traffic_potential,
+           cta_recommendations = @cta_recommendations, eeat_guidance = @eeat_guidance,
+           content_checklist = @content_checklist, schema_recommendations = @schema_recommendations,
+           page_type = @page_type, reference_urls = @reference_urls,
+           real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results,
+           keyword_locked = @keyword_locked, keyword_source = @keyword_source,
+           keyword_validation = @keyword_validation, template_id = @template_id,
+           title_variants = @title_variants, meta_desc_variants = @meta_desc_variants,
+           generation_style = @generation_style, source_evidence = @source_evidence,
+           superseded_by = @superseded_by,
+           generation_revision = generation_revision + 1
+         WHERE id = @id AND workspace_id = @workspace_id
+           AND generation_revision = @expected_generation_revision`,
+  ),
+  updateGenerated: db.prepare(
+    `UPDATE content_briefs SET
+           target_keyword = @target_keyword, secondary_keywords = @secondary_keywords,
+           suggested_title = @suggested_title, suggested_meta_desc = @suggested_meta_desc,
+           outline = @outline, word_count_target = @word_count_target, intent = @intent,
+           audience = @audience, competitor_insights = @competitor_insights,
+           internal_link_suggestions = @internal_link_suggestions,
+           executive_summary = @executive_summary, content_format = @content_format,
+           tone_and_style = @tone_and_style, people_also_ask = @people_also_ask,
+           topical_entities = @topical_entities, serp_analysis = @serp_analysis,
+           difficulty_score = @difficulty_score, traffic_potential = @traffic_potential,
+           cta_recommendations = @cta_recommendations, eeat_guidance = @eeat_guidance,
+           content_checklist = @content_checklist, schema_recommendations = @schema_recommendations,
+           page_type = @page_type, reference_urls = @reference_urls,
+           real_people_also_ask = @real_people_also_ask, real_top_results = @real_top_results,
+           keyword_locked = @keyword_locked, keyword_source = @keyword_source,
+           keyword_validation = @keyword_validation, template_id = @template_id,
+           title_variants = @title_variants, meta_desc_variants = @meta_desc_variants,
+           generation_style = @generation_style, source_evidence = @source_evidence,
+           superseded_by = @superseded_by,
+           generation_revision = generation_revision + 1,
+           generation_provenance = @generation_provenance
+         WHERE id = @id AND workspace_id = @workspace_id
+           AND generation_revision = @expected_generation_revision`,
+  ),
+  markSuperseded: db.prepare(
+    `UPDATE content_briefs
+     SET superseded_by = @successorId,
+         generation_revision = generation_revision + 1
+     WHERE id = @id AND workspace_id = @workspaceId
+       AND generation_revision = @expectedRevision
+       AND superseded_by IS NULL`,
+  ),
+  bumpRevision: db.prepare(
+    `UPDATE content_briefs
+     SET generation_revision = generation_revision + 1
+     WHERE id = @id AND workspace_id = @workspaceId`,
+  ),
+  bumpRevisionExpected: db.prepare(
+    `UPDATE content_briefs
+     SET generation_revision = generation_revision + 1
+     WHERE id = @id AND workspace_id = @workspaceId
+       AND generation_revision = @expectedRevision`,
   ),
   deleteById: db.prepare(
     `DELETE FROM content_briefs WHERE id = ? AND workspace_id = ?`,
   ),
+  deleteByRevision: db.prepare(
+    `DELETE FROM content_briefs
+     WHERE id = @id AND workspace_id = @workspaceId
+       AND generation_revision = @expectedRevision`,
+  ),
 }));
 
-function briefToParams(brief: ContentBrief): Record<string, unknown> {
+interface BriefGenerationTracking {
+  generationRevision: number;
+  generationProvenance: GenerationProvenance | null;
+}
+
+function briefToParams(
+  brief: ContentBrief,
+  tracking: BriefGenerationTracking = {
+    generationRevision: brief.generationRevision ?? 0,
+    generationProvenance: brief.generationProvenance ?? null,
+  },
+): Record<string, unknown> {
+  if (!Number.isInteger(tracking.generationRevision) || tracking.generationRevision < 0) {
+    throw new Error('Content brief generation revision must be a non-negative integer');
+  }
+  const provenance = tracking.generationProvenance
+    ? canonicalGenerationProvenanceSchema.parse(tracking.generationProvenance)
+    : null;
   return {
     id: brief.id,
     workspace_id: brief.workspaceId,
@@ -248,7 +353,41 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
     generation_style: resolveContentGenerationStyle(brief.generationStyle),
     source_evidence: brief.sourceEvidence ? JSON.stringify(brief.sourceEvidence) : null,
     superseded_by: brief.supersededBy ?? null,
+    generation_revision: tracking.generationRevision,
+    generation_provenance: provenance ? JSON.stringify(provenance) : null,
   };
+}
+
+/**
+ * Human edits preserve provenance verbatim in SQLite; their UPDATE statements do
+ * not write that column. Passing null here avoids treating a read-compatible
+ * legacy fingerprint as a new provenance write while still serializing every
+ * mutable brief field through the canonical row mapper.
+ */
+function humanBriefUpdateParams(
+  brief: ContentBrief,
+  generationRevision: number,
+): Record<string, unknown> {
+  return briefToParams(brief, {
+    generationRevision,
+    generationProvenance: null,
+  });
+}
+
+function insertBrief(
+  workspaceId: string,
+  brief: ContentBrief,
+  tracking: BriefGenerationTracking,
+): PersistedContentBrief {
+  if (brief.workspaceId !== workspaceId) {
+    throw new Error(
+      `upsertBrief: brief.workspaceId (${brief.workspaceId}) does not match workspaceId param (${workspaceId})`,
+    );
+  }
+  stmts().insert.run(briefToParams(brief, tracking));
+  const inserted = getBrief(workspaceId, brief.id);
+  if (!inserted) throw new Error('Content brief insert did not produce a readable row');
+  return inserted;
 }
 
 /**
@@ -256,33 +395,174 @@ function briefToParams(brief: ContentBrief): Record<string, unknown> {
  * Note: the underlying prepared statement is plain INSERT, not INSERT OR REPLACE.
  */
 export function upsertBrief(workspaceId: string, brief: ContentBrief): void {
-  if (brief.workspaceId !== workspaceId) {
-    throw new Error(
-      `upsertBrief: brief.workspaceId (${brief.workspaceId}) does not match workspaceId param (${workspaceId})`,
-    );
-  }
-  stmts().insert.run(briefToParams(brief));
+  insertBrief(workspaceId, brief, {
+    generationRevision: brief.generationRevision ?? 0,
+    generationProvenance: brief.generationProvenance ?? null,
+  });
 }
 
-export function listBriefs(workspaceId: string, opts?: { includeSuperseded?: boolean }): ContentBrief[] {
+/** Persist a freshly generated, already-validated brief exactly once at revision 1. */
+export function persistGeneratedBrief(
+  workspaceId: string,
+  brief: ContentBrief,
+): PersistedContentBrief {
+  if (!brief.generationProvenance) {
+    throw new Error('Generated content brief persistence requires provenance');
+  }
+  return insertBrief(workspaceId, brief, {
+    generationRevision: 1,
+    generationProvenance: brief.generationProvenance,
+  });
+}
+
+export function listBriefs(workspaceId: string, opts?: { includeSuperseded?: boolean }): PersistedContentBrief[] {
   return readBriefs(workspaceId, opts);
 }
 
-export function getBrief(workspaceId: string, briefId: string): ContentBrief | undefined {
+export function getBrief(workspaceId: string, briefId: string): PersistedContentBrief | undefined {
   return readBrief(workspaceId, briefId);
 }
 
-export function updateBrief(workspaceId: string, briefId: string, updates: Partial<Omit<ContentBrief, 'id' | 'workspaceId' | 'createdAt'>>): ContentBrief | null {
-  const existing = getBrief(workspaceId, briefId);
-  if (!existing) return null;
-  Object.assign(existing, updates);
-  stmts().update.run(briefToParams(existing));
-  return existing;
+export type ContentBriefHumanUpdates = Partial<Omit<
+  ContentBrief,
+  'id' | 'workspaceId' | 'createdAt' | 'generationRevision' | 'generationProvenance'
+>>;
+
+function hasBriefChanges(
+  existing: PersistedContentBrief,
+  updates: ContentBriefHumanUpdates,
+): boolean {
+  return Object.entries(updates).some(([key, value]) => {
+    if (value === undefined) return false;
+    const current = existing[key as keyof ContentBriefHumanUpdates];
+    if (value !== null && typeof value === 'object') {
+      return JSON.stringify(current) !== JSON.stringify(value);
+    }
+    return current !== value;
+  });
+}
+
+function mergeBriefUpdates(
+  existing: PersistedContentBrief,
+  updates: ContentBriefHumanUpdates,
+): ContentBrief {
+  const definedUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([, value]) => value !== undefined),
+  ) as ContentBriefHumanUpdates;
+  return { ...existing, ...definedUpdates };
+}
+
+export function updateBrief(
+  workspaceId: string,
+  briefId: string,
+  updates: ContentBriefHumanUpdates,
+): PersistedContentBrief | null {
+  return db.transaction(() => {
+    const existing = getBrief(workspaceId, briefId);
+    if (!existing) return null;
+    if (!hasBriefChanges(existing, updates)) return existing;
+    const next = mergeBriefUpdates(existing, updates);
+    const result = stmts().updateHuman.run(
+      humanBriefUpdateParams(next, existing.generationRevision),
+    );
+    if (result.changes !== 1) return null;
+    return getBrief(workspaceId, briefId) ?? null;
+  }).immediate();
+}
+
+export function updateBriefAtRevision(
+  workspaceId: string,
+  briefId: string,
+  expectedRevision: number,
+  updates: ContentBriefHumanUpdates,
+): PersistedContentBrief | null {
+  return db.transaction(() => {
+    const existing = getBrief(workspaceId, briefId);
+    if (!existing) return null;
+    if (existing.generationRevision !== expectedRevision) {
+      throw new GenerationRevisionConflictError('content_brief', briefId, expectedRevision);
+    }
+    if (!hasBriefChanges(existing, updates)) return existing;
+    const next = mergeBriefUpdates(existing, updates);
+    const result = stmts().updateHumanExpected.run({
+      ...humanBriefUpdateParams(next, existing.generationRevision),
+      expected_generation_revision: expectedRevision,
+    });
+    if (result.changes !== 1) {
+      throw new GenerationRevisionConflictError('content_brief', briefId, expectedRevision);
+    }
+    return getBrief(workspaceId, briefId) ?? null;
+  }).immediate();
+}
+
+/** Commit generated fields only when the exact pre-generation revision still owns the row. */
+export function commitGeneratedBriefUpdate(
+  workspaceId: string,
+  briefId: string,
+  expectedRevision: number,
+  updates: ContentBriefHumanUpdates,
+  provenance: GenerationProvenance,
+): PersistedContentBrief {
+  return db.transaction(() => {
+    const current = getBrief(workspaceId, briefId);
+    if (!current || current.generationRevision !== expectedRevision) {
+      throw new GenerationRevisionConflictError('content_brief', briefId, expectedRevision);
+    }
+    const next = mergeBriefUpdates(current, updates);
+    const result = stmts().updateGenerated.run({
+      ...briefToParams(next, {
+        generationRevision: current.generationRevision,
+        generationProvenance: provenance,
+      }),
+      expected_generation_revision: expectedRevision,
+    });
+    if (result.changes !== 1) {
+      throw new GenerationRevisionConflictError('content_brief', briefId, expectedRevision);
+    }
+    const saved = getBrief(workspaceId, briefId);
+    if (!saved) throw new Error('Generated content brief commit did not produce a readable row');
+    return saved;
+  }).immediate();
+}
+
+/** Invalidate in-flight generation when another module makes linked state authoritative. */
+export function bumpBriefGenerationRevision(
+  workspaceId: string,
+  briefId: string,
+  expectedRevision?: number,
+): PersistedContentBrief | null {
+  const result = expectedRevision === undefined
+    ? stmts().bumpRevision.run({ id: briefId, workspaceId })
+    : stmts().bumpRevisionExpected.run({
+        id: briefId,
+        workspaceId,
+        expectedRevision,
+      });
+  if (result.changes !== 1) {
+    const current = getBrief(workspaceId, briefId);
+    if (!current) return null;
+    if (expectedRevision !== undefined) {
+      throw new GenerationRevisionConflictError('content_brief', briefId, expectedRevision);
+    }
+    return null;
+  }
+  return getBrief(workspaceId, briefId) ?? null;
 }
 
 export function deleteBrief(workspaceId: string, briefId: string): boolean {
   const info = stmts().deleteById.run(briefId, workspaceId);
   return info.changes > 0;
+}
+
+export function deleteBriefAtRevision(
+  workspaceId: string,
+  briefId: string,
+  expectedRevision: number,
+): boolean {
+  const info = stmts().deleteByRevision.run({ id: briefId, workspaceId, expectedRevision });
+  if (info.changes === 1) return true;
+  if (!getBrief(workspaceId, briefId)) return false;
+  throw new GenerationRevisionConflictError('content_brief', briefId, expectedRevision);
 }
 
 // Page-type-specific configuration: word counts, section counts, content style, and prompt instructions
@@ -696,6 +976,44 @@ function formatContentGenerationPromptBlock(promptContext: string): string {
   return `\n\n${promptContext}${localGuidance}`;
 }
 
+export interface BriefAICommitOptions {
+  /** Revision observed before paid work. Required by background/integration callers. */
+  expectedRevision?: number;
+  /** Logical background-job correlation shared with the provider execution. */
+  executionChainId?: string;
+  /** Cooperative cancellation owned by the background-job worker. */
+  signal?: AbortSignal;
+}
+
+function latestEvidenceTimestamp(values: Array<string | undefined>): string | undefined {
+  return values
+    .filter((value): value is string => Boolean(value) && Number.isFinite(Date.parse(value!)))
+    .sort()
+    .at(-1);
+}
+
+function briefGenerationProvenance(
+  result: AICallResult,
+  input: {
+    system: string;
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    researchMode: boolean;
+  },
+  evidenceCapturedAt?: string,
+): GenerationProvenance {
+  return buildGenerationProvenance({
+    accepted: {
+      execution: result.execution,
+      inputFingerprint: fingerprintRenderedAIInput(renderAIProviderInput({
+        provider: 'openai',
+        ...input,
+      })),
+    },
+    executionChainId: result.execution.executionChainId,
+    evidenceCapturedAt,
+  });
+}
+
 function buildBriefIntelligenceBlockFromSlice(
   targetKeyword: string,
   workspaceId: string,
@@ -728,11 +1046,24 @@ export async function regenerateBrief(
   workspaceId: string,
   existingBrief: ContentBrief,
   feedback: string,
-): Promise<ContentBrief> {
+  options: BriefAICommitOptions = {},
+): Promise<PersistedContentBrief> {
+  throwIfSignalAborted(options.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const { promptContext } = await buildContentGenerationContext(workspaceId, {
+  const currentBrief = getBrief(workspaceId, existingBrief.id);
+  if (!currentBrief) throw new Error('Brief not found');
+  const expectedRevision = options.expectedRevision
+    ?? existingBrief.generationRevision
+    ?? currentBrief.generationRevision;
+  if (currentBrief.generationRevision !== expectedRevision || currentBrief.supersededBy) {
+    throw new GenerationRevisionConflictError('content_brief', existingBrief.id, expectedRevision);
+  }
+  // The persisted row is the authority for every prompt and finalization input.
+  existingBrief = currentBrief;
+
+  const { intelligence, promptContext } = await buildContentGenerationContext(workspaceId, {
     slices: ['seoContext'],
     tokenBudget: 3200,
   });
@@ -817,6 +1148,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     'You are an expert content strategist. Regenerate the requested brief and return only valid JSON matching the requested schema.',
   );
 
+  throwIfSignalAborted(options.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const aiResult = await callAI({
     operation: 'content-brief-regenerate',
     model: 'gpt-5.4',
@@ -827,10 +1159,25 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     responseFormat: { type: 'json_object' },
     researchMode: true,
     workspaceId,
+    executionChainId: options.executionChainId,
+    signal: options.signal,
   });
+  throwIfSignalAborted(options.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
 
   const raw = aiResult.text || '{}';
   const parsed = parseContentBriefUpdate(raw);
+  const provenance = briefGenerationProvenance(
+    aiResult,
+    {
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }],
+      researchMode: true,
+    },
+    latestEvidenceTimestamp([
+      intelligence?.assembledAt,
+      existingBrief.sourceEvidence?.capturedAt,
+    ]),
+  );
 
   // Create a new brief ID — preserves the old one for history
   const newBrief: ContentBrief = {
@@ -877,19 +1224,30 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     generationStyle,
   };
 
-  // Bug 3 fix: insert the new brief and mark the old one superseded in a single
-  // transaction so the list never shows two live entries for the same keyword.
-  db.transaction(() => {
-    upsertBrief(workspaceId, newBrief);
-    // Guard: re-read the old brief inside the transaction so the UPDATE operates
-    // on the current row state, not the snapshot taken before the AI call.
+  // Claim the source revision before inserting the successor. The IMMEDIATE
+  // transaction makes lineage and successor creation one rollback boundary.
+  return db.transaction(() => {
     const currentOld = getBrief(workspaceId, existingBrief.id);
-    if (currentOld && !currentOld.supersededBy) {
-      updateBrief(workspaceId, existingBrief.id, { supersededBy: newBrief.id });
+    if (!currentOld
+      || currentOld.generationRevision !== expectedRevision
+      || currentOld.supersededBy) {
+      throw new GenerationRevisionConflictError('content_brief', existingBrief.id, expectedRevision);
     }
-  })();
-
-  return newBrief;
+    const inserted = insertBrief(workspaceId, newBrief, {
+      generationRevision: 1,
+      generationProvenance: provenance,
+    });
+    const lineage = stmts().markSuperseded.run({
+      id: existingBrief.id,
+      workspaceId,
+      successorId: newBrief.id,
+      expectedRevision,
+    });
+    if (lineage.changes !== 1) {
+      throw new GenerationRevisionConflictError('content_brief', existingBrief.id, expectedRevision);
+    }
+    return inserted;
+  }).immediate();
 }
 
 /**
@@ -900,11 +1258,17 @@ export async function regenerateOutline(
   workspaceId: string,
   briefId: string,
   feedback?: string,
-): Promise<ContentBrief | null> {
+  options: BriefAICommitOptions = {},
+): Promise<PersistedContentBrief | null> {
+  throwIfSignalAborted(options.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const existingBrief = getBrief(workspaceId, briefId);
   if (!existingBrief) return null;
+  const expectedRevision = options.expectedRevision ?? existingBrief.generationRevision;
+  if (existingBrief.generationRevision !== expectedRevision || existingBrief.supersededBy) {
+    throw new GenerationRevisionConflictError('content_brief', briefId, expectedRevision);
+  }
 
-  const { promptContext } = await buildContentGenerationContext(workspaceId, {
+  const { intelligence, promptContext } = await buildContentGenerationContext(workspaceId, {
     slices: ['seoContext'],
     tokenBudget: 3200,
   });
@@ -958,6 +1322,7 @@ Rules:
     'You are an expert SEO content strategist. Return only valid JSON for the outline array requested by the user prompt.',
   );
 
+  throwIfSignalAborted(options.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const aiResult = await callAI({
     operation: 'content-brief-outline',
     model: 'gpt-5.4',
@@ -967,7 +1332,10 @@ Rules:
     temperature: 0.6,
     researchMode: true,
     workspaceId,
+    executionChainId: options.executionChainId,
+    signal: options.signal,
   });
+  throwIfSignalAborted(options.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
 
   // Parse the outline from the response — must be a bare JSON array (see ai-content-brief.ts)
   const outlineRaw = aiResult.text || '[]';
@@ -1010,10 +1378,26 @@ Rules:
   });
 
   const newOutline = normalizeOutlineForPageType(normalizedItems, existingBrief.pageType);
+  const provenance = briefGenerationProvenance(
+    aiResult,
+    {
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }],
+      researchMode: true,
+    },
+    latestEvidenceTimestamp([
+      intelligence?.assembledAt,
+      existingBrief.sourceEvidence?.capturedAt,
+    ]),
+  );
 
-  // Update only the outline field
-  const updated = updateBrief(workspaceId, briefId, { outline: newOutline });
-  return updated;
+  return commitGeneratedBriefUpdate(
+    workspaceId,
+    briefId,
+    expectedRevision,
+    { outline: newOutline },
+    provenance,
+  );
 }
 
 export async function generateBrief(
@@ -1067,12 +1451,19 @@ export async function generateBrief(
     decayQueryContext?: string;
     /** Admin-selected writing style for the brief and downstream post generation. */
     generationStyle?: ContentGenerationStyle;
+    /** Persisted evidence envelope assembled before paid generation. */
+    sourceEvidence?: ContentBrief['sourceEvidence'];
   },
   options?: {
     /** Persist generated brief row to content_briefs (default: true). */
     persist?: boolean;
+    /** Logical background-job correlation shared with the provider execution. */
+    executionChainId?: string;
+    /** Cooperative cancellation owned by the background-job worker. */
+    signal?: AbortSignal;
   },
 ): Promise<ContentBrief> {
+  throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!openaiKey) throw new Error('OPENAI_API_KEY not configured');
 
@@ -1087,6 +1478,12 @@ export async function generateBrief(
     slices: ['seoContext', 'eeatAssets'],
     tokenBudget: 3600,
   });
+  const evidenceCapturedAtCandidates: Array<string | undefined> = [
+    seoContextResult?.assembledAt,
+    context.sourceEvidence?.capturedAt,
+    ...((context.scrapedReferences ?? []).map(page => page.fetchedAt)),
+    ...((context.styleExamples ?? []).map(page => page.fetchedAt)),
+  ];
   const seo = seoContextResult.seoContext;
   const workspaceContextBlock = formatContentGenerationPromptBlock(seoPromptContext);
   const kwMapContext = formatPageMapForPrompt(seo);
@@ -1306,6 +1703,7 @@ The outline sections MUST match the following template sections in order. You ma
       slices: ['insights'],
       includeLocalSeo: false,
     });
+    evidenceCapturedAtCandidates.push(intelligence?.assembledAt);
     intelligenceBlock = buildBriefIntelligenceBlockFromSlice(
       targetKeyword,
       workspaceId,
@@ -1319,11 +1717,12 @@ The outline sections MUST match the following template sections in order. You ma
   let learningsBlock = '';
   let learningsStatusBlock = '';
   try {
-    const { promptContext, learningsAvailability } = await buildContentGenerationContext(workspaceId, {
+    const { intelligence, promptContext, learningsAvailability } = await buildContentGenerationContext(workspaceId, {
       slices: ['learnings'],
       learningsDomain: 'content',
       includeLocalSeo: false,
     });
+    evidenceCapturedAtCandidates.push(intelligence?.assembledAt);
     if (hasMeaningfulBuilderPromptContext(promptContext)) {
       learningsBlock = `\n\n${promptContext}`;
     } else {
@@ -1444,7 +1843,9 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   const systemInstructions = 'You are an expert SEO content strategist. Generate a right-sized content brief as a JSON object. Return ONLY valid JSON matching the expected schema — no markdown fences, no explanation.';
   const systemPrompt = buildSystemPrompt(workspaceId, systemInstructions);
 
+  throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const aiResult = await callAI({
+    operation: 'content-brief-generate',
     model: 'gpt-5.4',
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
@@ -1452,12 +1853,23 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     temperature: 0.5,
     responseFormat: { type: 'json_object' },
     researchMode: true,
-    feature: 'content-brief',
     workspaceId,
+    executionChainId: options?.executionChainId,
+    signal: options?.signal,
   });
+  throwIfSignalAborted(options?.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
 
   const raw = aiResult.text || '{}';
   const parsed = parseContentBriefSchema(raw);
+  const provenance = briefGenerationProvenance(
+    aiResult,
+    {
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }],
+      researchMode: true,
+    },
+    latestEvidenceTimestamp(evidenceCapturedAtCandidates),
+  );
 
   const brief: ContentBrief = {
     id: `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -1502,11 +1914,19 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
     keywordValidation: context.keywordValidation || undefined,
     templateId: context.templateId || undefined,
     generationStyle,
+    sourceEvidence: context.sourceEvidence,
   };
 
   if (options?.persist !== false) {
-    upsertBrief(workspaceId, brief);
+    return insertBrief(workspaceId, brief, {
+      generationRevision: 1,
+      generationProvenance: provenance,
+    });
   }
 
-  return brief;
+  return {
+    ...brief,
+    generationRevision: 0,
+    generationProvenance: provenance,
+  };
 }

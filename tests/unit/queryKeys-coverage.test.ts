@@ -51,6 +51,7 @@ describe('queryKeys.admin content keys', () => {
 
   it('brief key includes briefId', () => {
     expect(queryKeys.admin.brief(WS, ID)).toEqual(['admin-brief', WS, ID]);
+    expect(queryKeys.admin.briefsDetailAll(WS)).toEqual(['admin-brief', WS]);
   });
 
   it('posts key shape', () => {

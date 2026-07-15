@@ -599,15 +599,28 @@ export async function runResourceScopedJobWorker<T>(
   try {
     return await worker(controller.signal);
   } finally {
-    const current = getJob(jobId);
-    if (current?.status === 'pending' || current?.status === 'running') {
-      updateJob(jobId, {
-        status: 'error',
-        message: 'Worker exited before recording a terminal result',
-        error: 'Background worker exited without a terminal status',
-      });
+    try {
+      const current = getJob(jobId);
+      if (current?.status === 'pending' || current?.status === 'running') {
+        updateJob(jobId, {
+          status: 'error',
+          message: 'Worker exited before recording a terminal result',
+          error: 'Background worker exited without a terminal status',
+        });
+      }
+    } finally {
+      try {
+        unregisterAbort(jobId);
+      } finally {
+        // The worker has drained, so a failed fallback terminal write must not
+        // strand its resource claim until process restart. Successful done/error
+        // writes already released the claim; this is an idempotent safety net.
+        const drained = getJob(jobId);
+        if (drained?.status === 'pending' || drained?.status === 'running') {
+          finalizeJobResourceClaims(jobId);
+        }
+      }
     }
-    unregisterAbort(jobId);
   }
 }
 

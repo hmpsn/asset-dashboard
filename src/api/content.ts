@@ -3,6 +3,8 @@ import { get, post, patch, put, del, getSafe, getOptional, getText } from './cli
 import type {
   ContentBrief,
   GeneratedPost,
+  PublicContentPost,
+  PublicContentTopicRequest,
   ContentTopicRequest,
   ContentTemplate,
   ContentMatrix,
@@ -11,8 +13,8 @@ import type {
   KeywordRecommendationResult,
   AiFixRequest,
   BriefTemplateCrossrefMatch,
+  ContentCalendarDateSuggestionsResponse,
 } from '../../shared/types/content';
-import type { ClientContentRequest } from '../components/client/types';
 import type { CopySectionStatus, ClientSuggestion } from '../../shared/types/copy-pipeline';
 
 export interface PublicCopyEntryListItem {
@@ -57,11 +59,11 @@ export const contentBriefs = {
   generate: (wsId: string, body: Record<string, unknown>) =>
     post<ContentBrief>(`/api/content-briefs/${wsId}/generate`, body),
 
-  update: (wsId: string, briefId: string, body: Record<string, unknown>) =>
-    patch<ContentBrief>(`/api/content-briefs/${wsId}/${briefId}`, body),
+  update: (wsId: string, briefId: string, expectedRevision: number, body: Record<string, unknown>) =>
+    patch<ContentBrief>(`/api/content-briefs/${wsId}/${briefId}`, { ...body, expectedRevision }),
 
-  remove: (wsId: string, briefId: string) =>
-    del(`/api/content-briefs/${wsId}/${briefId}`),
+  remove: (wsId: string, briefId: string, expectedRevision: number) =>
+    del(`/api/content-briefs/${wsId}/${briefId}`, { expectedRevision }),
 
   validateKeyword: (wsId: string, keyword: string) =>
     post<{ keyword: string; valid: boolean; source: string; metrics: { volume: number; difficulty: number; cpc: number; validatedAt: string } | null; warnings?: string[]; message?: string }>(
@@ -79,49 +81,76 @@ export const contentBriefs = {
       null,
     ),
 
-  regenerateOutline: (wsId: string, briefId: string, feedback?: string) =>
-    post<ContentBrief>(`/api/content-briefs/${wsId}/${briefId}/regenerate-outline`, { feedback }),
+  regenerateOutline: (wsId: string, briefId: string, expectedRevision: number, feedback?: string) =>
+    post<ContentBrief>(`/api/content-briefs/${wsId}/${briefId}/regenerate-outline`, {
+      feedback,
+      expectedRevision,
+    }),
 };
 
 export const contentPosts = {
   list: (wsId: string) =>
     get<GeneratedPost[]>(`/api/content-posts/${wsId}`),
 
-  generate: (wsId: string, body: Record<string, unknown>) =>
+  generate: (wsId: string, body: {
+    briefId: string;
+    expectedBriefRevision: number;
+    generationStyle?: string;
+  }) =>
     post<GeneratedPost>(`/api/content-posts/${wsId}/generate`, body),
 
-  update: (wsId: string, postId: string, body: Record<string, unknown>) =>
-    patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}`, body),
+  update: (wsId: string, postId: string, expectedRevision: number, body: Record<string, unknown>) =>
+    patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}`, { ...body, expectedRevision }),
 
   // W6.6 (Forward-planning calendar): set or clear a post's planned publish date.
   // Pass an ISO string to schedule, or null to clear.
-  setPlannedDate: (wsId: string, postId: string, plannedPublishAt: string | null) =>
-    patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/planned-date`, { plannedPublishAt }),
+  setPlannedDate: (wsId: string, postId: string, expectedRevision: number, plannedPublishAt: string | null) =>
+    patch<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/planned-date`, {
+      plannedPublishAt,
+      expectedRevision,
+    }),
 
   // W6.6: propose publish dates for the workspace's unscheduled drafts.
   suggestDates: (wsId: string) =>
-    get<{ suggestions: Array<{ draftId: string; suggestedDate: string; reason: string; title: string }>; unscheduledCount: number }>(
+    get<ContentCalendarDateSuggestionsResponse>(
       `/api/content-posts/${wsId}/suggest-dates`,
     ),
 
-  remove: (wsId: string, postId: string) =>
-    del(`/api/content-posts/${wsId}/${postId}`),
+  remove: (wsId: string, postId: string, expectedRevision: number) =>
+    del(`/api/content-posts/${wsId}/${postId}`, { expectedRevision }),
 
   getById: (wsId: string, postId: string) =>
     get<GeneratedPost>(`/api/content-posts/${wsId}/${postId}`),
 
-  regenerateSection: (wsId: string, postId: string, body: Record<string, unknown>) =>
-    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/regenerate-section`, body),
+  regenerateSection: (
+    wsId: string,
+    postId: string,
+    expectedRevision: number,
+    expectedBriefRevision: number,
+    sectionIndex: number,
+  ) =>
+    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/regenerate-section`, {
+      sectionIndex,
+      expectedRevision,
+      expectedBriefRevision,
+    }),
 
   versions: (wsId: string, postId: string) =>
     getSafe<Array<{ id: string; createdAt: string; totalWordCount: number }>>(`/api/content-posts/${wsId}/${postId}/versions`, []),
 
-  revertVersion: (wsId: string, postId: string, versionId: string) =>
-    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/versions/${versionId}/revert`),
+  revertVersion: (wsId: string, postId: string, versionId: string, expectedRevision: number) =>
+    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/versions/${versionId}/revert`, {
+      expectedRevision,
+    }),
 
-  publishToWebflow: (wsId: string, postId: string, body?: { generateImage?: boolean }) =>
+  publishToWebflow: (
+    wsId: string,
+    postId: string,
+    expectedRevision: number,
+    body?: { generateImage?: boolean },
+  ) =>
     post<{ success: boolean; itemId?: string; slug?: string; isUpdate?: boolean; error?: string; post?: unknown }>(
-      `/api/content-posts/${wsId}/${postId}/publish-to-webflow`, body,
+      `/api/content-posts/${wsId}/${postId}/publish-to-webflow`, { ...body, expectedRevision },
     ),
 
   // W6.2: ai-review / ai-fix / score-voice now return 202 { jobId } and run on
@@ -129,24 +158,31 @@ export const contentPosts = {
   // and read the result off the terminal job (CONTENT_POST_REVIEW returns
   // { review, evidence }; CONTENT_POST_FIX returns the AiFixResult; voice score
   // returns { post }).
-  aiReview: (wsId: string, postId: string) =>
+  aiReview: (wsId: string, postId: string, expectedRevision: number) =>
     post<{ jobId: string }>(
       `/api/content-posts/${wsId}/${postId}/ai-review`,
+      { expectedRevision },
     ),
 
-  scoreVoice: (wsId: string, postId: string) =>
-    post<{ jobId: string }>(`/api/content-posts/${wsId}/${postId}/score-voice`, {}),
+  scoreVoice: (wsId: string, postId: string, expectedRevision: number) =>
+    post<{ jobId: string }>(`/api/content-posts/${wsId}/${postId}/score-voice`, { expectedRevision }),
 
-  aifix: (wsId: string, postId: string, body: AiFixRequest) =>
-    post<{ jobId: string }>(`/api/content-posts/${wsId}/${postId}/ai-fix`, body),
+  aifix: (wsId: string, postId: string, expectedRevision: number, body: AiFixRequest) =>
+    post<{ jobId: string }>(`/api/content-posts/${wsId}/${postId}/ai-fix`, {
+      ...body,
+      expectedRevision,
+    }),
+
+  applyAiFix: (wsId: string, postId: string, jobId: string) =>
+    post<GeneratedPost>(`/api/content-posts/${wsId}/${postId}/ai-fix/apply`, { jobId }),
 
   // Send a generated post to the client for review (POST-C1). Distinct from the internal
   // "Review" status bump — this creates a client-facing content_request (post_review) that
   // reaches the client inbox. Optional inline note per the Admin Send Convention.
-  sendToClient: (wsId: string, postId: string, note?: string) =>
+  sendToClient: (wsId: string, postId: string, expectedRevision: number, note?: string) =>
     post<ContentTopicRequest>(
       `/api/content-requests/${wsId}/posts/${postId}/send-to-client`,
-      note ? { note } : {},
+      { expectedRevision, ...(note ? { note } : {}) },
     ),
 };
 
@@ -168,31 +204,31 @@ export const contentRequests = {
 
 export const publicContent = {
   requests: (wsId: string) =>
-    getSafe<ClientContentRequest[]>(`/api/public/content-requests/${wsId}`, []),
+    getSafe<PublicContentTopicRequest[]>(`/api/public/content-requests/${wsId}`, []),
 
   requestTopic: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/public/content-requests/${wsId}`, body),
+    post<PublicContentTopicRequest>(`/api/public/content-requests/${wsId}`, body),
 
   createRequest: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/public/content-request/${wsId}`, body),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}`, body),
 
   submitRequest: (wsId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/public/content-request/${wsId}/submit`, body),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}/submit`, body),
 
   decline: (wsId: string, reqId: string, body?: Record<string, unknown>) =>
-    post<unknown>(`/api/public/content-request/${wsId}/${reqId}/decline`, body),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/decline`, body),
 
   approve: (wsId: string, reqId: string) =>
-    post<unknown>(`/api/public/content-request/${wsId}/${reqId}/approve`),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/approve`),
 
   requestChanges: (wsId: string, reqId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/public/content-request/${wsId}/${reqId}/request-changes`, body),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/request-changes`, body),
 
   comment: (wsId: string, reqId: string, body: Record<string, unknown>) =>
-    post<unknown>(`/api/public/content-request/${wsId}/${reqId}/comment`, body),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/comment`, body),
 
   upgrade: (wsId: string, reqId: string) =>
-    post<unknown>(`/api/public/content-request/${wsId}/${reqId}/upgrade`),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/upgrade`),
 
   briefPreview: (wsId: string, briefId: string) =>
     getOptional<unknown>(`/api/public/content-brief/${wsId}/${briefId}`),
@@ -208,10 +244,17 @@ export const publicCopyReview = {
   sections: (wsId: string, entryId: string) =>
     get<{ sections: PublicClientCopySection[] }>(`/api/public/copy/${wsId}/entry/${entryId}/sections`),
 
-  approveSection: (wsId: string, sectionId: string) =>
-    post<{ section: PublicClientCopySection }>(`/api/public/copy/${wsId}/section/${sectionId}/approve`),
+  approveSection: (wsId: string, sectionId: string, expectedUpdatedAt: string) =>
+    post<{ section: PublicClientCopySection }>(
+      `/api/public/copy/${wsId}/section/${sectionId}/approve`,
+      { expectedUpdatedAt },
+    ),
 
-  suggestEdit: (wsId: string, sectionId: string, body: { originalText: string; suggestedText: string }) =>
+  suggestEdit: (wsId: string, sectionId: string, body: {
+    originalText: string;
+    suggestedText: string;
+    expectedUpdatedAt: string;
+  }) =>
     post<{ section: PublicClientCopySection }>(`/api/public/copy/${wsId}/section/${sectionId}/suggest`, body),
 };
 
@@ -219,22 +262,25 @@ export const publicCopyReview = {
 
 export const publicPostReview = {
   getPost: (wsId: string, postId: string) =>
-    get<GeneratedPost>(`/api/public/content-posts/${wsId}/${postId}`),
+    get<PublicContentPost>(`/api/public/content-posts/${wsId}/${postId}`),
 
-  clientEdit: (wsId: string, postId: string, updates: {
+  clientEdit: (wsId: string, postId: string, expectedUpdatedAt: string, updates: {
     title?: string;
     metaDescription?: string;
     introduction?: string;
     sections?: Array<{ index: number; heading: string; content: string; wordCount: number }>;
     conclusion?: string;
   }) =>
-    patch<GeneratedPost>(`/api/public/content-posts/${wsId}/${postId}/client-edit`, updates),
+    patch<PublicContentPost>(`/api/public/content-posts/${wsId}/${postId}/client-edit`, {
+      expectedUpdatedAt,
+      ...updates,
+    }),
 
   approvePost: (wsId: string, reqId: string) =>
-    post<ContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/approve-post`),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/approve-post`),
 
   requestPostChanges: (wsId: string, reqId: string, feedback: string) =>
-    post<ContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/request-post-changes`, { feedback }),
+    post<PublicContentTopicRequest>(`/api/public/content-request/${wsId}/${reqId}/request-post-changes`, { feedback }),
 };
 
 // ── Content Templates (scalable content planning) ──────────────
