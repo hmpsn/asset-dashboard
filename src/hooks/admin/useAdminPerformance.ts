@@ -119,7 +119,9 @@ function asPageSpeedSnapshot(value: unknown): PerformanceSnapshot<SiteSpeedResul
 }
 
 function asSiteSpeedResult(value: unknown): SiteSpeedResult {
-  return value as SiteSpeedResult;
+  const result = value as SiteSpeedResult;
+  if (result.pages.length === 0) throw new Error('No pages could be tested');
+  return result;
 }
 
 function asPageSpeedResult(value: unknown): PageSpeedResult {
@@ -190,7 +192,7 @@ export function useAdminPageSpeedBulk(workspaceId: string, siteId: string | unde
       asSiteSpeedResult(await pageWeight.pagespeedBulk(siteId ?? '', strategy, maxPages, workspaceId))
     ),
     onSuccess: (result, variables) => {
-      if (!siteId) return;
+      if (!siteId || result.pages.length === 0) return;
       queryClient.setQueryData<PerformanceSnapshot<SiteSpeedResult>>(
         adminPerformanceKeys.pageSpeedSnapshot(workspaceId, siteId, variables.strategy),
         { siteId, createdAt: new Date().toISOString(), result },
