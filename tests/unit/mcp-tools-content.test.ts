@@ -70,7 +70,12 @@ vi.mock('../../server/domains/content/send-brief-to-client.js', () => {
       this.name = 'BriefNotFoundError';
     }
   }
-  return { sendBriefToClientForReview: vi.fn(), BriefNotFoundError };
+  class BriefReviewRequestLifecycleConflictError extends Error {}
+  return {
+    sendBriefToClientForReview: vi.fn(),
+    BriefNotFoundError,
+    BriefReviewRequestLifecycleConflictError,
+  };
 });
 vi.mock('../../server/domains/content/send-post-to-client.js', () => {
   class PostNotFoundError extends Error {
@@ -79,7 +84,12 @@ vi.mock('../../server/domains/content/send-post-to-client.js', () => {
       this.name = 'PostNotFoundError';
     }
   }
-  return { sendPostToClientForReview: vi.fn(), PostNotFoundError };
+  class PostReviewRequestLifecycleConflictError extends Error {}
+  return {
+    sendPostToClientForReview: vi.fn(),
+    PostNotFoundError,
+    PostReviewRequestLifecycleConflictError,
+  };
 });
 vi.mock('../../server/domains/brand/review-service.js', () => ({
   createBrandReviewDeliverable: vi.fn(),
@@ -107,8 +117,18 @@ import { invalidateContentPipelineIntelligence } from '../../server/intelligence
 import { UnresolvedContentPublishReconciliationError } from '../../server/content-publish-reconciliation.js';
 import { GenerationRevisionConflictError } from '../../server/generation-provenance.js';
 import { ActiveJobResourceConflict } from '../../server/jobs.js';
+import { InvalidTransitionError } from '../../server/state-machines.js';
 import { JOB_RESOURCE_TYPES } from '../../shared/types/background-jobs.js';
 import { contentActionTools, handleContentActionTool } from '../../server/mcp/tools/content-actions.js';
+
+function errorEnvelope(result: Awaited<ReturnType<typeof handleContentActionTool>>) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code: string;
+    message: string;
+    retryable: boolean;
+    details?: Record<string, unknown>;
+  };
+}
 
 describe('mcp content action tools', () => {
   beforeEach(() => {
@@ -535,8 +555,11 @@ describe('mcp content action tools', () => {
       updates: { suggestedTitle: 'Should fail' },
     });
     expect(conflicted.isError).toBe(true);
-    expect(conflicted.content[0].text).toContain('Revision conflict');
-    expect(conflicted.content[0].text).toContain('Current revision: 7');
+    expect(errorEnvelope(conflicted)).toMatchObject({
+      code: 'conflict',
+      retryable: true,
+      details: { current_revision: 7, expected_revision: 6 },
+    });
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
     expect(addActivity).not.toHaveBeenCalled();
   });
@@ -608,8 +631,11 @@ describe('mcp content action tools', () => {
       updates: { title: 'Should fail' },
     });
     expect(conflicted.isError).toBe(true);
-    expect(conflicted.content[0].text).toContain('Revision conflict');
-    expect(conflicted.content[0].text).toContain('Current revision: 4');
+    expect(errorEnvelope(conflicted)).toMatchObject({
+      code: 'conflict',
+      retryable: true,
+      details: { current_revision: 4, expected_revision: 3 },
+    });
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
     expect(addActivity).not.toHaveBeenCalled();
   });
@@ -932,8 +958,10 @@ describe('mcp content action tools', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('[active_job_resource_conflict]');
-    expect(result.content[0].text).toContain('active_job_id=job_publish_1');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'conflict',
+      details: { active_job_id: 'job_publish_1' },
+    });
     expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
     expect(addActivity).not.toHaveBeenCalled();
@@ -1040,7 +1068,10 @@ describe('mcp content action tools', () => {
     });
 
     expect(staleBriefDelete.isError).toBe(true);
-    expect(staleBriefDelete.content[0].text).toContain('Current revision: 4');
+    expect(errorEnvelope(staleBriefDelete)).toMatchObject({
+      code: 'conflict',
+      details: { current_revision: 4 },
+    });
 
     (getPost as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'post_1',
@@ -1058,7 +1089,10 @@ describe('mcp content action tools', () => {
     });
 
     expect(stalePostDelete.isError).toBe(true);
-    expect(stalePostDelete.content[0].text).toContain('Current revision: 8');
+    expect(errorEnvelope(stalePostDelete)).toMatchObject({
+      code: 'conflict',
+      details: { current_revision: 8 },
+    });
 
     (revertToVersion as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
       throw new GenerationRevisionConflictError('content_post', 'post_1', 7);
@@ -1071,7 +1105,10 @@ describe('mcp content action tools', () => {
     });
 
     expect(staleRevert.isError).toBe(true);
-    expect(staleRevert.content[0].text).toContain('Current revision: 8');
+    expect(errorEnvelope(staleRevert)).toMatchObject({
+      code: 'conflict',
+      details: { current_revision: 8 },
+    });
     expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
     expect(addActivity).not.toHaveBeenCalled();
@@ -1348,7 +1385,10 @@ describe('mcp content action tools', () => {
     });
 
     expect(keywordMismatch.isError).toBe(true);
-    expect(keywordMismatch.content[0].text).toContain('targetKeyword');
+    expect(errorEnvelope(keywordMismatch)).toMatchObject({
+      code: 'precondition_failed',
+      details: { failure_code: 'source_authority_mismatch' },
+    });
     expect(buildContentGenerationContext).not.toHaveBeenCalled();
 
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -1374,7 +1414,10 @@ describe('mcp content action tools', () => {
     });
 
     expect(lineageMismatch.isError).toBe(true);
-    expect(lineageMismatch.content[0].text).toContain('not source brief brief_1');
+    expect(errorEnvelope(lineageMismatch)).toMatchObject({
+      code: 'precondition_failed',
+      details: { failure_code: 'source_authority_mismatch' },
+    });
     expect(buildContentGenerationContext).not.toHaveBeenCalled();
   });
 
@@ -1570,7 +1613,7 @@ describe('mcp content action tools', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/does not match source brief outline/);
+    expect(errorEnvelope(result)).toMatchObject({ code: 'precondition_failed' });
     expect(savePost).not.toHaveBeenCalled();
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
@@ -1618,7 +1661,7 @@ describe('mcp content action tools', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/Revision conflict|artifact no longer exists/);
+    expect(errorEnvelope(result)).toMatchObject({ code: 'conflict' });
     expect(savePost).not.toHaveBeenCalled();
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
     expect(addActivity).not.toHaveBeenCalled();
@@ -1662,7 +1705,7 @@ describe('mcp content action tools', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/does not match prepared request briefId/);
+    expect(errorEnvelope(result)).toMatchObject({ code: 'precondition_failed' });
     expect(savePost).not.toHaveBeenCalled();
   });
 
@@ -1935,7 +1978,10 @@ describe('mcp content action tools', () => {
     });
 
     expect(staleBriefSend.isError).toBe(true);
-    expect(staleBriefSend.content[0].text).toContain('Current revision: 6');
+    expect(errorEnvelope(staleBriefSend)).toMatchObject({
+      code: 'conflict',
+      details: { current_revision: 6 },
+    });
     expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
     expect(addActivity).not.toHaveBeenCalled();
@@ -1946,7 +1992,7 @@ describe('mcp content action tools', () => {
       workspace_id: 'ws-1',
     });
     expect(invalid.isError).toBe(true);
-    expect(invalid.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(invalid)).toMatchObject({ code: 'validation_failed' });
 
     (getWorkspace as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
     const noWorkspace = await handleContentActionTool('prepare_brief_context', {
@@ -1959,7 +2005,10 @@ describe('mcp content action tools', () => {
 
     const unknown = await handleContentActionTool('unknown_content_action', { workspace_id: 'ws-1' });
     expect(unknown.isError).toBe(true);
-    expect(unknown.content[0].text).toContain('Unknown content action tool');
+    expect(errorEnvelope(unknown)).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'tool' },
+    });
   });
 
   it('returns context-build errors in prepare flows', async () => {
@@ -1970,7 +2019,8 @@ describe('mcp content action tools', () => {
       layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
     });
     expect(briefCtx.isError).toBe(true);
-    expect(briefCtx.content[0].text).toContain('Failed to prepare brief context: context failed');
+    expect(errorEnvelope(briefCtx)).toMatchObject({ code: 'internal_error' });
+    expect(briefCtx.content[0].text).not.toContain('context failed');
 
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'brief_1',
@@ -1983,7 +2033,8 @@ describe('mcp content action tools', () => {
       brief_id: 'brief_1',
     });
     expect(postCtx.isError).toBe(true);
-    expect(postCtx.content[0].text).toContain('Failed to prepare post context: boom');
+    expect(errorEnvelope(postCtx)).toMatchObject({ code: 'internal_error' });
+    expect(postCtx.content[0].text).not.toContain('boom');
   });
 
   it('returns handle and atomic parent-request failures for save paths', async () => {
@@ -2040,7 +2091,8 @@ describe('mcp content action tools', () => {
       },
     });
     expect(failedParentBrief.isError).toBe(true);
-    expect(failedParentBrief.content[0].text).toContain('request write failed');
+    expect(errorEnvelope(failedParentBrief)).toMatchObject({ code: 'internal_error' });
+    expect(failedParentBrief.content[0].text).not.toContain('request write failed');
 
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'brief_1',
@@ -2092,7 +2144,8 @@ describe('mcp content action tools', () => {
       },
     });
     expect(failedParentPost.isError).toBe(true);
-    expect(failedParentPost.content[0].text).toContain('post parent write failed');
+    expect(errorEnvelope(failedParentPost)).toMatchObject({ code: 'internal_error' });
+    expect(failedParentPost.content[0].text).not.toContain('post parent write failed');
   });
 
   it('returns send_to_client failures for missing entities and invalid handles', async () => {
@@ -2135,7 +2188,7 @@ describe('mcp content action tools', () => {
       note: 'Please review',
     });
     expect(missingBrief.isError).toBe(true);
-    expect(missingBrief.content[0].text).toContain('Brief not found');
+    expect(errorEnvelope(missingBrief)).toMatchObject({ code: 'not_found' });
 
     (getBrief as ReturnType<typeof vi.fn>).mockReturnValue({
       id: 'brief_1',
@@ -2195,7 +2248,8 @@ describe('mcp content action tools', () => {
       layout: { type: 'outline', structure: { sections: [{ heading: { level: 1, text: 'Intro' } }] } },
     });
     expect(prepFailure.isError).toBe(true);
-    expect(prepFailure.content[0].text).toContain('Failed to prepare brief context: plain-failure');
+    expect(errorEnvelope(prepFailure)).toMatchObject({ code: 'internal_error' });
+    expect(prepFailure.content[0].text).not.toContain('plain-failure');
 
     const prepared = await handleContentActionTool('prepare_brief_context', {
       workspace_id: 'ws-1',
@@ -2259,7 +2313,8 @@ describe('mcp content action tools', () => {
       },
     });
     expect(failedParent.isError).toBe(true);
-    expect(failedParent.content[0].text).toContain('brief-parent-failed');
+    expect(errorEnvelope(failedParent)).toMatchObject({ code: 'internal_error' });
+    expect(failedParent.content[0].text).not.toContain('brief-parent-failed');
   });
 
   it('covers validation/workspace and catch branches for post paths', async () => {
@@ -2381,7 +2436,8 @@ describe('mcp content action tools', () => {
       },
     });
     expect(failedParent.isError).toBe(true);
-    expect(failedParent.content[0].text).toContain('post-parent-failed');
+    expect(errorEnvelope(failedParent)).toMatchObject({ code: 'internal_error' });
+    expect(failedParent.content[0].text).not.toContain('post-parent-failed');
   });
 
   it('covers send_to_client validation/workspace and post-create request branches', async () => {
@@ -2538,7 +2594,8 @@ describe('mcp content action tools', () => {
       note: 'Please review',
     });
     expect(sendFailure.isError).toBe(true);
-    expect(sendFailure.content[0].text).toContain('send-to-client-exploded');
+    expect(errorEnvelope(sendFailure)).toMatchObject({ code: 'internal_error' });
+    expect(sendFailure.content[0].text).not.toContain('send-to-client-exploded');
   });
 
   // ── advance_content_status (operator workflow) ──────────────────────────────
@@ -2609,18 +2666,18 @@ describe('mcp content action tools', () => {
 
     it('surfaces an invalid transition error', async () => {
       (updateContentRequest as ReturnType<typeof vi.fn>).mockImplementation(() => {
-        const e = new Error('invalid transition'); e.name = 'InvalidTransitionError'; throw e;
+        throw new InvalidTransitionError('content_request', 'approved', 'delivered');
       });
       const res = await handleContentActionTool('advance_content_status', { workspace_id: 'ws-1', request_id: 'req_1', status: 'delivered' });
       expect(res.isError).toBe(true);
-      expect(res.content[0].text).toContain('Cannot advance');
+      expect(errorEnvelope(res)).toMatchObject({ code: 'conflict' });
     });
 
     it('returns not found when the request is missing', async () => {
       (updateContentRequest as ReturnType<typeof vi.fn>).mockReturnValue(null);
       const res = await handleContentActionTool('advance_content_status', { workspace_id: 'ws-1', request_id: 'gone', status: 'in_progress' });
       expect(res.isError).toBe(true);
-      expect(res.content[0].text).toContain('not found');
+      expect(errorEnvelope(res)).toMatchObject({ code: 'not_found' });
     });
   });
 
@@ -2666,7 +2723,10 @@ describe('mcp content action tools', () => {
           expected_revision: 3,
         });
         expect(res.isError, `status ${status} must be refused`).toBe(true);
-        expect(res.content[0].text).toContain("only 'approved'");
+        expect(errorEnvelope(res)).toMatchObject({
+          code: 'precondition_failed',
+          details: { failure_code: 'invalid_status' },
+        });
       }
       expect(publishPostToWebflow).not.toHaveBeenCalled();
     });
@@ -2683,7 +2743,10 @@ describe('mcp content action tools', () => {
         expected_revision: 5,
       });
       expect(stale.isError).toBe(true);
-      expect(stale.content[0].text).toContain('Current revision: 6');
+      expect(errorEnvelope(stale)).toMatchObject({
+        code: 'conflict',
+        details: { current_revision: 6 },
+      });
       expect(publishPostToWebflow).not.toHaveBeenCalled();
 
       (getPost as ReturnType<typeof vi.fn>)
@@ -2698,7 +2761,10 @@ describe('mcp content action tools', () => {
         expected_revision: 6,
       });
       expect(raced.isError).toBe(true);
-      expect(raced.content[0].text).toContain('Current revision: 7');
+      expect(errorEnvelope(raced)).toMatchObject({
+        code: 'conflict',
+        details: { current_revision: 7 },
+      });
       expect(invalidateContentPipelineIntelligence).not.toHaveBeenCalled();
       expect(broadcastToWorkspace).not.toHaveBeenCalled();
       expect(addActivity).not.toHaveBeenCalled();
@@ -2712,7 +2778,7 @@ describe('mcp content action tools', () => {
         expected_revision: 0,
       });
       expect(res.isError).toBe(true);
-      expect(res.content[0].text).toContain('not found');
+      expect(errorEnvelope(res)).toMatchObject({ code: 'not_found' });
       expect(publishPostToWebflow).not.toHaveBeenCalled();
     });
 
@@ -2729,7 +2795,11 @@ describe('mcp content action tools', () => {
         expected_revision: 5,
       });
       expect(res.isError).toBe(true);
-      expect(res.content[0].text).toContain('No publish target configured');
+      expect(errorEnvelope(res)).toMatchObject({
+        code: 'precondition_failed',
+        details: { failure_code: 'no_publish_target' },
+      });
+      expect(res.content[0].text).not.toContain('No publish target configured');
     });
   });
 });

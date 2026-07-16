@@ -939,6 +939,7 @@ export interface ResolvedTemplatePageBlock extends ResolvedPageBlockBase {
   source: 'template';
   sourceSectionId: string;
   generationRole: TemplateSectionGenerationRole;
+  optional?: boolean;
 }
 
 export interface ResolvedSystemConclusionBlock extends ResolvedPageBlockBase {
@@ -958,10 +959,20 @@ export type ResolvedPageBlockSequence = [
   ResolvedSystemConclusionBlock,
 ];
 
+export interface ResolvedOptionalTemplateSectionOmission {
+  sourceSectionId: string;
+  name: string;
+  generationRole: TemplateSectionGenerationRole;
+  evidenceRequirementId: string;
+  reason: 'missing_section_evidence';
+}
+
 /** Complete immutable block census, including stable system wrappers. */
 export interface ResolvedPageBlockManifest {
   generationContractVersion: number;
   blocks: ResolvedPageBlockSequence;
+  /** Present on manifests resolved after evidence-driven optional sections shipped. */
+  omittedOptionalSections?: ResolvedOptionalTemplateSectionOmission[];
   totalWordCountTarget: number;
   fingerprint: string;
 }
@@ -1157,6 +1168,7 @@ export type MatrixGenerationPreviewResult =
     })
   | (MatrixGenerationPreviewIdentity & {
       status: 'blocked';
+      omittedOptionalSections: ResolvedOptionalTemplateSectionOmission[];
       evidenceRequirements: GenerationEvidenceRequirement[];
       blockingRequirementIds: string[];
       expectedArtifactRevisions: MatrixArtifactRevisionExpectations;

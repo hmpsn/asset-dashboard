@@ -636,6 +636,8 @@ export interface TemplateSection {
   aeoContract?: TemplateAeoContract;
   /** Absent on legacy templates until an explicit generation upgrade is accepted. */
   ctaContract?: TemplateCtaContract;
+  /** Evidence-driven section: omitted when its exact matrix-cell evidence is absent. */
+  optional?: boolean;
 }
 
 export type ContentPageType =
@@ -664,6 +666,43 @@ export interface ContentTemplate {
   generationContractVersion?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Immutable studio-owned snapshot used to seed normal workspace templates. */
+export interface ContentTemplateLibraryItem {
+  id: string;
+  vertical: string;
+  name: string;
+  description?: string;
+  pageType: ContentPageType;
+  variables: TemplateVariable[];
+  sections: TemplateSection[];
+  urlPattern: string;
+  keywordPattern: string;
+  titlePattern?: string;
+  metaDescPattern?: string;
+  cmsFieldMap?: Record<string, string>;
+  toneAndStyle?: string;
+  schemaTypes?: string[];
+  generationContractVersion: number;
+  source: {
+    workspaceId: string;
+    templateId: string;
+    templateRevision: number;
+  };
+  createdAt: string;
+}
+
+export interface ContentTemplateLibrarySummary {
+  id: string;
+  vertical: string;
+  name: string;
+  description?: string;
+  pageType: ContentPageType;
+  variableCount: number;
+  sectionCount: number;
+  source: ContentTemplateLibraryItem['source'];
+  createdAt: string;
 }
 
 // ── Content Matrix (bulk content planning grid) ─────────────────
@@ -735,6 +774,10 @@ export interface MatrixCell {
   targetKeyword: string;
   customKeyword?: string;
   plannedUrl: string;
+  /** True only when plannedUrl was intentionally overridden for this cell. */
+  plannedUrlOverridden?: boolean;
+  /** True only when expectedSchemaTypes was intentionally overridden for this cell. */
+  expectedSchemaTypesOverridden?: boolean;
   briefId?: string;
   postId?: string;
   status: MatrixCellStatus;

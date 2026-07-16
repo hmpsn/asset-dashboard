@@ -118,7 +118,10 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       // M0 matrix structural planning
       'list_content_templates', 'get_content_template',
       'create_content_template', 'update_content_template',
-      'duplicate_content_template', 'create_content_matrix',
+      'duplicate_content_template',
+      'list_library_templates', 'get_library_template',
+      'promote_template_to_library', 'instantiate_library_template',
+      'create_content_matrix', 'update_content_matrix_cell',
       'list_content_matrices', 'get_content_matrix',
       'resolve_content_matrix_cells', 'accept_content_template_generation_upgrade',
       'preview_content_matrix_generation', 'resolve_content_matrix_evidence',
@@ -150,7 +153,7 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
   it('get_search_performance fails gracefully when no GSC property is connected', async () => {
     const body = await callTool('get_search_performance', { workspace_id: wsA.workspaceId }, MASTER_KEY);
     expect(body.result?.isError).toBe(true);
-    expect(body.result!.content[0].text).toMatch(/Google Search Console|Google is not connected/i);
+    expect(JSON.parse(body.result!.content[0].text)).toMatchObject({ code: 'precondition_failed' });
   });
 
   it('lists and reads content matrices through the registered json_v1 family', async () => {
@@ -280,13 +283,50 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     );
     expect(expandedRead.result?.isError).toBeFalsy();
     const expandedPayload = JSON.parse(expandedRead.result!.content[0].text) as {
-      cells: { items: Array<{ variable_values: { service: string } }> };
+      cells: {
+        items: Array<{
+          id: string;
+          revision: number;
+          variable_values: { service: string };
+        }>;
+      };
     };
     expect(expandedPayload.cells.items.map(item => item.variable_values.service).sort()).toEqual([
       'Cleaning',
       'Invisalign',
       'Whitening',
     ]);
+
+    const invisalignCell = expandedPayload.cells.items.find(
+      item => item.variable_values.service === 'Invisalign',
+    );
+    expect(invisalignCell).toBeDefined();
+    const overridden = await callTool(
+      'update_content_matrix_cell',
+      {
+        workspace_id: wsA.workspaceId,
+        matrix_id: expandedMatrix.matrix.id,
+        cell_id: invisalignCell!.id,
+        patch: {
+          target_keyword: 'clear aligners in Sarasota',
+          planned_url: '/services/clear-aligners-sarasota',
+          expected_schema_types: ['Service', 'FAQPage'],
+        },
+        expected_cell_revision: invisalignCell!.revision,
+      },
+      MASTER_KEY,
+    );
+    expect(overridden.result?.isError).toBeFalsy();
+    expect(JSON.parse(overridden.result!.content[0].text)).toMatchObject({
+      matrix_id: expandedMatrix.matrix.id,
+      cell: {
+        id: invisalignCell!.id,
+        revision: invisalignCell!.revision + 1,
+        target_keyword: 'clear aligners in Sarasota',
+        planned_url: '/services/clear-aligners-sarasota',
+        expected_schema_types: ['Service', 'FAQPage'],
+      },
+    });
   });
 
   it('reads an empty durable brand intake through the registered json_v1 family', async () => {
@@ -401,7 +441,7 @@ describe('MCP plumbing — per-workspace API key scope enforcement', () => {
   it('a workspace-scoped key is REJECTED on a different workspace (scope enforcement)', async () => {
     const body = await callTool('list_recommendations', { workspace_id: wsB.workspaceId }, perWsKey);
     expect(body.result?.isError).toBe(true);
-    expect(body.result!.content[0].text).toMatch(/Forbidden|scoped to workspace/i);
+    expect(JSON.parse(body.result!.content[0].text)).toMatchObject({ code: 'forbidden' });
   });
 
   it('an unknown key is rejected at the HTTP layer (401)', async () => {

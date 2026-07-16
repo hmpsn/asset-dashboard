@@ -20,8 +20,11 @@ import { toMcpJsonSchema } from '../json-schema.js';
 import { mirrorRecommendationToDeliverable } from '../../domains/inbox/recommendation-dual-write.js';
 import {
   buildDashboardUrl,
-  mcpError,
+  mcpConflictError,
+  mcpInternalError,
+  mcpNotFoundError,
   mcpSuccess,
+  mcpValidationError,
   requireWorkspace,
   zodErrorToMcp,
   type McpToolErrorResponse,
@@ -133,7 +136,10 @@ async function handleApplyRecommendation(
   if ('isError' in workspace) return workspace;
 
   if (action === 'throttle' && throttleDays === undefined) {
-    return mcpError("throttle_days is required when action is 'throttle' (must be 7, 30, or 90).");
+    return mcpValidationError('Invalid tool input at throttle_days: required when action is throttle.', {
+      field_path: 'throttle_days',
+      constraint: 'Required for throttle and must be 7, 30, or 90.',
+    });
   }
 
   // Dispatch to the single-writer lifecycle fn. These mutate ONLY the client-facing curation /
@@ -152,14 +158,17 @@ async function handleApplyRecommendation(
     }
   } catch (err) {
     if (err instanceof InvalidTransitionError) {
-      return mcpError(`Cannot ${action} recommendation: ${err.message}`);
+      return mcpConflictError(
+        'The recommendation cannot move to the requested lifecycle state. Re-read it before retrying.',
+      );
     }
     log.error({ err, workspaceId, recId, action }, 'apply_recommendation lifecycle call failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Failed to ${action} recommendation: ${message}`);
+    return mcpInternalError();
   }
 
-  if (!rec) return mcpError(`Recommendation not found: ${recId}`);
+  if (!rec) return mcpNotFoundError('Recommendation not found.', {
+    resource_type: 'recommendation',
+  });
 
   // Own the broadcast + activity (the lifecycle fns don't fire them — parity with the route
   // handlers in server/routes/recommendations.ts). Match the route's payload + activity types.
@@ -213,5 +222,5 @@ export async function handleRecommendationActionTool(
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   if (name === 'list_recommendations') return handleListRecommendations(args);
   if (name === 'apply_recommendation') return handleApplyRecommendation(args);
-  return mcpError(`Unknown recommendation action tool: ${name}`);
+  return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }

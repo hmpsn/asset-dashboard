@@ -6,6 +6,12 @@ import { INTELLIGENCE_SLICES, isIntelligenceSlice } from '../../../shared/types/
 import type { IntelligenceOptions } from '../../../shared/types/intelligence.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
+import {
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpValidationError,
+  zodErrorToMcp,
+} from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-intelligence');
 
@@ -23,15 +29,12 @@ export async function handleIntelligenceTool(
   args: Record<string, unknown>,
 ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   if (name !== 'get_workspace_intelligence') {
-    return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
+    return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
   }
 
   const parsed = getWorkspaceIntelligenceInputSchema.safeParse(args);
   if (!parsed.success) {
-    return {
-      isError: true,
-      content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
-    };
+    return zodErrorToMcp(parsed.error);
   }
   const {
     workspaceId,
@@ -44,7 +47,10 @@ export async function handleIntelligenceTool(
     include_site_inventory: includeSiteInventory,
   } = parsed.data;
   if (typeof workspaceId !== 'string') {
-    return { isError: true, content: [{ type: 'text' as const, text: 'Missing or invalid workspaceId' }] };
+    return mcpValidationError('Invalid tool input at workspaceId: Expected a workspace ID.', {
+      field_path: 'workspaceId',
+      constraint: 'Expected a non-empty workspace ID.',
+    });
   }
 
   let requestedSlices = Array.isArray(sliceArgs)
@@ -55,16 +61,16 @@ export async function handleIntelligenceTool(
   }
 
   if (requestedSlices.length === 0) {
-    return { isError: true, content: [{ type: 'text' as const, text: 'No valid intelligence slices specified' }] };
+    return mcpValidationError('Invalid tool input at slices: Select at least one supported intelligence slice.', {
+      field_path: 'slices',
+      constraint: 'At least one supported intelligence slice is required.',
+    });
   }
 
   try {
     const ws = getWorkspace(workspaceId);
     if (!ws) {
-      return {
-        isError: true,
-        content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }],
-      };
+      return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
     }
 
     const normalizeBaseUrl = (value: string | undefined): string | undefined => {
@@ -88,10 +94,6 @@ export async function handleIntelligenceTool(
     return { content: [{ type: 'text' as const, text: JSON.stringify(intel) }] };
   } catch (err) {
     log.error({ err, workspaceId, slices: requestedSlices }, 'Intelligence assembly failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      isError: true,
-      content: [{ type: 'text' as const, text: `Intelligence assembly failed: ${message}` }],
-    };
+    return mcpInternalError();
   }
 }

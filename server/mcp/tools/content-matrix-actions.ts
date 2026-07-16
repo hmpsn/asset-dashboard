@@ -1,6 +1,10 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
 import { z } from 'zod';
-import type { ContentMatrix, ContentTemplate } from '../../../shared/types/content.js';
+import type {
+  ContentMatrix,
+  ContentTemplate,
+  ContentTemplateLibrarySummary,
+} from '../../../shared/types/content.js';
 import {
   acceptContentTemplateGenerationUpgradeInputSchema,
   createContentMatrixFromPseoPlanInputSchema,
@@ -42,9 +46,21 @@ import {
   updateTemplate,
 } from '../../content-templates.js';
 import {
+  ContentTemplateLibraryError,
+  getLibraryTemplate,
+  instantiateLibraryTemplate,
+  listLibraryTemplates,
+  promoteTemplateToLibrary,
+} from '../../domains/content/template-library.js';
+import {
   ContentMatrixPatternRenderError,
+  ContentMatrixSourceIntegrityError,
   createMatrix,
+  MatrixCellPlannedUrlError,
+  MatrixCellRevisionConflictError,
+  MatrixCellRevisionRequiredError,
   MatrixTemplateIntegrityError,
+  updateMatrixCell,
 } from '../../content-matrices.js';
 import {
   getContentMatrix,
@@ -94,6 +110,7 @@ import {
   boundedDimensionSchema,
   createMatrixFieldsSchema,
   createMatrixSchema,
+  updateMatrixCellSchema,
 } from '../../routes/content-matrices.js';
 
 const log = createLogger('mcp-content-matrix-actions');
@@ -104,7 +121,19 @@ const DIRECT_CONTENT_TOOL_NAMES = new Set([
   'update_content_template',
   'duplicate_content_template',
   'create_content_matrix',
+  'update_content_matrix_cell',
+  'list_library_templates',
+  'get_library_template',
+  'promote_template_to_library',
+  'instantiate_library_template',
 ]);
+
+export const CONTENT_MATRIX_GLOBAL_TOOL_NAMES = [
+  'list_library_templates',
+  'get_library_template',
+  'promote_template_to_library',
+  'instantiate_library_template',
+] as const;
 
 const workspaceIdSchema = z.string().trim().min(1, 'workspace_id is required')
   .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes)
@@ -113,6 +142,8 @@ const durableIdSchema = z.string().trim().min(1)
   .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes);
 const templateCursorSchema = z.string().trim().min(1).max(2_048)
   .regex(/^[A-Za-z0-9_-]+$/, 'cursor must be an opaque base64url token');
+const verticalSchema = z.string().trim().min(1).max(64)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'vertical must be a lowercase slug');
 
 const listContentTemplatesInputSchema = z.object({
   workspace_id: workspaceIdSchema,
@@ -129,7 +160,7 @@ const getContentTemplateInputSchema = z.object({
 
 const createContentTemplateInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  template: createTemplateSchema.describe('Content template fields using the same contract as the admin HTTP create route.'),
+  template: createTemplateSchema.describe('Content template fields using the same contract as the admin HTTP create route. Pattern variables use one brace pair, for example /{service}-{city}; do not use {{double_braces}}.'),
   idempotency_key: z.string().trim().min(1).max(200).optional()
     .describe('Optional caller correlation key; template creation itself is not replay-idempotent.'),
 }).strict();
@@ -162,6 +193,34 @@ const duplicateContentTemplateInputSchema = z.object({
     .describe('Optional name for the copy; defaults to the existing duplicate convention.'),
 }).strict();
 
+const listLibraryTemplatesInputSchema = z.object({
+  vertical: verticalSchema.optional()
+    .describe('Optional flat vertical slug, for example dental or saas.'),
+  cursor: templateCursorSchema.optional()
+    .describe('Opaque cursor bound to the exact vertical filter and library ordering.'),
+  limit: z.number().int().min(1).max(MATRIX_READ_LIMITS.maxPageSize).optional()
+    .describe(`Page size; defaults to ${MATRIX_READ_LIMITS.defaultPageSize} and caps at ${MATRIX_READ_LIMITS.maxPageSize}.`),
+}).strict();
+
+const getLibraryTemplateInputSchema = z.object({
+  library_template_id: durableIdSchema.describe('Durable studio library template ID.'),
+}).strict();
+
+const promoteTemplateToLibraryInputSchema = z.object({
+  source_workspace_id: workspaceIdSchema.describe('Workspace that owns the proven source template.'),
+  template_id: durableIdSchema.describe('Durable source content template ID.'),
+  expected_template_revision: z.number().int().nonnegative()
+    .describe('Exact source template revision returned by get_content_template.'),
+  vertical: verticalSchema.describe('Flat studio vertical slug, for example dental or saas.'),
+}).strict();
+
+const instantiateLibraryTemplateInputSchema = z.object({
+  target_workspace_id: workspaceIdSchema.describe('Existing workspace that will own the independent copy.'),
+  library_template_id: durableIdSchema.describe('Durable studio library template ID.'),
+  name: z.string().trim().min(1).max(MATRIX_GENERATION_SOURCE_LIMITS.template.maxNameBytes)
+    .optional().describe('Optional workspace-specific name for the copied template.'),
+}).strict();
+
 const createContentMatrixInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   name: createMatrixFieldsSchema.shape.name.describe('Name for the new matrix.'),
@@ -170,9 +229,9 @@ const createContentMatrixInputSchema = z.object({
     .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensions)
     .describe('Cartesian dimensions using template variableName values exactly.'),
   url_pattern: createMatrixFieldsSchema.shape.urlPattern.optional()
-    .describe('Optional URL pattern; defaults to the selected template pattern.'),
+    .describe('Optional URL pattern; defaults to the selected template pattern. Variables use one brace pair, for example /{service}-{city}.'),
   keyword_pattern: createMatrixFieldsSchema.shape.keywordPattern.optional()
-    .describe('Optional keyword pattern; defaults to the selected template pattern.'),
+    .describe('Optional keyword pattern; defaults to the selected template pattern. Variables use one brace pair, for example {service} in {city}.'),
   expected_schema_types: z.array(z.string().trim().min(1)
     .max(MATRIX_GENERATION_SOURCE_LIMITS.template.maxSchemaTypeBytes))
     .max(MATRIX_GENERATION_SOURCE_LIMITS.template.maxSchemaTypes).optional()
@@ -198,6 +257,26 @@ const createContentMatrixInputSchema = z.object({
   }));
 });
 
+const updateContentMatrixCellInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  matrix_id: durableIdSchema.describe('Durable content matrix ID.'),
+  cell_id: durableIdSchema.describe('Durable matrix cell ID returned by get_content_matrix.'),
+  patch: z.object({
+    target_keyword: updateMatrixCellSchema.shape.targetKeyword.optional()
+      .describe('Exact target keyword for this cell, independent of the matrix keyword pattern.'),
+    planned_url: updateMatrixCellSchema.shape.plannedUrl.optional()
+      .describe('Safe workspace-relative path for this cell; URL validation and workspace matrix collision checks still apply.'),
+    variable_values: updateMatrixCellSchema.shape.variableValues.optional()
+      .describe('Complete template-variable values for this cell. Object keys remain exact template variable names.'),
+    expected_schema_types: updateMatrixCellSchema.shape.expectedSchemaTypes.optional()
+      .describe('Exact schema types expected for this cell.'),
+  }).strict().refine(patch => Object.keys(patch).length > 0, {
+    message: 'patch must include at least one supported field',
+  }).describe('Partial targeting override. Only target_keyword, planned_url, variable_values, and expected_schema_types are patchable.'),
+  expected_cell_revision: updateMatrixCellSchema.shape.expectedCellRevision
+    .describe('Exact cell revision returned by get_content_matrix.'),
+}).strict();
+
 export const contentMatrixActionTools: Tool[] = [
   {
     name: 'list_content_templates',
@@ -211,12 +290,12 @@ export const contentMatrixActionTools: Tool[] = [
   },
   {
     name: 'create_content_template',
-    description: 'Create a reusable page structure through the same validated template service used by the admin UI. This does not create pages, start AI work, or approve content.',
+    description: 'Create a reusable page structure through the same validated template service used by the admin UI. Mark a section optional only when evidence should decide whether it appears; missing section evidence omits it without blocking the page, and at least one section must remain required. Pattern variables use a single brace pair, for example /{service}-{city}; never use {{double_braces}}. This does not create pages, start AI work, or approve content.',
     inputSchema: toMcpJsonSchema(createContentTemplateInputSchema),
   },
   {
     name: 'update_content_template',
-    description: 'Revision-safely update one reusable content template through the existing domain service. Stale writes conflict; no generation or approval occurs.',
+    description: 'Revision-safely update one reusable content template through the existing domain service, including evidence-driven optional section markers. Stale writes conflict; no generation or approval occurs.',
     inputSchema: toMcpJsonSchema(updateContentTemplateInputSchema),
   },
   {
@@ -225,9 +304,34 @@ export const contentMatrixActionTools: Tool[] = [
     inputSchema: toMcpJsonSchema(duplicateContentTemplateInputSchema),
   },
   {
+    name: 'list_library_templates',
+    description: 'Master-key studio read. List bounded immutable template-library summaries, optionally filtered by one vertical slug. Library templates are studio assets, not workspace-owned generation sources.',
+    inputSchema: toMcpJsonSchema(listLibraryTemplatesInputSchema),
+  },
+  {
+    name: 'get_library_template',
+    description: 'Master-key studio read. Get one complete immutable library template and its exact source provenance. The snapshot cannot generate content until copied into a workspace.',
+    inputSchema: toMcpJsonSchema(getLibraryTemplateInputSchema),
+  },
+  {
+    name: 'promote_template_to_library',
+    description: 'Master-key studio action. Call only after the human operator explicitly requests promotion of this exact workspace template revision under this vertical. The immutable snapshot never edits the source, starts generation, approves, sends, or publishes.',
+    inputSchema: toMcpJsonSchema(promoteTemplateToLibraryInputSchema),
+  },
+  {
+    name: 'instantiate_library_template',
+    description: 'Master-key studio action. Copy one immutable library template into an existing workspace as a normal independently editable template with fresh section IDs. There is no live inheritance or later synchronization. This never starts generation or changes human approval gates.',
+    inputSchema: toMcpJsonSchema(instantiateLibraryTemplateInputSchema),
+  },
+  {
     name: 'create_content_matrix',
-    description: 'Create a validated Cartesian content matrix directly from an existing template and explicit dimensions, without requiring Page Strategy or a pSEO blueprint. Uses template URL, keyword, and schema defaults when omitted; never starts generation.',
+    description: 'Create a validated Cartesian content matrix directly from an existing template and explicit dimensions, without requiring Page Strategy or a pSEO blueprint. Pattern variables use a single brace pair, for example /{service}-{city}; never use {{double_braces}}. Uses template URL, keyword, and schema defaults when omitted; never starts generation.',
     inputSchema: toMcpJsonSchema(createContentMatrixInputSchema),
+  },
+  {
+    name: 'update_content_matrix_cell',
+    description: 'Revision-safely override one materialized matrix cell when its target keyword, URL, variable values, or schema types cannot follow the shared pattern. URL safety and workspace-wide matrix collision checks remain mandatory. This invalidates prior previews but never starts generation, approves, sends, or publishes.',
+    inputSchema: toMcpJsonSchema(updateContentMatrixCellInputSchema),
   },
   {
     name: 'list_pseo_blueprint_entries',
@@ -311,7 +415,12 @@ export interface ContentMatrixActionDependencies {
   createTemplate: typeof createTemplate;
   updateTemplate: typeof updateTemplate;
   duplicateTemplate: typeof duplicateTemplate;
+  listLibraryTemplates: typeof listLibraryTemplates;
+  getLibraryTemplate: typeof getLibraryTemplate;
+  promoteTemplateToLibrary: typeof promoteTemplateToLibrary;
+  instantiateLibraryTemplate: typeof instantiateLibraryTemplate;
   createMatrix: typeof createMatrix;
+  updateMatrixCell: typeof updateMatrixCell;
   listPseoBlueprintEntries: typeof listPseoBlueprintEntries;
   listContentMatrices: typeof listContentMatrices;
   getContentMatrix: typeof getContentMatrix;
@@ -338,7 +447,12 @@ const defaultDependencies: ContentMatrixActionDependencies = {
   createTemplate,
   updateTemplate,
   duplicateTemplate,
+  listLibraryTemplates,
+  getLibraryTemplate,
+  promoteTemplateToLibrary,
+  instantiateLibraryTemplate,
   createMatrix,
+  updateMatrixCell,
   listPseoBlueprintEntries,
   listContentMatrices,
   getContentMatrix,
@@ -418,6 +532,76 @@ function decodeTemplateCursor(cursor: string, workspaceId: string): TemplateList
   }
 }
 
+interface LibraryTemplateListCursor {
+  kind: 'library_template_list';
+  vertical: string | null;
+  createdAt: string;
+  libraryTemplateId: string;
+}
+
+function encodeLibraryTemplateCursor(cursor: LibraryTemplateListCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodeLibraryTemplateCursor(
+  cursor: string,
+  vertical: string | undefined,
+): LibraryTemplateListCursor {
+  try {
+    const decoded = Buffer.from(cursor, 'base64url');
+    if (decoded.length === 0 || decoded.toString('base64url') !== cursor) throw new Error('invalid');
+    const value = parseJsonFallback<Partial<LibraryTemplateListCursor>>(
+      decoded.toString('utf8'),
+      {},
+    );
+    if (
+      value.kind !== 'library_template_list'
+      || value.vertical !== (vertical ?? null)
+      || typeof value.createdAt !== 'string'
+      || typeof value.libraryTemplateId !== 'string'
+    ) throw new Error('invalid');
+    return value as LibraryTemplateListCursor;
+  } catch (error) {
+    log.debug({ error, vertical }, 'Library template cursor validation failed');
+    throw new MatrixReadServiceError(
+      'invalid_cursor',
+      'The library template cursor is invalid.',
+      {
+        field_path: 'cursor',
+        constraint: 'must be an opaque cursor returned by list_library_templates for the same vertical filter',
+      },
+    );
+  }
+}
+
+function listLibraryTemplateSummaries(
+  vertical: string | undefined,
+  cursor: string | undefined,
+  requestedLimit: number | undefined,
+  dependencies: ContentMatrixActionDependencies,
+): { items: ContentTemplateLibrarySummary[]; nextCursor: string | null } {
+  const limit = requestedLimit ?? MATRIX_READ_LIMITS.defaultPageSize;
+  const decoded = cursor ? decodeLibraryTemplateCursor(cursor, vertical) : undefined;
+  const result = dependencies.listLibraryTemplates({
+    vertical,
+    cursor: decoded ? {
+      createdAt: decoded.createdAt,
+      id: decoded.libraryTemplateId,
+    } : undefined,
+    limit,
+  });
+  const last = result.items.at(-1);
+  return {
+    items: result.items,
+    nextCursor: result.hasMore && last ? encodeLibraryTemplateCursor({
+      kind: 'library_template_list',
+      vertical: vertical ?? null,
+      createdAt: last.createdAt,
+      libraryTemplateId: last.id,
+    }) : null,
+  };
+}
+
 function listTemplateSummaries(
   workspaceId: string,
   cursor: string | undefined,
@@ -468,7 +652,8 @@ function projectCreatedMatrix(matrix: ContentMatrix) {
 
 function runContentPlanPostCommitEffects(
   workspaceId: string,
-  action: 'template_created' | 'template_updated' | 'template_duplicated' | 'matrix_created',
+  action: 'template_created' | 'template_updated' | 'template_duplicated'
+    | 'template_instantiated' | 'matrix_created',
   resource: ContentTemplate | ContentMatrix,
   dependencies: ContentMatrixActionDependencies,
 ): void {
@@ -487,8 +672,10 @@ function runContentPlanPostCommitEffects(
       ? 'Created content template'
       : action === 'template_updated'
         ? 'Updated content template'
-        : action === 'template_duplicated'
+      : action === 'template_duplicated'
           ? 'Duplicated content template'
+          : action === 'template_instantiated'
+            ? 'Instantiated studio content template'
           : 'Created content matrix';
     dependencies.addActivity(
       workspaceId,
@@ -599,7 +786,37 @@ function directContentNotFoundError(resource: 'template' | 'matrix'): CallToolRe
   });
 }
 
+function directContentCellNotFoundError(): CallToolResult {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.NOT_FOUND,
+    message: 'The requested content matrix cell was not found in this workspace matrix.',
+    retryable: false,
+    details: {
+      field_path: 'cell_id',
+      constraint: 'must identify an existing cell in the selected workspace matrix',
+    },
+  });
+}
+
 function directContentDomainError(error: unknown): CallToolResult | null {
+  if (error instanceof ContentTemplateLibraryError) {
+    return mcpJsonV1Error({
+      code: error.code === 'not_found'
+        ? MCP_TOOL_ERROR_CODES.NOT_FOUND
+        : error.code === 'conflict'
+          ? MCP_TOOL_ERROR_CODES.CONFLICT
+          : MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
+      message: error.message,
+      retryable: error.code === 'conflict',
+      details: {
+        field_path: error.fieldPath,
+        constraint: error.constraint,
+        ...(error.actualRevision === undefined
+          ? {}
+          : { actual_revision: error.actualRevision }),
+      },
+    });
+  }
   if (error instanceof ContentTemplateRevisionConflictError) {
     return mcpJsonV1Error({
       code: MCP_TOOL_ERROR_CODES.CONFLICT,
@@ -631,6 +848,60 @@ function directContentDomainError(error: unknown): CallToolResult | null {
     });
   }
   if (error instanceof MatrixTemplateIntegrityError) return directContentNotFoundError('template');
+  if (error instanceof MatrixCellRevisionConflictError) {
+    return mcpJsonV1Error({
+      code: MCP_TOOL_ERROR_CODES.CONFLICT,
+      message: 'The content matrix cell changed since it was read.',
+      retryable: true,
+      details: {
+        field_path: 'expected_cell_revision',
+        constraint: 'must equal the current cell revision',
+        expected_revision: error.expectedRevision,
+        actual_revision: error.actualRevision,
+      },
+    });
+  }
+  if (error instanceof MatrixCellRevisionRequiredError) {
+    return mcpJsonV1Error({
+      code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+      message: 'expected_cell_revision is required for a matrix cell write.',
+      retryable: false,
+      details: {
+        field_path: 'expected_cell_revision',
+        constraint: 'is required',
+      },
+    });
+  }
+  if (error instanceof MatrixCellPlannedUrlError) {
+    return mcpJsonV1Error({
+      code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+      message: error.message,
+      retryable: false,
+      details: {
+        field_path: 'patch.planned_url',
+        constraint: error.code === 'planned_url_collision'
+          ? 'must be unique across all content matrix cells in this workspace'
+          : `must be a safe workspace-relative path (${error.code})`,
+        ...(error.conflictingMatrixId
+          ? { conflicting_matrix_id: error.conflictingMatrixId }
+          : {}),
+        ...(error.conflictingCellId
+          ? { conflicting_cell_id: error.conflictingCellId }
+          : {}),
+      },
+    });
+  }
+  if (error instanceof ContentMatrixSourceIntegrityError) {
+    return mcpJsonV1Error({
+      code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
+      message: 'The stored content matrix source is malformed and cannot be safely rewritten.',
+      retryable: false,
+      details: {
+        field_path: 'matrix_id',
+        constraint: 'must reference a complete valid matrix source',
+      },
+    });
+  }
   if (error instanceof ContentMatrixPatternRenderError) {
     return mcpJsonV1Error({
       code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
@@ -840,6 +1111,83 @@ export function createContentMatrixActionHandler(
         return mcpSuccess(toMcpPayload({ template }));
       }
 
+      if (name === 'list_library_templates') {
+        const parsed = listLibraryTemplatesInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        return mcpSuccess(toMcpPayload(listLibraryTemplateSummaries(
+          parsed.data.vertical,
+          parsed.data.cursor,
+          parsed.data.limit,
+          dependencies,
+        )));
+      }
+
+      if (name === 'get_library_template') {
+        const parsed = getLibraryTemplateInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        const template = dependencies.getLibraryTemplate(parsed.data.library_template_id);
+        if (!template) {
+          return mcpJsonV1Error({
+            code: MCP_TOOL_ERROR_CODES.NOT_FOUND,
+            message: 'The requested library template was not found.',
+            retryable: false,
+            details: {
+              field_path: 'library_template_id',
+              constraint: 'must identify an existing studio library template',
+            },
+          });
+        }
+        return mcpSuccess(toMcpPayload({ template }));
+      }
+
+      if (name === 'promote_template_to_library') {
+        const parsed = promoteTemplateToLibraryInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        const result = dependencies.promoteTemplateToLibrary({
+          sourceWorkspaceId: parsed.data.source_workspace_id,
+          templateId: parsed.data.template_id,
+          expectedTemplateRevision: parsed.data.expected_template_revision,
+          vertical: parsed.data.vertical,
+        });
+        if (!result.replayed) {
+          runPseoPostCommitEffect(
+            parsed.data.source_workspace_id,
+            'record-template-library-promotion',
+            () => {
+              dependencies.addActivity(
+                parsed.data.source_workspace_id,
+                'content_updated',
+                `Promoted content template "${result.template.name}" to the ${result.template.vertical} studio library`,
+                undefined,
+                { source: 'mcp-chat', action: 'template_promoted_to_library',
+                  templateId: parsed.data.template_id,
+                  libraryTemplateId: result.template.id,
+                  sourceRevision: parsed.data.expected_template_revision,
+                },
+              );
+            },
+          );
+        }
+        return mcpSuccess(toMcpPayload(result));
+      }
+
+      if (name === 'instantiate_library_template') {
+        const parsed = instantiateLibraryTemplateInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        const template = dependencies.instantiateLibraryTemplate({
+          targetWorkspaceId: parsed.data.target_workspace_id,
+          libraryTemplateId: parsed.data.library_template_id,
+          name: parsed.data.name,
+        });
+        runContentPlanPostCommitEffects(
+          parsed.data.target_workspace_id,
+          'template_instantiated',
+          template,
+          dependencies,
+        );
+        return mcpSuccess(toMcpPayload({ template }));
+      }
+
       if (name === 'create_content_matrix') {
         const parsed = createContentMatrixInputSchema.safeParse(args);
         if (!parsed.success) return mcpZodValidationError(parsed.error);
@@ -860,6 +1208,79 @@ export function createContentMatrixActionHandler(
           dependencies,
         );
         return mcpSuccess(toMcpPayload(projectCreatedMatrix(matrix)));
+      }
+
+      if (name === 'update_content_matrix_cell') {
+        const parsed = updateContentMatrixCellInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        const updates = {
+          ...(parsed.data.patch.target_keyword !== undefined
+            ? { targetKeyword: parsed.data.patch.target_keyword }
+            : {}),
+          ...(parsed.data.patch.planned_url !== undefined
+            ? { plannedUrl: parsed.data.patch.planned_url }
+            : {}),
+          ...(parsed.data.patch.variable_values !== undefined
+            ? { variableValues: parsed.data.patch.variable_values }
+            : {}),
+          ...(parsed.data.patch.expected_schema_types !== undefined
+            ? { expectedSchemaTypes: parsed.data.patch.expected_schema_types }
+            : {}),
+        };
+        const matrix = dependencies.updateMatrixCell(
+          parsed.data.workspace_id,
+          parsed.data.matrix_id,
+          parsed.data.cell_id,
+          updates,
+          {
+            expectedCellRevision: parsed.data.expected_cell_revision,
+            requireExpectedCellRevision: true,
+          },
+        );
+        if (!matrix) return directContentCellNotFoundError();
+        const cell = matrix.cells.find(item => item.id === parsed.data.cell_id);
+        if (!cell) return directContentCellNotFoundError();
+        if ((cell.revision ?? 0) !== parsed.data.expected_cell_revision) {
+          runPseoPostCommitEffect(
+            parsed.data.workspace_id,
+            'invalidate-content-pipeline-intelligence',
+            () => dependencies.invalidateContentPipelineIntelligence(parsed.data.workspace_id),
+          );
+          runPseoPostCommitEffect(
+            parsed.data.workspace_id,
+            'broadcast-content-updated',
+            () => dependencies.broadcastToWorkspace(
+              parsed.data.workspace_id,
+              WS_EVENTS.CONTENT_UPDATED,
+              {
+                domain: 'content-plan',
+                matrixId: matrix.id,
+                cellId: cell.id,
+                action: 'matrix_cell_updated',
+              },
+            ),
+          );
+          runPseoPostCommitEffect(
+            parsed.data.workspace_id,
+            'record-activity',
+            () => {
+              dependencies.addActivity(
+                parsed.data.workspace_id,
+                'content_updated',
+                `Updated content plan page "${cell.targetKeyword}"`,
+                undefined,
+                {
+                  source: 'mcp-chat',
+                  matrixId: matrix.id,
+                  cellId: cell.id,
+                  action: 'matrix_cell_updated',
+                  changedFields: Object.keys(parsed.data.patch).sort(),
+                },
+              );
+            },
+          );
+        }
+        return mcpSuccess(toMcpPayload({ matrixId: matrix.id, cell }));
       }
 
       if (name === 'list_pseo_blueprint_entries') {

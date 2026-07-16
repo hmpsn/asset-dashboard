@@ -16,7 +16,7 @@ import type {
 import { createLogger } from './logger.js';
 import { queueSchemaPreGeneration, markSchemaStale } from './schema-queue.js';
 import { validateTransition, MATRIX_CELL_TRANSITIONS } from './state-machines.js';
-import { computeStats, getMatrix } from './content-matrix-read-model.js';
+import { computeStats, getMatrix, listMatrices } from './content-matrix-read-model.js';
 import {
   ContentTemplateRevisionConflictError,
   getTemplate,
@@ -28,6 +28,7 @@ import {
 } from './domains/content/matrix-generation/source-integrity.js';
 import {
   renderMatrixPattern,
+  canonicalizeMatrixPath,
   validateRenderedMatrixPath,
   type MatrixPathIssueCode,
   type MatrixPatternIssue,
@@ -115,6 +116,25 @@ export class MatrixCellRevisionRequiredError extends Error {
   }
 }
 
+export class MatrixCellPlannedUrlError extends Error {
+  readonly code: MatrixPathIssueCode | 'planned_url_collision';
+  readonly conflictingMatrixId?: string;
+  readonly conflictingCellId?: string;
+
+  constructor(
+    code: MatrixPathIssueCode | 'planned_url_collision',
+    conflict?: { matrixId: string; cellId: string },
+  ) {
+    super(code === 'planned_url_collision'
+      ? 'The planned URL conflicts with another content matrix cell in this workspace.'
+      : `The planned URL is invalid: ${code}.`);
+    this.name = 'MatrixCellPlannedUrlError';
+    this.code = code;
+    this.conflictingMatrixId = conflict?.matrixId;
+    this.conflictingCellId = conflict?.cellId;
+  }
+}
+
 export class ContentMatrixBulkCellWriteUnsupportedError extends Error {
   constructor() {
     super('Wholesale matrix cell writes are unsupported; update one cell with its expected revision');
@@ -196,6 +216,8 @@ function regenerateMatchedCell(
     plannedUrl: generated.plannedUrl,
     expectedSchemaTypes: generated.expectedSchemaTypes,
   };
+  delete generatedTarget.plannedUrlOverridden;
+  delete generatedTarget.expectedSchemaTypesOverridden;
   const targetChanged = generationTargetChanged(existing, generatedTarget, templateChanged);
   if (!targetChanged) return generatedTarget;
 
@@ -579,6 +601,28 @@ export function updateMatrixCell(
     }
 
     let effectiveUpdates = updates;
+    if (updates.plannedUrl !== undefined && updates.plannedUrl !== cell.plannedUrl) {
+      const validation = validateRenderedMatrixPath(updates.plannedUrl);
+      if (validation.status === 'blocked') {
+        throw new MatrixCellPlannedUrlError(validation.code);
+      }
+      for (const matrix of listMatrices(workspaceId)) {
+        for (const candidateCell of matrix.cells) {
+          if (matrix.id === matrixId && candidateCell.id === cellId) continue;
+          if (validation.canonicalPath === canonicalizeMatrixPath(candidateCell.plannedUrl)) {
+            throw new MatrixCellPlannedUrlError('planned_url_collision', {
+              matrixId: matrix.id,
+              cellId: candidateCell.id,
+            });
+          }
+        }
+      }
+      effectiveUpdates = {
+        ...effectiveUpdates,
+        plannedUrl: validation.canonicalPath,
+        plannedUrlOverridden: true,
+      };
+    }
     if (updates.expectedSchemaTypes !== undefined) {
       effectiveUpdates = {
         ...effectiveUpdates,
@@ -586,6 +630,7 @@ export function updateMatrixCell(
           updates.expectedSchemaTypes,
           'expectedSchemaTypes',
         ),
+        expectedSchemaTypesOverridden: true,
       };
     }
     if (updates.status && updates.status !== cell.status) {

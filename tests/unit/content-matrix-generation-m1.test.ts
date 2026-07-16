@@ -11,7 +11,7 @@ import type {
 import db from '../../server/db/index.js';
 import { getBrief } from '../../server/content-brief.js';
 import { createMatrix, getMatrix, updateMatrixCell } from '../../server/content-matrices.js';
-import { createTemplate } from '../../server/content-templates.js';
+import { createTemplate, getTemplate, updateTemplate } from '../../server/content-templates.js';
 import { getPost } from '../../server/content-posts-db.js';
 import {
   listCurrentMatrixCellEvidence,
@@ -54,7 +54,7 @@ afterEach(() => {
   cleanupWorkspaceIds.clear();
 });
 
-function createFixture(cities = ['Austin', 'Dallas']): Fixture {
+function createFixture(cities = ['Austin', 'Dallas'], includeOptionalProof = false): Fixture {
   const workspaceId = createWorkspace(`M1 matrix generation ${randomUUID()}`).id;
   cleanupWorkspaceIds.add(workspaceId);
   const template = createTemplate(workspaceId, {
@@ -64,17 +64,31 @@ function createFixture(cities = ['Austin', 'Dallas']): Fixture {
       { name: 'service', label: 'Service' },
       { name: 'city', label: 'City' },
     ],
-    sections: [{
-      id: 'service-details',
-      name: 'Service details',
-      headingTemplate: '{service} in {city}',
-      guidance: 'Explain the verified service clearly.',
-      wordCountTarget: 300,
-      order: 0,
-      generationRole: 'body',
-      aeoContract: { modes: [], required: false },
-      ctaContract: { role: 'none', required: false },
-    }],
+    sections: [
+      {
+        id: 'service-details',
+        name: 'Service details',
+        headingTemplate: '{service} in {city}',
+        guidance: 'Explain the verified service clearly.',
+        wordCountTarget: 300,
+        order: 0,
+        generationRole: 'body',
+        aeoContract: { modes: [], required: false },
+        ctaContract: { role: 'none', required: false },
+      },
+      ...(includeOptionalProof ? [{
+        id: 'service-proof',
+        name: 'Service proof',
+        headingTemplate: 'Why customers choose {service}',
+        guidance: 'Use only the supplied proof.',
+        wordCountTarget: 150,
+        order: 1,
+        generationRole: 'proof' as const,
+        aeoContract: { modes: [] as [], required: false },
+        ctaContract: { role: 'none' as const, required: false },
+        optional: true,
+      }] : []),
+    ],
     urlPattern: '/services/{city}/{service}',
     keywordPattern: '{service} in {city}',
     titlePattern: '{service} in {city}',
@@ -97,9 +111,10 @@ function createFixture(cities = ['Austin', 'Dallas']): Fixture {
 function sourceRevision(fixture: Fixture, cellId: string) {
   const matrix = getMatrix(fixture.workspaceId, fixture.matrix.id)!;
   const cell = matrix.cells.find(candidate => candidate.id === cellId)!;
+  const template = getTemplate(fixture.workspaceId, matrix.templateId)!;
   return {
     matrixRevision: matrix.revision ?? 0,
-    templateRevision: fixture.template.revision ?? 0,
+    templateRevision: template.revision ?? 0,
     cellRevision: cell.revision ?? 0,
   };
 }
@@ -395,6 +410,90 @@ function runAtGeneratingPost(
 }
 
 describe('content matrix generation M1', () => {
+  it('exposes optional omissions and includes the section only after exact evidence resolution', async () => {
+    const fixture = createFixture(['Austin'], true);
+    const cell = fixture.matrix.cells[0];
+    const initialRevision = sourceRevision(fixture, cell.id);
+    const initial = await previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: initialRevision }],
+    });
+    const initialResult = initial.results[0];
+    expect(initialResult?.status).toBe('blocked');
+    if (!initialResult || initialResult.status !== 'blocked') return;
+
+    const requirementId = `matrix-cell:${cell.id}:section:service-proof`;
+    expect(initialResult.omittedOptionalSections).toEqual([
+      expect.objectContaining({
+        sourceSectionId: 'service-proof',
+        evidenceRequirementId: requirementId,
+        reason: 'missing_section_evidence',
+      }),
+    ]);
+    expect(initialResult.evidenceRequirements.find(item => item.id === requirementId)).toMatchObject({
+      requirementStage: 'optional_omit',
+      status: 'missing',
+    });
+    expect(initialResult.blockingRequirementIds).not.toContain(requirementId);
+
+    await resolveContentMatrixEvidence({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      cellId: cell.id,
+      requirementId,
+      value: { kind: 'text', value: 'Customers consistently cite the clear process and practical next steps.' },
+      sourceRef: {
+        sourceType: 'operator_attestation',
+        sourceId: 'service-proof-attestation',
+        capturedAt: new Date().toISOString(),
+      },
+      resolvedBy: { actorType: 'operator', actorId: 'test-operator' },
+      expectedSourceRevision: initialRevision,
+      expectedArtifactRevisions: initialResult.expectedArtifactRevisions,
+      idempotencyKey: 'optional-service-proof',
+    });
+
+    const after = await previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: sourceRevision(fixture, cell.id) }],
+    });
+    const afterResult = after.results[0];
+    expect(afterResult?.status).toBe('blocked');
+    if (!afterResult || afterResult.status !== 'blocked') return;
+    expect(afterResult.omittedOptionalSections).toEqual([]);
+    expect(afterResult.evidenceRequirements.find(item => item.id === requirementId)?.status)
+      .toBe('verified');
+
+    const currentTemplate = getTemplate(fixture.workspaceId, fixture.template.id)!;
+    updateTemplate(fixture.workspaceId, currentTemplate.id, {
+      sections: currentTemplate.sections.map(section => (
+        section.id === 'service-proof'
+          ? { ...section, guidance: 'Use the newly changed proof contract only.' }
+          : section
+      )),
+    }, { expectedTemplateRevision: currentTemplate.revision });
+
+    const afterTemplateChange = await previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: sourceRevision(fixture, cell.id) }],
+    });
+    const staleResult = afterTemplateChange.results[0];
+    expect(staleResult?.status).toBe('blocked');
+    if (!staleResult || staleResult.status !== 'blocked') return;
+    expect(staleResult.omittedOptionalSections).toEqual([
+      expect.objectContaining({ sourceSectionId: 'service-proof' }),
+    ]);
+    expect(staleResult.evidenceRequirements.find(item => item.id === requirementId)?.status)
+      .toBe('missing');
+    expect(renderMatrixCellEvidencePrompt(
+      staleResult.evidenceRequirements,
+      listCurrentMatrixCellEvidence(fixture.workspaceId, fixture.matrix.id, cell.id),
+    )).not.toContain('Customers consistently cite');
+  });
+
   it('resolves pre-run evidence by durable cell identity and invalidates the old preview', async () => {
     const fixture = createFixture();
     const [cell, sibling] = fixture.matrix.cells;

@@ -294,12 +294,14 @@ describe('mcp read-model tools', () => {
     h.listWorkspaces.mockImplementationOnce(() => { throw new Error('db down'); });
     const caught = await handleWorkspaceTool('list_workspaces', {});
     expect(caught.isError).toBe(true);
-    expect(caught.content[0]?.text).toContain('Tool error: db down');
+    expect(parseContent(caught)).toMatchObject({ code: 'internal_error' });
+    expect(caught.content[0]?.text).not.toContain('db down');
 
     h.listWorkspaces.mockImplementationOnce(() => { throw 'non-error-failure'; });
     const caughtString = await handleWorkspaceTool('list_workspaces', {});
     expect(caughtString.isError).toBe(true);
-    expect(caughtString.content[0]?.text).toContain('Tool error: non-error-failure');
+    expect(parseContent(caughtString)).toMatchObject({ code: 'internal_error' });
+    expect(caughtString.content[0]?.text).not.toContain('non-error-failure');
   });
 
   it('workspace mutation tools validate input and support create/update/delete', async () => {
@@ -366,7 +368,8 @@ describe('mcp read-model tools', () => {
     h.listRequests.mockImplementationOnce(() => { throw new Error('request read failed'); });
     const caught = await handleClientTool('get_pending_work', {});
     expect(caught.isError).toBe(true);
-    expect(caught.content[0]?.text).toContain('Tool error: request read failed');
+    expect(parseContent(caught)).toMatchObject({ code: 'internal_error' });
+    expect(caught.content[0]?.text).not.toContain('request read failed');
   });
 
   it('insight tools handle filters and anomaly resolved toggle', async () => {
@@ -402,7 +405,8 @@ describe('mcp read-model tools', () => {
     h.getInsights.mockImplementationOnce(() => { throw new Error('insight read failure'); });
     const caught = await handleInsightTool('get_insights', { workspaceId: 'ws-1' });
     expect(caught.isError).toBe(true);
-    expect(caught.content[0]?.text).toContain('Tool error: insight read failure');
+    expect(parseContent(caught)).toMatchObject({ code: 'internal_error' });
+    expect(caught.content[0]?.text).not.toContain('insight read failure');
   });
 
   it('content tools cover decay, keyword analysis, seo context, unknown, and error fallback', async () => {
@@ -440,7 +444,8 @@ describe('mcp read-model tools', () => {
     h.getInsights.mockImplementationOnce(() => { throw new Error('decay crash'); });
     const caught = await handleContentTool('get_content_decay', { workspaceId: 'ws-1' });
     expect(caught.isError).toBe(true);
-    expect(caught.content[0]?.text).toContain('Tool error: decay crash');
+    expect(parseContent(caught)).toMatchObject({ code: 'internal_error' });
+    expect(caught.content[0]?.text).not.toContain('decay crash');
   });
 
   it('intelligence tool validates name/workspace and filters invalid slices', async () => {
@@ -467,12 +472,16 @@ describe('mcp read-model tools', () => {
       slices: ['invalid-slice'],
     });
     expect(invalidSlices.isError).toBe(true);
-    expect(invalidSlices.content[0]?.text).toContain('No valid intelligence slices');
+    expect(parseContent(invalidSlices)).toMatchObject({
+      code: 'validation_failed',
+      details: { field_path: 'slices' },
+    });
 
     h.buildWorkspaceIntelligence.mockRejectedValueOnce(new Error('assembly failed'));
     const caught = await handleIntelligenceTool('get_workspace_intelligence', { workspaceId: 'ws-1' });
     expect(caught.isError).toBe(true);
-    expect(caught.content[0]?.text).toContain('Intelligence assembly failed: assembly failed');
+    expect(parseContent(caught)).toMatchObject({ code: 'internal_error' });
+    expect(caught.content[0]?.text).not.toContain('assembly failed');
   });
 
   it('brand tool returns identity + voice status without deliverables by default', async () => {
@@ -535,15 +544,19 @@ describe('mcp read-model tools', () => {
 
     const notFound = await handleBrandTool('get_brand_identity', { workspaceId: 'ws-missing' });
     expect(notFound.isError).toBe(true);
-    expect(notFound.content[0]?.text).toContain('Workspace not found: ws-missing');
+    expect(parseContent(notFound)).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'workspace' },
+    });
 
     const invalid = await handleBrandTool('get_brand_identity', {});
     expect(invalid.isError).toBe(true);
-    expect(invalid.content[0]?.text).toContain('Validation failed');
+    expect(parseContent(invalid)).toMatchObject({ code: 'validation_failed' });
 
     h.buildWorkspaceIntelligence.mockRejectedValueOnce(new Error('brand assembly boom'));
     const caught = await handleBrandTool('get_brand_identity', { workspaceId: 'ws-1' });
     expect(caught.isError).toBe(true);
-    expect(caught.content[0]?.text).toContain('Tool error: brand assembly boom');
+    expect(parseContent(caught)).toMatchObject({ code: 'internal_error' });
+    expect(caught.content[0]?.text).not.toContain('brand assembly boom');
   });
 });

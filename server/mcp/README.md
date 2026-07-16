@@ -93,16 +93,12 @@ idempotency or uniqueness authority. The server generates the UUID used by HTTP 
 header, and durable attribution; every caller-supplied `X-Request-ID` value is ignored rather than
 retained, reflected, or classified by a finite credential denylist.
 
-### Error compatibility
+### Error contract
 
-The registry assigns each tool an explicit error contract:
-
-- The original **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
-  Registry-owned unknown-tool and authorization rejections are deliberately generic so caller
-  tool/workspace values cannot be reflected as secrets.
-- The eleven content-matrix tools, three brand-intake tools, seven brand-voice tools, four
-  brand-generation tools, and three brand-content-onboarding tools use `json_v1`: an error is a text content item containing a JSON
-  `{ code, message, retryable, details? }` envelope.
+Every registered tool uses `json_v1`: an error is a text content item containing a JSON
+`{ code, message, retryable, details? }` envelope. Registry-owned unknown-tool and authorization
+rejections are deliberately generic so caller tool/workspace values cannot be reflected as
+secrets.
 
 `server/mcp/tool-errors.ts` builds and privately marks the `json_v1` response and filters optional
 details as defense in depth. The registry rejects any JSON-tool error that did not cross that
@@ -117,7 +113,7 @@ failure classes; unknown names and mismatched workspace values are never logged 
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
 dispatch, workspace scope, and error compatibility. It composes **18 categories** for a total of
-**96 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+**101 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
 name with inert invalid input, asserts the exact 18 family-array→handler identities, and pins the
@@ -269,16 +265,21 @@ The coordinator does not replace the underlying generators or review systems. A 
 |------|-----|---------|
 | `list_content_templates` | R | Cursor-paged template summaries without full section blobs. |
 | `get_content_template` | R | Complete reusable template, including variables, sections, contracts, patterns, mapping, and revision. |
-| `create_content_template` | W | Create a reusable template through the same validation as the admin route. |
-| `update_content_template` | W | Revision-safe partial template update. |
+| `create_content_template` | W | Create a reusable template; `optional: true` sections are included only when their exact cell evidence is verified. |
+| `update_content_template` | W | Revision-safe partial template update, including optional section markers. |
 | `duplicate_content_template` | W | Duplicate a template as a new starting point. |
+| `list_library_templates` | R | Master-key cursor page of immutable studio templates, optionally filtered by vertical. |
+| `get_library_template` | R | Master-key complete immutable studio template snapshot and source provenance. |
+| `promote_template_to_library` | W | Master-key explicit promotion of one exact generation-ready workspace template revision. |
+| `instantiate_library_template` | W | Master-key copy into a workspace with fresh section IDs and no live inheritance. |
 | `create_content_matrix` | W | Create a matrix directly from a template plus Cartesian dimensions; Page Strategy is not required. |
+| `update_content_matrix_cell` | W | Revision-safe per-cell keyword, URL, variable, or schema override with path and workspace collision validation. |
 | `list_pseo_blueprint_entries` | R | Cursor-page Page Strategy collection entries and template/matrix links; empty means no collection entries have been generated. |
 | `list_content_matrices` | R | Cursor-paged matrix summaries, optionally filtered by template. |
 | `get_content_matrix` | R | Matrix metadata plus a revision-bound cursor page of cells. |
-| `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
+| `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets with explicit optional-section omissions, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
 | `accept_content_template_generation_upgrade` | W | Explicitly accept or reject the exact version-conditional deterministic template upgrade proposal. |
-| `preview_content_matrix_generation` | R | Freeze exact generation inputs and return bounded call, token, and cost estimates without paid work. |
+| `preview_content_matrix_generation` | R | Freeze exact generation inputs, report optional omissions, and return bounded call, token, and cost estimates without paid work. |
 | `resolve_content_matrix_evidence` | W | Resolve one typed factual requirement and invalidate the prior preview. |
 | `start_content_matrix_generation` | W | **[Paid API]** Start one bounded, idempotent background batch from exact preview fingerprints and accepted budget ceilings. |
 | `get_content_matrix_generation` | R | Read one durable batch plus cursor-paged item outcomes, audit findings, artifact revisions, and approval evidence. |
@@ -411,14 +412,13 @@ Four steps, all in the same commit:
 2. **Add the tool def + handler** in the right `server/mcp/tools/<category>.ts` file: push a
    `{ name, description, inputSchema }` entry onto the category's `*Tools` array and add a `case`/`if`
    branch to its `handle*Tool` dispatcher. Validate args with the Zod schema, return
-   `mcpSuccess(...)`; legacy tools keep `mcpError(...)`, while new `json_v1` tools use
+   `mcpSuccess(...)`; errors use the branded helpers in `tool-helpers.ts` or
    `mcpJsonV1Error(...)` with a stable public envelope. If the family validates workspace/external
    state before switching on `name`, also update its exported handled-name manifest; the census
    requires that manifest to equal the advertised definitions.
-3. **Register compatibility in `server/mcp/tool-registry.ts`.** A new category supplies its name,
+3. **Register the family in `server/mcp/tool-registry.ts`.** A new category supplies its name,
    definitions, handler, global-tool declarations (normally none), and default error contract once.
-   A new `json_v1` tool added to an existing legacy category adds its name to that registration's
-   `errorContractOverrides`. Discovery, scope resolution, and dispatch are derived from the one
+   Production families use `json_v1`. Discovery, scope resolution, and dispatch are derived from the one
    registration; do not add a second spread or dispatch chain.
 4. **Register in the tests** so coverage stays complete:
    - `tests/contract/mcp-tool-input-schema-properties.test.ts` (every top-level schema prop is
@@ -436,7 +436,7 @@ Four steps, all in the same commit:
   `WS_EVENTS.*` constant (never an inline string literal), and invalidates intelligence/pipeline
   caches where relevant, so admin and client UIs stay live.
 
-Use the shared helpers in `server/mcp/tool-helpers.ts` (`requireWorkspace`, `mcpSuccess`,
-`mcpError`, `zodErrorToMcp`, `buildDashboardUrl`) rather than hand-rolling responses. `mcpError`
-and `zodErrorToMcp` are legacy-only; a `json_v1` handler uses the constructors in
-`server/mcp/tool-errors.ts` so the registry can verify the result.
+Use the shared helpers in `server/mcp/tool-helpers.ts` (`requireWorkspace`, `mcpSuccess`, the typed
+error helpers, `zodErrorToMcp`, and `buildDashboardUrl`) rather than hand-rolling responses. Every
+error must cross the constructors in `server/mcp/tool-errors.ts` so the registry can verify and
+sanitize the result.

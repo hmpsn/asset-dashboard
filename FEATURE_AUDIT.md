@@ -9904,3 +9904,51 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Human review surface:** Brand & AI now has one visible pending-count action that opens a compact review modal containing every pending voice proposal and draft deliverable in full. `Approve all N changes` is scoped to the exact visible IDs; voice proposals use one revision-safe human attestation, while draft deliverables use the existing platform approval mutation. The Voice review surface also offers `Approve all N proposals` above the complete untruncated set. Voice finalization remains a separate explicit human lock because it establishes downstream generation authority; MCP still cannot attest, approve, mint authorization, or bypass the one-time token boundary.
 
 **Files:** MCP voice schemas/handler/registry docs; voice sample batch domain and authenticated HTTP route; Brand & AI pending-review modal and Voice approval surface; brand identity count projection; focused unit/integration/component/registry tests; `BRAND_DESIGN_LANGUAGE.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 701. MCP agent-legibility error contract and template syntax 2026-07-16
+
+**Status:** Complete. All 18 registered production tool families now use the same `json_v1` error envelope.
+
+**What it does:** Migrates the remaining 13 legacy families / 61 tools from free-form text errors to stable `code`, `message`, `retryable`, and bounded safe `details`. Validation failures retain field paths and constraints; missing resources, optimistic conflicts, unmet preconditions, and rate limits use typed codes. Unexpected provider, AI, database, and integration failures are logged internally and return a generic `internal_error` rather than reflecting exception text or secrets into MCP chat. Successful response shapes are unchanged.
+
+**Agent guidance and safety:** Template and matrix discovery now state that variables use exactly one brace pair, such as `/{service}-{city}`, never double braces. Existing tone-axis direction, brand-intake size, and pending-approval reporting were confirmed already present. Human voice finalization, brand/client approval, evidence, review, send, and publish gates are unchanged. Deterministic content-source mismatches are reported as precondition failures, while unexpected save failures remain internal errors.
+
+**Tests:** The canonical registry pins every production family to `json_v1`; dispatch census and 483 MCP unit/contract tests cover envelope branding, stable classifications, actionable validation detail, and raw exception/provider-message redaction.
+
+**Files:** MCP registry, shared error helpers, 13 legacy-family handlers, template/matrix discovery descriptions and instructions, focused MCP unit/contract tests, `server/mcp/README.md`, `docs/rules/mcp-deliverable-generation.md`, and the agent-legibility audit/plan.
+
+### 702. MCP revision-safe content-matrix cell overrides 2026-07-16
+
+**Status:** Complete. The operator can now make a bounded targeting exception through MCP chat without weakening the locked-template or human-review pipeline.
+
+**What it does:** Adds `update_content_matrix_cell(workspace_id, matrix_id, cell_id, patch, expected_cell_revision)` over the existing single-cell writer. The strict patch surface is limited to target keyword, planned URL, variable values, and expected schema types. Every write requires the exact current cell revision; a stale chat state returns a typed retryable conflict instead of overwriting newer work. The updated cell and advanced revision are returned directly so the next preview can use current authority.
+
+**URL and delivery integrity:** Planned URL exceptions still require a safe workspace-relative path and must be unique across every durable matrix cell in the workspace. Small stored provenance bits distinguish intentional URL/schema exceptions from accidental matrix-pattern drift or legacy schema snapshots during structural resolution; definition-driven regeneration clears them. The existing resolver still checks known and published workspace pages before generation. The action invalidates prior content-pipeline context, broadcasts the existing content update event, records MCP activity, and never starts generation, approves, sends, or publishes.
+
+**Tests:** Domain and resolver coverage pins arbitrary keyword/URL persistence, exact revision advancement, unsafe URL rejection, same- and cross-matrix collision rejection, regeneration behavior, and override-aware structural resolution. Contract and real spawned-server coverage pin strict snake-case input, field-addressed errors, workspace scope, registry discovery, one set of post-commit effects, and an end-to-end template → one-dimensional matrix → cell override call. The focused suite passes 8 files / 116 tests.
+
+**Files:** content-matrix stored cell contract/read model/writer/resolver; existing matrix HTTP schema and MCP adapter; MCP instructions/inventory; focused domain, resolver, contract, and integration tests; productized-template plan and roadmap.
+
+### 703. Evidence-driven optional content-template sections 2026-07-16
+
+**Status:** Complete. Template authors can mark a section optional through the existing HTTP/MCP template contract; evidence, not a manual per-cell toggle, decides whether it appears in each resolved page.
+
+**What it does:** Every optional section receives a stable `matrix-cell:<cell_id>:section:<section_id>` factual requirement. Without current evidence, resolution removes the block, records its name, generation role, requirement ID, and `missing_section_evidence` reason, and preview reports the same omission as non-blocking `optional_omit`. Resolving that exact requirement uses the existing evidence ledger and cell-revision invalidation path; the next resolution includes the block and its verified facts in the generation context.
+
+**Integrity and compatibility:** Required sections behave exactly as before, all-optional generation templates are rejected, and omitting an optional primary CTA transfers the sole required primary CTA to the system conclusion. New manifest fingerprints cover the ordered omission census. Legacy templates default `optional` to false, while durable pre-feature manifests without omission metadata preserve their original fingerprint contract. No voice-finalization, identity approval, content review, send, or publish authority changed.
+
+**Tests:** Domain, persistence, preview/evidence, route-schema, and MCP contract coverage pins omission/inclusion, revision invalidation, visible reasons, fingerprint changes, CTA fallback, all-optional rejection, optional marker persistence, and legacy stored-manifest compatibility.
+
+**Files:** shared template/matrix generation contracts; content-template validation/storage/upgrade; matrix manifest resolver, evidence/read/preview/persistence services; MCP descriptions/instructions; focused unit and contract tests; productized-template plan, roadmap, features, and audit.
+
+### 704. Per-vertical studio content-template library 2026-07-16
+
+**Status:** Complete. Proven generation-ready structures can be reused across client workspaces without shared mutable state.
+
+**What it does:** Adds a master-key-only studio library with bounded vertical list/read tools, explicit exact-revision promotion, and copy-on-instantiate workspace ownership. A promotion stores one immutable snapshot plus source workspace/template/revision provenance. Instantiation creates an ordinary content template in the selected workspace and regenerates every section ID through the same copy path used by template duplication.
+
+**Isolation and gates:** Library assets have no update, inheritance, or synchronization path. Editing one client copy cannot mutate another client or the studio snapshot; a later proven source revision becomes a new library asset. Stale promotion revisions, legacy generation contracts, malformed verticals, missing assets, and missing target workspaces fail with field-specific errors. Instantiation uses the existing content-plan activity, workspace broadcast, and intelligence invalidation effects. No generation, evidence, voice, approval, send, or publish authority changed.
+
+**Tests:** Domain and MCP contract coverage promotes one exact revision, filters by vertical, replays the same promotion, instantiates into two workspaces with distinct section IDs, edits one copy, and proves the other copy and library remain unchanged. Registry census pins all four tools as studio-global/master-key-only.
+
+**Files:** migration 195; shared content-template library contracts; content-template copy helper; studio library domain service; MCP schemas/handler/registry/instructions/inventory; focused domain, MCP, auth-scope, and dispatch tests; productized-template plan, roadmap, features, rule, and audit.

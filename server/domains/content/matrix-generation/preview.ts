@@ -416,6 +416,7 @@ export async function prepareMatrixGenerationCell(
         templateId: target.templateId,
         cellId: target.cellId,
         sourceRevision: target.sourceRevision,
+        omittedOptionalSections: target.blockManifest.omittedOptionalSections ?? [],
         evidenceRequirements: target.structuralRequirements,
         blockingRequirementIds: target.structuralBlockingRequirementIds,
         expectedArtifactRevisions: {
@@ -465,6 +466,7 @@ export async function prepareMatrixGenerationCell(
         templateId: target.templateId,
         cellId: target.cellId,
         sourceRevision: target.sourceRevision,
+        omittedOptionalSections: target.blockManifest.omittedOptionalSections ?? [],
         evidenceRequirements: requirements,
         blockingRequirementIds,
         expectedArtifactRevisions,
@@ -573,6 +575,7 @@ export async function previewMatrixGeneration(
         templateId: item.templateId,
         cellId: item.cellId,
         sourceRevision: item.sourceRevision,
+        omittedOptionalSections: [],
         evidenceRequirements: item.blockers,
         blockingRequirementIds: item.blockers.map(blocker => blocker.id),
         expectedArtifactRevisions: cell

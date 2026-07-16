@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from '@modelcontextprotocol/sdk/types';
-import type { ContentTemplate } from '../../shared/types/content.js';
+import type {
+  ContentTemplate,
+  ContentTemplateLibraryItem,
+} from '../../shared/types/content.js';
 import {
   MatrixGenerationSourceLimitError,
   type ContentTemplateGenerationUpgradeProposal,
@@ -16,6 +19,10 @@ import {
 } from '../../server/mcp/tools/content-matrix-actions.js';
 import { isValidatedMcpJsonV1ErrorResult } from '../../server/mcp/tool-errors.js';
 import { PseoMatrixBridgeError } from '../../server/domains/content/matrix-generation/pseo-bridge.js';
+import {
+  MatrixCellPlannedUrlError,
+  MatrixCellRevisionConflictError,
+} from '../../server/content-matrices.js';
 
 const pseoExpectedSource = {
   entry_updated_at: '2026-07-14T00:00:00.000Z',
@@ -52,6 +59,20 @@ function template(): ContentTemplate {
     metaDescPattern: 'Learn about {service}.',
     createdAt: '2026-07-01T00:00:00.000Z',
     updatedAt: '2026-07-01T00:00:00.000Z',
+  };
+}
+
+function libraryTemplate(): ContentTemplateLibraryItem {
+  const source = template();
+  const { id: _id, workspaceId: _workspaceId, revision: _revision,
+    createdAt: _createdAt, updatedAt: _updatedAt, ...snapshot } = source;
+  return {
+    id: 'libtpl_1',
+    vertical: 'dental',
+    ...snapshot,
+    generationContractVersion: 1,
+    source: { workspaceId: 'ws_1', templateId: 'tpl_1', templateRevision: 4 },
+    createdAt: '2026-07-15T00:00:00.000Z',
   };
 }
 
@@ -153,6 +174,27 @@ function dependencies() {
     createTemplate: vi.fn(() => template()),
     updateTemplate: vi.fn(() => ({ ...template(), revision: 5, name: 'Updated service template' })),
     duplicateTemplate: vi.fn(() => ({ ...template(), id: 'tpl_copy', name: 'Service template copy' })),
+    listLibraryTemplates: vi.fn(() => ({
+      items: [{
+        id: 'libtpl_1',
+        vertical: 'dental',
+        name: 'Service template',
+        pageType: 'service' as const,
+        variableCount: 0,
+        sectionCount: 0,
+        source: { workspaceId: 'ws_1', templateId: 'tpl_1', templateRevision: 4 },
+        createdAt: '2026-07-15T00:00:00.000Z',
+      }],
+      hasMore: false,
+    })),
+    getLibraryTemplate: vi.fn(() => libraryTemplate()),
+    promoteTemplateToLibrary: vi.fn(() => ({ template: libraryTemplate(), replayed: false })),
+    instantiateLibraryTemplate: vi.fn(() => ({
+      ...template(),
+      id: 'tpl_instantiated',
+      workspaceId: 'ws_2',
+      name: 'Dental Treatment Page',
+    })),
     createMatrix: vi.fn(() => ({
       id: 'mtx_direct',
       workspaceId: 'ws_1',
@@ -167,6 +209,30 @@ function dependencies() {
         { id: 'cell_dry_cleaning', revision: 1, variableValues: { service: 'Dry Cleaning' }, targetKeyword: 'Dry Cleaning service', plannedUrl: '/services/dry-cleaning', status: 'planned' as const },
       ],
       stats: { total: 2, planned: 2, briefGenerated: 0, drafted: 0, reviewed: 0, published: 0 },
+      createdAt: '2026-07-15T00:00:00.000Z',
+      updatedAt: '2026-07-15T00:00:00.000Z',
+    })),
+    updateMatrixCell: vi.fn((_workspaceId, _matrixId, cellId, updates) => ({
+      id: 'mtx_direct',
+      workspaceId: 'ws_1',
+      revision: 1,
+      name: 'Direct services',
+      templateId: 'tpl_1',
+      dimensions: [{ variableName: 'feature', values: ['Projects'] }],
+      urlPattern: '/features/{feature}',
+      keywordPattern: '{feature} software',
+      cells: [{
+        id: cellId,
+        revision: 2,
+        variableValues: { feature: 'Projects' },
+        targetKeyword: updates.targetKeyword ?? 'Projects software',
+        plannedUrl: updates.plannedUrl ?? '/features/projects',
+        plannedUrlOverridden: updates.plannedUrl === undefined ? undefined : true,
+        expectedSchemaTypes: updates.expectedSchemaTypes,
+        expectedSchemaTypesOverridden: updates.expectedSchemaTypes === undefined ? undefined : true,
+        status: 'planned' as const,
+      }],
+      stats: { total: 1, planned: 1, briefGenerated: 0, drafted: 0, reviewed: 0, published: 0 },
       createdAt: '2026-07-15T00:00:00.000Z',
       updatedAt: '2026-07-15T00:00:00.000Z',
     })),
@@ -303,7 +369,12 @@ describe('MCP content matrix read tools', () => {
       'create_content_template',
       'update_content_template',
       'duplicate_content_template',
+      'list_library_templates',
+      'get_library_template',
+      'promote_template_to_library',
+      'instantiate_library_template',
       'create_content_matrix',
+      'update_content_matrix_cell',
       'list_pseo_blueprint_entries',
       'list_content_matrices',
       'get_content_matrix',
@@ -321,7 +392,14 @@ describe('MCP content matrix read tools', () => {
     for (const tool of contentMatrixActionTools as Tool[]) {
       expect(tool.inputSchema.type).toBe('object');
       const properties = tool.inputSchema.properties as Record<string, { description?: string }>;
-      expect(properties.workspace_id?.description).toEqual(expect.any(String));
+      if (![
+        'list_library_templates',
+        'get_library_template',
+        'promote_template_to_library',
+        'instantiate_library_template',
+      ].includes(tool.name)) {
+        expect(properties.workspace_id?.description).toEqual(expect.any(String));
+      }
       expect(properties).not.toHaveProperty('workspaceId');
       for (const property of Object.values(properties)) {
         expect(property.description).toEqual(expect.any(String));
@@ -334,12 +412,85 @@ describe('MCP content matrix read tools', () => {
         limit: { minimum: 1, maximum: 100 },
       },
     });
-    const resolveSchema = contentMatrixActionTools[9].inputSchema as Record<string, unknown>;
+    const resolveSchema = contentMatrixActionTools
+      .find(tool => tool.name === 'resolve_content_matrix_cells')?.inputSchema as Record<string, unknown>;
     expect(resolveSchema).toMatchObject({
       properties: {
         selections: { minItems: 1, maxItems: 25 },
       },
     });
+  });
+
+  it('lists, reads, promotes, and instantiates immutable library templates', async () => {
+    const deps = dependencies();
+    const handle = createContentMatrixActionHandler(deps);
+    const masterContext = {
+      ...context,
+      targetWorkspaceId: null,
+      caller: {
+        kind: 'master_key' as const,
+        scope: 'all' as const,
+        keyId: null,
+        keyLabel: null,
+      },
+    };
+
+    const listed = await handle('list_library_templates', {
+      vertical: 'dental',
+      limit: 25,
+    }, { ...masterContext, toolName: 'list_library_templates' });
+    expect(textPayload(listed)).toMatchObject({
+      items: [{ id: 'libtpl_1', vertical: 'dental', section_count: 0 }],
+      next_cursor: null,
+    });
+    expect(deps.listLibraryTemplates).toHaveBeenCalledWith({
+      vertical: 'dental',
+      cursor: undefined,
+      limit: 25,
+    });
+
+    const read = await handle('get_library_template', {
+      library_template_id: 'libtpl_1',
+    }, { ...masterContext, toolName: 'get_library_template' });
+    expect(textPayload(read)).toMatchObject({
+      template: { id: 'libtpl_1', source: { template_revision: 4 } },
+    });
+
+    const promoted = await handle('promote_template_to_library', {
+      source_workspace_id: 'ws_1',
+      template_id: 'tpl_1',
+      expected_template_revision: 4,
+      vertical: 'dental',
+    }, { ...masterContext, toolName: 'promote_template_to_library' });
+    expect(textPayload(promoted)).toMatchObject({
+      template: { id: 'libtpl_1' },
+      replayed: false,
+    });
+    expect(deps.promoteTemplateToLibrary).toHaveBeenCalledWith({
+      sourceWorkspaceId: 'ws_1',
+      templateId: 'tpl_1',
+      expectedTemplateRevision: 4,
+      vertical: 'dental',
+    });
+
+    const instantiated = await handle('instantiate_library_template', {
+      target_workspace_id: 'ws_2',
+      library_template_id: 'libtpl_1',
+      name: 'Dental Treatment Page',
+    }, { ...masterContext, toolName: 'instantiate_library_template' });
+    expect(textPayload(instantiated)).toMatchObject({
+      template: { id: 'tpl_instantiated', workspace_id: 'ws_2' },
+    });
+    expect(deps.instantiateLibraryTemplate).toHaveBeenCalledWith({
+      targetWorkspaceId: 'ws_2',
+      libraryTemplateId: 'libtpl_1',
+      name: 'Dental Treatment Page',
+    });
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws_2',
+      expect.any(String),
+      expect.objectContaining({ action: 'template_instantiated' }),
+    );
   });
 
   it('authors, reads, revises, and duplicates a content template through the existing domain functions', async () => {
@@ -349,9 +500,36 @@ describe('MCP content matrix read tools', () => {
       name: 'Service template',
       pageType: 'service',
       variables: [{ name: 'service', label: 'Service' }],
-      sections: [],
+      sections: [
+        {
+          id: 'body',
+          name: 'Body',
+          headingTemplate: '{service}',
+          guidance: 'Explain the service.',
+          wordCountTarget: 300,
+          order: 0,
+          generationRole: 'body',
+          aeoContract: { modes: [], required: false },
+          ctaContract: { role: 'none', required: false },
+        },
+        {
+          id: 'proof',
+          name: 'Proof',
+          headingTemplate: 'Why choose {service}',
+          guidance: 'Use supplied proof only.',
+          wordCountTarget: 150,
+          order: 1,
+          generationRole: 'proof',
+          aeoContract: { modes: [], required: false },
+          ctaContract: { role: 'none', required: false },
+          optional: true,
+        },
+      ],
       urlPattern: '/services/{service}',
       keywordPattern: '{service} service',
+      titlePattern: '{service}',
+      metaDescPattern: 'Learn about {service}.',
+      generationContractVersion: 1,
     };
 
     const created = await handle('create_content_template', {
@@ -391,6 +569,42 @@ describe('MCP content matrix read tools', () => {
     expect(deps.duplicateTemplate).toHaveBeenCalledWith('ws_1', 'tpl_1', 'Service template copy');
     expect(textPayload(duplicated)).toMatchObject({ template: { id: 'tpl_copy' } });
     expect(deps.addActivity).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects a generation-ready template whose entire authored structure is optional', async () => {
+    const deps = dependencies();
+    const result = await createContentMatrixActionHandler(deps)(
+      'create_content_template',
+      {
+        workspace_id: 'ws_1',
+        template: {
+          name: 'Invalid optional-only template',
+          pageType: 'service',
+          variables: [{ name: 'service', label: 'Service' }],
+          sections: [{
+            id: 'proof',
+            name: 'Proof',
+            headingTemplate: 'Why choose {service}',
+            guidance: 'Use supplied proof only.',
+            wordCountTarget: 150,
+            order: 0,
+            generationRole: 'proof',
+            aeoContract: { modes: [], required: false },
+            ctaContract: { role: 'none', required: false },
+            optional: true,
+          }],
+          urlPattern: '/services/{service}',
+          keywordPattern: '{service} service',
+          titlePattern: '{service}',
+          metaDescPattern: 'Learn about {service}.',
+        },
+      },
+      { ...context, toolName: 'create_content_template' },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(deps.createTemplate).not.toHaveBeenCalled();
+    expect(textPayload(result)).toMatchObject({ code: 'validation_failed' });
   });
 
   it('lists bounded template summaries without returning section blobs', async () => {
@@ -436,6 +650,114 @@ describe('MCP content matrix read tools', () => {
     expect(JSON.stringify(textPayload(result))).not.toContain('"cells"');
     expect(deps.getPseoMatrixPlan).not.toHaveBeenCalled();
     expect(deps.createMatrixFromPseoPlan).not.toHaveBeenCalled();
+  });
+
+  it('revision-safely overrides one matrix cell and emits workspace feedback once', async () => {
+    const deps = dependencies();
+    const result = await createContentMatrixActionHandler(deps)(
+      'update_content_matrix_cell',
+      {
+        workspace_id: 'ws_1',
+        matrix_id: 'mtx_direct',
+        cell_id: 'cell_projects',
+        patch: {
+          target_keyword: 'asana alternative',
+          planned_url: '/asana-alternative',
+          variable_values: { feature: 'Projects' },
+          expected_schema_types: ['SoftwareApplication', 'FAQPage'],
+        },
+        expected_cell_revision: 1,
+      },
+      { ...context, toolName: 'update_content_matrix_cell' },
+    );
+
+    expect(result.isError).not.toBe(true);
+    expect(deps.updateMatrixCell).toHaveBeenCalledWith(
+      'ws_1',
+      'mtx_direct',
+      'cell_projects',
+      {
+        targetKeyword: 'asana alternative',
+        plannedUrl: '/asana-alternative',
+        variableValues: { feature: 'Projects' },
+        expectedSchemaTypes: ['SoftwareApplication', 'FAQPage'],
+      },
+      { expectedCellRevision: 1, requireExpectedCellRevision: true },
+    );
+    expect(textPayload(result)).toMatchObject({
+      matrix_id: 'mtx_direct',
+      cell: {
+        id: 'cell_projects',
+        revision: 2,
+        target_keyword: 'asana alternative',
+        planned_url: '/asana-alternative',
+      },
+    });
+    expect(deps.invalidateContentPipelineIntelligence).toHaveBeenCalledWith('ws_1');
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledOnce();
+    expect(deps.addActivity).toHaveBeenCalledOnce();
+  });
+
+  it('returns a field-addressed conflict for a stale cell override', async () => {
+    const deps = dependencies();
+    deps.updateMatrixCell.mockImplementation(() => {
+      throw new MatrixCellRevisionConflictError('cell_projects', 1, 2);
+    });
+    const result = await createContentMatrixActionHandler(deps)(
+      'update_content_matrix_cell',
+      {
+        workspace_id: 'ws_1',
+        matrix_id: 'mtx_direct',
+        cell_id: 'cell_projects',
+        patch: { target_keyword: 'asana alternative' },
+        expected_cell_revision: 1,
+      },
+      { ...context, toolName: 'update_content_matrix_cell' },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(textPayload(result)).toMatchObject({
+      code: MCP_TOOL_ERROR_CODES.CONFLICT,
+      retryable: true,
+      details: {
+        field_path: 'expected_cell_revision',
+        constraint: 'must equal the current cell revision',
+        expected_revision: 1,
+        actual_revision: 2,
+      },
+    });
+  });
+
+  it('returns a field-addressed validation error for a colliding planned URL', async () => {
+    const deps = dependencies();
+    deps.updateMatrixCell.mockImplementation(() => {
+      throw new MatrixCellPlannedUrlError('planned_url_collision', {
+        matrixId: 'mtx_other',
+        cellId: 'cell_other',
+      });
+    });
+    const result = await createContentMatrixActionHandler(deps)(
+      'update_content_matrix_cell',
+      {
+        workspace_id: 'ws_1',
+        matrix_id: 'mtx_direct',
+        cell_id: 'cell_projects',
+        patch: { planned_url: '/duplicate' },
+        expected_cell_revision: 1,
+      },
+      { ...context, toolName: 'update_content_matrix_cell' },
+    );
+
+    expect(textPayload(result)).toMatchObject({
+      code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+      retryable: false,
+      details: {
+        field_path: 'patch.planned_url',
+        constraint: 'must be unique across all content matrix cells in this workspace',
+        conflicting_matrix_id: 'mtx_other',
+        conflicting_cell_id: 'cell_other',
+      },
+    });
   });
 
   it('lists bounded pSEO collection entry identities before plan lookup', async () => {

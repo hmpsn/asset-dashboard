@@ -54,8 +54,16 @@ import db from '../../db/index.js';
 import { createBrandReviewDeliverable } from '../../domains/brand/review-service.js';
 import { onContentRequestLive } from '../../domains/content/on-content-request-live.js';
 import { PublishPostError } from '../../domains/content/publish-post-to-webflow.js';
-import { BriefNotFoundError, sendBriefToClientForReview } from '../../domains/content/send-brief-to-client.js';
-import { PostNotFoundError, sendPostToClientForReview } from '../../domains/content/send-post-to-client.js';
+import {
+  BriefNotFoundError,
+  BriefReviewRequestLifecycleConflictError,
+  sendBriefToClientForReview,
+} from '../../domains/content/send-brief-to-client.js';
+import {
+  PostNotFoundError,
+  PostReviewRequestLifecycleConflictError,
+  sendPostToClientForReview,
+} from '../../domains/content/send-post-to-client.js';
 import { publishPostToWebflowWithClaim } from '../../content-publish-job.js';
 import {
   completeExternalGeneration,
@@ -83,14 +91,22 @@ import { WS_EVENTS } from '../../ws-events.js';
 import {
   consumeHandle,
   consumeHandleAtomically,
+  HandleExpiredError,
+  HandleKindMismatchError,
+  HandleNotFoundError,
+  HandleWorkspaceMismatchError,
   issueHandle,
   readHandleForAtomicConsumption,
 } from '../handles.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import {
   buildDashboardUrl,
-  mcpError,
+  mcpConflictError,
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpPreconditionError,
   mcpSuccess,
+  mcpValidationError,
   requireWorkspace,
   zodErrorToMcp,
   type McpToolErrorResponse,
@@ -98,6 +114,13 @@ import {
 } from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-content-actions');
+
+function isHandleError(error: unknown): boolean {
+  return error instanceof HandleNotFoundError
+    || error instanceof HandleExpiredError
+    || error instanceof HandleKindMismatchError
+    || error instanceof HandleWorkspaceMismatchError;
+}
 
 const briefContentSchema = saveBriefInputSchema.shape.content;
 const postContentSchema = savePostInputSchema.shape.content;
@@ -107,6 +130,13 @@ type PostPatchUpdates = NonNullable<typeof updatePostInputSchema['_output']['upd
 interface PreparedParentRequestAuthority {
   id: string;
   updatedAt: string;
+}
+
+class ContentPreparationError extends Error {
+  constructor() {
+    super('The prepared content inputs no longer match their source authority.');
+    this.name = 'ContentPreparationError';
+  }
 }
 
 interface BriefRequestPayload {
@@ -142,14 +172,14 @@ interface PostSavedPayload {
 
 function assertExternalGenerationPreparation(
   preparation: ExternalGenerationPreparation | undefined,
-  producingTool: 'prepare_brief_context' | 'prepare_post_context',
+  _producingTool: 'prepare_brief_context' | 'prepare_post_context',
 ): asserts preparation is ExternalGenerationPreparation {
   if (!preparation
     || typeof preparation.runId !== 'string'
     || typeof preparation.operation !== 'string'
     || typeof preparation.inputFingerprint !== 'string'
     || typeof preparation.startedAt !== 'string') {
-    throw new Error(`Prepared context is missing generation authority. Re-run ${producingTool}.`);
+    throw new ContentPreparationError();
   }
 }
 
@@ -162,13 +192,11 @@ function toPreparedParentRequestAuthority(
 function requireCurrentPreparedParentRequest(
   workspaceId: string,
   authority: PreparedParentRequestAuthority,
-  producingTool: 'prepare_brief_context' | 'prepare_post_context',
+  _producingTool: 'prepare_brief_context' | 'prepare_post_context',
 ): ContentTopicRequest {
   const request = getContentRequest(workspaceId, authority.id);
   if (!request || request.updatedAt !== authority.updatedAt) {
-    throw new Error(
-      `Content request ${authority.id} changed after preparation. Re-run ${producingTool} before saving.`,
-    );
+    throw new ContentPreparationError();
   }
   return request;
 }
@@ -176,13 +204,10 @@ function requireCurrentPreparedParentRequest(
 function assertSaveParentMatchesPrepared(
   suppliedParentRequestId: string | undefined,
   preparedParent: PreparedParentRequestAuthority | undefined,
-  producingTool: 'prepare_brief_context' | 'prepare_post_context',
+  _producingTool: 'prepare_brief_context' | 'prepare_post_context',
 ): void {
   if (suppliedParentRequestId !== undefined && suppliedParentRequestId !== preparedParent?.id) {
-    const preparedLabel = preparedParent?.id ?? 'no parent request';
-    throw new Error(
-      `parent_request_id (${suppliedParentRequestId}) does not match the parent selected by ${producingTool} (${preparedLabel})`,
-    );
+    throw new ContentPreparationError();
   }
 }
 
@@ -192,9 +217,7 @@ function assertParentTargetKeyword(
 ): void {
   const requestTargetKeyword = sanitizeInlinePromptText(request.targetKeyword);
   if (requestTargetKeyword !== targetKeyword) {
-    throw new Error(
-      `Content request ${request.id} targetKeyword (${requestTargetKeyword}) does not match generated targetKeyword (${targetKeyword})`,
-    );
+    throw new ContentPreparationError();
   }
 }
 
@@ -203,7 +226,7 @@ function assertBriefParentLineage(
   briefId: string,
 ): void {
   if (request.briefId && request.briefId !== briefId) {
-    throw new Error(`Content request ${request.id} is already linked to another brief`);
+    throw new ContentPreparationError();
   }
 }
 
@@ -212,10 +235,7 @@ function assertPostParentSourceLineage(
   briefId: string,
 ): void {
   if (request.briefId !== briefId) {
-    const lineage = request.briefId ?? 'no brief';
-    throw new Error(
-      `Content request ${request.id} is linked to ${lineage}, not source brief ${briefId}`,
-    );
+    throw new ContentPreparationError();
   }
 }
 
@@ -226,14 +246,14 @@ function assertPostParentLineage(
 ): void {
   assertPostParentSourceLineage(request, briefId);
   if (request.postId && request.postId !== postId) {
-    throw new Error(`Content request ${request.id} is already linked to another post`);
+    throw new ContentPreparationError();
   }
 }
 
 function assertPreparedParentLifecycle(
   request: ContentTopicRequest,
   targetStatus: 'brief_generated' | 'in_progress',
-  producingTool: 'prepare_brief_context' | 'prepare_post_context',
+  _producingTool: 'prepare_brief_context' | 'prepare_post_context',
 ): void {
   if (request.status === targetStatus) return;
   try {
@@ -245,9 +265,7 @@ function assertPreparedParentLifecycle(
     );
   } catch (err) {
     if (!(err instanceof InvalidTransitionError)) throw err;
-    throw new Error(
-      `Content request ${request.id} in status ${request.status} cannot advance to ${targetStatus} through ${producingTool}`,
-    );
+    throw new ContentPreparationError();
   }
 }
 
@@ -416,11 +434,13 @@ function revisionConflictResponse(
     ? getBrief(workspaceId, error.artifactId)?.generationRevision
     : getPost(workspaceId, error.artifactId)?.generationRevision;
   const refetchTool = isBrief ? 'get_brief' : 'get_post';
-  const revisionDetail = currentRevision === undefined
-    ? 'The artifact no longer exists.'
-    : `Current revision: ${currentRevision}.`;
-  return mcpError(
-    `Revision conflict for ${error.artifactId}. ${revisionDetail} Re-fetch via ${refetchTool} before retrying.`,
+  return mcpConflictError(
+    `The content artifact changed. Re-fetch via ${refetchTool} before retrying.`,
+    {
+      resource_type: error.artifactType,
+      expected_revision: error.expectedRevision,
+      ...(currentRevision === undefined ? {} : { current_revision: currentRevision }),
+    },
   );
 }
 
@@ -429,12 +449,13 @@ function preparePostContextRevisionConflictResponse(
   error: GenerationRevisionConflictError,
 ): McpToolErrorResponse {
   const currentRevision = getBrief(workspaceId, error.artifactId)?.generationRevision;
-  const revisionDetail = currentRevision === undefined
-    ? 'The source brief no longer exists.'
-    : `Current revision: ${currentRevision}.`;
-  return mcpError(
-    `Revision conflict for ${error.artifactId}. ${revisionDetail} `
-    + 'Re-run prepare_post_context before generating post content; no post-request handle was issued.',
+  return mcpConflictError(
+    'The source brief changed. Re-run prepare_post_context before generating post content; no post-request handle was issued.',
+    {
+      resource_type: 'content_brief',
+      expected_revision: error.expectedRevision,
+      ...(currentRevision === undefined ? {} : { current_revision: currentRevision }),
+    },
   );
 }
 
@@ -542,7 +563,7 @@ async function handleGetBrief(
   if ('isError' in workspace) return workspace;
 
   const brief = getBrief(workspaceId, briefId);
-  if (!brief) return mcpError(`Brief not found: ${briefId}`);
+  if (!brief) return mcpNotFoundError('Brief not found.', { resource_type: 'content_brief' });
 
   return mcpSuccess({
     brief,
@@ -561,12 +582,15 @@ async function handleUpdateBrief(
   if ('isError' in workspace) return workspace;
 
   const existing = getBrief(workspaceId, briefId);
-  if (!existing) return mcpError(`Brief not found: ${briefId}`);
+  if (!existing) return mcpNotFoundError('Brief not found.', { resource_type: 'content_brief' });
 
   let updates: Partial<Omit<ContentBrief, 'id' | 'workspaceId' | 'createdAt'>>;
   if (parsed.data.mode === 'patch') {
     const patch = parsed.data.updates;
-    if (!patch) return mcpError('Invalid patch payload: updates is required when mode is patch');
+    if (!patch) return mcpValidationError('Invalid tool input at updates: updates is required in patch mode.', {
+      field_path: 'updates',
+      constraint: 'Required when mode is patch.',
+    });
     updates = {
       ...(patch.targetKeyword !== undefined ? { targetKeyword: patch.targetKeyword } : {}),
       ...(patch.secondaryKeywords !== undefined ? { secondaryKeywords: patch.secondaryKeywords } : {}),
@@ -612,7 +636,10 @@ async function handleUpdateBrief(
     };
   } else {
     const replacement = parsed.data.content;
-    if (!replacement) return mcpError('Invalid replace payload: content is required when mode is replace');
+    if (!replacement) return mcpValidationError('Invalid tool input at content: content is required in replace mode.', {
+      field_path: 'content',
+      constraint: 'Required when mode is replace.',
+    });
     updates = {
       ...(buildBriefEditablePayload(existing) as Partial<Omit<ContentBrief, 'id' | 'workspaceId' | 'createdAt'>>),
       ...replacement,
@@ -632,7 +659,7 @@ async function handleUpdateBrief(
     }
     throw err;
   }
-  if (!updated) return mcpError(`Brief not found: ${briefId}`);
+  if (!updated) return mcpNotFoundError('Brief not found.', { resource_type: 'content_brief' });
 
   const changed = updated.generationRevision !== expectedRevision;
   if (!changed) {
@@ -719,7 +746,7 @@ async function handleGetPost(
   if ('isError' in workspace) return workspace;
 
   const post = getPost(workspaceId, postId);
-  if (!post) return mcpError(`Post not found: ${postId}`);
+  if (!post) return mcpNotFoundError('Post not found.', { resource_type: 'content_post' });
 
   return mcpSuccess({
     post,
@@ -738,12 +765,15 @@ async function handleUpdatePost(
   if ('isError' in workspace) return workspace;
 
   const existing = getPost(workspaceId, postId);
-  if (!existing) return mcpError(`Post not found: ${postId}`);
+  if (!existing) return mcpNotFoundError('Post not found.', { resource_type: 'content_post' });
 
   const updates: Partial<Omit<GeneratedPost, 'id' | 'workspaceId' | 'createdAt'>> = {};
   if (parsed.data.mode === 'patch') {
     const patch = parsed.data.updates;
-    if (!patch) return mcpError('Invalid patch payload: updates is required when mode is patch');
+    if (!patch) return mcpValidationError('Invalid tool input at updates: updates is required in patch mode.', {
+      field_path: 'updates',
+      constraint: 'Required when mode is patch.',
+    });
     if (patch.title !== undefined) updates.title = patch.title;
     if (patch.metaDescription !== undefined) updates.metaDescription = patch.metaDescription;
     if (patch.introduction !== undefined) updates.introduction = patch.introduction;
@@ -752,7 +782,10 @@ async function handleUpdatePost(
     if (patch.seoMetaDescription !== undefined) updates.seoMetaDescription = patch.seoMetaDescription;
     if (patch.sections !== undefined) {
       const merged = mergePostSectionUpdates(existing.sections, patch.sections);
-      if ('error' in merged) return mcpError(merged.error);
+      if ('error' in merged) return mcpValidationError('Invalid tool input at updates.sections: section indexes must be unique and exist in the post.', {
+        field_path: 'updates.sections',
+        constraint: 'Each section index must be unique and reference an existing post section.',
+      });
       updates.sections = merged.sections;
     }
     if (patch.introduction !== undefined || patch.conclusion !== undefined || patch.sections !== undefined) {
@@ -764,7 +797,10 @@ async function handleUpdatePost(
     }
   } else {
     const replacement = parsed.data.content;
-    if (!replacement) return mcpError('Invalid replace payload: content is required when mode is replace');
+    if (!replacement) return mcpValidationError('Invalid tool input at content: content is required in replace mode.', {
+      field_path: 'content',
+      constraint: 'Required when mode is replace.',
+    });
     updates.title = replacement.title;
     updates.metaDescription = replacement.metaDescription;
     updates.introduction = replacement.introduction;
@@ -788,7 +824,7 @@ async function handleUpdatePost(
     }
     throw err;
   }
-  if (!updated) return mcpError(`Post not found: ${postId}`);
+  if (!updated) return mcpNotFoundError('Post not found.', { resource_type: 'content_post' });
 
   const changed = updated.generationRevision !== expectedRevision;
   if (!changed) {
@@ -862,7 +898,7 @@ async function handlePrepareBriefContext(
       ? getContentRequest(workspaceId, parentRequestId)
       : undefined;
     if (parentRequestId && !initialParentRequest) {
-      return mcpError(`Content request not found: ${parentRequestId}`);
+      return mcpNotFoundError('Content request not found.', { resource_type: 'content_request' });
     }
     const parentRequestAuthority = initialParentRequest
       ? toPreparedParentRequestAuthority(initialParentRequest)
@@ -947,9 +983,14 @@ async function handlePrepareBriefContext(
       dashboard_url: buildDashboardUrl(workspaceId, 'content'),
     });
   } catch (err) {
+    if (err instanceof ContentPreparationError) {
+      return mcpPreconditionError(
+        'The brief inputs no longer match their source content request. Re-read the source and prepare the brief again.',
+        { failure_code: 'source_authority_mismatch' },
+      );
+    }
     log.error({ err, workspaceId, topic }, 'prepare_brief_context failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Failed to prepare brief context: ${message}`);
+    return mcpInternalError();
   }
 }
 
@@ -1036,9 +1077,7 @@ async function handleSaveBrief(
           'prepare_brief_context',
         );
         if (payload.targetKeyword && content.targetKeyword !== payload.targetKeyword) {
-          throw new Error(
-            `Brief targetKeyword (${content.targetKeyword}) does not match prepared targetKeyword (${payload.targetKeyword})`,
-          );
+          throw new ContentPreparationError();
         }
         const provenance = completeExternalGeneration(payload.generation);
         const brief: ContentBrief = {
@@ -1066,7 +1105,7 @@ async function handleSaveBrief(
             briefId: brief.id,
             status: 'brief_generated',
           });
-          if (!updated) throw new Error(`Content request not found: ${parentRequestId}`);
+          if (!updated) throw new ContentPreparationError();
         }
         const briefHandle = issueHandle('brief', workspaceId, {
           briefId: brief.id,
@@ -1077,8 +1116,13 @@ async function handleSaveBrief(
       },
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(message);
+    if (isHandleError(err) || err instanceof ContentPreparationError) {
+      return mcpPreconditionError(
+        'The brief request handle is invalid, expired, already used, or no longer matches its source. Run prepare_brief_context again.',
+      );
+    }
+    log.error({ err, workspaceId }, 'save_brief failed');
+    return mcpInternalError();
   }
 
   const { brief, briefHandle, parentRequestId } = accepted;
@@ -1140,7 +1184,7 @@ async function handlePreparePostContext(
   if ('isError' in workspace) return workspace;
 
   const brief = getBrief(workspaceId, briefId);
-  if (!brief) return mcpError(`Brief not found: ${briefId}`);
+  if (!brief) return mcpNotFoundError('Brief not found.', { resource_type: 'content_brief' });
   const postId = `post_${randomUUID()}`;
 
   try {
@@ -1148,7 +1192,7 @@ async function handlePreparePostContext(
       ? getContentRequest(workspaceId, parentRequestId)
       : undefined;
     if (parentRequestId && !initialParentRequest) {
-      return mcpError(`Content request not found: ${parentRequestId}`);
+      return mcpNotFoundError('Content request not found.', { resource_type: 'content_request' });
     }
     const parentRequestAuthority = initialParentRequest
       ? toPreparedParentRequestAuthority(initialParentRequest)
@@ -1234,9 +1278,14 @@ async function handlePreparePostContext(
     if (err instanceof GenerationRevisionConflictError) {
       return preparePostContextRevisionConflictResponse(workspaceId, err);
     }
+    if (err instanceof ContentPreparationError) {
+      return mcpPreconditionError(
+        'The post inputs no longer match their source brief or content request. Re-read the sources and prepare the post again.',
+        { failure_code: 'source_authority_mismatch' },
+      );
+    }
     log.error({ err, workspaceId, briefId }, 'prepare_post_context failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Failed to prepare post context: ${message}`);
+    return mcpInternalError();
   }
 }
 
@@ -1297,9 +1346,7 @@ async function handleSavePost(
         );
         const post = buildPostEntity(workspaceId, content, payload);
         if (post.briefId !== payload.briefId) {
-          throw new Error(
-            `Post briefId (${post.briefId}) does not match prepared request briefId (${payload.briefId})`,
-          );
+          throw new ContentPreparationError();
         }
         const sourceBrief = getBrief(workspaceId, payload.briefId);
         if (!sourceBrief || sourceBrief.generationRevision !== payload.briefRevision) {
@@ -1310,14 +1357,10 @@ async function handleSavePost(
           );
         }
         if (post.targetKeyword !== sourceBrief.targetKeyword) {
-          throw new Error(
-            `Post targetKeyword (${post.targetKeyword}) does not match source brief targetKeyword (${sourceBrief.targetKeyword})`,
-          );
+          throw new ContentPreparationError();
         }
         if (post.sections.length !== sourceBrief.outline.length) {
-          throw new Error(
-            `Post section count (${post.sections.length}) does not match source brief outline (${sourceBrief.outline.length})`,
-          );
+          throw new ContentPreparationError();
         }
 
         const parentRequest = payload.parentRequest
@@ -1346,7 +1389,7 @@ async function handleSavePost(
             postId: post.id,
             status: 'in_progress',
           });
-          if (!updated) throw new Error(`Content request not found: ${parentRequestId}`);
+          if (!updated) throw new ContentPreparationError();
         }
         const postHandle = issueHandle('post', workspaceId, {
           postId: savedPost.id,
@@ -1361,8 +1404,13 @@ async function handleSavePost(
     if (err instanceof GenerationRevisionConflictError) {
       return revisionConflictResponse(workspaceId, err);
     }
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(message);
+    if (isHandleError(err) || err instanceof ContentPreparationError) {
+      return mcpPreconditionError(
+        'The post request handle is invalid, expired, already used, or no longer matches its source. Run prepare_post_context again.',
+      );
+    }
+    log.error({ err, workspaceId }, 'save_post failed');
+    return mcpInternalError();
   }
 
   const { post: savedPost, postHandle, parentRequestId } = accepted;
@@ -1451,7 +1499,7 @@ async function handleGetContentRequestById(
   if ('isError' in workspace) return workspace;
 
   const request = getContentRequest(workspaceId, requestId);
-  if (!request) return mcpError(`Content request not found: ${requestId}`);
+  if (!request) return mcpNotFoundError('Content request not found.', { resource_type: 'content_request' });
 
   return mcpSuccess({
     request,
@@ -1553,11 +1601,11 @@ async function handleDeleteBrief(
   if ('isError' in workspace) return workspace;
 
   const existing = getBrief(workspaceId, briefId);
-  if (!existing) return mcpError(`Brief not found: ${briefId}`);
+  if (!existing) return mcpNotFoundError('Brief not found.', { resource_type: 'content_brief' });
 
   try {
     if (!deleteBriefAtRevision(workspaceId, briefId, expectedRevision)) {
-      return mcpError(`Brief not found: ${briefId}`);
+      return mcpNotFoundError('Brief not found.', { resource_type: 'content_brief' });
     }
   } catch (err) {
     if (err instanceof GenerationRevisionConflictError) {
@@ -1611,21 +1659,25 @@ async function handleDeletePost(
   if ('isError' in workspace) return workspace;
 
   const existing = getPost(workspaceId, postId);
-  if (!existing) return mcpError(`Post not found: ${postId}`);
+  if (!existing) return mcpNotFoundError('Post not found.', { resource_type: 'content_post' });
 
   try {
     if (!deletePostAtRevision(workspaceId, postId, expectedRevision)) {
-      return mcpError(`Post not found: ${postId}`);
+      return mcpNotFoundError('Post not found.', { resource_type: 'content_post' });
     }
   } catch (err) {
     if (err instanceof GenerationRevisionConflictError) {
       return revisionConflictResponse(workspaceId, err);
     }
     if (err instanceof UnresolvedContentPublishReconciliationError) {
-      return mcpError(err.message);
+      return mcpPreconditionError(
+        'This post cannot be deleted because its external publish state is unresolved. Retry publish reconciliation or resolve the external item first.',
+      );
     }
     if (err instanceof ActiveJobResourceConflict) {
-      return mcpError(`[${err.code}] ${err.message}. active_job_id=${err.jobId}`);
+      return mcpConflictError('A publish or generation job is active for this post.', {
+        active_job_id: err.jobId,
+      });
     }
     throw err;
   }
@@ -1671,7 +1723,7 @@ async function handleListPostVersions(
   if ('isError' in workspace) return workspace;
 
   const post = getPost(workspaceId, postId);
-  if (!post) return mcpError(`Post not found: ${postId}`);
+  if (!post) return mcpNotFoundError('Post not found.', { resource_type: 'content_post' });
 
   const versions = listPostVersions(workspaceId, postId)
     .slice(0, limit ?? 50)
@@ -1715,7 +1767,9 @@ async function handleRevertPostVersion(
     }
     throw err;
   }
-  if (!reverted) return mcpError(`Post or version not found for post ${postId}`);
+  if (!reverted) return mcpNotFoundError('The post or requested version was not found.', {
+    resource_type: 'content_post_version',
+  });
 
   runMcpContentPostCommitEffect(workspaceId, 'invalidate-content-intelligence', () => {
     invalidateContentPipelineIntelligence(workspaceId);
@@ -1847,7 +1901,9 @@ async function handleSendToClient(
         } : {}),
       });
     } catch (err) {
-      if (err instanceof PostNotFoundError) return mcpError(err.message);
+      if (err instanceof PostNotFoundError) {
+        return mcpNotFoundError('Post not found.', { resource_type: 'content_post' });
+      }
       throw err;
     }
     const { request, post, changed } = sendResult;
@@ -1869,10 +1925,21 @@ async function handleSendToClient(
       return revisionConflictResponse(workspaceId, err);
     }
     if (err instanceof BriefNotFoundError || err instanceof PostNotFoundError) {
-      return mcpError(err.message);
+      return mcpNotFoundError('The content artifact was not found.', { resource_type: 'content_artifact' });
     }
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(message);
+    if (err instanceof BriefReviewRequestLifecycleConflictError
+      || err instanceof PostReviewRequestLifecycleConflictError) {
+      return mcpConflictError(
+        'The selected content request cannot enter client review from its current status. Re-read it before retrying.',
+      );
+    }
+    if (isHandleError(err)) {
+      return mcpPreconditionError(
+        'The content handle is invalid, expired, already used, or belongs to another workspace. Re-run the producing tool.',
+      );
+    }
+    log.error({ err, workspaceId }, 'send_to_client failed');
+    return mcpInternalError();
   }
 }
 
@@ -1893,10 +1960,15 @@ async function handleAdvanceContentStatus(
       ...(internalNote !== undefined ? { internalNote } : {}),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Cannot advance content request to '${status}': ${message}`);
+    if (err instanceof InvalidTransitionError) {
+      return mcpConflictError(
+        'The content request cannot move to the requested status. Re-read it before retrying.',
+      );
+    }
+    log.error({ err, workspaceId, requestId }, 'advance_content_status failed');
+    return mcpInternalError();
   }
-  if (!updated) return mcpError(`Content request not found: ${requestId}`);
+  if (!updated) return mcpNotFoundError('Content request not found.', { resource_type: 'content_request' });
 
   // Parity with the admin content-requests route: a transition to `delivered`
   // makes the target page live, so it must run the same page-state update +
@@ -1957,15 +2029,19 @@ async function handlePublishPost(
     });
   } catch (err) {
     if (err instanceof ActiveJobResourceConflict) {
-      return mcpError(
-        `[${err.code}] A publish or generation job is already active for this post. active_job_id=${err.jobId}`,
-      );
+      return mcpConflictError('A publish or generation job is already active for this post.', {
+        active_job_id: err.jobId,
+      });
     }
     if (err instanceof PublishPostError) {
       if (err.code === 'local_revision_conflict') {
         if (err.reconciliation) {
-          return mcpError(
-            `[${err.code}] ${err.message} item_id=${err.reconciliation.itemId} external_state=${err.reconciliation.externalState}. A retry will reuse this Webflow item.`,
+          return mcpConflictError(
+            'The post changed after Webflow accepted the item. Re-read the post; a retry will reuse the existing Webflow item.',
+            {
+              item_id: err.reconciliation.itemId,
+              external_state: err.reconciliation.externalState,
+            },
           );
         }
         return revisionConflictResponse(
@@ -1973,10 +2049,24 @@ async function handlePublishPost(
           new GenerationRevisionConflictError('content_post', postId, expectedRevision),
         );
       }
-      return mcpError(err.message);
+      if (err.code === 'workspace_not_found' || err.code === 'post_not_found') {
+        return mcpNotFoundError('The publish source was not found.', { resource_type: 'content_post' });
+      }
+      if (err.httpStatus === 409) {
+        return mcpConflictError('The publish target changed. Re-read the post and workspace publish settings before retrying.', {
+          failure_code: err.code,
+        });
+      }
+      if (err.httpStatus >= 500) {
+        log.error({ err, workspaceId, postId, failureCode: err.code }, 'publish_post failed');
+        return mcpInternalError();
+      }
+      return mcpPreconditionError('The post cannot be published until its workspace, status, and Webflow configuration are ready.', {
+        failure_code: err.code,
+      });
     }
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Publish failed: ${message}`);
+    log.error({ err, workspaceId, postId }, 'publish_post failed');
+    return mcpInternalError();
   }
 }
 
@@ -2004,5 +2094,5 @@ export async function handleContentActionTool(
   if (name === 'delete_post') return handleDeletePost(args);
   if (name === 'list_post_versions') return handleListPostVersions(args);
   if (name === 'revert_post_version') return handleRevertPostVersion(args);
-  return mcpError(`Unknown content action tool: ${name}`);
+  return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }

@@ -182,7 +182,7 @@ describe('resolve_insight / bulk_resolve_insights MCP tools', () => {
   it('rejects invalid args (missing insightId)', async () => {
     const result = await handleInsightTool('resolve_insight', { workspaceId: ws.workspaceId, status: 'resolved' });
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain('Validation failed');
+    expect(JSON.parse(result.content[0]?.text ?? '{}')).toMatchObject({ code: 'validation_failed' });
   });
 
   // R3-PR2: the resolution_status transition guard must never crash a bulk batch.

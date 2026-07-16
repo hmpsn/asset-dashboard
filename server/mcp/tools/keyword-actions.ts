@@ -30,8 +30,11 @@ import { toMcpJsonSchema } from '../json-schema.js';
 import { recordPaidCall } from '../paid-call-counter.js';
 import {
   buildDashboardUrl,
-  mcpError,
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpPreconditionError,
   mcpSuccess,
+  mcpValidationError,
   requireWorkspace,
   zodErrorToMcp,
   type McpToolErrorResponse,
@@ -103,7 +106,7 @@ async function handleResearchKeywords(
     typeof workspace.seoDataProvider === 'string' ? workspace.seoDataProvider : undefined,
   );
   const provider = getConfiguredProvider(preferredProvider);
-  if (!provider) return mcpError('No SEO data provider is configured for this workspace');
+  if (!provider) return mcpPreconditionError('No SEO data provider is configured for this workspace');
 
   try {
     const metrics = await provider.getKeywordMetrics(
@@ -140,8 +143,7 @@ async function handleResearchKeywords(
     return mcpSuccess({ results, warning });
   } catch (err) {
     log.error({ err, workspaceId, terms }, 'research_keywords failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Keyword research failed: ${message}`);
+    return mcpInternalError();
   }
 }
 
@@ -161,11 +163,19 @@ async function handleAddKeywordToStrategy(
       const payload = consumeHandle<{ term: string }>(researchHandle, 'keyword-research', workspaceId);
       resolvedTerm = payload.term.trim();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return mcpError(message);
+      log.debug(
+        { failureClass: 'handle_validation_failed', wasErrorObject: err instanceof Error, workspaceId },
+        'Keyword research handle validation failed',
+      );
+      return mcpPreconditionError(
+        'The keyword research handle is invalid, expired, already used, or belongs to another workspace. Run research_keywords again.',
+      );
     }
   }
-  if (!resolvedTerm) return mcpError('No keyword term resolved');
+  if (!resolvedTerm) return mcpValidationError('Invalid tool input at term: no keyword term could be resolved.', {
+    field_path: 'term',
+    constraint: 'Provide a non-empty term or a current research_handle.',
+  });
 
   // M3/M4: Route through addKeywordToPage (shared helper): handles merge-as-secondary,
   // secondaryKeywords cap (MAX_SECONDARY_KEYWORDS), and clean slug-derived title (never raw URL).
@@ -346,5 +356,5 @@ export async function handleKeywordActionTool(
   if (name === 'remove_page_keyword') return handleRemovePageKeyword(args);
   if (name === 'add_keywords_batch') return handleAddKeywordsBatch(args);
   if (name === 'replace_keyword_strategy') return handleReplaceKeywordStrategy(args);
-  return mcpError(`Unknown keyword action tool: ${name}`);
+  return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }

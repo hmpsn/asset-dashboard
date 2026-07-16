@@ -345,6 +345,7 @@ export function createContentTemplateGenerationUpgradeProposal(
     }
     upgradedSections.push({
       ...section,
+      optional: section.optional ?? false,
       generationRole: role,
       aeoContract,
       ctaContract,

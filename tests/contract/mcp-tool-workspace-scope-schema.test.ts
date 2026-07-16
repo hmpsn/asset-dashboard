@@ -7,7 +7,14 @@ import {
 
 const ALL_TOOLS: Tool[] = listMcpToolDefinitions();
 
-const GLOBAL_TOOL_NAMES = ['create_workspace', 'list_workspaces'] as const;
+const GLOBAL_TOOL_NAMES = [
+  'create_workspace',
+  'get_library_template',
+  'instantiate_library_template',
+  'list_library_templates',
+  'list_workspaces',
+  'promote_template_to_library',
+] as const;
 const WORKSPACE_ARGUMENT_NAMES = ['workspaceId', 'workspace_id'] as const;
 
 function declaredWorkspaceArguments(tool: Tool): string[] {
@@ -23,7 +30,7 @@ describe('MCP tool workspace-scope schema census', () => {
     const names = ALL_TOOLS.map(tool => tool.name);
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
 
-    expect(ALL_TOOLS).toHaveLength(96);
+    expect(ALL_TOOLS).toHaveLength(101);
     expect(duplicates, `Duplicate MCP tool names: ${duplicates.join(', ')}`).toEqual([]);
   });
 

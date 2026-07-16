@@ -46,6 +46,11 @@ describe('MCP server instructions', () => {
     for (const tool of [
       'get_pseo_matrix_plan',
       'create_content_matrix_from_pseo_plan',
+      'update_content_matrix_cell',
+      'promote_template_to_library',
+      'list_library_templates',
+      'get_library_template',
+      'instantiate_library_template',
       'list_content_matrices',
       'get_content_matrix',
       'resolve_content_matrix_cells',
@@ -59,11 +64,20 @@ describe('MCP server instructions', () => {
       expect(MCP_SERVER_INSTRUCTIONS).toContain(tool);
     }
     expect(MCP_SERVER_INSTRUCTIONS).toContain('expected_source_revision');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('expected_cell_revision');
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/caller-accepted hard limits/i);
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/cannot approve or publish/i);
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not call AI/i);
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/does not.+create a generation run/i);
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/never previews or starts generation/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('/{service}-{city}');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/single brace pair/i);
+  });
+
+  it('documents one stable error envelope for every tool', () => {
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('json_v1');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/every tool/i);
+    expect(MCP_SERVER_INSTRUCTIONS).not.toMatch(/legacy text errors/i);
   });
 
   it('explains the immutable, evidence-addressed brand-intake workflow', () => {

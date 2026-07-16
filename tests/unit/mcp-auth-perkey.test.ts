@@ -320,7 +320,7 @@ describe('handleMcpRequest — workspace scope enforcement', () => {
   it('workspace-A key calling tool with workspace_id=B is rejected', async () => {
     const result = await callTool(WORKSPACE_KEY_A, 'get_workspace_overview', { workspaceId: 'ws-B' });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Forbidden');
+    expect(JSON.parse(result.content[0].text)).toMatchObject({ code: 'forbidden' });
     expect(h.workspaceHandler).not.toHaveBeenCalled();
   });
 
@@ -364,14 +364,14 @@ describe('handleMcpRequest — workspace scope enforcement', () => {
       { workspace_id: 'ws-B' },
     );
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Forbidden');
+    expect(JSON.parse(result.content[0].text)).toMatchObject({ code: 'forbidden' });
     expect(h.workspaceHandler).not.toHaveBeenCalled();
   });
 
   it('workspace-A key calling a no-workspace_id tool (list_workspaces) is rejected', async () => {
     const result = await callTool(WORKSPACE_KEY_A, 'list_workspaces', {});
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('not workspace-scoped');
+    expect(JSON.parse(result.content[0].text)).toMatchObject({ code: 'forbidden' });
     expect(h.workspaceHandler).not.toHaveBeenCalled();
   });
 
@@ -382,7 +382,7 @@ describe('handleMcpRequest — workspace scope enforcement', () => {
       { workspaceId: 'ws-A' },
     );
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('not workspace-scoped');
+    expect(JSON.parse(result.content[0].text)).toMatchObject({ code: 'forbidden' });
     expect(h.workspaceHandler).not.toHaveBeenCalled();
   });
 

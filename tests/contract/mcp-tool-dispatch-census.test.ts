@@ -171,8 +171,6 @@ const EXPECTED_FAMILY_REGISTRATIONS: readonly ExpectedFamilyRegistration[] = [
   },
 ];
 
-const UNKNOWN_TOOL_SENTINEL = /\bUnknown\b[\s\S]*\btool:/i;
-
 const inertArgs: Record<string, unknown> = {
   // Empty workspace IDs fail validation/not-found checks before paid or write work.
   workspaceId: '',
@@ -188,6 +186,20 @@ function textContent(result: CallToolResult): string {
     .join('\n');
 }
 
+function isUnknownToolResult(result: CallToolResult): boolean {
+  const text = textContent(result);
+  try {
+    const envelope = JSON.parse(text) as {
+      code?: string;
+      details?: { resource_type?: string };
+    };
+    return envelope.code === 'not_found'
+      && (envelope.details?.resource_type === 'tool' || /unknown .*tool/i.test(text));
+  } catch {
+    return /\bUnknown\b[\s\S]*\btool:/i.test(text);
+  }
+}
+
 async function assertDefinitionIsDispatched(entry: McpToolRegistryEntry): Promise<void> {
   const context: McpToolExecutionContext = {
     requestId: `dispatch-census:${entry.definition.name}`,
@@ -201,13 +213,15 @@ async function assertDefinitionIsDispatched(entry: McpToolRegistryEntry): Promis
     },
   };
 
+  let result: CallToolResult;
   try {
-    const result = await entry.handler(entry.definition.name, inertArgs, context);
-    expect(textContent(result), entry.definition.name).not.toMatch(UNKNOWN_TOOL_SENTINEL);
+    result = await entry.handler(entry.definition.name, inertArgs, context);
   } catch (error) {
     const classification = error instanceof Error ? error.message : String(error);
-    expect(classification, entry.definition.name).not.toMatch(UNKNOWN_TOOL_SENTINEL);
+    expect(classification, entry.definition.name).not.toMatch(/\bUnknown\b[\s\S]*\btool:/i);
+    return;
   }
+  expect(isUnknownToolResult(result), entry.definition.name).toBe(false);
 }
 
 describe('MCP definition-to-handler dispatch census', () => {
@@ -247,12 +261,12 @@ describe('MCP definition-to-handler dispatch census', () => {
         },
       };
       const result = await expected.handler(probeName, inertArgs, context);
-      expect(textContent(result), expected.family).toMatch(UNKNOWN_TOOL_SENTINEL);
+      expect(isUnknownToolResult(result), expected.family).toBe(true);
     }
   });
 
   it('routes every registered production definition into its family handler', async () => {
-    expect(MCP_TOOL_REGISTRY.size).toBe(96);
+    expect(MCP_TOOL_REGISTRY.size).toBe(101);
     for (const entry of MCP_TOOL_REGISTRY.values()) {
       await assertDefinitionIsDispatched(entry);
     }
@@ -266,13 +280,18 @@ describe('MCP definition-to-handler dispatch census', () => {
         inputSchema: { type: 'object', properties: { workspaceId: { type: 'string' } } },
       },
       family: 'fixture',
-      handler: async name => ({
+      handler: async () => ({
         isError: true,
-        content: [{ type: 'text', text: `Unknown fixture tool: ${name}` }],
+        content: [{ type: 'text', text: JSON.stringify({
+          code: 'not_found',
+          message: 'The requested tool does not exist.',
+          retryable: false,
+          details: { resource_type: 'tool' },
+        }) }],
       }),
       scope: 'workspace',
       workspaceField: 'workspaceId',
-      errorContract: 'legacy_text',
+      errorContract: 'json_v1',
     };
 
     await expect(assertDefinitionIsDispatched(fixture)).rejects.toThrow(/missing_dispatch_fixture/);

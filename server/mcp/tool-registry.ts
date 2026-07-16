@@ -31,6 +31,7 @@ import {
   handleContentGenerationActionTool,
 } from './tools/content-generation-actions.js';
 import {
+  CONTENT_MATRIX_GLOBAL_TOOL_NAMES,
   contentMatrixActionTools,
   handleContentMatrixActionTool,
 } from './tools/content-matrix-actions.js';
@@ -297,7 +298,6 @@ export function buildMcpToolRegistry(
   return readonlyRegistryView(registry);
 }
 
-const legacyContract = MCP_TOOL_ERROR_CONTRACTS.LEGACY_TEXT;
 const jsonV1Contract = MCP_TOOL_ERROR_CONTRACTS.JSON_V1;
 
 const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Object.freeze([
@@ -306,66 +306,67 @@ const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Obje
     tools: workspaceTools,
     handler: handleWorkspaceTool,
     globalToolNames: ['create_workspace', 'list_workspaces'],
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'intelligence',
     tools: intelligenceTools,
     handler: handleIntelligenceTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'insights',
     tools: insightTools,
     handler: handleInsightTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'content',
     tools: contentTools,
     handler: handleContentTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'brand',
     tools: brandTools,
     handler: handleBrandTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'clients',
     tools: clientTools,
     handler: handleClientTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'keyword-actions',
     tools: keywordActionTools,
     handler: handleKeywordActionTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'content-actions',
     tools: contentActionTools,
     handler: handleContentActionTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'recommendation-actions',
     tools: recommendationActionTools,
     handler: handleRecommendationActionTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'content-generation-actions',
     tools: contentGenerationActionTools,
     handler: handleContentGenerationActionTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'content-matrix-actions',
     tools: contentMatrixActionTools,
     handler: handleContentMatrixActionTool,
+    globalToolNames: CONTENT_MATRIX_GLOBAL_TOOL_NAMES,
     errorContract: jsonV1Contract,
   },
   {
@@ -396,19 +397,19 @@ const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Obje
     family: 'schema-actions',
     tools: schemaActionTools,
     handler: handleSchemaActionTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'analytics-read-actions',
     tools: analyticsReadActionTools,
     handler: handleAnalyticsReadActionTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
   {
     family: 'job-actions',
     tools: jobActionTools,
     handler: handleJobActionTool,
-    errorContract: legacyContract,
+    errorContract: jsonV1Contract,
   },
 ]);
 
@@ -599,9 +600,8 @@ async function executeRegisteredMcpTool(
     }
     return result;
   } catch (err) {
-    // Existing tools historically let unexpected handler failures reach the
-    // HTTP boundary. Preserve that behavior; new json_v1 tools get a stable,
-    // client-safe envelope instead of exception text or stack details.
+    // The generic builder still supports isolated legacy compatibility fixtures;
+    // production families use json_v1 and receive a safe envelope here.
     if (entry.errorContract === MCP_TOOL_ERROR_CONTRACTS.LEGACY_TEXT) throw err;
     log.error(
       { tool: name, failureClass: 'handler_exception' },

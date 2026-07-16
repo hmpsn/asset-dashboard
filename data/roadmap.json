@@ -1,6 +1,58 @@
 {
   "sprints": [
     {
+      "id": "sprint-productized-content-templates-2026-07-16",
+      "name": "Productized Content Templates — overrides, optional sections, and library reuse",
+      "hours": "TBD — four small staging-first PRs after MCP legibility",
+      "rationale": "Turn the verified template-to-matrix path into a reusable studio delivery system: allow revision-safe cell exceptions, let evidence determine optional template blocks, reuse proven structures across clients without live inheritance, and retire the workspace-parameter casing tax without weakening authorization. Plan: docs/superpowers/plans/2026-07-16-mcp-agent-legibility-plan.md.",
+      "items": [
+        {
+          "id": "productized-template-cell-overrides",
+          "title": "MCP per-cell matrix overrides with revision, URL, and collision integrity",
+          "source": "2026-07-16 productized templates spec item 1",
+          "est": "S",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "content-pipeline",
+          "notes": "Complete 2026-07-16. Exposes the existing updateMatrixCell service through snake-case MCP for target keyword, planned URL, variables, and schema types with exact cell-revision CAS. Intentional URL/schema overrides retain small provenance markers so generation does not misclassify them as pattern drift or legacy snapshots; unsafe paths plus same- and cross-matrix workspace collisions fail before mutation. Real MCP dispatch, resolver, registry, instruction, stale-write, and no-gate-bypass coverage added. No list mode, generation start, approval, send, or publish authority."
+        },
+        {
+          "id": "productized-template-optional-sections",
+          "title": "Evidence-driven optional template sections with visible omissions",
+          "source": "2026-07-16 productized templates spec item 2",
+          "est": "M",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "content-pipeline",
+          "notes": "Complete 2026-07-16. Adds false-by-default optional template sections driven only by stable matrix-cell section evidence requirements. Missing evidence produces a visible non-blocking optional_omit and omission-aware manifest fingerprint; resolving exact evidence advances the cell revision and restores the block. All-optional generation templates fail closed, optional primary CTA omission preserves the single system fallback CTA, legacy upgrades default false, and pre-feature durable fingerprints remain readable. MCP template schemas and guidance expose the flow without adding manual cell toggles or changing human gates."
+        },
+        {
+          "id": "productized-template-vertical-library",
+          "title": "Per-vertical cross-workspace template library with copy-on-instantiate ownership",
+          "source": "2026-07-16 productized templates spec item 3",
+          "est": "L",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "content-pipeline",
+          "notes": "Complete 2026-07-16. Adds a master-key-only, per-vertical studio library of immutable generation-ready template snapshots. Explicit promotion is bound to one exact source revision and is replay-safe; bounded list/get reads expose source provenance. Instantiation creates a normal workspace-owned template with regenerated section IDs and the existing content-plan activity, broadcast, and intelligence invalidation effects. Editing one instance cannot mutate the library or another client. No library update/sync path, generation start, approval, send, publish, or human-gate bypass was added."
+        },
+        {
+          "id": "mcp-workspace-parameter-aliases",
+          "title": "Auth-safe deprecated camelCase workspace aliases",
+          "source": "2026-07-16 MCP agent-legibility appendix C",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-16",
+          "owner": "platform-foundation",
+          "notes": "Make snake_case canonical while accepting documented deprecated camelCase aliases through the authorization boundary. Conflicting aliases fail closed; scope resolution cannot authorize one spelling and dispatch another. Include a removal window."
+        }
+      ]
+    },
+    {
       "id": "sprint-generation-quality-performance-2026-07-13",
       "name": "Generation Quality & Performance — integrity before experimentation",
       "hours": "TBD — autonomous phase-per-PR program, staging-first",
@@ -2140,6 +2192,18 @@
           "shippedAt": "2026-07-15",
           "owner": "brand-engine",
           "notes": "Makes voice approval explicit and reachable in the platform while preserving the human gate. Review & approve is the default voice section; the checklist exposes missing DNA, guardrails, authentic anchors, and MCP proposals. MCP-proposed samples require a revision-safe human attestation before they become finalization evidence. The operator may finalize directly or create the existing 15-minute, one-use, exact-command bearer code for MCP to consume. The Brand & AI top bar now exposes one pending-count modal with full voice proposals and draft deliverables plus exact visible-set batch approval; the Voice review surface adds a full-set batch proposal action. MCP cannot mint the code, attest its own samples, or use a reusable approval password."
+        },
+        {
+          "id": "mcp-agent-legibility-json-errors",
+          "title": "MCP agent legibility — unified typed errors and discoverable template syntax",
+          "source": "2026-07-16 productized-template agent-legibility appendix",
+          "est": "M",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "shippedAt": "2026-07-16",
+          "owner": "platform-foundation",
+          "notes": "Migrates the remaining 13 legacy MCP families / 61 tools to the branded json_v1 envelope, keeps field-addressed validation details, maps deterministic resource/state/precondition failures to stable codes, and prevents raw provider/AI/DB exception text from reaching agents. Template and matrix discovery now documents single-brace placeholders with /{service}-{city}. Tone direction, intake cap, and pending-approval counts were already fixed on staging. Human approval, voice-finalization, evidence, review, send, and publish gates remain unchanged."
         }
       ],
       "shippedAt": "2026-07-14"

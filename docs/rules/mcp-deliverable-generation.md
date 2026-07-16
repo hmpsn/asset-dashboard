@@ -61,7 +61,12 @@ The evidence policy is typed per requirement:
   and `ready_to_publish`. Typical examples are required hours, pricing, staff,
   credentials, statistics, or CTA contact details.
 - `optional_omit` requirements are omitted cleanly. They never invite invented
-  copy or a placeholder that the page does not need.
+  copy or a placeholder that the page does not need. Evidence-driven template
+  sections use `matrix-cell:<cell_id>:section:<section_id>`; their ordered
+  omissions and reasons are part of the resolved manifest fingerprint. At least
+  one authored section remains non-optional, and omission cannot remove the
+  manifest's single required primary CTA because the system conclusion owns the
+  fallback.
 
 The voice-foundation bootstrap is the only voice exception: it may generate a
 provisional foundation from accepted intake without an already-finalized voice
@@ -495,11 +500,24 @@ never sufficient to dispatch paid work.
   run attribution and ignore every caller `X-Request-ID`; arbitrary caller text
   cannot be proven non-secret with a finite denylist. Rejection logs/results use
   stable classifications, not raw unknown tool names or workspace arguments.
-- Error compatibility is per tool. Existing handlers remain legacy text while
-  registry-owned unknown/auth rejections are generic and non-reflective; every
-  `json_v1` scope error, handler-returned error, and thrown error must cross the
+- Every production MCP tool uses the `json_v1` error contract. Registry-owned
+  unknown/auth rejections are generic and non-reflective; every scope error,
+  handler-returned error, and thrown error must cross the
   sanitizing registry boundary. Unvalidated results degrade to a generic safe
   envelope rather than being serialized.
+
+### Studio template library
+
+- Cross-workspace template reuse is a master-key studio operation. A workspace
+  key cannot enumerate, promote, read, or instantiate studio-owned assets.
+- Promotion snapshots one exact generation-ready source revision under one flat
+  vertical slug. The snapshot is immutable and retains source provenance.
+- Instantiation copies through the normal workspace template writer and gives
+  every section a fresh ID. Generation reads only that workspace-owned copy.
+- There is no live inheritance, sync, or retroactive library edit. A later source
+  revision is promoted as a new immutable asset.
+- Promotion and instantiation do not start paid work or grant approval, send,
+  publish, evidence, identity, or voice-finalization authority.
 
 ## 10. Brand review and projection
 
