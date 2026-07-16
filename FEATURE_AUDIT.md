@@ -9916,3 +9916,15 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Tests:** The canonical registry pins every production family to `json_v1`; dispatch census and 483 MCP unit/contract tests cover envelope branding, stable classifications, actionable validation detail, and raw exception/provider-message redaction.
 
 **Files:** MCP registry, shared error helpers, 13 legacy-family handlers, template/matrix discovery descriptions and instructions, focused MCP unit/contract tests, `server/mcp/README.md`, `docs/rules/mcp-deliverable-generation.md`, and the agent-legibility audit/plan.
+
+### 702. MCP revision-safe content-matrix cell overrides 2026-07-16
+
+**Status:** Complete. The operator can now make a bounded targeting exception through MCP chat without weakening the locked-template or human-review pipeline.
+
+**What it does:** Adds `update_content_matrix_cell(workspace_id, matrix_id, cell_id, patch, expected_cell_revision)` over the existing single-cell writer. The strict patch surface is limited to target keyword, planned URL, variable values, and expected schema types. Every write requires the exact current cell revision; a stale chat state returns a typed retryable conflict instead of overwriting newer work. The updated cell and advanced revision are returned directly so the next preview can use current authority.
+
+**URL and delivery integrity:** Planned URL exceptions still require a safe workspace-relative path and must be unique across every durable matrix cell in the workspace. Small stored provenance bits distinguish intentional URL/schema exceptions from accidental matrix-pattern drift or legacy schema snapshots during structural resolution; definition-driven regeneration clears them. The existing resolver still checks known and published workspace pages before generation. The action invalidates prior content-pipeline context, broadcasts the existing content update event, records MCP activity, and never starts generation, approves, sends, or publishes.
+
+**Tests:** Domain and resolver coverage pins arbitrary keyword/URL persistence, exact revision advancement, unsafe URL rejection, same- and cross-matrix collision rejection, regeneration behavior, and override-aware structural resolution. Contract and real spawned-server coverage pin strict snake-case input, field-addressed errors, workspace scope, registry discovery, one set of post-commit effects, and an end-to-end template → one-dimensional matrix → cell override call. The focused suite passes 8 files / 116 tests.
+
+**Files:** content-matrix stored cell contract/read model/writer/resolver; existing matrix HTTP schema and MCP adapter; MCP instructions/inventory; focused domain, resolver, contract, and integration tests; productized-template plan and roadmap.

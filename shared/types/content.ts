@@ -735,6 +735,10 @@ export interface MatrixCell {
   targetKeyword: string;
   customKeyword?: string;
   plannedUrl: string;
+  /** True only when plannedUrl was intentionally overridden for this cell. */
+  plannedUrlOverridden?: boolean;
+  /** True only when expectedSchemaTypes was intentionally overridden for this cell. */
+  expectedSchemaTypesOverridden?: boolean;
   briefId?: string;
   postId?: string;
   status: MatrixCellStatus;

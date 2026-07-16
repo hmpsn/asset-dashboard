@@ -16,6 +16,7 @@ import {
   ContentMatrixSourceIntegrityError,
   ContentMatrixPatternRenderError,
   MatrixCellRevisionConflictError,
+  MatrixCellPlannedUrlError,
   MatrixCellRevisionRequiredError,
   MatrixTemplateIntegrityError,
 } from '../content-matrices.js';
@@ -163,8 +164,14 @@ const updateMatrixSchema = z.object({
   }
 });
 
-const updateMatrixCellSchema = matrixCellSchema
-  .omit({ id: true, revision: true, statusHistory: true })
+export const updateMatrixCellSchema = matrixCellSchema
+  .omit({
+    id: true,
+    revision: true,
+    statusHistory: true,
+    plannedUrlOverridden: true,
+    expectedSchemaTypesOverridden: true,
+  })
   .partial()
   .extend({
     expectedCellRevision: z.number().int().nonnegative(),
@@ -313,6 +320,9 @@ function mapTransitionError(err: unknown): { status: number; error: string } | n
     return { status: 400, error: err.message };
   }
   if (err instanceof MatrixGenerationSchemaTypeContractError) {
+    return { status: 400, error: err.message };
+  }
+  if (err instanceof MatrixCellPlannedUrlError) {
     return { status: 400, error: err.message };
   }
   if (err instanceof MatrixTemplateIntegrityError) {

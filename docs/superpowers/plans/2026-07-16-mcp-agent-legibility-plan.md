@@ -106,3 +106,28 @@ PR A unified MCP errors + placeholder guidance (this plan)
 
 Every PR preserves voice finalization, evidence, approval, review, send, and
 publication gates, and must merge green to `staging` before the next PR starts.
+
+### PR B implementation closure
+
+Dependency order: stored cell provenance and URL validation → resolver support →
+snake-case MCP adapter → discovery/instructions → boundary tests. The adapter
+allows only `target_keyword`, `planned_url`, `variable_values`, and
+`expected_schema_types`, requires the exact current cell revision, and delegates
+to the existing single-cell writer. Intentional URL overrides remain safe
+workspace-relative paths and unique across every durable matrix cell; ordinary
+pattern drift still blocks generation. Matrix-definition regeneration clears the
+override marker. The mutation advances only the target cell, invalidates stale
+content-pipeline context, broadcasts the existing content update event, records
+MCP provenance, and creates no generation, approval, send, or publish action.
+
+Acceptance checklist:
+
+- [x] A one-dimensional matrix cell accepts an arbitrary keyword and URL that no
+  shared pattern could produce.
+- [x] Unsafe URLs, same-matrix collisions, cross-matrix collisions, and stale
+  cell revisions fail without mutation.
+- [x] Resolution treats an explicitly overridden URL as the intended target but
+  preserves the live-page and workspace collision census.
+- [x] Real HTTP/MCP dispatch returns the updated cell and exact advanced revision.
+- [x] Registry, workspace-scope, instructions, and tool-count contracts include
+  the new tool; no human gate changes.

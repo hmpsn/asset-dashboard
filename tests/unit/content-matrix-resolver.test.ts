@@ -199,6 +199,29 @@ describe('resolveMatrixStructure', () => {
     expect(first.target.structuralFingerprint).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it('uses an explicitly validated per-cell planned URL override without treating it as drift', () => {
+    const overridden = cell({
+      plannedUrl: '/urgent-dental-care',
+      plannedUrlOverridden: true,
+      targetKeyword: 'best emergency dentist near me',
+      keywordValidation: undefined,
+    } as Partial<MatrixCell> & { plannedUrlOverridden: true });
+    const result = resolveMatrixStructure(input({
+      cell: overridden,
+      matrix: matrix(overridden),
+      matrixPlannedUrls: [{ cellId: overridden.id, plannedUrl: overridden.plannedUrl }],
+    }));
+
+    expect(result.status).toBe('resolved');
+    if (result.status !== 'resolved') return;
+    expect(result.target.plannedUrl).toBe('/urgent-dental-care');
+    expect(result.target.targetKeyword).toMatchObject({
+      value: 'best emergency dentist near me',
+      source: 'target',
+    });
+    expect(blockerIds(result)).not.toContain('planned_url_drift');
+  });
+
   it('uses non-empty custom, then target, then recommended keyword precedence', () => {
     const custom = resolveMatrixStructure(input({
       cell: cell({ customKeyword: '  custom implants san jose  ', recommendedKeyword: 'recommended' }),
@@ -345,6 +368,20 @@ describe('resolveMatrixStructure', () => {
     }));
     expect(result.status === 'resolved' && result.target.schemaTypes)
       .toEqual(['Service', 'BreadcrumbList']);
+  });
+
+  it('uses an intentional per-cell schema override before template defaults', () => {
+    const targetCell = cell({
+      expectedSchemaTypes: ['SoftwareApplication', 'FAQPage'],
+      expectedSchemaTypesOverridden: true,
+    });
+    const result = resolveMatrixStructure(input({
+      cell: targetCell,
+      matrix: matrix(targetCell),
+      template: template({ schemaTypes: ['Service'] }),
+    }));
+    expect(result.status === 'resolved' && result.target.schemaTypes)
+      .toEqual(['SoftwareApplication', 'FAQPage']);
   });
 
   it('blocks contract-v1 sections whose explicit AEO or CTA contract conflicts with its role', () => {

@@ -56,6 +56,8 @@ export const matrixCellSchema = z.object({
   targetKeyword: z.string(),
   customKeyword: z.string().optional(),
   plannedUrl: z.string(),
+  plannedUrlOverridden: z.boolean().optional(),
+  expectedSchemaTypesOverridden: z.boolean().optional(),
   briefId: z.string().optional(),
   postId: z.string().optional(),
   status: matrixCellStatusSchema,
