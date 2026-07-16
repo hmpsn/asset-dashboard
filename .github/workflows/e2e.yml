@@ -36,13 +36,14 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      e2e: ${{ steps.filter.outputs.e2e }}
+      e2e: ${{ steps.changes.outputs.e2e }}
     steps:
       - uses: actions/checkout@v5
 
       - name: Detect E2E-relevant changes
         id: filter
         uses: dorny/paths-filter@v4
+        continue-on-error: true
         with:
           filters: |
             e2e:
@@ -55,6 +56,23 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/e2e.yml'
+
+      # Keep E2E conservative when GitHub's PR-files API is unavailable: mark
+      # the lane relevant so a ready PR validates it instead of failing or
+      # silently skipping the suite.
+      - name: Resolve changed-path output
+        id: changes
+        if: always()
+        env:
+          FILTER_OUTCOME: ${{ steps.filter.outcome }}
+          E2E_CHANGED: ${{ steps.filter.outputs.e2e }}
+        run: |
+          if [[ "$FILTER_OUTCOME" != "success" ]]; then
+            echo "::warning::Changed-path detection failed; treating E2E as required."
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=${E2E_CHANGED:-false}" >> "$GITHUB_OUTPUT"
+          fi
 
   e2e-build:
     needs: changes

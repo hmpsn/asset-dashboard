@@ -27,13 +27,16 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      quality: ${{ steps.filter.outputs.quality }}
-      test: ${{ steps.filter.outputs.test }}
-      coverage: ${{ steps.filter.outputs.coverage }}
+      quality: ${{ steps.changes.outputs.quality }}
+      test: ${{ steps.changes.outputs.test }}
+      coverage: ${{ steps.changes.outputs.coverage }}
     steps:
       - uses: actions/checkout@v5
-      - uses: dorny/paths-filter@v4
+
+      - name: Detect CI-relevant changes
+        uses: dorny/paths-filter@v4
         id: filter
+        continue-on-error: true
         with:
           filters: |
             quality:
@@ -73,6 +76,29 @@ jobs:
               - 'tsconfig*.json'
               - 'vite.config.ts'
               - 'playwright*.ts'
+
+      # dorny/paths-filter reads PR files through GitHub's API. If that API
+      # returns a transient error page, fail open and run validation instead of
+      # failing the selector job or silently skipping required checks.
+      - name: Resolve changed-path outputs
+        id: changes
+        if: always()
+        env:
+          FILTER_OUTCOME: ${{ steps.filter.outcome }}
+          QUALITY_CHANGED: ${{ steps.filter.outputs.quality }}
+          TEST_CHANGED: ${{ steps.filter.outputs.test }}
+          COVERAGE_CHANGED: ${{ steps.filter.outputs.coverage }}
+        run: |
+          if [[ "$FILTER_OUTCOME" != "success" ]]; then
+            echo "::warning::Changed-path detection failed; running all CI validation lanes."
+            echo "quality=true" >> "$GITHUB_OUTPUT"
+            echo "test=true" >> "$GITHUB_OUTPUT"
+            echo "coverage=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "quality=${QUALITY_CHANGED:-false}" >> "$GITHUB_OUTPUT"
+            echo "test=${TEST_CHANGED:-false}" >> "$GITHUB_OUTPUT"
+            echo "coverage=${COVERAGE_CHANGED:-false}" >> "$GITHUB_OUTPUT"
+          fi
 
   quality:
     needs: changes
