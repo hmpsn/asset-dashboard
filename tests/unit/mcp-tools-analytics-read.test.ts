@@ -52,6 +52,10 @@ function textOf(result: { content: Array<{ text: string }> }): string {
   return result.content[0]?.text ?? '';
 }
 
+function errorEnvelope(result: { content: Array<{ text: string }> }) {
+  return JSON.parse(textOf(result)) as { code: string; details?: Record<string, unknown> };
+}
+
 describe('mcp analytics read action tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,7 +78,10 @@ describe('mcp analytics read action tools', () => {
   it('returns Unknown tool for an unrecognized name', async () => {
     const result = await handleAnalyticsReadActionTool('nope', { workspace_id: 'ws-1' });
     expect(result.isError).toBe(true);
-    expect(textOf(result as { content: Array<{ text: string }> })).toContain('Unknown analytics read action tool');
+    expect(errorEnvelope(result as { content: Array<{ text: string }> })).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'tool' },
+    });
   });
 
   it('reads with the default 28-day window when no range is given', async () => {
@@ -169,6 +176,9 @@ describe('mcp analytics read action tools', () => {
     (fetchSearchOverview as Mock).mockRejectedValue(new Error('GSC API error (429)'));
     const result = await handleAnalyticsReadActionTool('get_search_performance', { workspace_id: 'ws-1' });
     expect(result.isError).toBe(true);
-    expect(textOf(result as { content: Array<{ text: string }> })).toContain('Failed to read search performance');
+    expect(errorEnvelope(result as { content: Array<{ text: string }> })).toMatchObject({
+      code: 'internal_error',
+    });
+    expect(textOf(result as { content: Array<{ text: string }> })).not.toContain('GSC API error');
   });
 });

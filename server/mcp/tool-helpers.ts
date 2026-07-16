@@ -1,18 +1,90 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ZodError } from 'zod';
+import { MCP_TOOL_ERROR_CODES } from '../../shared/types/mcp-runtime.js';
 import { createLogger } from '../logger.js';
 import { getWorkspace } from '../workspaces.js';
 import type { Workspace } from '../../shared/types/workspace.js';
+import {
+  mcpJsonV1Error,
+  mcpZodValidationError,
+  type McpToolErrorDetails,
+} from './tool-errors.js';
 
 const log = createLogger('mcp-tool-helpers');
 
-export type McpToolErrorResponse = CallToolResult;
-export type McpToolSuccessResponse = CallToolResult;
+export type McpToolErrorResponse = {
+  content: Array<{ type: 'text'; text: string }>;
+  isError: true;
+};
+export type McpToolSuccessResponse = {
+  content: Array<{ type: 'text'; text: string }>;
+};
 
-export function mcpError(message: string): McpToolErrorResponse {
-  return {
-    isError: true,
-    content: [{ type: 'text' as const, text: message }],
-  };
+export function mcpValidationError(
+  message: string,
+  details?: McpToolErrorDetails,
+): McpToolErrorResponse {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+    message,
+    retryable: false,
+    ...(details ? { details } : {}),
+  }) as McpToolErrorResponse;
+}
+
+export function mcpNotFoundError(
+  message: string,
+  details?: McpToolErrorDetails,
+): McpToolErrorResponse {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.NOT_FOUND,
+    message,
+    retryable: false,
+    ...(details ? { details } : {}),
+  }) as McpToolErrorResponse;
+}
+
+export function mcpConflictError(
+  message: string,
+  details?: McpToolErrorDetails,
+): McpToolErrorResponse {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.CONFLICT,
+    message,
+    retryable: true,
+    ...(details ? { details } : {}),
+  }) as McpToolErrorResponse;
+}
+
+export function mcpPreconditionError(
+  message: string,
+  details?: McpToolErrorDetails,
+): McpToolErrorResponse {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
+    message,
+    retryable: false,
+    ...(details ? { details } : {}),
+  }) as McpToolErrorResponse;
+}
+
+export function mcpRateLimitedError(
+  message: string,
+  details?: McpToolErrorDetails,
+): McpToolErrorResponse {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.RATE_LIMITED,
+    message,
+    retryable: true,
+    ...(details ? { details } : {}),
+  }) as McpToolErrorResponse;
+}
+
+export function mcpInternalError(): McpToolErrorResponse {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.INTERNAL_ERROR,
+    message: 'The tool could not complete because of an internal error.',
+    retryable: false,
+  }) as McpToolErrorResponse;
 }
 
 export function mcpSuccess(payload: unknown): McpToolSuccessResponse {
@@ -23,10 +95,8 @@ export function mcpSuccess(payload: unknown): McpToolSuccessResponse {
 
 /**
  * Type predicate that narrows a `T | McpToolErrorResponse` union to the error
- * branch. `CallToolResult` carries a passthrough index signature, so a bare
- * `'isError' in value` check does NOT narrow the success branch back to `T`
- * (TS keeps it as the union). Use this guard when the success value's fields
- * are accessed afterward (e.g. requireWorkspace → workspace.webflowSiteId).
+ * branch. Use this guard when the success value's fields are accessed afterward
+ * (e.g. requireWorkspace → workspace.webflowSiteId).
  */
 export function isMcpError<T>(value: T | McpToolErrorResponse): value is McpToolErrorResponse {
   return typeof value === 'object'
@@ -38,7 +108,9 @@ export function requireWorkspace(workspaceId: string): Workspace | McpToolErrorR
   const ws = getWorkspace(workspaceId);
   if (!ws) {
     log.warn({ workspaceId }, 'Workspace not found for MCP tool call');
-    return mcpError(`Workspace not found: ${workspaceId}`);
+    return mcpNotFoundError('Workspace not found.', {
+      resource_type: 'workspace',
+    });
   }
   return ws;
 }
@@ -49,10 +121,6 @@ export function buildDashboardUrl(workspaceId: string, tab?: string): string {
   return base ? `${base}${path}` : path;
 }
 
-export function zodErrorToMcp(error: unknown): McpToolErrorResponse {
-  const issues = (error as { issues?: unknown[] })?.issues;
-  if (Array.isArray(issues)) {
-    return mcpError(`Validation failed: ${JSON.stringify(issues)}`);
-  }
-  return mcpError(`Validation failed: ${String(error)}`);
+export function zodErrorToMcp(error: ZodError): McpToolErrorResponse {
+  return mcpZodValidationError(error) as McpToolErrorResponse;
 }

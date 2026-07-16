@@ -54,6 +54,13 @@ async function callMcpTool(name: string, args: Record<string, unknown>) {
   return body.result;
 }
 
+function errorEnvelope(result: { content: Array<{ text: string }> }) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code?: string;
+    details?: Record<string, unknown>;
+  };
+}
+
 beforeAll(async () => {
   await ctx.startServer();
 });
@@ -71,13 +78,13 @@ afterEach(() => {
 });
 
 describe('MCP keyword tools (integration)', () => {
-  it('research_keywords returns mcpError when no SEO provider is configured', async () => {
+  it('research_keywords returns a precondition error when no SEO provider is configured', async () => {
     const result = await callMcpTool('research_keywords', {
       workspace_id: ws.workspaceId,
       terms: ['best crm for solopreneurs'],
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/No SEO data provider is configured/i);
+    expect(errorEnvelope(result)).toMatchObject({ code: 'precondition_failed' });
   });
 
   it('research_keywords rejects empty terms via validation', async () => {
@@ -86,16 +93,19 @@ describe('MCP keyword tools (integration)', () => {
       terms: [],
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/Validation failed/i);
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'validation_failed',
+      details: { field_path: 'terms' },
+    });
   });
 
-  it('research_keywords returns mcpError for unknown workspace', async () => {
+  it('research_keywords returns not_found for unknown workspace', async () => {
     const result = await callMcpTool('research_keywords', {
       workspace_id: 'ws-does-not-exist',
       terms: ['crm'],
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/Workspace not found/i);
+    expect(errorEnvelope(result)).toMatchObject({ code: 'not_found' });
   });
 
   it('add_keyword_to_strategy persists a new-page keyword and logs activity', async () => {

@@ -9904,3 +9904,15 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Human review surface:** Brand & AI now has one visible pending-count action that opens a compact review modal containing every pending voice proposal and draft deliverable in full. `Approve all N changes` is scoped to the exact visible IDs; voice proposals use one revision-safe human attestation, while draft deliverables use the existing platform approval mutation. The Voice review surface also offers `Approve all N proposals` above the complete untruncated set. Voice finalization remains a separate explicit human lock because it establishes downstream generation authority; MCP still cannot attest, approve, mint authorization, or bypass the one-time token boundary.
 
 **Files:** MCP voice schemas/handler/registry docs; voice sample batch domain and authenticated HTTP route; Brand & AI pending-review modal and Voice approval surface; brand identity count projection; focused unit/integration/component/registry tests; `BRAND_DESIGN_LANGUAGE.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 701. MCP agent-legibility error contract and template syntax 2026-07-16
+
+**Status:** Complete. All 18 registered production tool families now use the same `json_v1` error envelope.
+
+**What it does:** Migrates the remaining 13 legacy families / 61 tools from free-form text errors to stable `code`, `message`, `retryable`, and bounded safe `details`. Validation failures retain field paths and constraints; missing resources, optimistic conflicts, unmet preconditions, and rate limits use typed codes. Unexpected provider, AI, database, and integration failures are logged internally and return a generic `internal_error` rather than reflecting exception text or secrets into MCP chat. Successful response shapes are unchanged.
+
+**Agent guidance and safety:** Template and matrix discovery now state that variables use exactly one brace pair, such as `/{service}-{city}`, never double braces. Existing tone-axis direction, brand-intake size, and pending-approval reporting were confirmed already present. Human voice finalization, brand/client approval, evidence, review, send, and publish gates are unchanged. Deterministic content-source mismatches are reported as precondition failures, while unexpected save failures remain internal errors.
+
+**Tests:** The canonical registry pins every production family to `json_v1`; dispatch census and 483 MCP unit/contract tests cover envelope branding, stable classifications, actionable validation detail, and raw exception/provider-message redaction.
+
+**Files:** MCP registry, shared error helpers, 13 legacy-family handlers, template/matrix discovery descriptions and instructions, focused MCP unit/contract tests, `server/mcp/README.md`, `docs/rules/mcp-deliverable-generation.md`, and the agent-legibility audit/plan.

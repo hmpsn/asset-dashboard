@@ -44,6 +44,14 @@ import { broadcastToWorkspace } from '../../server/broadcast.js';
 import { addActivity } from '../../server/activity-log.js';
 import { schemaActionTools, handleSchemaActionTool } from '../../server/mcp/tools/schema-actions.js';
 
+function errorEnvelope(result: Awaited<ReturnType<typeof handleSchemaActionTool>>) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}
+
 const VALID_SCHEMA = {
   '@context': 'https://schema.org',
   '@graph': [{ '@type': 'WebPage', name: 'HVAC Services' }],
@@ -117,7 +125,10 @@ describe('mcp schema action tools', () => {
 
     const unknown = await handleSchemaActionTool('not_a_schema_tool', { workspace_id: 'ws-1' });
     expect(unknown.isError).toBe(true);
-    expect(unknown.content[0].text).toContain('Unknown schema action tool');
+    expect(errorEnvelope(unknown)).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'tool' },
+    });
   });
 
   it('generate_schema generates, persists, broadcasts, and returns the JSON-LD + validation', async () => {
@@ -174,7 +185,7 @@ describe('mcp schema action tools', () => {
   it('validate_schema rejects when neither/both of page_id and schema_json are given', async () => {
     const neither = await handleSchemaActionTool('validate_schema', { workspace_id: 'ws-1' });
     expect(neither.isError).toBe(true);
-    expect(neither.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(neither)).toMatchObject({ code: 'validation_failed' });
 
     const both = await handleSchemaActionTool('validate_schema', {
       workspace_id: 'ws-1',
@@ -191,7 +202,10 @@ describe('mcp schema action tools', () => {
 
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Schema validation failed — not publishing');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'precondition_failed',
+      details: { validation_errors: expect.any(Array) },
+    });
     // Critical: the shared publish service (and thus its follow-ons) must NEVER
     // be called on a failed validation. The VALIDATE-FIRST guard sits before it.
     expect(publishSchemaToLive).not.toHaveBeenCalled();
@@ -275,7 +289,8 @@ describe('mcp schema action tools', () => {
 
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('CMS publish blocked');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'precondition_failed' });
+    expect(result.content[0].text).not.toContain('CMS publish blocked');
     // No mcp-chat success activity when the publish failed.
     expect(addActivity).not.toHaveBeenCalled();
   });
@@ -293,7 +308,8 @@ describe('mcp schema action tools', () => {
 
     const result = await handleSchemaActionTool('publish_schema', { workspace_id: 'ws-1', page_id: 'page_1' });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('manual action required');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'precondition_failed' });
+    expect(errorEnvelope(result).message).toMatch(/manual Webflow publish/i);
     expect(addActivity).not.toHaveBeenCalled();
   });
 
@@ -322,6 +338,6 @@ describe('mcp schema action tools', () => {
   it('returns validation errors for malformed tool input', async () => {
     const result = await handleSchemaActionTool('generate_schema', { workspace_id: 'ws-1' });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'validation_failed' });
   });
 });

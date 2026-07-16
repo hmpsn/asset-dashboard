@@ -28,8 +28,11 @@ import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import {
   buildDashboardUrl,
-  mcpError,
+  mcpConflictError,
+  mcpNotFoundError,
+  mcpPreconditionError,
   mcpSuccess,
+  mcpValidationError,
   requireWorkspace,
   zodErrorToMcp,
   type McpToolErrorResponse,
@@ -130,11 +133,10 @@ function runKeywordStrategyJob(
         );
       } catch (err) {
         if (jobWasCancelled()) return;
+        log.error({ err, jobId, workspaceId }, 'MCP keyword strategy generation job failed');
         const message = err instanceof KeywordStrategyGenerationError
-          ? (err.payload.message || err.payload.error)
-          : err instanceof Error
-            ? err.message
-            : String(err);
+          ? 'Keyword strategy generation failed its provider or evidence preconditions.'
+          : 'Keyword strategy generation failed unexpectedly.';
         updateJob(jobId, {
           status: 'error',
           message: 'Keyword strategy generation failed',
@@ -154,17 +156,22 @@ async function handleStartKeywordStrategyGeneration(
   const { workspace_id: workspaceId, options } = parsed.data;
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
-  if (!workspace.webflowSiteId) return mcpError('Workspace has no linked Webflow site');
+  if (!workspace.webflowSiteId) return mcpPreconditionError('Workspace has no linked Webflow site');
 
   if (options?.maxPages && options.maxPages > KEYWORD_STRATEGY_MAX_PAGE_CAP) {
-    return mcpError(`maxPages must be <= ${KEYWORD_STRATEGY_MAX_PAGE_CAP}`);
+    return mcpValidationError(`Invalid tool input at options.maxPages: must be at most ${KEYWORD_STRATEGY_MAX_PAGE_CAP}.`, {
+      field_path: 'options.maxPages',
+      constraint: `Must be at most ${KEYWORD_STRATEGY_MAX_PAGE_CAP}.`,
+    });
   }
   if (hasActiveKeywordStrategyGeneration(workspaceId)) {
-    return mcpError('A keyword strategy is already being generated for this workspace');
+    return mcpConflictError('A keyword strategy is already being generated for this workspace.');
   }
   const activeJob = hasActiveJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, workspaceId);
   if (activeJob) {
-    return mcpError(`A keyword strategy job is already running (${activeJob.id})`);
+    return mcpConflictError('A keyword strategy job is already running.', {
+      active_job_id: activeJob.id,
+    });
   }
 
   const job = createJob(BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY, {
@@ -233,11 +240,11 @@ function runSeoAuditJob(
           },
         );
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        log.error({ err, jobId, workspaceId }, 'MCP SEO audit job failed');
         updateJob(jobId, {
           status: 'error',
           message: 'SEO audit failed',
-          error: message,
+          error: 'SEO audit failed unexpectedly. Review the connection and server logs before retrying.',
         });
       }
     })();
@@ -254,11 +261,13 @@ async function handleStartSeoAudit(
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
   if (workspace.webflowSiteId !== siteId) {
-    return mcpError(`Workspace ${workspaceId} is not linked to site ${siteId}`);
+    return mcpPreconditionError('The requested site is not linked to this workspace.');
   }
 
   const active = hasActiveJob(BACKGROUND_JOB_TYPES.SEO_AUDIT, workspaceId);
-  if (active) return mcpError(`An SEO audit is already running (${active.id})`);
+  if (active) return mcpConflictError('An SEO audit is already running.', {
+    active_job_id: active.id,
+  });
 
   const job = createJob(BACKGROUND_JOB_TYPES.SEO_AUDIT, {
     workspaceId,
@@ -285,15 +294,17 @@ async function handleStartLocalSeoRefresh(
   if ('isError' in workspace) return workspace;
 
   const activeWorkspaceJob = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, workspaceId);
-  if (activeWorkspaceJob) return mcpError(`Local SEO refresh is already running (${activeWorkspaceJob.id})`);
+  if (activeWorkspaceJob) return mcpConflictError('A local SEO refresh is already running for this workspace.', {
+    active_job_id: activeWorkspaceJob.id,
+  });
   const globalActiveJob = hasActiveJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH);
   if (globalActiveJob) {
-    return mcpError(`Another workspace is currently running local SEO refresh (${globalActiveJob.id})`);
+    return mcpConflictError('Another local SEO refresh is currently using the shared provider capacity. Retry after it completes.');
   }
 
   const refreshBody = refreshBodyRaw as LocalSeoRefreshRequest;
   const plan = createLocalSeoRefreshPlan(workspaceId, refreshBody);
-  if (!plan) return mcpError(`Workspace not found: ${workspaceId}`);
+  if (!plan) return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
 
   const job = createJob(BACKGROUND_JOB_TYPES.LOCAL_SEO_REFRESH, {
     workspaceId,
@@ -305,7 +316,7 @@ async function handleStartLocalSeoRefresh(
     updateJob(job.id, {
       status: 'error',
       message: 'Local SEO refresh failed unexpectedly',
-      error: err instanceof Error ? err.message : String(err),
+      error: 'Local SEO refresh failed unexpectedly. Review server logs before retrying.',
     });
   });
 
@@ -327,12 +338,12 @@ function requireJobWorkspaceMatch(
   jobId: string,
 ): Job | McpToolErrorResponse {
   const job = getJob(jobId);
-  if (!job) return mcpError(`Job not found: ${jobId}`);
+  if (!job) return mcpNotFoundError('The job was not found.', { resource_type: 'job' });
   if (job.workspaceId && job.workspaceId !== workspaceId) {
-    return mcpError(`Job ${jobId} does not belong to workspace ${workspaceId}`);
+    return mcpNotFoundError('The job was not found in this workspace.', { resource_type: 'job' });
   }
   if (!job.workspaceId) {
-    return mcpError(`Job ${jobId} is not workspace-scoped and is not accessible from this tool`);
+    return mcpNotFoundError('The job was not found in this workspace.', { resource_type: 'job' });
   }
   return job;
 }
@@ -387,10 +398,14 @@ async function handleCancelJob(
   if (!('id' in existing)) return existing;
   const existingJob = existing as Job;
   const cancellationError = getJobCancellationError(existingJob);
-  if (cancellationError) return mcpError(cancellationError);
+  if (cancellationError) {
+    return mcpPreconditionError('The job cannot be cancelled from its current status.', {
+      current_status: existingJob.status,
+    });
+  }
 
   const job = cancelJob(jobId);
-  if (!job) return mcpError(`Job not found: ${jobId}`);
+  if (!job) return mcpNotFoundError('The job was not found.', { resource_type: 'job' });
 
   return mcpSuccess({
     ok: true,
@@ -409,5 +424,5 @@ export async function handleJobActionTool(
   if (name === 'get_job_status') return handleGetJobStatus(args);
   if (name === 'list_jobs') return handleListJobs(args);
   if (name === 'cancel_job') return handleCancelJob(args);
-  return mcpError(`Unknown job action tool: ${name}`);
+  return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }

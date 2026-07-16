@@ -10,17 +10,54 @@ vi.mock('../../server/workspaces.js', () => ({
 
 import {
   buildDashboardUrl,
-  mcpError,
+  mcpConflictError,
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpPreconditionError,
+  mcpRateLimitedError,
   mcpSuccess,
+  mcpValidationError,
   requireWorkspace,
   zodErrorToMcp,
 } from '../../server/mcp/tool-helpers.js';
 
+function errorEnvelope(result: ReturnType<typeof mcpValidationError>) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as Record<string, unknown>;
+}
+
 describe('mcp tool helpers', () => {
-  it('builds error/success payloads', () => {
-    const err = mcpError('bad');
-    expect(err.isError).toBe(true);
-    expect(err.content[0]?.text).toBe('bad');
+  it('builds branded json_v1 error and success payloads', () => {
+    expect(errorEnvelope(mcpValidationError('Invalid input.', {
+      field_path: 'limit',
+      constraint: 'Must be at most 100.',
+    }))).toEqual({
+      code: 'validation_failed',
+      message: 'Invalid input.',
+      retryable: false,
+      details: {
+        field_path: 'limit',
+        constraint: 'Must be at most 100.',
+      },
+    });
+    expect(errorEnvelope(mcpNotFoundError('The workspace was not found.'))).toMatchObject({
+      code: 'not_found',
+    });
+    expect(errorEnvelope(mcpConflictError('The revision changed.'))).toMatchObject({
+      code: 'conflict',
+      retryable: true,
+    });
+    expect(errorEnvelope(mcpPreconditionError('Connect a site first.'))).toMatchObject({
+      code: 'precondition_failed',
+    });
+    expect(errorEnvelope(mcpRateLimitedError('Try again later.'))).toMatchObject({
+      code: 'rate_limited',
+      retryable: true,
+    });
+    expect(errorEnvelope(mcpInternalError())).toEqual({
+      code: 'internal_error',
+      message: 'The tool could not complete because of an internal error.',
+      retryable: false,
+    });
 
     const ok = mcpSuccess({ ok: true });
     expect(ok.isError).toBeUndefined();
@@ -35,7 +72,12 @@ describe('mcp tool helpers', () => {
     h.getWorkspace.mockReturnValue(undefined);
     const missing = requireWorkspace('ws-missing');
     expect('isError' in missing && missing.isError).toBe(true);
-    expect(missing.content[0]?.text).toContain('Workspace not found: ws-missing');
+    expect(JSON.parse(missing.content[0]?.text ?? '{}')).toEqual({
+      code: 'not_found',
+      message: 'Workspace not found.',
+      retryable: false,
+      details: { resource_type: 'workspace' },
+    });
   });
 
   it('buildDashboardUrl uses public/app URL and trims trailing slashes', () => {
@@ -60,14 +102,20 @@ describe('mcp tool helpers', () => {
     else process.env.APP_URL = prevApp;
   });
 
-  it('formats zod-style and unknown validation errors', () => {
-    const zodLike = zodErrorToMcp({ issues: [{ path: ['a'], message: 'required' }] });
+  it('formats field-addressed zod validation errors', () => {
+    const zodLike = zodErrorToMcp({
+      issues: [{ path: ['a'], message: 'required', code: 'custom' }],
+    } as never);
     expect(zodLike.isError).toBe(true);
-    expect(zodLike.content[0]?.text).toContain('Validation failed:');
-    expect(zodLike.content[0]?.text).toContain('"required"');
-
-    const unknown = zodErrorToMcp('boom');
-    expect(unknown.isError).toBe(true);
-    expect(unknown.content[0]?.text).toBe('Validation failed: boom');
+    expect(JSON.parse(zodLike.content[0]?.text ?? '{}')).toEqual({
+      code: 'validation_failed',
+      message: 'Invalid tool input at a: required',
+      retryable: false,
+      details: {
+        field_path: 'a',
+        constraint: 'required',
+        issue_code: 'custom',
+      },
+    });
   });
 });

@@ -11,6 +11,12 @@ import { getPrimaryMarketLocationCode } from '../../local-seo.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import { handleContentPerformance } from '../../routes/content-requests.js';
+import {
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpValidationError,
+  zodErrorToMcp,
+} from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-content');
 
@@ -83,21 +89,21 @@ export async function handleContentTool(
   args: Record<string, unknown>,
 ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   if (!isContentHandledToolName(name)) {
-    return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
+    return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
   }
 
   const workspaceId = args.workspaceId;
   if (typeof workspaceId !== 'string') {
-    return { isError: true, content: [{ type: 'text' as const, text: 'Missing or invalid workspaceId' }] };
+    return mcpValidationError('Invalid tool input at workspaceId: Expected a workspace ID.', {
+      field_path: 'workspaceId',
+      constraint: 'Expected a non-empty workspace ID.',
+    });
   }
 
   try {
     const ws = getWorkspace(workspaceId);
     if (!ws) {
-      return {
-        isError: true,
-        content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }],
-      };
+      return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
     }
 
     if (name === 'get_content_decay') {
@@ -152,20 +158,15 @@ export async function handleContentTool(
     if (name === 'get_content_performance') {
       const parsed = getContentPerformanceInputSchema.safeParse(args);
       if (!parsed.success) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
-        };
+        return zodErrorToMcp(parsed.error);
       }
       const data = await handleContentPerformance(parsed.data.workspaceId);
       return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
     }
 
-    const unhandledName: never = name;
-    return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${unhandledName}` }] };
+    return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
   } catch (err) {
     log.error({ err, tool: name, workspaceId }, 'MCP tool error');
-    const message = err instanceof Error ? err.message : String(err);
-    return { isError: true, content: [{ type: 'text' as const, text: `Tool error: ${message}` }] };
+    return mcpInternalError();
   }
 }

@@ -72,7 +72,7 @@ describe('MCP tool error contracts', () => {
     expect(JSON.stringify(payload)).not.toContain('private oversized input');
   });
 
-  it('keeps legacy text byte-compatible while selecting JSON v1 for new tools', () => {
+  it('keeps isolated legacy compatibility fixtures byte-compatible while selecting JSON v1', () => {
     const descriptor = {
       legacyText: 'Forbidden: this API key cannot access that workspace.',
       envelope: {

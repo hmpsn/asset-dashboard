@@ -14,6 +14,14 @@ import {
 import type { IntelligenceSlice } from '../../../shared/types/intelligence.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
+import { WorkspaceMutationError } from '../../workspace-mutation-helper.js';
+import {
+  mcpConflictError,
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpValidationError,
+  zodErrorToMcp,
+} from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-clients');
 
@@ -70,17 +78,14 @@ export async function handleClientTool(
     if (name === 'get_client_signals') {
       const workspaceId = args.workspaceId;
       if (typeof workspaceId !== 'string') {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: 'Missing or invalid workspaceId' }],
-        };
+        return mcpValidationError('Invalid tool input at workspaceId: Expected a workspace ID.', {
+          field_path: 'workspaceId',
+          constraint: 'Expected a non-empty workspace ID.',
+        });
       }
       const ws = getWorkspace(workspaceId);
       if (!ws) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }],
-        };
+        return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
       }
       const intel = await buildWorkspaceIntelligence(workspaceId, { slices: CLIENT_SIGNALS_SLICE });
       return {
@@ -95,10 +100,7 @@ export async function handleClientTool(
         // Single workspace mode
         const ws = getWorkspace(workspaceId);
         if (!ws) {
-          return {
-            isError: true,
-            content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }],
-          };
+          return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
         }
         const approvalBatches = listBatches(workspaceId);
         const requests = listRequests(workspaceId);
@@ -155,12 +157,12 @@ export async function handleClientTool(
     if (name === 'respond_to_client_action') {
       const parsed = respondToClientActionInputSchema.safeParse(args);
       if (!parsed.success) {
-        return { isError: true, content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }] };
+        return zodErrorToMcp(parsed.error);
       }
       const { workspaceId, actionId, status, clientNote } = parsed.data;
       const ws = getWorkspace(workspaceId);
       if (!ws) {
-        return { isError: true, content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }] };
+        return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
       }
       // Routes through the admin client-action service, which validates the status
       // transition and fires its own activity + broadcast + insight/outcome feedback.
@@ -175,12 +177,12 @@ export async function handleClientTool(
     if (name === 'respond_to_approval_item') {
       const parsed = respondToApprovalItemInputSchema.safeParse(args);
       if (!parsed.success) {
-        return { isError: true, content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }] };
+        return zodErrorToMcp(parsed.error);
       }
       const { workspaceId, batchId, itemId, clientNote } = parsed.data;
       const ws = getWorkspace(workspaceId);
       if (!ws) {
-        return { isError: true, content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }] };
+        return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
       }
       // Decline-only: always 'rejected' (request changes). Agents cannot approve on the
       // client's behalf. actor is named honestly so the ACTIVITY LOG (the user-facing
@@ -198,18 +200,22 @@ export async function handleClientTool(
         actor: { name: 'MCP agent' },
       });
       if (!result) {
-        return { isError: true, content: [{ type: 'text' as const, text: `Approval item not found: ${batchId}/${itemId}` }] };
+        return mcpNotFoundError('The approval item was not found.', { resource_type: 'approval_item' });
       }
       return { content: [{ type: 'text' as const, text: JSON.stringify(result.batch) }] };
     }
 
-    return {
-      isError: true,
-      content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
-    };
+    return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
   } catch (err) {
     log.error({ err, tool: name }, 'MCP tool error');
-    const message = err instanceof Error ? err.message : String(err);
-    return { isError: true, content: [{ type: 'text' as const, text: `Tool error: ${message}` }] };
+    if (err instanceof WorkspaceMutationError) {
+      if (err.status === 404) {
+        return mcpNotFoundError('The client action was not found.', { resource_type: 'client_action' });
+      }
+      if (err.status === 409) {
+        return mcpConflictError('The client action cannot move to the requested status. Re-read it before retrying.');
+      }
+    }
+    return mcpInternalError();
   }
 }

@@ -50,6 +50,13 @@ async function callMcpTool(name: string, args: Record<string, unknown>) {
   return body.result;
 }
 
+function errorEnvelope(result: { content: Array<{ text: string }> }) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code?: string;
+    details?: Record<string, unknown>;
+  };
+}
+
 beforeAll(async () => {
   await ctx.startServer();
 });
@@ -101,7 +108,7 @@ describe('MCP job tools (integration)', () => {
 
     const second = await callMcpTool('start_keyword_strategy_generation', { workspace_id: ws.workspaceId });
     expect(second.isError).toBe(true);
-    expect(second.content[0].text).toMatch(/already running|already being generated/i);
+    expect(errorEnvelope(second)).toMatchObject({ code: 'conflict' });
     cancelJob(activeJob.id);
   });
 
@@ -110,7 +117,10 @@ describe('MCP job tools (integration)', () => {
       workspace_id: ws.workspaceId,
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/Validation failed/i);
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'validation_failed',
+      details: { field_path: 'site_id' },
+    });
   });
 
   it('start_seo_audit rejects site ids that do not belong to workspace', async () => {
@@ -119,7 +129,7 @@ describe('MCP job tools (integration)', () => {
       site_id: 'site-does-not-belong',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/not linked to site/i);
+    expect(errorEnvelope(result)).toMatchObject({ code: 'precondition_failed' });
   });
 
   it('start_local_seo_refresh creates a local SEO refresh job payload', async () => {

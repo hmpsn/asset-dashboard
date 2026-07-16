@@ -1,0 +1,108 @@
+# MCP agent-legibility implementation plan
+
+Date: 2026-07-16
+Target: `staging`
+Owner: MCP boundary (`server/mcp/`)
+
+## Dependency graph
+
+```text
+P1 error helpers and contract tests
+  -> P2 migrate read-only families
+  -> P3 migrate mutation/generation families
+  -> P4 flip registry contracts and update operator guidance
+  -> P5 full verification and adversarial review
+```
+
+Each phase is part of one independently complete PR. The later casing-alias
+change is deliberately excluded because it changes authorization semantics.
+
+## P1 — Lock the public error contract
+
+Acceptance checklist:
+
+- Add small branded constructors for validation, not-found, conflict,
+  precondition, rate-limit, and internal failures.
+- Field-addressed validation keeps `field_path` and `constraint` details.
+- Constructors redact prohibited detail keys and likely credentials through the
+  existing `mcpJsonV1Error` boundary.
+- Tests fail if an arbitrary/unbranded error result crosses a `json_v1` family.
+
+## P2 — Read-only families
+
+Migrate workspaces, intelligence, insights, content reads, legacy brand reads,
+clients, and analytics reads.
+
+Acceptance checklist:
+
+- Missing resources use `not_found`.
+- Invalid arguments use `validation_failed` with actionable safe detail.
+- Unexpected read failures return a generic `internal_error`; exception text is
+  not returned.
+- Existing successful response shapes do not change.
+
+## P3 — Mutation and generation families
+
+Migrate keyword, content, recommendation, content-generation, schema, and job
+actions.
+
+Acceptance checklist:
+
+- Revision/state conflicts use `conflict`.
+- Missing prerequisites use `precondition_failed`.
+- Throttling uses `rate_limited` where applicable.
+- Domain-safe messages remain actionable, while raw provider/AI/DB exceptions
+  return generic `internal_error`.
+- Human approval/finalization/publish gates are unchanged.
+
+## P4 — Registry and guidance
+
+Acceptance checklist:
+
+- All 18 registered families use `json_v1`; the legacy tool count is zero.
+- Instructions and README no longer describe a mixed error surface.
+- Template/matrix descriptions explicitly say placeholders use one brace pair,
+  with `/{service}-{city}` as the example.
+- Existing tone, intake-cap, and pending-approval documentation remains tested.
+
+## P5 — Verification
+
+Run focused MCP tests first, followed by:
+
+```text
+npm run typecheck
+npx vite build
+npm run pr-check
+npm run lint:hooks
+npx vitest run
+```
+
+Then perform an independent adversarial diff review focused on secret leakage,
+wrong stable codes, lost field details, registry census drift, and accidental
+weakening of human gates. Fix every material finding before pushing the PR.
+
+## Follow-on productized-template PR sequence
+
+This PR is the safety/legibility prerequisite for the attached productized-template
+spec. The remaining work ships as small staging-first PRs in this order:
+
+```text
+PR A unified MCP errors + placeholder guidance (this plan)
+  -> PR B update_content_matrix_cell MCP wrap + URL/collision integrity
+  -> PR C evidence-driven optional template sections + visible omissions
+  -> PR D copy-on-instantiate per-vertical template library
+  -> PR E auth-safe deprecated camelCase workspace aliases
+```
+
+- PR B reuses the existing `updateMatrixCell` service and revision guard; it does
+  not add a second matrix mode or bypass URL validation.
+- PR C defaults `optional` to false, derives section requirements from existing
+  generation roles, includes omissions in manifest fingerprints, and keeps pages
+  with zero resolved blocks or no required primary CTA blocked.
+- PR D uses a vertical tag and copy-on-instantiate ownership. Library edits never
+  mutate an approved workspace instance; promotion remains an explicit operator act.
+- PR E is isolated because workspace aliases affect authorization scope resolution.
+  Conflicting spellings fail closed, and snake_case remains canonical.
+
+Every PR preserves voice finalization, evidence, approval, review, send, and
+publication gates, and must merge green to `staging` before the next PR starts.

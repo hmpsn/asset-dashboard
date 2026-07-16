@@ -16,6 +16,13 @@ import { WS_EVENTS } from '../../ws-events.js';
 import type { InsightType } from '../../../shared/types/analytics.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
+import {
+  mcpConflictError,
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpValidationError,
+  zodErrorToMcp,
+} from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-insights');
 
@@ -71,35 +78,26 @@ export async function handleInsightTool(
   args: Record<string, unknown>,
 ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   if (!isInsightHandledToolName(name)) {
-    return {
-      isError: true,
-      content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
-    };
+    return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
   }
 
   const workspaceId = args.workspaceId;
   try {
     if (typeof workspaceId !== 'string') {
-      return {
-        isError: true,
-        content: [{ type: 'text' as const, text: 'Missing or invalid workspaceId' }],
-      };
+      return mcpValidationError('Invalid tool input at workspaceId: Expected a workspace ID.', {
+        field_path: 'workspaceId',
+        constraint: 'Expected a non-empty workspace ID.',
+      });
     }
     const ws = getWorkspace(workspaceId);
     if (!ws) {
-      return {
-        isError: true,
-        content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }],
-      };
+      return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
     }
 
     if (name === 'get_insights') {
       const parsed = getInsightsInputSchema.safeParse(args);
       if (!parsed.success) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
-        };
+        return zodErrorToMcp(parsed.error);
       }
       const { type, domain, limit } = parsed.data;
       const base = domain
@@ -116,10 +114,7 @@ export async function handleInsightTool(
     if (name === 'get_unresolved_insights') {
       const parsed = getUnresolvedInsightsInputSchema.safeParse(args);
       if (!parsed.success) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
-        };
+        return zodErrorToMcp(parsed.error);
       }
       const { limit } = parsed.data;
       const items = getUnresolvedInsights(workspaceId).slice(0, limit ?? 100);
@@ -129,10 +124,7 @@ export async function handleInsightTool(
     if (name === 'get_anomalies') {
       const parsed = getAnomaliesInputSchema.safeParse(args);
       if (!parsed.success) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
-        };
+        return zodErrorToMcp(parsed.error);
       }
       const resolved = parsed.data.resolved === true;
       let anomalies = getInsights(workspaceId, 'anomaly_digest');
@@ -148,10 +140,7 @@ export async function handleInsightTool(
     if (name === 'resolve_insight') {
       const parsed = resolveInsightInputSchema.safeParse(args);
       if (!parsed.success) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
-        };
+        return zodErrorToMcp(parsed.error);
       }
       const { insightId, status, note } = parsed.data;
       let updated;
@@ -159,18 +148,14 @@ export async function handleInsightTool(
         updated = resolveInsight(insightId, workspaceId, status, note, 'mcp-chat');
       } catch (err) {
         if (err instanceof InvalidTransitionError) {
-          return {
-            isError: true,
-            content: [{ type: 'text' as const, text: `Illegal insight resolution transition: ${err.message}` }],
-          };
+          return mcpConflictError(
+            'The insight cannot move to the requested resolution status. Re-read it before retrying.',
+          );
         }
         throw err;
       }
       if (!updated) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: `Insight not found: ${insightId}` }],
-        };
+        return mcpNotFoundError('The insight was not found.', { resource_type: 'insight' });
       }
       if (status === 'resolved') recordInsightResolutionOutcome(workspaceId, updated);
       addActivity(
@@ -187,10 +172,7 @@ export async function handleInsightTool(
     if (name === 'bulk_resolve_insights') {
       const parsed = bulkResolveInsightsInputSchema.safeParse(args);
       if (!parsed.success) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: `Validation failed: ${JSON.stringify(parsed.error.issues)}` }],
-        };
+        return zodErrorToMcp(parsed.error);
       }
       const { insightIds, status, note } = parsed.data;
       // `status` may be 'resolved' OR 'in_progress', so the accumulator holds "updated"
@@ -207,7 +189,7 @@ export async function handleInsightTool(
           updated = resolveInsight(insightId, workspaceId, status, note, 'mcp-chat');
         } catch (err) {
           if (err instanceof InvalidTransitionError) {
-            rejected.push({ insightId, reason: err.message });
+            rejected.push({ insightId, reason: 'invalid_transition' });
             continue;
           }
           throw err;
@@ -232,17 +214,9 @@ export async function handleInsightTool(
       };
     }
 
-    const unhandledName: never = name;
-    return {
-      isError: true,
-      content: [{ type: 'text' as const, text: `Unknown tool: ${unhandledName}` }],
-    };
+    return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
   } catch (err) {
     log.error({ err, tool: name, workspaceId }, 'MCP tool error');
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      isError: true,
-      content: [{ type: 'text' as const, text: `Tool error: ${message}` }],
-    };
+    return mcpInternalError();
   }
 }

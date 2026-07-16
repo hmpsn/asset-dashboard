@@ -216,9 +216,11 @@ describe('update_brand_deliverable MCP tool', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toBe(
-      'Version conflict. Current version: 1. Re-fetch via get_brand_identity (includeDeliverables:true) before retrying.',
-    );
+    expect(parse(result)).toMatchObject({
+      code: 'conflict',
+      retryable: true,
+      details: { current_version: 1 },
+    });
     // No write happened
     expect(rawRow(id)).toMatchObject({ content: 'Mission v1', version: 1 });
     expect(getDeliverable(ws.workspaceId, id)?.versions).toHaveLength(0);
@@ -295,11 +297,11 @@ describe('update_brand_deliverable MCP tool', () => {
       content: '',
     });
     expect(emptyContent.isError).toBe(true);
-    expect(emptyContent.content[0]?.text).toContain('Validation failed');
+    expect(parse(emptyContent)).toMatchObject({ code: 'validation_failed' });
 
     const missing = await handleBrandTool('update_brand_deliverable', { workspaceId: ws.workspaceId });
     expect(missing.isError).toBe(true);
-    expect(missing.content[0]?.text).toContain('Validation failed');
+    expect(parse(missing)).toMatchObject({ code: 'validation_failed' });
   });
 
   it('still rejects unknown tool names after the dispatcher split', async () => {

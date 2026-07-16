@@ -147,7 +147,7 @@ describe('get_workspace_overview', () => {
     );
     const body = await res.json() as { result?: { isError?: boolean; content: Array<{ text: string }> } };
     expect(body.result?.isError).toBe(true);
-    expect(body.result?.content[0].text).toContain('Workspace not found');
+    expect(JSON.parse(body.result?.content[0].text ?? '{}')).toMatchObject({ code: 'not_found' });
   });
 });
 
@@ -200,7 +200,7 @@ describe('workspace lifecycle mutations', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { result?: { isError?: boolean; content: Array<{ text: string }> } };
     expect(body.result?.isError).toBe(true);
-    expect(body.result?.content[0]?.text).toContain('Validation failed');
+    expect(JSON.parse(body.result?.content[0]?.text ?? '{}')).toMatchObject({ code: 'validation_failed' });
   });
 });
 
@@ -245,7 +245,10 @@ describe('get_workspace_intelligence', () => {
     );
     const body = await res.json() as { result?: { isError?: boolean; content: Array<{ text: string }> } };
     expect(body.result?.isError).toBe(true);
-    expect(body.result?.content[0].text).toContain('No valid intelligence slices');
+    expect(JSON.parse(body.result?.content[0].text ?? '{}')).toMatchObject({
+      code: 'validation_failed',
+      details: { field_path: 'slices' },
+    });
   });
 
   it('accepts enrichment flags and optional site-inventory auto include', async () => {

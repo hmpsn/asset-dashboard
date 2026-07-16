@@ -18,8 +18,11 @@ import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import {
   buildDashboardUrl,
-  mcpError,
+  mcpConflictError,
+  mcpInternalError,
+  mcpNotFoundError,
   mcpSuccess,
+  mcpValidationError,
   requireWorkspace,
   zodErrorToMcp,
   type McpToolErrorResponse,
@@ -30,19 +33,20 @@ const log = createLogger('mcp-tools-content-generation-actions');
 
 function generationStartConflict(err: unknown): McpToolErrorResponse | null {
   if (err instanceof ActiveJobResourceConflict) {
-    return mcpError(
-      `[${err.code}] A generation job is already active for this resource. active_job_id=${err.jobId}`,
-    );
+    return mcpConflictError('A generation job is already active for this resource.', {
+      active_job_id: err.jobId,
+    });
   }
   if (err instanceof ContentRequestGenerationConflictError) {
-    return mcpError(
-      `[${err.code}] Content request ${err.requestId} changed. Re-read it before retrying.`,
-    );
+    return mcpConflictError('The content request changed. Re-read it before retrying.', {
+      resource_type: 'content_request',
+    });
   }
   if (err instanceof GenerationRevisionConflictError) {
-    return mcpError(
-      `[${err.code}] ${err.artifactType} ${err.artifactId} changed from expected revision ${err.expectedRevision}. Re-read it before retrying.`,
-    );
+    return mcpConflictError('The generation source changed. Re-read it before retrying.', {
+      resource_type: err.artifactType,
+      expected_revision: err.expectedRevision,
+    });
   }
   return null;
 }
@@ -85,14 +89,19 @@ async function handleStartBriefGeneration(
   // content request (which already carries its keyword/intent/page type). Exactly one
   // of the two must be supplied.
   if (!requestId && !targetKeyword) {
-    return mcpError('Provide target_keyword (standalone brief) or request_id (request brief).');
+    return mcpValidationError('Invalid tool input: provide target_keyword or request_id.', {
+      field_path: 'target_keyword,request_id',
+      constraint: 'One generation source is required.',
+    });
   }
 
   let started: { jobId: string };
   try {
     if (requestId) {
       const request = getContentRequest(workspaceId, requestId);
-      if (!request) return mcpError(`Content request not found: ${requestId}`);
+      if (!request) return mcpNotFoundError('Content request not found.', {
+        resource_type: 'content_request',
+      });
       // The grounded generation + persistence + broadcast + activity all live inside the
       // shared service (server/content-brief-generation-job.ts). The job platform owns the
       // job lifecycle and broadcasts JOB_* events; do not broadcast or write the DB here.
@@ -117,9 +126,8 @@ async function handleStartBriefGeneration(
   } catch (err) {
     const conflict = generationStartConflict(err);
     if (conflict) return conflict;
-    const message = err instanceof Error ? err.message : String(err);
     log.error({ err, workspaceId, targetKeyword, requestId }, 'start_brief_generation failed');
-    return mcpError(`Failed to start brief generation: ${message}`);
+    return mcpInternalError();
   }
 
   // Paid provider work runs inside the job — count it so the paid-call signal covers all
@@ -150,7 +158,7 @@ async function handleStartPostGeneration(
   if ('isError' in workspace) return workspace;
 
   const brief = getBrief(workspaceId, briefId);
-  if (!brief) return mcpError(`Brief not found: ${briefId}`);
+  if (!brief) return mcpNotFoundError('Brief not found.', { resource_type: 'content_brief' });
 
   // createContentPostGenerationJob persists the post skeleton, creates the job, and
   // broadcasts the start (POST_UPDATED + CONTENT_UPDATED) inside the shared service.
@@ -168,9 +176,8 @@ async function handleStartPostGeneration(
   } catch (err) {
     const conflict = generationStartConflict(err);
     if (conflict) return conflict;
-    const message = err instanceof Error ? err.message : String(err);
     log.error({ err, workspaceId, briefId }, 'start_post_generation failed');
-    return mcpError(`Failed to start post generation: ${message}`);
+    return mcpInternalError();
   }
   runContentPostGenerationJob({
     workspaceId,
@@ -198,5 +205,5 @@ export async function handleContentGenerationActionTool(
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   if (name === 'start_brief_generation') return handleStartBriefGeneration(args);
   if (name === 'start_post_generation') return handleStartPostGeneration(args);
-  return mcpError(`Unknown content generation action tool: ${name}`);
+  return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }
