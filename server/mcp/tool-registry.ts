@@ -31,6 +31,7 @@ import {
   handleContentGenerationActionTool,
 } from './tools/content-generation-actions.js';
 import {
+  CONTENT_MATRIX_GLOBAL_TOOL_NAMES,
   contentMatrixActionTools,
   handleContentMatrixActionTool,
 } from './tools/content-matrix-actions.js';
@@ -365,6 +366,7 @@ const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Obje
     family: 'content-matrix-actions',
     tools: contentMatrixActionTools,
     handler: handleContentMatrixActionTool,
+    globalToolNames: CONTENT_MATRIX_GLOBAL_TOOL_NAMES,
     errorContract: jsonV1Contract,
   },
   {

@@ -9940,3 +9940,15 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Tests:** Domain, persistence, preview/evidence, route-schema, and MCP contract coverage pins omission/inclusion, revision invalidation, visible reasons, fingerprint changes, CTA fallback, all-optional rejection, optional marker persistence, and legacy stored-manifest compatibility.
 
 **Files:** shared template/matrix generation contracts; content-template validation/storage/upgrade; matrix manifest resolver, evidence/read/preview/persistence services; MCP descriptions/instructions; focused unit and contract tests; productized-template plan, roadmap, features, and audit.
+
+### 704. Per-vertical studio content-template library 2026-07-16
+
+**Status:** Complete. Proven generation-ready structures can be reused across client workspaces without shared mutable state.
+
+**What it does:** Adds a master-key-only studio library with bounded vertical list/read tools, explicit exact-revision promotion, and copy-on-instantiate workspace ownership. A promotion stores one immutable snapshot plus source workspace/template/revision provenance. Instantiation creates an ordinary content template in the selected workspace and regenerates every section ID through the same copy path used by template duplication.
+
+**Isolation and gates:** Library assets have no update, inheritance, or synchronization path. Editing one client copy cannot mutate another client or the studio snapshot; a later proven source revision becomes a new library asset. Stale promotion revisions, legacy generation contracts, malformed verticals, missing assets, and missing target workspaces fail with field-specific errors. Instantiation uses the existing content-plan activity, workspace broadcast, and intelligence invalidation effects. No generation, evidence, voice, approval, send, or publish authority changed.
+
+**Tests:** Domain and MCP contract coverage promotes one exact revision, filters by vertical, replays the same promotion, instantiates into two workspaces with distinct section IDs, edits one copy, and proves the other copy and library remain unchanged. Registry census pins all four tools as studio-global/master-key-only.
+
+**Files:** migration 195; shared content-template library contracts; content-template copy helper; studio library domain service; MCP schemas/handler/registry/instructions/inventory; focused domain, MCP, auth-scope, and dispatch tests; productized-template plan, roadmap, features, rule, and audit.

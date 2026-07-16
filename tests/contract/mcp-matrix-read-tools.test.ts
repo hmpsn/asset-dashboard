@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from '@modelcontextprotocol/sdk/types';
-import type { ContentTemplate } from '../../shared/types/content.js';
+import type {
+  ContentTemplate,
+  ContentTemplateLibraryItem,
+} from '../../shared/types/content.js';
 import {
   MatrixGenerationSourceLimitError,
   type ContentTemplateGenerationUpgradeProposal,
@@ -56,6 +59,20 @@ function template(): ContentTemplate {
     metaDescPattern: 'Learn about {service}.',
     createdAt: '2026-07-01T00:00:00.000Z',
     updatedAt: '2026-07-01T00:00:00.000Z',
+  };
+}
+
+function libraryTemplate(): ContentTemplateLibraryItem {
+  const source = template();
+  const { id: _id, workspaceId: _workspaceId, revision: _revision,
+    createdAt: _createdAt, updatedAt: _updatedAt, ...snapshot } = source;
+  return {
+    id: 'libtpl_1',
+    vertical: 'dental',
+    ...snapshot,
+    generationContractVersion: 1,
+    source: { workspaceId: 'ws_1', templateId: 'tpl_1', templateRevision: 4 },
+    createdAt: '2026-07-15T00:00:00.000Z',
   };
 }
 
@@ -157,6 +174,27 @@ function dependencies() {
     createTemplate: vi.fn(() => template()),
     updateTemplate: vi.fn(() => ({ ...template(), revision: 5, name: 'Updated service template' })),
     duplicateTemplate: vi.fn(() => ({ ...template(), id: 'tpl_copy', name: 'Service template copy' })),
+    listLibraryTemplates: vi.fn(() => ({
+      items: [{
+        id: 'libtpl_1',
+        vertical: 'dental',
+        name: 'Service template',
+        pageType: 'service' as const,
+        variableCount: 0,
+        sectionCount: 0,
+        source: { workspaceId: 'ws_1', templateId: 'tpl_1', templateRevision: 4 },
+        createdAt: '2026-07-15T00:00:00.000Z',
+      }],
+      hasMore: false,
+    })),
+    getLibraryTemplate: vi.fn(() => libraryTemplate()),
+    promoteTemplateToLibrary: vi.fn(() => ({ template: libraryTemplate(), replayed: false })),
+    instantiateLibraryTemplate: vi.fn(() => ({
+      ...template(),
+      id: 'tpl_instantiated',
+      workspaceId: 'ws_2',
+      name: 'Dental Treatment Page',
+    })),
     createMatrix: vi.fn(() => ({
       id: 'mtx_direct',
       workspaceId: 'ws_1',
@@ -331,6 +369,10 @@ describe('MCP content matrix read tools', () => {
       'create_content_template',
       'update_content_template',
       'duplicate_content_template',
+      'list_library_templates',
+      'get_library_template',
+      'promote_template_to_library',
+      'instantiate_library_template',
       'create_content_matrix',
       'update_content_matrix_cell',
       'list_pseo_blueprint_entries',
@@ -350,7 +392,14 @@ describe('MCP content matrix read tools', () => {
     for (const tool of contentMatrixActionTools as Tool[]) {
       expect(tool.inputSchema.type).toBe('object');
       const properties = tool.inputSchema.properties as Record<string, { description?: string }>;
-      expect(properties.workspace_id?.description).toEqual(expect.any(String));
+      if (![
+        'list_library_templates',
+        'get_library_template',
+        'promote_template_to_library',
+        'instantiate_library_template',
+      ].includes(tool.name)) {
+        expect(properties.workspace_id?.description).toEqual(expect.any(String));
+      }
       expect(properties).not.toHaveProperty('workspaceId');
       for (const property of Object.values(properties)) {
         expect(property.description).toEqual(expect.any(String));
@@ -370,6 +419,78 @@ describe('MCP content matrix read tools', () => {
         selections: { minItems: 1, maxItems: 25 },
       },
     });
+  });
+
+  it('lists, reads, promotes, and instantiates immutable library templates', async () => {
+    const deps = dependencies();
+    const handle = createContentMatrixActionHandler(deps);
+    const masterContext = {
+      ...context,
+      targetWorkspaceId: null,
+      caller: {
+        kind: 'master_key' as const,
+        scope: 'all' as const,
+        keyId: null,
+        keyLabel: null,
+      },
+    };
+
+    const listed = await handle('list_library_templates', {
+      vertical: 'dental',
+      limit: 25,
+    }, { ...masterContext, toolName: 'list_library_templates' });
+    expect(textPayload(listed)).toMatchObject({
+      items: [{ id: 'libtpl_1', vertical: 'dental', section_count: 0 }],
+      next_cursor: null,
+    });
+    expect(deps.listLibraryTemplates).toHaveBeenCalledWith({
+      vertical: 'dental',
+      cursor: undefined,
+      limit: 25,
+    });
+
+    const read = await handle('get_library_template', {
+      library_template_id: 'libtpl_1',
+    }, { ...masterContext, toolName: 'get_library_template' });
+    expect(textPayload(read)).toMatchObject({
+      template: { id: 'libtpl_1', source: { template_revision: 4 } },
+    });
+
+    const promoted = await handle('promote_template_to_library', {
+      source_workspace_id: 'ws_1',
+      template_id: 'tpl_1',
+      expected_template_revision: 4,
+      vertical: 'dental',
+    }, { ...masterContext, toolName: 'promote_template_to_library' });
+    expect(textPayload(promoted)).toMatchObject({
+      template: { id: 'libtpl_1' },
+      replayed: false,
+    });
+    expect(deps.promoteTemplateToLibrary).toHaveBeenCalledWith({
+      sourceWorkspaceId: 'ws_1',
+      templateId: 'tpl_1',
+      expectedTemplateRevision: 4,
+      vertical: 'dental',
+    });
+
+    const instantiated = await handle('instantiate_library_template', {
+      target_workspace_id: 'ws_2',
+      library_template_id: 'libtpl_1',
+      name: 'Dental Treatment Page',
+    }, { ...masterContext, toolName: 'instantiate_library_template' });
+    expect(textPayload(instantiated)).toMatchObject({
+      template: { id: 'tpl_instantiated', workspace_id: 'ws_2' },
+    });
+    expect(deps.instantiateLibraryTemplate).toHaveBeenCalledWith({
+      targetWorkspaceId: 'ws_2',
+      libraryTemplateId: 'libtpl_1',
+      name: 'Dental Treatment Page',
+    });
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledWith(
+      'ws_2',
+      expect.any(String),
+      expect.objectContaining({ action: 'template_instantiated' }),
+    );
   });
 
   it('authors, reads, revises, and duplicates a content template through the existing domain functions', async () => {

@@ -34,10 +34,10 @@
           "source": "2026-07-16 productized templates spec item 3",
           "est": "L",
           "priority": "P1",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-16",
           "owner": "content-pipeline",
-          "notes": "List/read per-vertical studio templates, explicitly promote a proven workspace template, and instantiate independent workspace copies with regenerated section IDs. No live inheritance or retroactive client mutation. Promotion remains an explicit operator act."
+          "notes": "Complete 2026-07-16. Adds a master-key-only, per-vertical studio library of immutable generation-ready template snapshots. Explicit promotion is bound to one exact source revision and is replay-safe; bounded list/get reads expose source provenance. Instantiation creates a normal workspace-owned template with regenerated section IDs and the existing content-plan activity, broadcast, and intelligence invalidation effects. Editing one instance cannot mutate the library or another client. No library update/sync path, generation start, approval, send, publish, or human-gate bypass was added."
         },
         {
           "id": "mcp-workspace-parameter-aliases",

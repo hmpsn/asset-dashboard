@@ -157,3 +157,25 @@ Acceptance checklist:
   fingerprints remain readable.
 - [x] MCP create/update discovery exposes the section marker and omission flow;
   voice, evidence, approval, review, send, and publish gates are unchanged.
+
+### PR D implementation closure
+
+Dependency order: immutable library snapshot storage → copy-on-instantiate domain
+service → master-key MCP surface → discovery/instructions → boundary tests. A
+promotion names one exact generation-ready workspace template revision and one
+flat vertical slug. The library row is immutable; re-promoting a later source
+revision creates a new asset. Instantiation copies the snapshot into the target
+workspace through the normal template writer and regenerates every section ID.
+
+Acceptance checklist:
+
+- [x] Master-key MCP can list/read vertical library assets and explicitly promote
+  one exact source revision; workspace keys cannot access studio-global tools.
+- [x] Instantiating one library asset into two workspaces creates normal,
+  independently editable templates with distinct section IDs.
+- [x] Editing one client instance leaves the other instance and immutable library
+  snapshot byte-for-byte unchanged.
+- [x] Stale source revisions, legacy generation contracts, invalid verticals,
+  missing library assets, and missing target workspaces return field-specific errors.
+- [x] Instantiation records the normal workspace mutation effects; promotion does
+  not start generation or change approval, send, publish, or voice-finalization gates.

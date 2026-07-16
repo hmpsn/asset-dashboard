@@ -33,19 +33,19 @@ import {
 const log = createLogger('content-templates');
 const generationPageTypeSet = new Set<string>(BRIEF_PAGE_TYPES);
 
-const contentPageTypeSchema = z.enum([
+export const contentPageTypeStoredSchema = z.enum([
   'blog', 'landing', 'service', 'location', 'product',
   'pillar', 'resource', 'provider-profile', 'procedure-guide', 'pricing-page',
   'homepage', 'about', 'contact', 'faq', 'testimonials', 'custom',
 ]);
 
-const templateVariableStoredSchema = z.object({
+export const templateVariableStoredSchema = z.object({
   name: z.string().min(1),
   label: z.string().min(1),
   description: z.string().optional(),
 });
 
-const templateSectionStoredSchema = z.object({
+export const templateSectionStoredSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   headingTemplate: z.string(),
@@ -70,7 +70,7 @@ const templateSectionStoredSchema = z.object({
   optional: z.boolean().optional(),
 });
 
-const stringRecordSchema = z.record(z.string());
+export const stringRecordStoredSchema = z.record(z.string());
 
 // ── SQLite row shape ──
 
@@ -138,7 +138,7 @@ const stmts = createStmtCache(() => ({
 
 function rowToTemplate(row: TemplateRow): ContentTemplate {
   const context = { workspaceId: row.workspace_id, table: 'content_templates' };
-  const parsedPageType = contentPageTypeSchema.safeParse(row.page_type);
+  const parsedPageType = contentPageTypeStoredSchema.safeParse(row.page_type);
   const schemaTypes = parseJsonSafeArray(
     row.schema_types,
     z.string().refine(value => value.trim().length > 0, 'Schema type cannot be blank'),
@@ -166,7 +166,7 @@ function rowToTemplate(row: TemplateRow): ContentTemplate {
     keywordPattern: row.keyword_pattern,
     titlePattern: row.title_pattern ?? undefined,
     metaDescPattern: row.meta_desc_pattern ?? undefined,
-    cmsFieldMap: parseJsonSafe(row.cms_field_map, stringRecordSchema, null, {
+    cmsFieldMap: parseJsonSafe(row.cms_field_map, stringRecordStoredSchema, null, {
       ...context,
       field: 'cms_field_map',
     }) ?? undefined,
@@ -414,7 +414,7 @@ export function updateTemplate(
 
     // Re-derive schemaTypes from new pageType if pageType changed and schemaTypes not explicitly set
     const effectiveUpdates = { ...updates };
-    const storedPageTypeIsKnown = contentPageTypeSchema.safeParse(existingRow.page_type).success;
+    const storedPageTypeIsKnown = contentPageTypeStoredSchema.safeParse(existingRow.page_type).success;
     if (!storedPageTypeIsKnown && effectiveUpdates.pageType === 'custom') {
       // `rowToTemplate` intentionally projects an unknown future page type as
       // `custom`. The current editor submits its full read DTO, so that fallback
@@ -511,23 +511,49 @@ export function deleteTemplate(workspaceId: string, templateId: string): boolean
   return false;
 }
 
+type ContentTemplateCopySource = Pick<ContentTemplate,
+  | 'name'
+  | 'description'
+  | 'pageType'
+  | 'variables'
+  | 'sections'
+  | 'urlPattern'
+  | 'keywordPattern'
+  | 'titlePattern'
+  | 'metaDescPattern'
+  | 'cmsFieldMap'
+  | 'toneAndStyle'
+  | 'schemaTypes'
+  | 'generationContractVersion'
+>;
+
+export function copyTemplateIntoWorkspace(
+  workspaceId: string,
+  source: ContentTemplateCopySource,
+  name: string,
+): ContentTemplate {
+  return createTemplate(workspaceId, {
+    name,
+    description: source.description,
+    pageType: source.pageType,
+    variables: source.variables,
+    sections: source.sections.map(section => ({
+      ...section,
+      id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    })),
+    urlPattern: source.urlPattern,
+    keywordPattern: source.keywordPattern,
+    titlePattern: source.titlePattern,
+    metaDescPattern: source.metaDescPattern,
+    cmsFieldMap: source.cmsFieldMap,
+    toneAndStyle: source.toneAndStyle,
+    schemaTypes: source.schemaTypes,
+    generationContractVersion: source.generationContractVersion,
+  });
+}
+
 export function duplicateTemplate(workspaceId: string, templateId: string, newName?: string): ContentTemplate | null {
   const existing = getTemplate(workspaceId, templateId);
   if (!existing) return null;
-
-  return createTemplate(workspaceId, {
-    name: newName || `${existing.name} (copy)`,
-    description: existing.description,
-    pageType: existing.pageType,
-    variables: existing.variables,
-    sections: existing.sections.map(s => ({ ...s, id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` })),
-    urlPattern: existing.urlPattern,
-    keywordPattern: existing.keywordPattern,
-    titlePattern: existing.titlePattern,
-    metaDescPattern: existing.metaDescPattern,
-    cmsFieldMap: existing.cmsFieldMap,
-    toneAndStyle: existing.toneAndStyle,
-    schemaTypes: existing.schemaTypes,
-    generationContractVersion: existing.generationContractVersion,
-  });
+  return copyTemplateIntoWorkspace(workspaceId, existing, newName || `${existing.name} (copy)`);
 }

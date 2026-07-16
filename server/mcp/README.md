@@ -113,7 +113,7 @@ failure classes; unknown names and mismatched workspace values are never logged 
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
 dispatch, workspace scope, and error compatibility. It composes **18 categories** for a total of
-**97 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+**101 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
 name with inert invalid input, asserts the exact 18 family-array→handler identities, and pins the
@@ -268,6 +268,10 @@ The coordinator does not replace the underlying generators or review systems. A 
 | `create_content_template` | W | Create a reusable template; `optional: true` sections are included only when their exact cell evidence is verified. |
 | `update_content_template` | W | Revision-safe partial template update, including optional section markers. |
 | `duplicate_content_template` | W | Duplicate a template as a new starting point. |
+| `list_library_templates` | R | Master-key cursor page of immutable studio templates, optionally filtered by vertical. |
+| `get_library_template` | R | Master-key complete immutable studio template snapshot and source provenance. |
+| `promote_template_to_library` | W | Master-key explicit promotion of one exact generation-ready workspace template revision. |
+| `instantiate_library_template` | W | Master-key copy into a workspace with fresh section IDs and no live inheritance. |
 | `create_content_matrix` | W | Create a matrix directly from a template plus Cartesian dimensions; Page Strategy is not required. |
 | `update_content_matrix_cell` | W | Revision-safe per-cell keyword, URL, variable, or schema override with path and workspace collision validation. |
 | `list_pseo_blueprint_entries` | R | Cursor-page Page Strategy collection entries and template/matrix links; empty means no collection entries have been generated. |
