@@ -11,15 +11,15 @@
 
 ## 1. HEADLINE
 
-**Verdict: the rebuild is directionally right and nobody wants legacy back — but it is not safe to flip on for production until a narrow, well-defined cluster of "truth-in-labels" defects is fixed, and the single highest-leverage action is not a fix at all: it is banking the 82-commit closure branch that staging never received.**
+**Verdict: the rebuild is directionally right and nobody wants legacy back — but it is not safe to flip on for production until a narrow, well-defined cluster of "truth-in-labels" defects is fixed. Every confirmed finding in this audit is a net-new defect that survives the entire parity + closure effort: staging already contains all of it.**
 
 Two structural findings dominate everything else:
 
-### 1a. Staging is auditing as "visually approved but functionally unclosed" because the closure wave never landed
+### 1a. ⚠️ CORRECTED (same day, post-delivery): the closure wave DID reach staging — the earlier "stranded branch" headline was an ancestry-check error
 
-`origin/codex/ui-visual-parity` holds **82 commits that are not ancestors of staging** (~7.6K lines), including the entire post-parity closure record the parity docs cite as complete: the `AUD-D1`–`AUD-D7` implementation commits, the stacked-overlay coordination fix, admin refresh-wiring repair, workspace-state isolation, and `69a686583` — an 11-defect fix wave (Roadmap shipping-velocity metric, Published trend arrow sign, cockpit Refresh/source-chip scoping, ConfirmDialog Enter, and more) that resolves several defects this audit independently re-found on staging. The branch also rewrites the exact files where our biggest confirmed losses live (`SiteAuditSurface.tsx` 908 lines changed, `SeoEditorWorksheet.tsx` 637, `PageSpeedLens.tsx` 382). Verified first-hand: `git merge-base --is-ancestor 69a686583 origin/staging` → NO.
+The first version of this section claimed `origin/codex/ui-visual-parity` held 82 commits of closure work that staging never received, and made "bank that branch" decision #1. **That was wrong.** Content verification (`git diff f4278712f origin/codex/ui-visual-parity` → empty; zero staging commits between the Jul 7 fork point and the bank) proves PR #1519 ("bank owner-approved admin visual parity", 2026-07-12) was a squash-style port of the **entire branch tip, closure wave included** — the `AUD-D1`–`AUD-D7` implementations, the stacked-overlay/refresh-wiring/state-isolation repairs, and the `69a686583` 11-defect fix are all on staging. The 82 commits merely lack *ancestry*, which squash merges never preserve; both the audit's maintenance agent and the first-pass human verification used `git merge-base --is-ancestor` (an ancestry test) where a tree/content diff was required.
 
-**Consequence:** part of this audit's finding set is *already fixed, one unmerged branch away*. Before actioning any individual finding below, cross-check it against that branch — and the owner's first decision should be authorizing the per-cohort extraction to staging that the shipping manifest already specifies (it requires explicit owner authorization, which is why it is stranded).
+**Corrected consequences:** (1) there is nothing to recover — no banking decision exists; (2) every validated finding in this audit was verified against staging *with the closure wave already applied*, so the finding set is net-new beyond all prior review waves and carries no double-fix risk; (3) the fully-banked branch should be archived or deleted so its dangling ref cannot mislead a future session the same way; (4) the audit's remaining process observation stands in sharpened form — five review waves (parity contracts, Sol reviews, post-parity audit, the 11-defect multi-agent review, owner walks) all ran against the prototype or the integration stack, and the 23 validated majors below are what a legacy-as-comparator, adversarially-validated pass still finds afterwards.
 
 ### 1b. The risk that remains is concentrated in one theme: labels that don't tell the truth
 
@@ -72,14 +72,14 @@ The extension lane collapsed 116 opportunities into 9 themes; the striking resul
 | # | Blocker | Seats | Status |
 |---|---------|-------|--------|
 | B1 | **Truth-in-labels on client-facing actions** — Site Audit drawer group-badge vs first-page-only actions; Cockpit "Send"/"Propose" navigate-only; SEO Editor CMS send fails silently (error renders only in an unopened drawer); "Accept all 785" with no preview/undo | 1, 2, 3, 4 | Validated: CMS silent send CONFIRMED-major; drawer scope validated major; navigate-only Send confirmed in source |
-| B2 | **Fabricated or false-window numbers** — rate-limited bulk PageSpeed → success toast + fabricated red-0 average (CONFIRMED ×2); Outcomes Book "Rolling 90 days" over all-time/28d/30d data; Keyword Hub "$0 Monthly value" vs Cockpit "— Unavailable" for the same absent provider; Site Audit 2215-vs-4187 warnings on one screen; Roadmap Completion % denominator excludes deferred/closed while Total doesn't | 1, 5, 7 (2, 3 echo) | Fabrication + mislabel claims CONFIRMED; several have fixes on the stranded branch |
+| B2 | **Fabricated or false-window numbers** — rate-limited bulk PageSpeed → success toast + fabricated red-0 average (CONFIRMED ×2); Outcomes Book "Rolling 90 days" over all-time/28d/30d data; Keyword Hub "$0 Monthly value" vs Cockpit "— Unavailable" for the same absent provider; Site Audit 2215-vs-4187 warnings on one screen; Roadmap Completion % denominator excludes deferred/closed while Total doesn't | 1, 5, 7 (2, 3 echo) | Fabrication + mislabel claims CONFIRMED on post-closure staging code (§1a correction) |
 | B3 | **Global tabs adopt `workspaces[0]` as context** — breadcrumb, sidebar selector, and AdminChat all claim the first workspace on /settings, /roadmap, /revenue. Validation nuance: the *mechanism* is an owner-approved shell-mount fix (`global-ops-contract.md`, 2026-07-10) — but the approval never enumerated these three operator-visible consequences, and four personas independently flagged them. First-hand: bare `/settings` rendered "Command Center → cascade-debug-1783977240399 → Settings" with that junk workspace active in the selector | 2, 3, 5, 7 (blocker for 7) | Mechanism approved; consequences unapproved — owner circle-back, not a regression |
 | B4 | **Anomaly alert stream has no flag-ON home** — 21 legacy alerts compress to "1 risk signal / Risk (0)" with no provable classification story | 1, 5, 7 | Confirmed in walk; work-queue ingests all severities incl. `positive` under "Risk" |
 | B5 | **Send-model discoverability** — no send affordance at 0 staged on the Engine; three surfaces, three send behaviors; the client "wins worth saying / what I'd flag" talking points now live only inside the Edit drawer | 1, 2 | Confirmed `EngineSurface.tsx:381,407` |
 | B6 | **Nav demotions and triple taxonomy** — Requests/Action Results/Diagnostics/Roadmap unlabeled; sidebar vs registry vs palette naming | 1, 2, 3, 7 | Confirmed (`GROUP_PRESENTATION` overrides bypass registry) |
 | B7 | **Flag retirement structurally blocked** — six rebuilt surfaces wrap legacy components; `/` and `/subscriptions` never mount rebuilt chrome; AI Visibility marooned in legacy; 89/89 open deferrals with `roadmapItemId: null` | 6 (7 for `/`) | Confirmed by maintenance lane with LOC/file counts |
 
-**The transversal blocker: bank `codex/ui-visual-parity` first** — it demonstrably fixes a subset of B1/B2 items and rewrites the files behind others; fixing on staging without it guarantees conflicts and double work.
+~~The transversal blocker: bank `codex/ui-visual-parity` first~~ **Retracted (§1a correction):** the branch is fully banked into staging via #1519; every B-item above exists on post-closure code and can be fixed directly on staging with no conflict or double-fix risk.
 
 ---
 
@@ -108,7 +108,7 @@ Adversarial validation of all 44 blocker/major claims (each claim independently 
 | OVERSTATED → minor | 19 | Real but weaker: capability relocated (e.g. content-gap→brief survives via Engine backing moves + Keyword drawer), demoted-not-lost (Outcomes attention triage), or owner-documented (the `workspaces[0]` global-tab mechanism is approved in `global-ops-contract.md` — though its three operator-visible consequences were never enumerated there) |
 | REFUTED | 2 | Both fixContext cold-chunk handoff claims (#21, #25): React Router 7 wraps navigation in `startTransition`, so the lazy-chunk "Draft brief" handoff works on cold mounts |
 
-Net answer to "do we lose functionality?": **23 validated major losses/regressions, zero surviving blockers** — concentrated in SEO Editor CMS depth (4), truth-in-labels/fabrication (6), Brand & AI cockpit wiring (3), schema pre-scan homes + silent failures (2), and one live marooned feature (AI Visibility). Several have fixes waiting on the stranded branch (§1a).
+Net answer to "do we lose functionality?": **23 validated major losses/regressions, zero surviving blockers** — concentrated in SEO Editor CMS depth (4), truth-in-labels/fabrication (6), Brand & AI cockpit wiring (3), schema pre-scan homes + silent failures (2), and one live marooned feature (AI Visibility). All exist on staging with the full closure wave applied — net-new, no double-fix risk (§1a correction).
 
 Full per-claim verdicts with corrected severities and file:line evidence are in the companion `.verdicts.json`. Reading guide: CONFIRMED = accurate as stated; OVERSTATED = real but downgraded (capability relocated, partially present, or owner-documented); REFUTED = wrong or the capability exists elsewhere.
 
@@ -128,7 +128,7 @@ Medium:
 9. **Anomaly home** — a flag-ON anomaly stream (Search & Traffic anomalies section + Cockpit risk-stream pointer) with a provable mapping from the legacy 21-alert strip.
 
 Large (already-ledgered; the ask is scheduling):
-10. **Bank the stranded branch** (first, before everything above — much of 1–3 may come for free).
+10. **Archive/delete `codex/ui-visual-parity`** — it is fully banked into staging via #1519 (§1a correction); the dangling ref invites the exact ancestry-vs-content confusion this audit initially fell for. Hygiene, not recovery.
 11. **Book-level Cockpit at `/`** — rebuild the Command Center with the cross-workspace verdict/stream rollup (server-side classification already exists per workspace); restores presence + "Needs attention" triage and closes the dual-shell seam.
 12. **Keywords server-owned read models** (DEF-kw-001..003) and the **GO-004 Outcomes Book rollup** (kills the false "Rolling 90 days" label with real windowed data).
 13. **Flag-retirement plan (Phase Z)** — port-or-except triage over the confirmed losses (AI Visibility first: live feature), rebuild-or-fold `/subscriptions`, inventory the six legacy-inside-rebuilt mounts, then the CLAUDE.md retirement template. Tighten `verify:deferred-ledger` (open entries must gain `roadmapItemId` or expire).
