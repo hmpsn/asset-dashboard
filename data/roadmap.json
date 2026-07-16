@@ -40,6 +40,18 @@
           "notes": "Complete 2026-07-16. Adds a master-key-only, per-vertical studio library of immutable generation-ready template snapshots. Explicit promotion is bound to one exact source revision and is replay-safe; bounded list/get reads expose source provenance. Instantiation creates a normal workspace-owned template with regenerated section IDs and the existing content-plan activity, broadcast, and intelligence invalidation effects. Editing one instance cannot mutate the library or another client. No library update/sync path, generation start, approval, send, publish, or human-gate bypass was added."
         },
         {
+          "id": "mcp-generation-open-work-critical-path",
+          "title": "Unblock MCP service-page generation with operator identity creation and reachable budgets",
+          "source": "Insights Engine spec-open-work-2026-07-16 items 1-2",
+          "est": "S",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "shippedAt": "2026-07-16",
+          "owner": "brand-engine",
+          "notes": "Complete 2026-07-16. Adds snake-case create_brand_deliverable for studio/client-authored identity content, always as a new draft with duplicate workspace/type conflicts and the existing human approval boundary intact. Matrix preview/runtime input reservations now share a 4 UTF-8 bytes per token estimate plus framing headroom, making caller-accepted budgets reachable without removing the deliberate dual-provider fallback reserve or changing hard ceilings. Focused coverage pins a rich six-page, fifteen-section service batch under every hard limit. The separate brand-generation stage-closure proof remains fail-closed and unchanged; its stages are independent envelopes rather than recursively nested prompts."
+        },
+        {
           "id": "mcp-workspace-parameter-aliases",
           "title": "Auth-safe deprecated camelCase workspace aliases",
           "source": "2026-07-16 MCP agent-legibility appendix C",

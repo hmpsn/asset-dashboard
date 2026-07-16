@@ -4,7 +4,11 @@ import {
   LOCAL_SEO_MAX_KEYWORDS_PER_REFRESH_CAP,
 } from './local-seo.js';
 import { CONTENT_GENERATION_STYLES } from './content.js';
-import { BRAND_REVIEW_BUNDLE_KINDS } from './brand-generation.js';
+import {
+  BRAND_GENERATION_LIMITS,
+  BRAND_REVIEW_BUNDLE_KINDS,
+} from './brand-generation.js';
+import { BRAND_DELIVERABLE_TYPES } from './brand-engine.js';
 import { hasVisibleHtmlContent } from '../content-post-integrity.js';
 
 // --- Shared building blocks -------------------------------------------------
@@ -950,6 +954,15 @@ export const getBrandIdentityInputSchema = z.object({
     .describe('When true, also return every brand deliverable with its draft/approved status and version (needed to get deliverable ids/versions for update_brand_deliverable).'),
 });
 export type GetBrandIdentityInput = z.infer<typeof getBrandIdentityInputSchema>;
+
+export const createBrandDeliverableInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  deliverable_type: z.enum(BRAND_DELIVERABLE_TYPES)
+    .describe('The canonical brand deliverable type to create.'),
+  content: z.string().trim().min(1).max(BRAND_GENERATION_LIMITS.maxContentBytes)
+    .describe(`Operator-authored deliverable content (max ${BRAND_GENERATION_LIMITS.maxContentBytes} characters). The new row is always a draft and still requires explicit human approval.`),
+}).strict();
+export type CreateBrandDeliverableInput = z.infer<typeof createBrandDeliverableInputSchema>;
 
 export const updateBrandDeliverableInputSchema = z.object({
   workspaceId: z.string().min(1)

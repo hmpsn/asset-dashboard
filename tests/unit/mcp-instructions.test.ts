@@ -122,6 +122,14 @@ describe('MCP server instructions', () => {
     expect(MCP_SERVER_INSTRUCTIONS).toMatch(/creative proposals/i);
   });
 
+  it('explains operator-authored brand deliverables without weakening approval', () => {
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('create_brand_deliverable');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('workspace_id');
+    expect(MCP_SERVER_INSTRUCTIONS).toContain('deliverable_type');
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/always creates a new `draft`/i);
+    expect(MCP_SERVER_INSTRUCTIONS).toMatch(/human must still approve/i);
+  });
+
   it('explains the gated brand-to-content onboarding workflow', () => {
     for (const tool of [
       'start_brand_content_onboarding',

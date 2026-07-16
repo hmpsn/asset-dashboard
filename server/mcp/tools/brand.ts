@@ -1,13 +1,17 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types';
 import {
+  createBrandDeliverableInputSchema,
   getBrandIdentityInputSchema,
   updateBrandDeliverableInputSchema,
 } from '../../../shared/types/mcp-action-schemas.js';
+import { MCP_TOOL_ERROR_CODES } from '../../../shared/types/mcp-runtime.js';
 import { getWorkspace } from '../../workspaces.js';
 import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import { listDeliverables, getDeliverable } from '../../brand-deliverable-read-model.js';
 import {
+  BrandDeliverableAlreadyExistsError,
   BrandDeliverableVersionConflictError,
+  createOperatorAuthoredDeliverable,
   updateDeliverableContent,
 } from '../../brand-identity.js';
 import { addActivity } from '../../activity-log.js';
@@ -16,6 +20,7 @@ import { BRAND_IDENTITY_UPDATED_PAYLOAD, WS_EVENTS } from '../../ws-events.js';
 import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
+import { mcpJsonV1Error } from '../tool-errors.js';
 import {
   mcpConflictError,
   mcpInternalError,
@@ -40,6 +45,12 @@ export const brandTools: Tool[] = [
     inputSchema: toMcpJsonSchema(getBrandIdentityInputSchema),
   },
   {
+    name: 'create_brand_deliverable',
+    description:
+      'Create one operator-authored brand deliverable without AI generation. Use this for finalized positioning or messaging supplied by the studio/client. The new deliverable is always saved as draft and still requires explicit human approval before page generation can use it; this tool cannot approve, finalize voice, send, or publish. If the workspace already has that deliverable type, use update_brand_deliverable instead.',
+    inputSchema: toMcpJsonSchema(createBrandDeliverableInputSchema),
+  },
+  {
     name: 'update_brand_deliverable',
     description:
       "Update the content of an existing brand deliverable (e.g. mission, values, tagline, brand story). First call get_brand_identity with includeDeliverables:true to get the deliverable's id and current version. Pass expectedVersion (that current version) to guard against clobbering a concurrent edit — a mismatch is rejected as a conflict so you can re-fetch and retry. The deliverable is reset to 'draft' on edit; updates the existing row only (it does not create new deliverables).",
@@ -52,6 +63,7 @@ export async function handleBrandTool(
   args: Record<string, unknown>,
 ): Promise<McpToolResponse> {
   if (name === 'get_brand_identity') return handleGetBrandIdentity(args);
+  if (name === 'create_brand_deliverable') return handleCreateBrandDeliverable(args);
   if (name === 'update_brand_deliverable') return handleUpdateBrandDeliverable(args);
   return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }
@@ -102,6 +114,74 @@ async function handleGetBrandIdentity(args: Record<string, unknown>): Promise<Mc
     return ok(payload);
   } catch (e) {
     log.error({ err: e, workspaceId }, 'MCP tool error');
+    return mcpInternalError();
+  }
+}
+
+async function handleCreateBrandDeliverable(args: Record<string, unknown>): Promise<McpToolResponse> {
+  const parsed = createBrandDeliverableInputSchema.safeParse(args);
+  if (!parsed.success) return zodErrorToMcp(parsed.error);
+
+  const {
+    workspace_id: workspaceId,
+    deliverable_type: deliverableType,
+    content,
+  } = parsed.data;
+  try {
+    const ws = getWorkspace(workspaceId);
+    if (!ws) return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
+
+    const created = createOperatorAuthoredDeliverable(
+      workspaceId,
+      deliverableType,
+      content,
+    );
+    const typeLabel = created.deliverableType.replace(/_/g, ' ');
+    addActivity(
+      workspaceId,
+      'brand_deliverable_generated',
+      `Created operator-authored ${typeLabel} deliverable via MCP`,
+      undefined,
+      {
+        source: 'mcp-chat',
+        deliverableId: created.id,
+        action: 'mcp_brand_deliverable_created',
+      },
+    );
+    broadcastToWorkspace(
+      workspaceId,
+      WS_EVENTS.BRAND_IDENTITY_UPDATED,
+      BRAND_IDENTITY_UPDATED_PAYLOAD,
+    );
+    invalidateIntelligenceCache(workspaceId);
+
+    return ok({
+      id: created.id,
+      deliverable_type: created.deliverableType,
+      content: created.content,
+      status: created.status,
+      version: created.version,
+      tier: created.tier,
+      created_at: created.createdAt,
+      updated_at: created.updatedAt,
+      created: true,
+      approval_required: true,
+    });
+  } catch (error) {
+    if (error instanceof BrandDeliverableAlreadyExistsError) {
+      return mcpJsonV1Error({
+        code: MCP_TOOL_ERROR_CODES.CONFLICT,
+        message: 'That brand deliverable type already exists. Read it with get_brand_identity and use update_brand_deliverable instead.',
+        retryable: false,
+        details: {
+          deliverable_id: error.existing.id,
+          deliverable_type: error.existing.deliverableType,
+          current_version: error.existing.version,
+          current_status: error.existing.status,
+        },
+      }) as McpToolResponse;
+    }
+    log.error({ err: error, workspaceId }, 'MCP tool error');
     return mcpInternalError();
   }
 }

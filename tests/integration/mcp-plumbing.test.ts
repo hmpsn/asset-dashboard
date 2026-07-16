@@ -131,6 +131,8 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       // B1 operator-authorized brand voice
       'get_brand_voice', 'get_pending_approvals',
       'add_brand_voice_samples', 'finalize_brand_voice',
+      // Operator-authored brand identity
+      'create_brand_deliverable',
       // B2 grounded brand deliverable generation
       'start_brand_deliverable_generation', 'get_brand_generation',
       'resume_brand_deliverable_generation', 'start_brand_deliverable_revision',
@@ -142,6 +144,36 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
 });
 
 describe('MCP plumbing — new tools dispatch over real HTTP', () => {
+  it('creates operator-authored brand identity as a human-approval-gated draft', async () => {
+    const body = await callTool('create_brand_deliverable', {
+      workspace_id: wsA.workspaceId,
+      deliverable_type: 'differentiators',
+      content: 'We explain the tradeoffs before recommending a path forward.',
+    }, MASTER_KEY);
+    expect(body.result?.isError).toBeFalsy();
+    expect(JSON.parse(body.result!.content[0].text)).toMatchObject({
+      deliverable_type: 'differentiators',
+      status: 'draft',
+      version: 1,
+      approval_required: true,
+    });
+
+    const identity = await callTool('get_brand_identity', {
+      workspaceId: wsA.workspaceId,
+      includeDeliverables: true,
+    }, MASTER_KEY);
+    expect(identity.result?.isError).toBeFalsy();
+    expect(JSON.parse(identity.result!.content[0].text)).toMatchObject({
+      availability: 'pending_approval',
+      deliverable_counts: { approved: 0, pending: 1, total: 1 },
+      deliverables: [expect.objectContaining({
+        deliverableType: 'differentiators',
+        status: 'draft',
+        version: 1,
+      })],
+    });
+  });
+
   it('list_recommendations dispatches and returns a recommendations payload', async () => {
     const body = await callTool('list_recommendations', { workspace_id: wsA.workspaceId }, MASTER_KEY);
     expect(body.result?.isError).toBeFalsy();
