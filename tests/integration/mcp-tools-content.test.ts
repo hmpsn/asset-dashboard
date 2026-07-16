@@ -210,6 +210,14 @@ async function callMcpTool(name: string, args: Record<string, unknown>) {
   return callMcpToolRequest(name, args);
 }
 
+function errorEnvelope(result: { content: Array<{ text: string }> }) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code?: string;
+    retryable?: boolean;
+    details?: Record<string, unknown>;
+  };
+}
+
 beforeAll(async () => {
   await ctx.startServer();
 });
@@ -360,7 +368,10 @@ describe('MCP content tools (integration)', () => {
     });
 
     expect(rejected.isError).toBe(true);
-    expect(rejected.content[0].text).toContain('cannot advance to brief_generated');
+    expect(errorEnvelope(rejected)).toMatchObject({
+      code: 'precondition_failed',
+      details: { failure_code: 'source_authority_mismatch' },
+    });
     expect(countWorkspaceHandles('brief-request')).toBe(handlesBefore);
   });
 
@@ -404,7 +415,10 @@ describe('MCP content tools (integration)', () => {
     });
 
     expect(rejected.isError).toBe(true);
-    expect(rejected.content[0].text).toContain('cannot advance to in_progress');
+    expect(errorEnvelope(rejected)).toMatchObject({
+      code: 'precondition_failed',
+      details: { failure_code: 'source_authority_mismatch' },
+    });
     expect(countWorkspaceHandles('post-request')).toBe(handlesBefore);
   });
 
@@ -484,7 +498,7 @@ describe('MCP content tools (integration)', () => {
     });
 
     expect(failed.isError).toBe(true);
-    expect(failed.content[0].text).toContain('does not match the parent selected by prepare_brief_context');
+    expect(errorEnvelope(failed)).toMatchObject({ code: 'precondition_failed' });
     expect(countWorkspaceArtifacts('content_briefs')).toBe(beforeCount);
 
     const retried = await callMcpTool('save_brief', {
@@ -563,8 +577,7 @@ describe('MCP content tools (integration)', () => {
       content: buildBriefContent(),
     });
     expect(rejected.isError).toBe(true);
-    expect(rejected.content[0].text).toContain('changed after preparation');
-    expect(rejected.content[0].text).toContain('Re-run prepare_brief_context');
+    expect(errorEnvelope(rejected)).toMatchObject({ code: 'precondition_failed' });
     expect(countWorkspaceArtifacts('content_briefs')).toBe(briefsBefore);
     expect(countWorkspaceHandles('brief-request')).toBe(1);
 
@@ -574,7 +587,7 @@ describe('MCP content tools (integration)', () => {
       content: buildBriefContent(),
     });
     expect(retried.isError).toBe(true);
-    expect(retried.content[0].text).toContain('changed after preparation');
+    expect(errorEnvelope(retried)).toMatchObject({ code: 'precondition_failed' });
     expect(retried.content[0].text).not.toContain('already consumed');
     expect(countWorkspaceArtifacts('content_briefs')).toBe(briefsBefore);
   });
@@ -843,10 +856,15 @@ describe('MCP content tools (integration)', () => {
     expect(pendingPrepare).toBeDefined();
     const conflicted = await pendingPrepare!;
     expect(conflicted.isError).toBe(true);
-    expect(conflicted.content[0].text).toContain('Revision conflict');
-    expect(conflicted.content[0].text).toContain(`Current revision: ${savedBriefPayload.revision + 1}`);
-    expect(conflicted.content[0].text).toContain('Re-run prepare_post_context');
-    expect(conflicted.content[0].text).toContain('no post-request handle was issued');
+    expect(errorEnvelope(conflicted)).toMatchObject({
+      code: 'conflict',
+      retryable: true,
+      details: {
+        resource_type: 'content_brief',
+        expected_revision: savedBriefPayload.revision,
+        current_revision: savedBriefPayload.revision + 1,
+      },
+    });
     expect(countWorkspaceHandles('post-request')).toBe(handlesBefore);
 
     const reprepared = await callMcpTool('prepare_post_context', {
@@ -908,8 +926,14 @@ describe('MCP content tools (integration)', () => {
     });
 
     expect(rejected.isError).toBe(true);
-    expect(rejected.content[0].text).toContain('Revision conflict');
-    expect(rejected.content[0].text).toContain(`Current revision: ${editedBrief?.generationRevision}`);
+    expect(errorEnvelope(rejected)).toMatchObject({
+      code: 'conflict',
+      details: {
+        resource_type: 'content_brief',
+        expected_revision: savedBriefPayload.revision,
+        current_revision: editedBrief?.generationRevision,
+      },
+    });
     expect(countWorkspaceArtifacts('content_posts')).toBe(postsBefore);
   });
 
@@ -956,7 +980,7 @@ describe('MCP content tools (integration)', () => {
     });
 
     expect(failed.isError).toBe(true);
-    expect(failed.content[0].text).toContain('does not match the parent selected by prepare_post_context');
+    expect(errorEnvelope(failed)).toMatchObject({ code: 'precondition_failed' });
     expect(countWorkspaceArtifacts('content_posts')).toBe(postsBefore);
 
     const retried = await callMcpTool('save_post', {
@@ -1031,8 +1055,7 @@ describe('MCP content tools (integration)', () => {
       content: buildPostContent(briefId),
     });
     expect(rejected.isError).toBe(true);
-    expect(rejected.content[0].text).toContain('changed after preparation');
-    expect(rejected.content[0].text).toContain('Re-run prepare_post_context');
+    expect(errorEnvelope(rejected)).toMatchObject({ code: 'precondition_failed' });
     expect(countWorkspaceArtifacts('content_posts')).toBe(postsBefore);
     expect(countWorkspaceHandles('post-request')).toBe(1);
 
@@ -1042,7 +1065,7 @@ describe('MCP content tools (integration)', () => {
       content: buildPostContent(briefId),
     });
     expect(retried.isError).toBe(true);
-    expect(retried.content[0].text).toContain('changed after preparation');
+    expect(errorEnvelope(retried)).toMatchObject({ code: 'precondition_failed' });
     expect(retried.content[0].text).not.toContain('already consumed');
     expect(countWorkspaceArtifacts('content_posts')).toBe(postsBefore);
   });
@@ -1234,7 +1257,10 @@ describe('MCP content tools (integration)', () => {
       updates: { suggestedTitle: 'Should fail with stale revision' },
     });
     expect(conflict.isError).toBe(true);
-    expect(conflict.content[0].text).toContain('Revision conflict');
+    expect(errorEnvelope(conflict)).toMatchObject({
+      code: 'conflict',
+      details: { resource_type: 'content_brief' },
+    });
 
     const invalidField = await callMcpTool('update_brief', {
       workspace_id: ws.workspaceId,
@@ -1349,7 +1375,10 @@ describe('MCP content tools (integration)', () => {
       updates: { title: 'Should fail with stale revision' },
     });
     expect(conflict.isError).toBe(true);
-    expect(conflict.content[0].text).toContain('Revision conflict');
+    expect(errorEnvelope(conflict)).toMatchObject({
+      code: 'conflict',
+      details: { resource_type: 'content_post' },
+    });
 
     const invalidField = await callMcpTool('update_post', {
       workspace_id: ws.workspaceId,
@@ -1554,6 +1583,6 @@ describe('MCP content tools (integration)', () => {
       content: buildBriefContent(),
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/Handle not found|expired/i);
+    expect(errorEnvelope(result)).toMatchObject({ code: 'precondition_failed' });
   });
 });

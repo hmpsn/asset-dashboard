@@ -76,6 +76,13 @@ vi.mock('../../server/seo-audit.js', () => ({
 
 import { handleJobActionTool } from '../../server/mcp/tools/job-actions.js';
 
+function errorEnvelope(result: Awaited<ReturnType<typeof handleJobActionTool>>) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code: string;
+    details?: Record<string, unknown>;
+  };
+}
+
 describe('mcp job action tools', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -150,7 +157,10 @@ describe('mcp job action tools', () => {
     });
 
     expect(res.isError).toBe(true);
-    expect(res.content[0].text).toContain('maxPages must be <= 500');
+    expect(errorEnvelope(res)).toMatchObject({
+      code: 'validation_failed',
+      details: { field_path: 'options.maxPages' },
+    });
   });
 
   it('rejects keyword generation when workspace already generating or has active job', async () => {
@@ -176,7 +186,7 @@ describe('mcp job action tools', () => {
 
     expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({
       status: 'error',
-      error: 'Provider rate limit',
+      error: 'Keyword strategy generation failed its provider or evidence preconditions.',
     }));
   });
 
@@ -227,7 +237,10 @@ describe('mcp job action tools', () => {
       site_id: 'site-1',
     });
     await vi.runAllTimersAsync();
-    expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({ status: 'error', error: 'audit crash' }));
+    expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({
+      status: 'error',
+      error: 'SEO audit failed unexpectedly. Review the connection and server logs before retrying.',
+    }));
   });
 
   it('starts local seo refresh and handles active jobs, missing plan, and rejected runner', async () => {
@@ -263,7 +276,10 @@ describe('mcp job action tools', () => {
     h.runLocalSeoRefreshJob.mockRejectedValue(new Error('refresh failed'));
     await handleJobActionTool('start_local_seo_refresh', { workspace_id: 'ws-1', refresh_body: {} });
     await Promise.resolve();
-    expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({ status: 'error', error: 'refresh failed' }));
+    expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({
+      status: 'error',
+      error: 'Local SEO refresh failed unexpectedly. Review server logs before retrying.',
+    }));
   });
 
   it('rejects cancel_job when the job metadata marks it non-cancellable', async () => {
@@ -295,13 +311,16 @@ describe('mcp job action tools', () => {
   it('returns unknown-tool error for unsupported job action', async () => {
     const res = await handleJobActionTool('start_nonexistent_job', { workspace_id: 'ws-1' });
     expect(res.isError).toBe(true);
-    expect(res.content[0].text).toContain('Unknown job action tool');
+    expect(errorEnvelope(res)).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'tool' },
+    });
   });
 
   it('covers validation, workspace, and webflow-site guards', async () => {
     const invalid = await handleJobActionTool('start_keyword_strategy_generation', {});
     expect(invalid.isError).toBe(true);
-    expect(invalid.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(invalid)).toMatchObject({ code: 'validation_failed' });
 
     h.getWorkspace.mockReturnValueOnce(undefined);
     const missingWorkspace = await handleJobActionTool('start_keyword_strategy_generation', { workspace_id: 'ws-missing' });
@@ -349,7 +368,7 @@ describe('mcp job action tools', () => {
     await vi.runAllTimersAsync();
     expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({
       status: 'error',
-      error: 'raw-payload-error',
+      error: 'Keyword strategy generation failed its provider or evidence preconditions.',
     }));
 
     h.runLocalSeoRefreshJob.mockRejectedValueOnce('refresh exploded');
@@ -360,7 +379,7 @@ describe('mcp job action tools', () => {
     await Promise.resolve();
     expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({
       status: 'error',
-      error: 'refresh exploded',
+      error: 'Local SEO refresh failed unexpectedly. Review server logs before retrying.',
     }));
   });
 
@@ -391,7 +410,7 @@ describe('mcp job action tools', () => {
   it('covers remaining seo/local-seo validation and non-Error branches', async () => {
     const invalidSeo = await handleJobActionTool('start_seo_audit', {});
     expect(invalidSeo.isError).toBe(true);
-    expect(invalidSeo.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(invalidSeo)).toMatchObject({ code: 'validation_failed' });
 
     h.getWorkspace.mockReturnValueOnce(undefined);
     const missingSeoWorkspace = await handleJobActionTool('start_seo_audit', {
@@ -408,7 +427,7 @@ describe('mcp job action tools', () => {
     await vi.runAllTimersAsync();
     expect(h.updateJob).toHaveBeenCalledWith('job-1', expect.objectContaining({
       status: 'error',
-      error: 'seo exploded',
+      error: 'SEO audit failed unexpectedly. Review the connection and server logs before retrying.',
     }));
 
     const invalidLocal = await handleJobActionTool('start_local_seo_refresh', {});

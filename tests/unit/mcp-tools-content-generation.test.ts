@@ -80,6 +80,14 @@ const SAMPLE_BRIEF = {
 };
 const REQUEST_UPDATED_AT = '2026-07-14T12:00:00.000Z';
 
+function errorEnvelope(result: Awaited<ReturnType<typeof handleContentGenerationActionTool>>) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+}
+
 describe('mcp content generation action tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -193,8 +201,10 @@ describe('mcp content generation action tools', () => {
       target_keyword: 'hvac maintenance',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('[active_job_resource_conflict]');
-    expect(result.content[0].text).toContain('active_job_id=job_existing');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'conflict',
+      details: { active_job_id: 'job_existing' },
+    });
     expect(getPaidCallCount()).toBe(0);
   });
 
@@ -219,8 +229,10 @@ describe('mcp content generation action tools', () => {
       expected_request_updated_at: REQUEST_UPDATED_AT,
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('[content_request_generation_conflict]');
-    expect(result.content[0].text).toContain('cr_1');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'conflict',
+      details: { resource_type: 'content_request' },
+    });
     expect(getPaidCallCount()).toBe(0);
   });
 
@@ -257,7 +269,7 @@ describe('mcp content generation action tools', () => {
       target_keyword: 'hvac maintenance',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'validation_failed' });
     expect(startContentBriefGenerationJob).not.toHaveBeenCalled();
   });
 
@@ -271,7 +283,8 @@ describe('mcp content generation action tools', () => {
       target_keyword: 'hvac maintenance',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Failed to start brief generation: provider unavailable');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'internal_error' });
+    expect(result.content[0].text).not.toContain('provider unavailable');
     // No false "ok" payload — paid call is only recorded on a successful start.
     expect(getPaidCallCount()).toBe(0);
   });
@@ -327,8 +340,10 @@ describe('mcp content generation action tools', () => {
       expected_brief_revision: 7,
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('[active_job_resource_conflict]');
-    expect(result.content[0].text).toContain('active_job_id=job_existing_post');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'conflict',
+      details: { active_job_id: 'job_existing_post' },
+    });
     expect(runContentPostGenerationJob).not.toHaveBeenCalled();
     expect(getPaidCallCount()).toBe(0);
   });
@@ -343,8 +358,10 @@ describe('mcp content generation action tools', () => {
       expected_brief_revision: 6,
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('[generation_revision_conflict]');
-    expect(result.content[0].text).toContain('expected revision 6');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'conflict',
+      details: { expected_revision: 6 },
+    });
     expect(runContentPostGenerationJob).not.toHaveBeenCalled();
     expect(getPaidCallCount()).toBe(0);
   });
@@ -354,7 +371,7 @@ describe('mcp content generation action tools', () => {
       workspace_id: 'ws-1',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'validation_failed' });
     expect(createContentPostGenerationJob).not.toHaveBeenCalled();
   });
 
@@ -381,7 +398,8 @@ describe('mcp content generation action tools', () => {
       expected_brief_revision: 7,
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Failed to start post generation');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'internal_error' });
+    expect(result.content[0].text).not.toContain('job write failed');
     expect(runContentPostGenerationJob).not.toHaveBeenCalled();
     expect(getPaidCallCount()).toBe(0);
   });
@@ -411,6 +429,9 @@ describe('mcp content generation action tools', () => {
   it('returns an unknown-tool error for an unrecognized name', async () => {
     const result = await handleContentGenerationActionTool('unknown_generation_tool', { workspace_id: 'ws-1' });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Unknown content generation action tool');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'tool' },
+    });
   });
 });

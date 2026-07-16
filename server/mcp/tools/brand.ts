@@ -16,17 +16,20 @@ import { BRAND_IDENTITY_UPDATED_PAYLOAD, WS_EVENTS } from '../../ws-events.js';
 import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
+import {
+  mcpConflictError,
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpSuccess,
+  zodErrorToMcp,
+} from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-brand');
 
 type McpToolResponse = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
 function ok(payload: unknown): McpToolResponse {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
-}
-
-function err(message: string): McpToolResponse {
-  return { isError: true, content: [{ type: 'text' as const, text: message }] };
+  return mcpSuccess(payload);
 }
 
 export const brandTools: Tool[] = [
@@ -50,19 +53,19 @@ export async function handleBrandTool(
 ): Promise<McpToolResponse> {
   if (name === 'get_brand_identity') return handleGetBrandIdentity(args);
   if (name === 'update_brand_deliverable') return handleUpdateBrandDeliverable(args);
-  return err(`Unknown tool: ${name}`);
+  return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }
 
 async function handleGetBrandIdentity(args: Record<string, unknown>): Promise<McpToolResponse> {
   const parsed = getBrandIdentityInputSchema.safeParse(args);
   if (!parsed.success) {
-    return err(`Validation failed: ${JSON.stringify(parsed.error.issues)}`);
+    return zodErrorToMcp(parsed.error);
   }
 
   const { workspaceId, includeDeliverables } = parsed.data;
   try {
     const ws = getWorkspace(workspaceId);
-    if (!ws) return err(`Workspace not found: ${workspaceId}`);
+    if (!ws) return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
 
     const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['brand'] });
     const brand = intel.brand;
@@ -99,21 +102,20 @@ async function handleGetBrandIdentity(args: Record<string, unknown>): Promise<Mc
     return ok(payload);
   } catch (e) {
     log.error({ err: e, workspaceId }, 'MCP tool error');
-    const message = e instanceof Error ? e.message : String(e);
-    return err(`Tool error: ${message}`);
+    return mcpInternalError();
   }
 }
 
 async function handleUpdateBrandDeliverable(args: Record<string, unknown>): Promise<McpToolResponse> {
   const parsed = updateBrandDeliverableInputSchema.safeParse(args);
   if (!parsed.success) {
-    return err(`Validation failed: ${JSON.stringify(parsed.error.issues)}`);
+    return zodErrorToMcp(parsed.error);
   }
 
   const { workspaceId, deliverableId, content, expectedVersion } = parsed.data;
   try {
     const ws = getWorkspace(workspaceId);
-    if (!ws) return err(`Workspace not found: ${workspaceId}`);
+    if (!ws) return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
 
     if (expectedVersion === undefined) {
       log.warn({
@@ -126,7 +128,9 @@ async function handleUpdateBrandDeliverable(args: Record<string, unknown>): Prom
     }
 
     const existing = getDeliverable(workspaceId, deliverableId);
-    if (!existing) return err(`Brand deliverable not found: ${deliverableId}`);
+    if (!existing) return mcpNotFoundError('Brand deliverable not found.', {
+      resource_type: 'brand_deliverable',
+    });
 
     const updated = updateDeliverableContent(
       workspaceId,
@@ -137,7 +141,9 @@ async function handleUpdateBrandDeliverable(args: Record<string, unknown>): Prom
     // The getDeliverable guard above already handled "never existed", so the only
     // way updateDeliverableContent returns null here is a delete that raced in
     // between that read and this write.
-    if (!updated) return err(`Brand deliverable not found: ${deliverableId}`);
+    if (!updated) return mcpNotFoundError('Brand deliverable not found.', {
+      resource_type: 'brand_deliverable',
+    });
 
     // No-op write (content identical) leaves the version untouched — don't emit a
     // misleading "Edited" activity entry, broadcast, or cache bust for a non-change.
@@ -172,15 +178,12 @@ async function handleUpdateBrandDeliverable(args: Record<string, unknown>): Prom
     });
   } catch (e) {
     if (e instanceof BrandDeliverableVersionConflictError) {
-      // This existing tool intentionally retains its legacy text contract.
-      // New B2 MCP tools use JSON-v1 envelopes; changing this payload would
-      // break compatibility for current update_brand_deliverable consumers.
-      return err(
-        `Version conflict. Current version: ${e.actualVersion}. Re-fetch via get_brand_identity (includeDeliverables:true) before retrying.`,
+      return mcpConflictError(
+        'The brand deliverable changed. Re-fetch get_brand_identity with includeDeliverables:true before retrying.',
+        { current_version: e.actualVersion },
       );
     }
     log.error({ err: e, workspaceId }, 'MCP tool error');
-    const message = e instanceof Error ? e.message : String(e);
-    return err(`Tool error: ${message}`);
+    return mcpInternalError();
   }
 }

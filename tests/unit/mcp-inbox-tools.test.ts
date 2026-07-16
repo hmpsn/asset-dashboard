@@ -28,6 +28,7 @@ vi.mock('../../server/workspaces.js', () => ({ getWorkspace: h.getWorkspace, lis
 vi.mock('../../server/workspace-intelligence.js', () => ({ buildWorkspaceIntelligence: vi.fn() }));
 
 import { handleClientTool } from '../../server/mcp/tools/clients.js';
+import { WorkspaceMutationError } from '../../server/workspace-mutation-helper.js';
 
 const WS = 'ws-1';
 function parse(result: { content: Array<{ text: string }> }) {
@@ -65,16 +66,21 @@ describe('inbox decision MCP tools', () => {
     });
 
     it('surfaces a service error (e.g. invalid transition / not found)', async () => {
-      h.updateAdminClientAction.mockImplementation(() => { throw new Error('Client action not found'); });
+      h.updateAdminClientAction.mockImplementation(() => {
+        throw new WorkspaceMutationError(404, 'Client action not found');
+      });
       const result = await handleClientTool('respond_to_client_action', { workspaceId: WS, actionId: 'missing', status: 'completed' });
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('Client action not found');
+      expect(parse(result)).toMatchObject({
+        code: 'not_found',
+        details: { resource_type: 'client_action' },
+      });
     });
 
     it('rejects an invalid status (not in the allowed enum)', async () => {
       const result = await handleClientTool('respond_to_client_action', { workspaceId: WS, actionId: 'ca_1', status: 'applied' });
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('Validation failed');
+      expect(parse(result)).toMatchObject({ code: 'validation_failed' });
       expect(h.updateAdminClientAction).not.toHaveBeenCalled();
     });
   });
@@ -123,7 +129,7 @@ describe('inbox decision MCP tools', () => {
     it('rejects invalid args (missing itemId)', async () => {
       const result = await handleClientTool('respond_to_approval_item', { workspaceId: WS, batchId: 'b1' });
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('Validation failed');
+      expect(parse(result)).toMatchObject({ code: 'validation_failed' });
     });
   });
 });

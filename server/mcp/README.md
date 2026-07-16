@@ -93,16 +93,12 @@ idempotency or uniqueness authority. The server generates the UUID used by HTTP 
 header, and durable attribution; every caller-supplied `X-Request-ID` value is ignored rather than
 retained, reflected, or classified by a finite credential denylist.
 
-### Error compatibility
+### Error contract
 
-The registry assigns each tool an explicit error contract:
-
-- The original **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
-  Registry-owned unknown-tool and authorization rejections are deliberately generic so caller
-  tool/workspace values cannot be reflected as secrets.
-- The eleven content-matrix tools, three brand-intake tools, seven brand-voice tools, four
-  brand-generation tools, and three brand-content-onboarding tools use `json_v1`: an error is a text content item containing a JSON
-  `{ code, message, retryable, details? }` envelope.
+Every registered tool uses `json_v1`: an error is a text content item containing a JSON
+`{ code, message, retryable, details? }` envelope. Registry-owned unknown-tool and authorization
+rejections are deliberately generic so caller tool/workspace values cannot be reflected as
+secrets.
 
 `server/mcp/tool-errors.ts` builds and privately marks the `json_v1` response and filters optional
 details as defense in depth. The registry rejects any JSON-tool error that did not cross that
@@ -411,14 +407,13 @@ Four steps, all in the same commit:
 2. **Add the tool def + handler** in the right `server/mcp/tools/<category>.ts` file: push a
    `{ name, description, inputSchema }` entry onto the category's `*Tools` array and add a `case`/`if`
    branch to its `handle*Tool` dispatcher. Validate args with the Zod schema, return
-   `mcpSuccess(...)`; legacy tools keep `mcpError(...)`, while new `json_v1` tools use
+   `mcpSuccess(...)`; errors use the branded helpers in `tool-helpers.ts` or
    `mcpJsonV1Error(...)` with a stable public envelope. If the family validates workspace/external
    state before switching on `name`, also update its exported handled-name manifest; the census
    requires that manifest to equal the advertised definitions.
-3. **Register compatibility in `server/mcp/tool-registry.ts`.** A new category supplies its name,
+3. **Register the family in `server/mcp/tool-registry.ts`.** A new category supplies its name,
    definitions, handler, global-tool declarations (normally none), and default error contract once.
-   A new `json_v1` tool added to an existing legacy category adds its name to that registration's
-   `errorContractOverrides`. Discovery, scope resolution, and dispatch are derived from the one
+   Production families use `json_v1`. Discovery, scope resolution, and dispatch are derived from the one
    registration; do not add a second spread or dispatch chain.
 4. **Register in the tests** so coverage stays complete:
    - `tests/contract/mcp-tool-input-schema-properties.test.ts` (every top-level schema prop is
@@ -436,7 +431,7 @@ Four steps, all in the same commit:
   `WS_EVENTS.*` constant (never an inline string literal), and invalidates intelligence/pipeline
   caches where relevant, so admin and client UIs stay live.
 
-Use the shared helpers in `server/mcp/tool-helpers.ts` (`requireWorkspace`, `mcpSuccess`,
-`mcpError`, `zodErrorToMcp`, `buildDashboardUrl`) rather than hand-rolling responses. `mcpError`
-and `zodErrorToMcp` are legacy-only; a `json_v1` handler uses the constructors in
-`server/mcp/tool-errors.ts` so the registry can verify the result.
+Use the shared helpers in `server/mcp/tool-helpers.ts` (`requireWorkspace`, `mcpSuccess`, the typed
+error helpers, `zodErrorToMcp`, and `buildDashboardUrl`) rather than hand-rolling responses. Every
+error must cross the constructors in `server/mcp/tool-errors.ts` so the registry can verify and
+sanitize the result.

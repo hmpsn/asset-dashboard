@@ -129,7 +129,7 @@ const getContentTemplateInputSchema = z.object({
 
 const createContentTemplateInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  template: createTemplateSchema.describe('Content template fields using the same contract as the admin HTTP create route.'),
+  template: createTemplateSchema.describe('Content template fields using the same contract as the admin HTTP create route. Pattern variables use one brace pair, for example /{service}-{city}; do not use {{double_braces}}.'),
   idempotency_key: z.string().trim().min(1).max(200).optional()
     .describe('Optional caller correlation key; template creation itself is not replay-idempotent.'),
 }).strict();
@@ -170,9 +170,9 @@ const createContentMatrixInputSchema = z.object({
     .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensions)
     .describe('Cartesian dimensions using template variableName values exactly.'),
   url_pattern: createMatrixFieldsSchema.shape.urlPattern.optional()
-    .describe('Optional URL pattern; defaults to the selected template pattern.'),
+    .describe('Optional URL pattern; defaults to the selected template pattern. Variables use one brace pair, for example /{service}-{city}.'),
   keyword_pattern: createMatrixFieldsSchema.shape.keywordPattern.optional()
-    .describe('Optional keyword pattern; defaults to the selected template pattern.'),
+    .describe('Optional keyword pattern; defaults to the selected template pattern. Variables use one brace pair, for example {service} in {city}.'),
   expected_schema_types: z.array(z.string().trim().min(1)
     .max(MATRIX_GENERATION_SOURCE_LIMITS.template.maxSchemaTypeBytes))
     .max(MATRIX_GENERATION_SOURCE_LIMITS.template.maxSchemaTypes).optional()
@@ -211,7 +211,7 @@ export const contentMatrixActionTools: Tool[] = [
   },
   {
     name: 'create_content_template',
-    description: 'Create a reusable page structure through the same validated template service used by the admin UI. This does not create pages, start AI work, or approve content.',
+    description: 'Create a reusable page structure through the same validated template service used by the admin UI. Pattern variables use a single brace pair, for example /{service}-{city}; never use {{double_braces}}. This does not create pages, start AI work, or approve content.',
     inputSchema: toMcpJsonSchema(createContentTemplateInputSchema),
   },
   {
@@ -226,7 +226,7 @@ export const contentMatrixActionTools: Tool[] = [
   },
   {
     name: 'create_content_matrix',
-    description: 'Create a validated Cartesian content matrix directly from an existing template and explicit dimensions, without requiring Page Strategy or a pSEO blueprint. Uses template URL, keyword, and schema defaults when omitted; never starts generation.',
+    description: 'Create a validated Cartesian content matrix directly from an existing template and explicit dimensions, without requiring Page Strategy or a pSEO blueprint. Pattern variables use a single brace pair, for example /{service}-{city}; never use {{double_braces}}. Uses template URL, keyword, and schema defaults when omitted; never starts generation.',
     inputSchema: toMcpJsonSchema(createContentMatrixInputSchema),
   },
   {

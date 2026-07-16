@@ -150,7 +150,7 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
   it('get_search_performance fails gracefully when no GSC property is connected', async () => {
     const body = await callTool('get_search_performance', { workspace_id: wsA.workspaceId }, MASTER_KEY);
     expect(body.result?.isError).toBe(true);
-    expect(body.result!.content[0].text).toMatch(/Google Search Console|Google is not connected/i);
+    expect(JSON.parse(body.result!.content[0].text)).toMatchObject({ code: 'precondition_failed' });
   });
 
   it('lists and reads content matrices through the registered json_v1 family', async () => {
@@ -401,7 +401,7 @@ describe('MCP plumbing — per-workspace API key scope enforcement', () => {
   it('a workspace-scoped key is REJECTED on a different workspace (scope enforcement)', async () => {
     const body = await callTool('list_recommendations', { workspace_id: wsB.workspaceId }, perWsKey);
     expect(body.result?.isError).toBe(true);
-    expect(body.result!.content[0].text).toMatch(/Forbidden|scoped to workspace/i);
+    expect(JSON.parse(body.result!.content[0].text)).toMatchObject({ code: 'forbidden' });
   });
 
   it('an unknown key is rejected at the HTTP layer (401)', async () => {

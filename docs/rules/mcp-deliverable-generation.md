@@ -495,9 +495,9 @@ never sufficient to dispatch paid work.
   run attribution and ignore every caller `X-Request-ID`; arbitrary caller text
   cannot be proven non-secret with a finite denylist. Rejection logs/results use
   stable classifications, not raw unknown tool names or workspace arguments.
-- Error compatibility is per tool. Existing handlers remain legacy text while
-  registry-owned unknown/auth rejections are generic and non-reflective; every
-  `json_v1` scope error, handler-returned error, and thrown error must cross the
+- Every production MCP tool uses the `json_v1` error contract. Registry-owned
+  unknown/auth rejections are generic and non-reflective; every scope error,
+  handler-returned error, and thrown error must cross the
   sanitizing registry boundary. Unvalidated results degrade to a generic safe
   envelope rather than being serialized.
 

@@ -1050,7 +1050,11 @@ describe('POST /api/content-posts/:workspaceId/:postId/publish-to-webflow', () =
       expected_revision: revision,
     });
     expect(mcpResponse.isError).toBe(true);
-    expect(mcpResponse.content[0].text).toContain('active_job_resource_conflict');
+    expect(JSON.parse(mcpResponse.content[0].text)).toMatchObject({
+      code: 'conflict',
+      retryable: true,
+      details: { active_job_id: expect.any(String) },
+    });
 
     createGate.release();
     expect((await ownerResponse).status).toBe(200);

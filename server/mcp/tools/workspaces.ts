@@ -27,8 +27,10 @@ import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import {
   buildDashboardUrl,
-  mcpError,
+  mcpInternalError,
+  mcpNotFoundError,
   mcpSuccess,
+  mcpValidationError,
   requireWorkspace,
   zodErrorToMcp,
   type McpToolErrorResponse,
@@ -111,14 +113,14 @@ async function handleListWorkspaces() {
 async function handleGetWorkspaceOverview(args: Record<string, unknown>) {
   const workspaceId = args.workspaceId;
   if (typeof workspaceId !== 'string') {
-    return { isError: true, content: [{ type: 'text' as const, text: 'Missing or invalid workspaceId' }] };
+    return mcpValidationError('Invalid tool input at workspaceId: Expected a workspace ID.', {
+      field_path: 'workspaceId',
+      constraint: 'Expected a non-empty workspace ID.',
+    });
   }
   const ws = getWorkspace(workspaceId);
   if (!ws) {
-    return {
-      isError: true,
-      content: [{ type: 'text' as const, text: `Workspace not found: ${workspaceId}` }],
-    };
+    return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
   }
 
   const counts = pendingCounts(workspaceId);
@@ -211,7 +213,7 @@ async function handleUpdateWorkspace(
   };
 
   const next = updateWorkspace(workspaceId, mappedUpdates);
-  if (!next) return mcpError(`Workspace not found: ${workspaceId}`);
+  if (!next) return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
 
   const safe = toAdminWorkspaceView(next);
   invalidateIntelligenceCache(workspaceId);
@@ -258,7 +260,7 @@ async function handleDeleteWorkspace(
     },
   );
   const deleted = deleteWorkspace(workspaceId);
-  if (!deleted) return mcpError(`Workspace not found: ${workspaceId}`);
+  if (!deleted) return mcpNotFoundError('Workspace not found.', { resource_type: 'workspace' });
   broadcast(ADMIN_EVENTS.WORKSPACE_DELETED, { id: workspaceId });
 
   return mcpSuccess({
@@ -286,11 +288,10 @@ export async function handleWorkspaceTool(
       case 'delete_workspace':
         return await handleDeleteWorkspace(args);
       default:
-        return { isError: true, content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }] };
+        return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
     }
   } catch (err) {
     log.error({ err, tool: name }, 'MCP tool error');
-    const message = err instanceof Error ? err.message : String(err);
-    return { isError: true, content: [{ type: 'text' as const, text: `Tool error: ${message}` }] };
+    return mcpInternalError();
   }
 }

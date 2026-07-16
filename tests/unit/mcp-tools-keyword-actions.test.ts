@@ -54,6 +54,13 @@ vi.mock('../../server/logger.js', () => ({
 
 import { handleKeywordActionTool, keywordActionTools } from '../../server/mcp/tools/keyword-actions.js';
 
+function errorEnvelope(result: Awaited<ReturnType<typeof handleKeywordActionTool>>) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code: string;
+    details?: Record<string, unknown>;
+  };
+}
+
 describe('mcp keyword action tools', () => {
   beforeEach(() => {
     __resetHandleStoreForTests();
@@ -120,7 +127,8 @@ describe('mcp keyword action tools', () => {
       market: 'not-a-number',
     });
     expect(providerErr.isError).toBe(true);
-    expect(providerErr.content[0].text).toContain('Keyword research failed: provider timeout');
+    expect(errorEnvelope(providerErr)).toMatchObject({ code: 'internal_error' });
+    expect(providerErr.content[0].text).not.toContain('provider timeout');
   });
 
   it('add_keyword_to_strategy supports research_handle source and new_page target slugging', async () => {
@@ -188,7 +196,10 @@ describe('mcp keyword action tools', () => {
       target: { kind: 'new_page', topic: 'Test', intent: 'informational' },
     });
     expect(unresolved.isError).toBe(true);
-    expect(unresolved.content[0].text).toContain('No keyword term resolved');
+    expect(errorEnvelope(unresolved)).toMatchObject({
+      code: 'validation_failed',
+      details: { field_path: 'term' },
+    });
 
     const invalidHandle = await handleKeywordActionTool('add_keyword_to_strategy', {
       workspace_id: 'ws-1',
@@ -199,17 +210,20 @@ describe('mcp keyword action tools', () => {
 
     const unknown = await handleKeywordActionTool('unknown_keyword_tool', { workspace_id: 'ws-1' });
     expect(unknown.isError).toBe(true);
-    expect(unknown.content[0].text).toContain('Unknown keyword action tool');
+    expect(errorEnvelope(unknown)).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'tool' },
+    });
   });
 
   it('covers validation/workspace guards and non-Error provider failures', async () => {
     const invalidResearch = await handleKeywordActionTool('research_keywords', { workspace_id: 'ws-1' });
     expect(invalidResearch.isError).toBe(true);
-    expect(invalidResearch.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(invalidResearch)).toMatchObject({ code: 'validation_failed' });
 
     const invalidAdd = await handleKeywordActionTool('add_keyword_to_strategy', { workspace_id: 'ws-1' });
     expect(invalidAdd.isError).toBe(true);
-    expect(invalidAdd.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(invalidAdd)).toMatchObject({ code: 'validation_failed' });
 
     h.getWorkspace.mockReturnValueOnce(undefined);
     const missingWs = await handleKeywordActionTool('research_keywords', {
@@ -228,7 +242,8 @@ describe('mcp keyword action tools', () => {
       market: '123',
     });
     expect(providerErr.isError).toBe(true);
-    expect(providerErr.content[0].text).toContain('Keyword research failed: provider exploded');
+    expect(errorEnvelope(providerErr)).toMatchObject({ code: 'internal_error' });
+    expect(providerErr.content[0].text).not.toContain('provider exploded');
   });
 
   it('normalizes legacy semrush provider preference and covers page/url fallback branches', async () => {

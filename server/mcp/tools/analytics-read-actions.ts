@@ -12,8 +12,11 @@ import { toMcpJsonSchema } from '../json-schema.js';
 import {
   buildDashboardUrl,
   isMcpError,
-  mcpError,
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpPreconditionError,
   mcpSuccess,
+  mcpValidationError,
   requireWorkspace,
   zodErrorToMcp,
   type McpToolErrorResponse,
@@ -56,12 +59,12 @@ async function handleGetSearchPerformance(
   const siteId = workspace.webflowSiteId;
   const gscSiteUrl = workspace.gscPropertyUrl;
   if (!siteId || !gscSiteUrl) {
-    return mcpError(
+    return mcpPreconditionError(
       'No Google Search Console property is connected for this workspace. Connect GSC (and a Webflow site) before requesting search performance.',
     );
   }
   if (!isGlobalConnected()) {
-    return mcpError(
+    return mcpPreconditionError(
       'Google is not connected on this server. Reconnect Google Search Console to read search performance.',
     );
   }
@@ -69,13 +72,19 @@ async function handleGetSearchPerformance(
   // start_date/end_date must be supplied together; when both are present they
   // override `days`. A lone bound is ambiguous, so reject it explicitly.
   if ((startDate && !endDate) || (!startDate && endDate)) {
-    return mcpError('start_date and end_date must be provided together (or omit both and use days).');
+    return mcpValidationError('Invalid tool input at start_date/end_date: provide both dates or neither.', {
+      field_path: 'start_date,end_date',
+      constraint: 'start_date and end_date must be provided together.',
+    });
   }
 
   let dateRange: CustomDateRange | undefined;
   if (startDate && endDate) {
     if (endDate < startDate) {
-      return mcpError('end_date must be on or after start_date.');
+      return mcpValidationError('Invalid tool input at end_date: end_date must be on or after start_date.', {
+        field_path: 'end_date',
+        constraint: 'Must be on or after start_date.',
+      });
     }
     dateRange = { startDate, endDate };
   }
@@ -109,8 +118,7 @@ async function handleGetSearchPerformance(
     });
   } catch (err) {
     log.error({ err, workspaceId }, 'get_search_performance failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Failed to read search performance: ${message}`);
+    return mcpInternalError();
   }
 }
 
@@ -119,5 +127,5 @@ export async function handleAnalyticsReadActionTool(
   args: Record<string, unknown>,
 ): Promise<McpToolSuccessResponse | McpToolErrorResponse> {
   if (name === 'get_search_performance') return handleGetSearchPerformance(args);
-  return mcpError(`Unknown analytics read action tool: ${name}`);
+  return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }

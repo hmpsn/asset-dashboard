@@ -39,7 +39,9 @@ import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import {
   buildDashboardUrl,
-  mcpError,
+  mcpInternalError,
+  mcpNotFoundError,
+  mcpPreconditionError,
   mcpSuccess,
   requireWorkspace,
   zodErrorToMcp,
@@ -97,7 +99,7 @@ function resolveSite(workspace: Workspace | McpToolErrorResponse): HelperResult<
   if (!ws.webflowSiteId) {
     return {
       ok: false,
-      error: mcpError(`Workspace ${ws.id} has no linked Webflow site — connect a site before generating or publishing schema.`),
+      error: mcpPreconditionError('This workspace has no linked Webflow site. Connect a site before generating or publishing schema.'),
     };
   }
   const siteId = ws.webflowSiteId;
@@ -176,13 +178,18 @@ async function generateAndPersist(
     pageTypeHint as SchemaPageType | undefined,
   );
   const result = await generateSchemaForPage(siteId, pageId, token, ctx);
-  if (!result) return { ok: false, error: mcpError(`Page not found for schema generation: ${pageId}`) };
+  if (!result) return {
+    ok: false,
+    error: mcpNotFoundError('Page not found for schema generation.', {
+      resource_type: 'page',
+    }),
+  };
 
   const schema = extractSchemaJson(result);
   if (!schema) {
     return {
       ok: false,
-      error: mcpError(`No schema could be generated for page ${pageId} — the page has no eligible schema content.`),
+      error: mcpPreconditionError('No schema could be generated because the page has no eligible schema content.'),
     };
   }
 
@@ -235,8 +242,7 @@ async function handleGenerateSchema(
     });
   } catch (err) {
     log.error({ err, workspaceId, pageId }, 'generate_schema failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Schema generation failed: ${message}`);
+    return mcpInternalError();
   }
 }
 
@@ -285,8 +291,7 @@ async function handleValidateSchema(
     });
   } catch (err) {
     log.error({ err, workspaceId, pageId }, 'validate_schema failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Schema validation failed: ${message}`);
+    return mcpInternalError();
   }
 }
 
@@ -313,10 +318,14 @@ async function handlePublishSchema(
     // below are NEVER called when validation has errors.
     const validation = validateSchema(schema);
     if (!validation.valid) {
-      return mcpError(
-        `Schema validation failed — not publishing. Fix these ${validation.errors.length} error(s) and retry: ${
-          validation.errors.map(e => `${e.type}${e.field ? `.${e.field}` : ''}: ${e.message}`).join('; ')
-        }`,
+      return mcpPreconditionError(
+        `Schema validation failed, so nothing was published. Fix the ${validation.errors.length} reported error(s) and retry.`,
+        {
+          validation_errors: validation.errors.map(error => ({
+            type: error.type,
+            ...(error.field ? { field: error.field } : {}),
+          })),
+        },
       );
     }
 
@@ -341,14 +350,12 @@ async function handlePublishSchema(
 
     if (!publishResult.ok) {
       if (publishResult.kind === 'cms-blocked' || publishResult.kind === 'cms-failed') {
-        return mcpError(`Schema publish failed (CMS field): ${publishResult.message}`);
+        return mcpPreconditionError('Schema could not be published through the configured CMS field. Review the Webflow field configuration and retry.');
       }
       if (publishResult.kind === 'manual-required') {
-        return mcpError(
-          `Schema could not be published automatically: ${publishResult.message} (manual action required in Webflow).`,
-        );
+        return mcpPreconditionError('Schema requires a manual Webflow publish action. No automatic publish occurred.');
       }
-      return mcpError(`Schema publish failed: ${publishResult.message}`);
+      return mcpPreconditionError('Schema could not be published. Review the Webflow connection and page target before retrying.');
     }
 
     // The service emits a generic 'schema-publish' activity; add the MCP-tagged
@@ -374,8 +381,7 @@ async function handlePublishSchema(
     });
   } catch (err) {
     log.error({ err, workspaceId, pageId }, 'publish_schema failed');
-    const message = err instanceof Error ? err.message : String(err);
-    return mcpError(`Schema publish failed: ${message}`);
+    return mcpInternalError();
   }
 }
 
@@ -386,5 +392,5 @@ export async function handleSchemaActionTool(
   if (name === 'generate_schema') return handleGenerateSchema(args);
   if (name === 'validate_schema') return handleValidateSchema(args);
   if (name === 'publish_schema') return handlePublishSchema(args);
-  return mcpError(`Unknown schema action tool: ${name}`);
+  return mcpNotFoundError('Unknown tool: the requested tool does not exist.', { resource_type: 'tool' });
 }

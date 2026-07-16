@@ -82,7 +82,7 @@ describe('canonical MCP tool registry', () => {
     ]);
   });
 
-  it('records each declared workspace field and the explicit legacy/json compatibility split', () => {
+  it('records each declared workspace field and uses json_v1 for every production tool', () => {
     expect(getDeclaredWorkspaceField('get_workspace_overview')).toBe('workspaceId');
     expect(getDeclaredWorkspaceField('update_workspace')).toBe('workspace_id');
     expect(getDeclaredWorkspaceField('get_brand_voice')).toBe('workspace_id');
@@ -91,48 +91,8 @@ describe('canonical MCP tool registry', () => {
     expect(getDeclaredWorkspaceField('list_workspaces')).toBeUndefined();
     const entries = [...MCP_TOOL_REGISTRY.values()];
     expect(entries.length).toBeGreaterThan(0);
-    expect(entries.filter(entry => entry.errorContract === 'legacy_text')).toHaveLength(61);
-    expect(
-      entries
-        .filter(entry => entry.errorContract === 'json_v1')
-        .map(entry => entry.definition.name),
-    ).toEqual([
-      'list_content_templates',
-      'get_content_template',
-      'create_content_template',
-      'update_content_template',
-      'duplicate_content_template',
-      'create_content_matrix',
-      'list_pseo_blueprint_entries',
-      'list_content_matrices',
-      'get_content_matrix',
-      'resolve_content_matrix_cells',
-      'accept_content_template_generation_upgrade',
-      'preview_content_matrix_generation',
-      'resolve_content_matrix_evidence',
-      'start_content_matrix_generation',
-      'get_content_matrix_generation',
-      'retry_content_matrix_generation',
-      'get_pseo_matrix_plan',
-      'create_content_matrix_from_pseo_plan',
-      'submit_brand_intake',
-      'get_brand_intake',
-      'resolve_brand_intake_evidence',
-      'get_brand_voice',
-      'get_pending_approvals',
-      'create_brand_voice_profile',
-      'update_brand_voice_draft',
-      'add_brand_voice_sample',
-      'add_brand_voice_samples',
-      'finalize_brand_voice',
-      'start_brand_deliverable_generation',
-      'get_brand_generation',
-      'resume_brand_deliverable_generation',
-      'start_brand_deliverable_revision',
-      'start_brand_content_onboarding',
-      'get_brand_content_onboarding',
-      'resume_brand_content_onboarding',
-    ]);
+    expect(entries.filter(entry => entry.errorContract === 'legacy_text')).toHaveLength(0);
+    expect(entries.filter(entry => entry.errorContract === 'json_v1')).toHaveLength(96);
   });
 
   it('fails fast on duplicate names and missing handlers', () => {

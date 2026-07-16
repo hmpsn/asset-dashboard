@@ -43,6 +43,13 @@ import {
 
 type Mock = ReturnType<typeof vi.fn>;
 
+function errorEnvelope(result: Awaited<ReturnType<typeof handleRecommendationActionTool>>) {
+  return JSON.parse(result.content[0]?.text ?? '{}') as {
+    code: string;
+    details?: Record<string, unknown>;
+  };
+}
+
 function makeRec(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'rec_1',
@@ -244,7 +251,10 @@ describe('mcp recommendation action tools', () => {
       action: 'throttle',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('throttle_days is required');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'validation_failed',
+      details: { field_path: 'throttle_days' },
+    });
     expect(throttleRecommendation).not.toHaveBeenCalled();
   });
 
@@ -279,7 +289,10 @@ describe('mcp recommendation action tools', () => {
       action: 'send',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Recommendation not found');
+    expect(errorEnvelope(result)).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'recommendation' },
+    });
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
     expect(addActivity).not.toHaveBeenCalled();
   });
@@ -294,7 +307,7 @@ describe('mcp recommendation action tools', () => {
       action: 'send',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Cannot send recommendation');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'conflict' });
     expect(broadcastToWorkspace).not.toHaveBeenCalled();
   });
 
@@ -305,7 +318,7 @@ describe('mcp recommendation action tools', () => {
       action: 'approve',
     });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Validation failed');
+    expect(errorEnvelope(result)).toMatchObject({ code: 'validation_failed' });
     expect(sendRecommendation).not.toHaveBeenCalled();
     expect(throttleRecommendation).not.toHaveBeenCalled();
     expect(strikeRecommendation).not.toHaveBeenCalled();
@@ -319,6 +332,9 @@ describe('mcp recommendation action tools', () => {
 
     const unknown = await handleRecommendationActionTool('unknown_rec_action', { workspace_id: 'ws-1' });
     expect(unknown.isError).toBe(true);
-    expect(unknown.content[0].text).toContain('Unknown recommendation action tool');
+    expect(errorEnvelope(unknown)).toMatchObject({
+      code: 'not_found',
+      details: { resource_type: 'tool' },
+    });
   });
 });
