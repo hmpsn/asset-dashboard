@@ -289,7 +289,7 @@ No parallel dispatch. A3 is the only task with a shared-type change; nothing dow
 
 ## Model assignments
 
-Platform: **Codex/OpenAI**. Implementation: **GPT-5.6 Sol, effort HIGH**, every task (owner-specified; overrides the least-capable-model default). Review: **GPT-5.6 Sol, effort HIGH** (reviewers are never downgraded). Single agent, sequential.
+Platform: **Codex/OpenAI**. Implementation: **GPT-5.6 Sol, effort HIGH**, every task (owner-specified; overrides the least-capable-model default). Review: **cross-model adversarial review by the orchestrating Claude (Fable) agent** — contract re-verification against the actual diff, independent gate runs, and flag-ON browser smoke; findings return to Sol for fixes (reviewers are never downgraded; cross-family review supersedes the earlier Sol-reviews-Sol line). Single implementation agent, sequential.
 
 ## Systemic improvements
 
