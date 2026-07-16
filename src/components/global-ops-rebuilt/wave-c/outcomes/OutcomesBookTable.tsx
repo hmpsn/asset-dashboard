@@ -74,7 +74,7 @@ export function OutcomesBookTable({ entries, loading, onOpenWorkspace }: Outcome
       subtitle="Ranked by delivered value, with search evidence and outcome coverage one step deeper"
       titleIcon={<Icon name="trophy" size="md" className="text-[var(--emerald)]" aria-hidden="true" />}
       iconChip
-      action={<span className="hidden t-caption-sm text-[var(--brand-text-muted)] sm:inline">Rolling 90 days</span>}
+      action={<span className="hidden t-caption-sm text-[var(--brand-text-muted)] sm:inline">All-time value · 28-day clicks</span>}
       noPadding
     >
       <div
@@ -88,7 +88,7 @@ export function OutcomesBookTable({ entries, loading, onOpenWorkspace }: Outcome
             className="sticky top-0 z-[var(--z-sticky)] grid items-center gap-2.5 border-b border-[var(--brand-border)] bg-[var(--surface-1)] px-[18px] py-[11px]"
             style={{ gridTemplateColumns: GRID_TEMPLATE }}
           >
-            {['Workspace', 'Value delivered / mo', 'Clicks', 'Wins', 'Trend', 'Open workspace'].map((label, index) => (
+            {['Workspace', 'Value delivered / mo (all-time)', 'Clicks (28d)', 'Wins (all-time)', 'Trend', 'Open workspace'].map((label, index) => (
               <span
                 key={`${label}-${index}`}
                 role="columnheader"
@@ -222,7 +222,7 @@ export function OutcomesBookTable({ entries, loading, onOpenWorkspace }: Outcome
                           },
                           { label: 'Average search position', value: workspace.gscRollup?.dataAvailable ? workspace.gscRollup.avgPosition.toFixed(1) : '—' },
                           { label: 'Open site issues', value: formatNumber(workspace.siteHealthIssueMatrix?.totalIssues) },
-                          { label: 'Win rate', value: outcome && outcome.scoredLast30d > 0 ? percent(outcome.winRate * 100) : '—' },
+                          { label: 'Win rate (all-time)', value: outcome && outcome.scoredLast30d > 0 ? percent(outcome.winRate * 100) : '—' },
                         ]} />
                         <DefinitionList items={[
                           { label: 'Active actions', value: formatNumber(outcome?.activeActions) },
