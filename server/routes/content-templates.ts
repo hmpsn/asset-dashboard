@@ -93,6 +93,7 @@ const templateSectionSchema = z.object({
     role: z.enum(['none', 'primary', 'secondary']),
     required: z.boolean(),
   }).optional(),
+  optional: z.boolean().optional(),
 });
 
 const cmsFieldMapSchema = z.record(boundedUtf8String(
@@ -160,6 +161,13 @@ const templateWriteFieldsSchema = templateWriteFieldsBaseSchema
   .superRefine(addTotalTemplateWordCountIssue);
 
 export const createTemplateSchema = templateWriteFieldsSchema.superRefine((value, ctx) => {
+  if (value.sections?.length && value.sections.every(section => section.optional === true)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['sections'],
+      message: 'A content template requires at least one non-optional section',
+    });
+  }
   if (value.generationContractVersion === undefined) return;
   if (!value.sections || value.sections.length === 0) {
     ctx.addIssue({
@@ -190,6 +198,13 @@ export const updateTemplateSchema = updateTemplateFieldsSchema.extend({
   revision: z.number().int().nonnegative().optional(),
 }).superRefine((value, ctx) => {
     addTotalTemplateWordCountIssue(value, ctx);
+    if (value.sections?.length && value.sections.every(section => section.optional === true)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sections'],
+        message: 'A content template requires at least one non-optional section',
+      });
+    }
     const generationFields = [
       'pageType', 'variables', 'sections', 'urlPattern', 'keywordPattern',
       'titlePattern', 'metaDescPattern', 'cmsFieldMap', 'toneAndStyle', 'schemaTypes',

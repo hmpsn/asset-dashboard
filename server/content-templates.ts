@@ -67,6 +67,7 @@ const templateSectionStoredSchema = z.object({
     role: z.enum(['none', 'primary', 'secondary']),
     required: z.boolean(),
   }).optional(),
+  optional: z.boolean().optional(),
 });
 
 const stringRecordSchema = z.record(z.string());
@@ -217,6 +218,9 @@ export class ContentTemplateSourceIntegrityError extends Error {
 }
 
 function assertTemplateGenerationContract(template: ContentTemplate): void {
+  if (template.sections.length > 0 && template.sections.every(section => section.optional === true)) {
+    throw new ContentTemplateGenerationContractError(['all_sections_optional']);
+  }
   if (template.generationContractVersion !== MATRIX_GENERATION_CONTRACT_VERSION) return;
 
   const issueCodes: string[] = [];

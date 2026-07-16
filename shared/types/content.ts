@@ -636,6 +636,8 @@ export interface TemplateSection {
   aeoContract?: TemplateAeoContract;
   /** Absent on legacy templates until an explicit generation upgrade is accepted. */
   ctaContract?: TemplateCtaContract;
+  /** Evidence-driven section: omitted when its exact matrix-cell evidence is absent. */
+  optional?: boolean;
 }
 
 export type ContentPageType =

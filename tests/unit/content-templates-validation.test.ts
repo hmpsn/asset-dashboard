@@ -34,6 +34,7 @@ const templateSectionSchema = z.object({
   narrativeRole: z.string().optional(),
   brandNote: z.string().optional(),
   seoNote: z.string().optional(),
+  optional: z.boolean().optional(),
 });
 
 const createTemplateSchema = z.object({
@@ -142,6 +143,23 @@ describe('createTemplateSchema', () => {
       sections: [{ name: 'Hero' }], // missing id, headingTemplate, guidance, wordCountTarget, order
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts and preserves an optional section marker', () => {
+    const result = createTemplateSchema.safeParse({
+      name: 'Test',
+      sections: [{
+        id: 'proof',
+        name: 'Proof',
+        headingTemplate: 'Results',
+        guidance: 'Use supplied proof only.',
+        wordCountTarget: 120,
+        order: 0,
+        optional: true,
+      }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.sections?.[0]?.optional).toBe(true);
   });
 
   it('rejects a variable missing label', () => {

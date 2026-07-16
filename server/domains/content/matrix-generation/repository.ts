@@ -284,6 +284,7 @@ const resolvedBlockSchema = z.union([
     source: z.literal('template'),
     sourceSectionId: z.string().min(1),
     generationRole: z.enum(['body', 'answer_first', 'definition', 'proof', 'process', 'faq', 'cta']),
+    optional: z.boolean().optional(),
     ...resolvedBlockBaseShape,
   }).strict(),
   z.object({
@@ -456,6 +457,13 @@ const resolvedStructuralTargetSchema = z.object({
   blockManifest: z.object({
     generationContractVersion: z.number().int().positive(),
     blocks: resolvedBlockSequenceSchema,
+    omittedOptionalSections: z.array(z.object({
+      sourceSectionId: z.string().min(1),
+      name: z.string().min(1),
+      generationRole: z.enum(['body', 'answer_first', 'definition', 'proof', 'process', 'faq', 'cta']),
+      evidenceRequirementId: z.string().min(1),
+      reason: z.literal('missing_section_evidence'),
+    }).strict()).optional(),
     totalWordCountTarget: z.number().nonnegative(),
     fingerprint: z.string().min(1),
   }),

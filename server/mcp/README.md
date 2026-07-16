@@ -265,17 +265,17 @@ The coordinator does not replace the underlying generators or review systems. A 
 |------|-----|---------|
 | `list_content_templates` | R | Cursor-paged template summaries without full section blobs. |
 | `get_content_template` | R | Complete reusable template, including variables, sections, contracts, patterns, mapping, and revision. |
-| `create_content_template` | W | Create a reusable template through the same validation as the admin route. |
-| `update_content_template` | W | Revision-safe partial template update. |
+| `create_content_template` | W | Create a reusable template; `optional: true` sections are included only when their exact cell evidence is verified. |
+| `update_content_template` | W | Revision-safe partial template update, including optional section markers. |
 | `duplicate_content_template` | W | Duplicate a template as a new starting point. |
 | `create_content_matrix` | W | Create a matrix directly from a template plus Cartesian dimensions; Page Strategy is not required. |
 | `update_content_matrix_cell` | W | Revision-safe per-cell keyword, URL, variable, or schema override with path and workspace collision validation. |
 | `list_pseo_blueprint_entries` | R | Cursor-page Page Strategy collection entries and template/matrix links; empty means no collection entries have been generated. |
 | `list_content_matrices` | R | Cursor-paged matrix summaries, optionally filtered by template. |
 | `get_content_matrix` | R | Matrix metadata plus a revision-bound cursor page of cells. |
-| `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
+| `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets with explicit optional-section omissions, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
 | `accept_content_template_generation_upgrade` | W | Explicitly accept or reject the exact version-conditional deterministic template upgrade proposal. |
-| `preview_content_matrix_generation` | R | Freeze exact generation inputs and return bounded call, token, and cost estimates without paid work. |
+| `preview_content_matrix_generation` | R | Freeze exact generation inputs, report optional omissions, and return bounded call, token, and cost estimates without paid work. |
 | `resolve_content_matrix_evidence` | W | Resolve one typed factual requirement and invalidate the prior preview. |
 | `start_content_matrix_generation` | W | **[Paid API]** Start one bounded, idempotent background batch from exact preview fingerprints and accepted budget ceilings. |
 | `get_content_matrix_generation` | R | Read one durable batch plus cursor-paged item outcomes, audit findings, artifact revisions, and approval evidence. |

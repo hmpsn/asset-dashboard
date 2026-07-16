@@ -253,7 +253,7 @@
     {
       "id": 26,
       "title": "Content Templates",
-      "oneLiner": "Reusable page-structure templates with named variables and AI-enforced outlines — stamp out consistent service/location pages at scale",
+      "oneLiner": "Reusable page structures with named variables, locked outlines, and evidence-driven optional sections — stamp out grounded service/location pages at scale",
       "category": "content",
       "painPoints": ["content-production", "scale"],
       "tier": "growth",

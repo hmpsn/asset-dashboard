@@ -8,7 +8,7 @@ export { canonicalGenerationFingerprint };
 
 type BlockManifestFingerprintSource = Pick<
   ResolvedPageBlockManifest,
-  'generationContractVersion' | 'blocks' | 'totalWordCountTarget'
+  'generationContractVersion' | 'blocks' | 'omittedOptionalSections' | 'totalWordCountTarget'
 >;
 
 /** Exact block-manifest payload protected by `ResolvedPageBlockManifest.fingerprint`. */
@@ -18,6 +18,9 @@ export function blockManifestFingerprintCore(
   return {
     generationContractVersion: manifest.generationContractVersion,
     blocks: manifest.blocks,
+    ...(manifest.omittedOptionalSections !== undefined
+      ? { omittedOptionalSections: manifest.omittedOptionalSections }
+      : {}),
     totalWordCountTarget: manifest.totalWordCountTarget,
   };
 }

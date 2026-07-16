@@ -26,6 +26,7 @@ import { createStmtCache } from '../../../db/stmt-cache.js';
 import { z } from '../../../middleware/validate.js';
 import { canonicalGenerationFingerprint } from './fingerprint.js';
 import { MatrixReadServiceError, resolveMatrixStructures } from './read-service.js';
+import { matrixCellSectionEvidenceRequirementId } from './requirements.js';
 
 const evidenceValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('text'), value: z.string().min(1) }).strict(),
@@ -249,14 +250,20 @@ export function buildMatrixCellEvidenceRequirements(
   resolutions: readonly MatrixGenerationEvidenceResolution[],
 ): GenerationEvidenceRequirement[] {
   const resolutionByRequirement = new Map(
-    resolutions.map(resolution => [resolution.requirementId, resolution]),
+    resolutions
+      .filter(resolution => (
+        !resolution.requirementId.includes(':section:')
+        || resolution.expectedSourceRevision.templateRevision
+          === target.sourceRevision.templateRevision
+      ))
+      .map(resolution => [resolution.requirementId, resolution]),
   );
   const definitions: Array<{
     id: string;
     fieldPath: string;
     claim: string;
     reason: string;
-    requirementStage: 'preflight' | 'ready';
+    requirementStage: 'preflight' | 'ready' | 'optional_omit';
     clientSafePrompt: string;
   }> = [];
 
@@ -296,6 +303,27 @@ export function buildMatrixCellEvidenceRequirements(
       reason: 'A required CTA must not invent booking, pricing, contact, or offer details.',
       requirementStage: 'ready',
       clientSafePrompt: 'Provide the verified CTA destination or instruction for this page.',
+    });
+  }
+  const optionalSections = [
+    ...target.blockManifest.blocks.flatMap(block => (
+      block.source === 'template' && block.optional === true
+        ? [{
+            sourceSectionId: block.sourceSectionId,
+            generationRole: block.generationRole,
+          }]
+        : []
+    )),
+    ...(target.blockManifest.omittedOptionalSections ?? []),
+  ].sort((left, right) => left.sourceSectionId.localeCompare(right.sourceSectionId));
+  for (const section of optionalSections) {
+    definitions.push({
+      id: matrixCellSectionEvidenceRequirementId(target.cellId, section.sourceSectionId),
+      fieldPath: `sections.${section.sourceSectionId}.evidence`,
+      claim: `The optional ${section.generationRole} section has source-backed facts.`,
+      reason: `The optional section is omitted unless evidence supports it.`,
+      requirementStage: 'optional_omit',
+      clientSafePrompt: `Provide verified facts for the optional ${section.generationRole} section.`,
     });
   }
 
@@ -338,7 +366,9 @@ export function renderMatrixCellEvidencePrompt(
   );
   const lines = requirements.flatMap(requirement => {
     const resolution = resolutionByRequirement.get(requirement.id);
-    if (resolution) return [`- ${requirement.fieldPath}: ${evidenceValueText(resolution.value)}`];
+    if (resolution && requirement.status === 'verified') {
+      return [`- ${requirement.fieldPath}: ${evidenceValueText(resolution.value)}`];
+    }
     if (requirement.status === 'missing' && requirement.requirementStage === 'ready') {
       return [`- ${requirement.fieldPath}: [NEEDS CLIENT INPUT: ${requirement.clientSafePrompt ?? requirement.reason}]`];
     }
@@ -373,6 +403,19 @@ function assertRequirementValue(requirementIdValue: string, value: GenerationEvi
   const parsed = evidenceValueSchema.safeParse(value);
   if (!parsed.success) {
     throw new MatrixGenerationEvidenceError('precondition_failed', 'Evidence value is invalid');
+  }
+  if (requirementIdValue.includes(':section:')) {
+    const hasEvidence = (value.kind === 'text' && value.value.trim().length >= 2)
+      || (value.kind === 'text_list' && value.value.some(item => item.trim().length >= 2))
+      || value.kind === 'number'
+      || value.kind === 'date'
+      || value.kind === 'url'
+      || (value.kind === 'boolean' && value.value);
+    if (hasEvidence) return;
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      'Optional section evidence must affirm or substantively describe the section facts',
+    );
   }
   if (requirementIdValue.endsWith(`:${MATRIX_CELL_EVIDENCE_REQUIREMENT_SUFFIXES.serviceAvailability}`)) {
     if (value.kind === 'boolean' && value.value) return;

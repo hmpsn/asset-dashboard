@@ -291,6 +291,12 @@ export interface ContentMatrixReadServiceDependencies {
     workspaceId: string,
     matrixId: string,
   ): WorkspaceMatrixUrlCensus;
+  listCurrentEvidenceRequirementIds?(
+    workspaceId: string,
+    matrixId: string,
+    cellId: string,
+    templateRevision: number,
+  ): string[];
   resolveMatrixStructure(input: ResolveMatrixStructureInput): ReturnType<typeof resolveMatrixStructure>;
 }
 
@@ -489,7 +495,28 @@ const readStmts = createStmtCache(() => ({
     WHERE matrix.workspace_id = ?
       AND matrix.id = ?
   `),
+  listCurrentEvidenceRequirementIds: db.prepare(`
+    SELECT requirement_id
+    FROM content_matrix_cell_evidence
+    WHERE workspace_id = ? AND matrix_id = ? AND cell_id = ?
+      AND template_revision = ? AND is_current = 1
+    ORDER BY requirement_id
+  `),
 }));
+
+function listCurrentEvidenceRequirementIds(
+  workspaceId: string,
+  matrixId: string,
+  cellId: string,
+  templateRevision: number,
+): string[] {
+  return (readStmts().listCurrentEvidenceRequirementIds.all(
+    workspaceId,
+    matrixId,
+    cellId,
+    templateRevision,
+  ) as Array<{ requirement_id: string }>).map(row => row.requirement_id);
+}
 
 function rowToMatrixSummary(row: MatrixSummaryRow): ContentMatrixSummary {
   const scalarFieldsAreBounded = row.id !== null
@@ -1303,6 +1330,7 @@ const defaultDependencies: ContentMatrixReadServiceDependencies = {
   getGenerationSourceCensus: getMatrixGenerationSourceCensus,
   getKnownWorkspacePageCensus: buildKnownWorkspacePageCensus,
   getOtherWorkspaceMatrixPlannedUrls: defaultOtherWorkspaceMatrixPlannedUrls,
+  listCurrentEvidenceRequirementIds,
   resolveMatrixStructure,
 };
 
@@ -1721,6 +1749,12 @@ export function createContentMatrixReadService(
           ? []
           : publishedPathsByCanonicalPath.get(selectedCanonicalPath) ?? [],
         workspaceUrlCensusComplete,
+        currentEvidenceRequirementIds: dependencies.listCurrentEvidenceRequirementIds?.(
+          request.workspaceId,
+          matrix.id,
+          cell.id,
+          currentRevision.templateRevision,
+        ) ?? [],
       });
     });
     results.forEach((result, index) => assertBoundedReadPayload(
