@@ -3,14 +3,15 @@
  * sort-roadmap.ts — Auto-sort roadmap.json
  *
  * Rules:
- *   1. Non-shipped sprints stay at the top, in their current order. Deferred and
- *      closed items are terminal planning dispositions, but never shipment evidence.
- *   2. Backlog always sits right after the last active sprint.
- *   3. Newly completed sprints (all items "done", not yet archived) get:
- *      - Name prefixed with "✅ SHIPPED —"
- *      - A sprint-level `shippedAt` set to the latest item's shippedAt (or today)
- *   4. Recent completed/archived sprints live below the backlog, newest first.
- *   5. Older completed/archived sprints move to data/roadmap.archive.json.
+ *   1. The active roadmap contains only actionable planning rows: pending,
+ *      in_progress, and deferred.
+ *   2. Done and closed rows move to data/roadmap.archive.json. Closed rows remain
+ *      closed and never receive shipment metadata.
+ *   3. Mixed sprints are split into an active sprint plus a stable
+ *      `<sprint-id>-terminal-history` archive sibling.
+ *   4. Fully done archive siblings are labeled "✅ SHIPPED". Any sibling that
+ *      contains a closed disposition is labeled "🗃️ TERMINAL HISTORY".
+ *   5. Backlog stays after the last named active sprint.
  *
  * Usage:
  *   npx tsx scripts/sort-roadmap.ts            # sorts in-place
@@ -20,7 +21,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { SprintData, RoadmapData } from '../shared/types/roadmap.js';
+import type { RoadmapItem, SprintData, RoadmapData } from '../shared/types/roadmap.js';
 
 // When adding new items to roadmap.json manually, include:
 //   "createdAt": "YYYY-MM-DD"
@@ -30,24 +31,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROADMAP_PATH = path.resolve(__dirname, '../data/roadmap.json');
 const ROADMAP_ARCHIVE_PATH = path.resolve(__dirname, '../data/roadmap.archive.json');
-const SHIPPED_SPRINT_RETAIN_DAYS = 30;
 const dryRun = process.argv.includes('--dry-run');
 
 type Sprint = SprintData;
 type Roadmap = RoadmapData;
 
-function isFullyShipped(sprint: Sprint): boolean {
-  // Deliberately strict: a closed/superseded item may finish planning work, but it
-  // must not turn its sprint into shipped product history or inflate velocity.
-  return sprint.items.length > 0 && sprint.items.every(i => i.status === 'done');
-}
-
 function isBacklog(sprint: Sprint): boolean {
   return sprint.id === 'backlog';
 }
 
-function isAlreadyArchived(sprint: Sprint): boolean {
-  return sprint.name.startsWith('✅');
+function isTerminal(item: RoadmapItem): boolean {
+  return item.status === 'done' || item.status === 'closed';
 }
 
 function latestShippedAt(sprint: Sprint): string {
@@ -64,31 +58,48 @@ function loadArchive(): Roadmap {
   return JSON.parse(fs.readFileSync(ROADMAP_ARCHIVE_PATH, 'utf-8')) as Roadmap;
 }
 
-function parseArchiveDate(raw: string | undefined): Date | null {
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(`${raw}T00:00:00Z`);
-  if (/^\d{4}-\d{2}$/.test(raw)) return new Date(`${raw}-01T00:00:00Z`);
-  return null;
+function cleanSprintName(name: string): string {
+  return name
+    .replace(/^✅ SHIPPED —\s*/, '')
+    .replace(/^🗃️ TERMINAL HISTORY —\s*/, '');
 }
 
-function daysSince(date: Date): number {
-  const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
-  return Math.floor((today.getTime() - date.getTime()) / (24 * 60 * 60 * 1000));
-}
-
-function shouldMoveToArchive(sprint: Sprint): boolean {
-  if (!isFullyShipped(sprint)) return false;
-  // Monthly/history buckets are changelog material, not active planning context.
-  if (sprint.id.startsWith('shipped-')) return true;
-
-  const date = parseArchiveDate(sprint.shippedAt);
-  return date ? daysSince(date) > SHIPPED_SPRINT_RETAIN_DAYS : false;
+function terminalArchiveSibling(sprint: Sprint, items: RoadmapItem[]): Sprint {
+  const allDone = items.every(item => item.status === 'done');
+  const baseName = cleanSprintName(sprint.name);
+  return {
+    id: `${sprint.id}-terminal-history`,
+    name: `${allDone ? '✅ SHIPPED' : '🗃️ TERMINAL HISTORY'} — ${baseName}`,
+    ...(sprint.hours ? { hours: sprint.hours } : {}),
+    rationale: `Terminal item history split from ${sprint.id}. ${sprint.rationale ?? ''}`.trim(),
+    items,
+    ...(allDone ? { shippedAt: latestShippedAt({ ...sprint, items }) } : {}),
+  };
 }
 
 function mergeArchive(existing: Sprint[], incoming: Sprint[]): Sprint[] {
   const byId = new Map<string, Sprint>();
   for (const sprint of existing) byId.set(sprint.id, sprint);
-  for (const sprint of incoming) byId.set(sprint.id, sprint);
+  for (const sprint of incoming) {
+    const prior = byId.get(sprint.id);
+    if (!prior) {
+      byId.set(sprint.id, sprint);
+      continue;
+    }
+    const itemsById = new Map(prior.items.map(item => [String(item.id), item]));
+    for (const item of sprint.items) itemsById.set(String(item.id), item);
+    const mergedItems = Array.from(itemsById.values());
+    const allDone = mergedItems.every(item => item.status === 'done');
+    byId.set(sprint.id, {
+      ...prior,
+      ...sprint,
+      name: `${allDone ? '✅ SHIPPED' : '🗃️ TERMINAL HISTORY'} — ${cleanSprintName(sprint.name)}`,
+      items: mergedItems,
+      ...(allDone
+        ? { shippedAt: latestShippedAt({ ...sprint, items: mergedItems }) }
+        : { shippedAt: undefined }),
+    });
+  }
   return Array.from(byId.values()).sort((a, b) => {
     const da = a.shippedAt || '0000';
     const db = b.shippedAt || '0000';
@@ -104,49 +115,28 @@ const archive = loadArchive();
 
 const active: Sprint[] = [];
 const backlog: Sprint[] = [];
-const shipped: Sprint[] = [];
 const archiveAdditions: Sprint[] = [];
-const newlyArchived: string[] = []; // track IDs before mutation
+const terminalMoves: Array<{ sprintId: string; count: number }> = [];
 
 let changed = false;
 
 for (const sprint of roadmap.sprints) {
-  if (isBacklog(sprint)) {
-    backlog.push(sprint);
-  } else if (isAlreadyArchived(sprint)) {
-    if (!sprint.shippedAt) sprint.shippedAt = latestShippedAt(sprint);
-    if (shouldMoveToArchive(sprint)) {
-      archiveAdditions.push(sprint);
-      changed = true;
-    } else {
-      shipped.push(sprint);
-    }
-  } else if (isFullyShipped(sprint)) {
-    // Newly completed — archive it
-    newlyArchived.push(sprint.id);
-    sprint.name = `✅ SHIPPED — ${sprint.name}`;
-    if (!sprint.shippedAt) {
-      sprint.shippedAt = latestShippedAt(sprint);
-    }
-    if (shouldMoveToArchive(sprint)) {
-      archiveAdditions.push(sprint);
-    } else {
-      shipped.push(sprint);
-    }
+  const terminalItems = sprint.items.filter(isTerminal);
+  const actionableItems = sprint.items.filter(item => !isTerminal(item));
+  if (terminalItems.length > 0) {
+    archiveAdditions.push(terminalArchiveSibling(sprint, terminalItems));
+    terminalMoves.push({ sprintId: sprint.id, count: terminalItems.length });
     changed = true;
-  } else {
-    active.push(sprint);
+  }
+  if (actionableItems.length > 0) {
+    const actionableSprint = { ...sprint, name: cleanSprintName(sprint.name), items: actionableItems };
+    delete actionableSprint.shippedAt;
+    if (isBacklog(sprint)) backlog.push(actionableSprint);
+    else active.push(actionableSprint);
   }
 }
 
-// Sort shipped sprints newest-first by shippedAt
-shipped.sort((a, b) => {
-  const da = a.shippedAt || '0000';
-  const db = b.shippedAt || '0000';
-  return db.localeCompare(da);
-});
-
-const sorted: Sprint[] = [...active, ...backlog, ...shipped];
+const sorted: Sprint[] = [...active, ...backlog];
 
 // Check if order actually changed
 const orderChanged = sorted.some((s, i) => s.id !== roadmap.sprints[i]?.id);
@@ -157,21 +147,13 @@ if (!changed && !orderChanged) {
 }
 
 // Report what moved
-if (newlyArchived.length > 0) {
-  console.log('Archiving completed sprints:');
-  for (const id of newlyArchived) {
-    const s = shipped.find(sp => sp.id === id) ?? archiveAdditions.find(sp => sp.id === id)!;
-    console.log(`  → ${s.name} (${s.items.length} items, shipped ${s.shippedAt})`);
-  }
-}
-
 if (archiveAdditions.length > 0) {
-  console.log('Moving shipped history to roadmap.archive.json:');
-  for (const sprint of archiveAdditions) {
-    console.log(`  → ${sprint.name} (${sprint.items.length} items, shipped ${sprint.shippedAt ?? 'unknown'})`);
+  console.log('Moving terminal roadmap history to roadmap.archive.json:');
+  for (const move of terminalMoves) {
+    console.log(`  → ${move.sprintId}: ${move.count} done/closed item(s)`);
   }
 } else if (orderChanged) {
-  console.log('Reordering shipped sprints (newest-first).');
+  console.log('Reordering active roadmap sprints.');
 }
 
 roadmap.sprints = sorted;
@@ -181,7 +163,7 @@ if (dryRun) {
   console.log('\n--dry-run: no file written.');
   console.log('New order:');
   for (const s of sorted) {
-    const tag = isBacklog(s) ? '[backlog]' : isAlreadyArchived(s) ? '[archived]' : '[active]';
+    const tag = isBacklog(s) ? '[backlog]' : '[active]';
     console.log(`  ${tag} ${s.name}`);
   }
 } else {
