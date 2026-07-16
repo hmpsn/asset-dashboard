@@ -668,6 +668,43 @@ export interface ContentTemplate {
   updatedAt: string;
 }
 
+/** Immutable studio-owned snapshot used to seed normal workspace templates. */
+export interface ContentTemplateLibraryItem {
+  id: string;
+  vertical: string;
+  name: string;
+  description?: string;
+  pageType: ContentPageType;
+  variables: TemplateVariable[];
+  sections: TemplateSection[];
+  urlPattern: string;
+  keywordPattern: string;
+  titlePattern?: string;
+  metaDescPattern?: string;
+  cmsFieldMap?: Record<string, string>;
+  toneAndStyle?: string;
+  schemaTypes?: string[];
+  generationContractVersion: number;
+  source: {
+    workspaceId: string;
+    templateId: string;
+    templateRevision: number;
+  };
+  createdAt: string;
+}
+
+export interface ContentTemplateLibrarySummary {
+  id: string;
+  vertical: string;
+  name: string;
+  description?: string;
+  pageType: ContentPageType;
+  variableCount: number;
+  sectionCount: number;
+  source: ContentTemplateLibraryItem['source'];
+  createdAt: string;
+}
+
 // ── Content Matrix (bulk content planning grid) ─────────────────
 
 export interface MatrixDimension {

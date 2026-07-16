@@ -1,6 +1,10 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
 import { z } from 'zod';
-import type { ContentMatrix, ContentTemplate } from '../../../shared/types/content.js';
+import type {
+  ContentMatrix,
+  ContentTemplate,
+  ContentTemplateLibrarySummary,
+} from '../../../shared/types/content.js';
 import {
   acceptContentTemplateGenerationUpgradeInputSchema,
   createContentMatrixFromPseoPlanInputSchema,
@@ -41,6 +45,13 @@ import {
   listTemplates,
   updateTemplate,
 } from '../../content-templates.js';
+import {
+  ContentTemplateLibraryError,
+  getLibraryTemplate,
+  instantiateLibraryTemplate,
+  listLibraryTemplates,
+  promoteTemplateToLibrary,
+} from '../../domains/content/template-library.js';
 import {
   ContentMatrixPatternRenderError,
   ContentMatrixSourceIntegrityError,
@@ -111,7 +122,18 @@ const DIRECT_CONTENT_TOOL_NAMES = new Set([
   'duplicate_content_template',
   'create_content_matrix',
   'update_content_matrix_cell',
+  'list_library_templates',
+  'get_library_template',
+  'promote_template_to_library',
+  'instantiate_library_template',
 ]);
+
+export const CONTENT_MATRIX_GLOBAL_TOOL_NAMES = [
+  'list_library_templates',
+  'get_library_template',
+  'promote_template_to_library',
+  'instantiate_library_template',
+] as const;
 
 const workspaceIdSchema = z.string().trim().min(1, 'workspace_id is required')
   .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes)
@@ -120,6 +142,8 @@ const durableIdSchema = z.string().trim().min(1)
   .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes);
 const templateCursorSchema = z.string().trim().min(1).max(2_048)
   .regex(/^[A-Za-z0-9_-]+$/, 'cursor must be an opaque base64url token');
+const verticalSchema = z.string().trim().min(1).max(64)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'vertical must be a lowercase slug');
 
 const listContentTemplatesInputSchema = z.object({
   workspace_id: workspaceIdSchema,
@@ -167,6 +191,34 @@ const duplicateContentTemplateInputSchema = z.object({
   template_id: durableIdSchema.describe('Durable source template ID.'),
   new_name: duplicateTemplateSchema.shape.name.optional()
     .describe('Optional name for the copy; defaults to the existing duplicate convention.'),
+}).strict();
+
+const listLibraryTemplatesInputSchema = z.object({
+  vertical: verticalSchema.optional()
+    .describe('Optional flat vertical slug, for example dental or saas.'),
+  cursor: templateCursorSchema.optional()
+    .describe('Opaque cursor bound to the exact vertical filter and library ordering.'),
+  limit: z.number().int().min(1).max(MATRIX_READ_LIMITS.maxPageSize).optional()
+    .describe(`Page size; defaults to ${MATRIX_READ_LIMITS.defaultPageSize} and caps at ${MATRIX_READ_LIMITS.maxPageSize}.`),
+}).strict();
+
+const getLibraryTemplateInputSchema = z.object({
+  library_template_id: durableIdSchema.describe('Durable studio library template ID.'),
+}).strict();
+
+const promoteTemplateToLibraryInputSchema = z.object({
+  source_workspace_id: workspaceIdSchema.describe('Workspace that owns the proven source template.'),
+  template_id: durableIdSchema.describe('Durable source content template ID.'),
+  expected_template_revision: z.number().int().nonnegative()
+    .describe('Exact source template revision returned by get_content_template.'),
+  vertical: verticalSchema.describe('Flat studio vertical slug, for example dental or saas.'),
+}).strict();
+
+const instantiateLibraryTemplateInputSchema = z.object({
+  target_workspace_id: workspaceIdSchema.describe('Existing workspace that will own the independent copy.'),
+  library_template_id: durableIdSchema.describe('Durable studio library template ID.'),
+  name: z.string().trim().min(1).max(MATRIX_GENERATION_SOURCE_LIMITS.template.maxNameBytes)
+    .optional().describe('Optional workspace-specific name for the copied template.'),
 }).strict();
 
 const createContentMatrixInputSchema = z.object({
@@ -250,6 +302,26 @@ export const contentMatrixActionTools: Tool[] = [
     name: 'duplicate_content_template',
     description: 'Duplicate an existing content template as a starting point for a new locked page structure. Does not alter the source template.',
     inputSchema: toMcpJsonSchema(duplicateContentTemplateInputSchema),
+  },
+  {
+    name: 'list_library_templates',
+    description: 'Master-key studio read. List bounded immutable template-library summaries, optionally filtered by one vertical slug. Library templates are studio assets, not workspace-owned generation sources.',
+    inputSchema: toMcpJsonSchema(listLibraryTemplatesInputSchema),
+  },
+  {
+    name: 'get_library_template',
+    description: 'Master-key studio read. Get one complete immutable library template and its exact source provenance. The snapshot cannot generate content until copied into a workspace.',
+    inputSchema: toMcpJsonSchema(getLibraryTemplateInputSchema),
+  },
+  {
+    name: 'promote_template_to_library',
+    description: 'Master-key studio action. Call only after the human operator explicitly requests promotion of this exact workspace template revision under this vertical. The immutable snapshot never edits the source, starts generation, approves, sends, or publishes.',
+    inputSchema: toMcpJsonSchema(promoteTemplateToLibraryInputSchema),
+  },
+  {
+    name: 'instantiate_library_template',
+    description: 'Master-key studio action. Copy one immutable library template into an existing workspace as a normal independently editable template with fresh section IDs. There is no live inheritance or later synchronization. This never starts generation or changes human approval gates.',
+    inputSchema: toMcpJsonSchema(instantiateLibraryTemplateInputSchema),
   },
   {
     name: 'create_content_matrix',
@@ -343,6 +415,10 @@ export interface ContentMatrixActionDependencies {
   createTemplate: typeof createTemplate;
   updateTemplate: typeof updateTemplate;
   duplicateTemplate: typeof duplicateTemplate;
+  listLibraryTemplates: typeof listLibraryTemplates;
+  getLibraryTemplate: typeof getLibraryTemplate;
+  promoteTemplateToLibrary: typeof promoteTemplateToLibrary;
+  instantiateLibraryTemplate: typeof instantiateLibraryTemplate;
   createMatrix: typeof createMatrix;
   updateMatrixCell: typeof updateMatrixCell;
   listPseoBlueprintEntries: typeof listPseoBlueprintEntries;
@@ -371,6 +447,10 @@ const defaultDependencies: ContentMatrixActionDependencies = {
   createTemplate,
   updateTemplate,
   duplicateTemplate,
+  listLibraryTemplates,
+  getLibraryTemplate,
+  promoteTemplateToLibrary,
+  instantiateLibraryTemplate,
   createMatrix,
   updateMatrixCell,
   listPseoBlueprintEntries,
@@ -452,6 +532,76 @@ function decodeTemplateCursor(cursor: string, workspaceId: string): TemplateList
   }
 }
 
+interface LibraryTemplateListCursor {
+  kind: 'library_template_list';
+  vertical: string | null;
+  createdAt: string;
+  libraryTemplateId: string;
+}
+
+function encodeLibraryTemplateCursor(cursor: LibraryTemplateListCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodeLibraryTemplateCursor(
+  cursor: string,
+  vertical: string | undefined,
+): LibraryTemplateListCursor {
+  try {
+    const decoded = Buffer.from(cursor, 'base64url');
+    if (decoded.length === 0 || decoded.toString('base64url') !== cursor) throw new Error('invalid');
+    const value = parseJsonFallback<Partial<LibraryTemplateListCursor>>(
+      decoded.toString('utf8'),
+      {},
+    );
+    if (
+      value.kind !== 'library_template_list'
+      || value.vertical !== (vertical ?? null)
+      || typeof value.createdAt !== 'string'
+      || typeof value.libraryTemplateId !== 'string'
+    ) throw new Error('invalid');
+    return value as LibraryTemplateListCursor;
+  } catch (error) {
+    log.debug({ error, vertical }, 'Library template cursor validation failed');
+    throw new MatrixReadServiceError(
+      'invalid_cursor',
+      'The library template cursor is invalid.',
+      {
+        field_path: 'cursor',
+        constraint: 'must be an opaque cursor returned by list_library_templates for the same vertical filter',
+      },
+    );
+  }
+}
+
+function listLibraryTemplateSummaries(
+  vertical: string | undefined,
+  cursor: string | undefined,
+  requestedLimit: number | undefined,
+  dependencies: ContentMatrixActionDependencies,
+): { items: ContentTemplateLibrarySummary[]; nextCursor: string | null } {
+  const limit = requestedLimit ?? MATRIX_READ_LIMITS.defaultPageSize;
+  const decoded = cursor ? decodeLibraryTemplateCursor(cursor, vertical) : undefined;
+  const result = dependencies.listLibraryTemplates({
+    vertical,
+    cursor: decoded ? {
+      createdAt: decoded.createdAt,
+      id: decoded.libraryTemplateId,
+    } : undefined,
+    limit,
+  });
+  const last = result.items.at(-1);
+  return {
+    items: result.items,
+    nextCursor: result.hasMore && last ? encodeLibraryTemplateCursor({
+      kind: 'library_template_list',
+      vertical: vertical ?? null,
+      createdAt: last.createdAt,
+      libraryTemplateId: last.id,
+    }) : null,
+  };
+}
+
 function listTemplateSummaries(
   workspaceId: string,
   cursor: string | undefined,
@@ -502,7 +652,8 @@ function projectCreatedMatrix(matrix: ContentMatrix) {
 
 function runContentPlanPostCommitEffects(
   workspaceId: string,
-  action: 'template_created' | 'template_updated' | 'template_duplicated' | 'matrix_created',
+  action: 'template_created' | 'template_updated' | 'template_duplicated'
+    | 'template_instantiated' | 'matrix_created',
   resource: ContentTemplate | ContentMatrix,
   dependencies: ContentMatrixActionDependencies,
 ): void {
@@ -521,8 +672,10 @@ function runContentPlanPostCommitEffects(
       ? 'Created content template'
       : action === 'template_updated'
         ? 'Updated content template'
-        : action === 'template_duplicated'
+      : action === 'template_duplicated'
           ? 'Duplicated content template'
+          : action === 'template_instantiated'
+            ? 'Instantiated studio content template'
           : 'Created content matrix';
     dependencies.addActivity(
       workspaceId,
@@ -646,6 +799,24 @@ function directContentCellNotFoundError(): CallToolResult {
 }
 
 function directContentDomainError(error: unknown): CallToolResult | null {
+  if (error instanceof ContentTemplateLibraryError) {
+    return mcpJsonV1Error({
+      code: error.code === 'not_found'
+        ? MCP_TOOL_ERROR_CODES.NOT_FOUND
+        : error.code === 'conflict'
+          ? MCP_TOOL_ERROR_CODES.CONFLICT
+          : MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
+      message: error.message,
+      retryable: error.code === 'conflict',
+      details: {
+        field_path: error.fieldPath,
+        constraint: error.constraint,
+        ...(error.actualRevision === undefined
+          ? {}
+          : { actual_revision: error.actualRevision }),
+      },
+    });
+  }
   if (error instanceof ContentTemplateRevisionConflictError) {
     return mcpJsonV1Error({
       code: MCP_TOOL_ERROR_CODES.CONFLICT,
@@ -934,6 +1105,83 @@ export function createContentMatrixActionHandler(
         runContentPlanPostCommitEffects(
           parsed.data.workspace_id,
           'template_duplicated',
+          template,
+          dependencies,
+        );
+        return mcpSuccess(toMcpPayload({ template }));
+      }
+
+      if (name === 'list_library_templates') {
+        const parsed = listLibraryTemplatesInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        return mcpSuccess(toMcpPayload(listLibraryTemplateSummaries(
+          parsed.data.vertical,
+          parsed.data.cursor,
+          parsed.data.limit,
+          dependencies,
+        )));
+      }
+
+      if (name === 'get_library_template') {
+        const parsed = getLibraryTemplateInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        const template = dependencies.getLibraryTemplate(parsed.data.library_template_id);
+        if (!template) {
+          return mcpJsonV1Error({
+            code: MCP_TOOL_ERROR_CODES.NOT_FOUND,
+            message: 'The requested library template was not found.',
+            retryable: false,
+            details: {
+              field_path: 'library_template_id',
+              constraint: 'must identify an existing studio library template',
+            },
+          });
+        }
+        return mcpSuccess(toMcpPayload({ template }));
+      }
+
+      if (name === 'promote_template_to_library') {
+        const parsed = promoteTemplateToLibraryInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        const result = dependencies.promoteTemplateToLibrary({
+          sourceWorkspaceId: parsed.data.source_workspace_id,
+          templateId: parsed.data.template_id,
+          expectedTemplateRevision: parsed.data.expected_template_revision,
+          vertical: parsed.data.vertical,
+        });
+        if (!result.replayed) {
+          runPseoPostCommitEffect(
+            parsed.data.source_workspace_id,
+            'record-template-library-promotion',
+            () => {
+              dependencies.addActivity(
+                parsed.data.source_workspace_id,
+                'content_updated',
+                `Promoted content template "${result.template.name}" to the ${result.template.vertical} studio library`,
+                undefined,
+                { source: 'mcp-chat', action: 'template_promoted_to_library',
+                  templateId: parsed.data.template_id,
+                  libraryTemplateId: result.template.id,
+                  sourceRevision: parsed.data.expected_template_revision,
+                },
+              );
+            },
+          );
+        }
+        return mcpSuccess(toMcpPayload(result));
+      }
+
+      if (name === 'instantiate_library_template') {
+        const parsed = instantiateLibraryTemplateInputSchema.safeParse(args);
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
+        const template = dependencies.instantiateLibraryTemplate({
+          targetWorkspaceId: parsed.data.target_workspace_id,
+          libraryTemplateId: parsed.data.library_template_id,
+          name: parsed.data.name,
+        });
+        runContentPlanPostCommitEffects(
+          parsed.data.target_workspace_id,
+          'template_instantiated',
           template,
           dependencies,
         );

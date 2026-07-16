@@ -506,6 +506,19 @@ never sufficient to dispatch paid work.
   sanitizing registry boundary. Unvalidated results degrade to a generic safe
   envelope rather than being serialized.
 
+### Studio template library
+
+- Cross-workspace template reuse is a master-key studio operation. A workspace
+  key cannot enumerate, promote, read, or instantiate studio-owned assets.
+- Promotion snapshots one exact generation-ready source revision under one flat
+  vertical slug. The snapshot is immutable and retains source provenance.
+- Instantiation copies through the normal workspace template writer and gives
+  every section a fresh ID. Generation reads only that workspace-owned copy.
+- There is no live inheritance, sync, or retroactive library edit. A later source
+  revision is promoted as a new immutable asset.
+- Promotion and instantiation do not start paid work or grant approval, send,
+  publish, evidence, identity, or voice-finalization authority.
+
 ## 10. Brand review and projection
 
 - Brand client review reuses the unified `ClientDeliverable` spine; it does not

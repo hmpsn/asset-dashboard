@@ -118,7 +118,10 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       // M0 matrix structural planning
       'list_content_templates', 'get_content_template',
       'create_content_template', 'update_content_template',
-      'duplicate_content_template', 'create_content_matrix', 'update_content_matrix_cell',
+      'duplicate_content_template',
+      'list_library_templates', 'get_library_template',
+      'promote_template_to_library', 'instantiate_library_template',
+      'create_content_matrix', 'update_content_matrix_cell',
       'list_content_matrices', 'get_content_matrix',
       'resolve_content_matrix_cells', 'accept_content_template_generation_upgrade',
       'preview_content_matrix_generation', 'resolve_content_matrix_evidence',
