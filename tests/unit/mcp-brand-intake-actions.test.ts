@@ -545,10 +545,10 @@ describe('MCP brand intake actions', () => {
     const unknown = await handle('not_a_brand_intake_tool', {}, context);
 
     expect(isValidatedMcpJsonV1ErrorResult(invalid)).toBe(true);
-    expect(textPayload(invalid)).toEqual({
+    expect(textPayload(invalid)).toMatchObject({
       code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-      message: 'The tool input is invalid.',
       retryable: false,
+      details: { field_path: 'intake_revision_id' },
     });
     expect(isValidatedMcpJsonV1ErrorResult(unknown)).toBe(true);
     expect(textPayload(unknown)).toEqual({

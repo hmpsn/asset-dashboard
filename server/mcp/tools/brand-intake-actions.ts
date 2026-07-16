@@ -26,7 +26,7 @@ import { createLogger } from '../../logger.js';
 import { getWorkspace } from '../../workspaces.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
-import { mcpJsonV1Error } from '../tool-errors.js';
+import { mcpJsonV1Error, mcpZodValidationError } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-brand-intake-actions');
@@ -35,7 +35,7 @@ export const brandIntakeActionTools: Tool[] = [
   {
     name: 'submit_brand_intake',
     description:
-      'Submit the brand-intake questionnaire from MCP chat as a normalized immutable revision. Empty fields stay empty, never-invent rules apply, and a caller-stable idempotency key safely replays delayed retries.',
+      'Submit the brand-intake questionnaire from MCP chat as a normalized immutable revision capped at 131072 UTF-8 bytes. Empty fields stay empty, never-invent rules apply, field/limit validation is path-addressed, and a caller-stable idempotency key safely replays delayed retries.',
     inputSchema: toMcpJsonSchema(submitBrandIntakeInputSchema),
   },
   {
@@ -88,12 +88,8 @@ function toMcpPayload(value: unknown): unknown {
   );
 }
 
-function validationError(): CallToolResult {
-  return mcpJsonV1Error({
-    code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-    message: 'The tool input is invalid.',
-    retryable: false,
-  });
+function validationError(error: ZodError): CallToolResult {
+  return mcpZodValidationError(error);
 }
 
 function notFoundError(): CallToolResult {
@@ -204,7 +200,7 @@ export function createBrandIntakeActionHandler(
     try {
       if (name === 'submit_brand_intake') {
         const parsed = submitBrandIntakeInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return validationError(parsed.error);
         if (!dependencies.getWorkspace(parsed.data.workspace_id)) return notFoundError();
         const questionnaire = parsed.data.questionnaire;
         const result = dependencies.submitBrandIntake({
@@ -259,7 +255,7 @@ export function createBrandIntakeActionHandler(
 
       if (name === 'get_brand_intake') {
         const parsed = getBrandIntakeInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return validationError(parsed.error);
         if (!dependencies.getWorkspace(parsed.data.workspace_id)) return notFoundError();
         const result = dependencies.getBrandIntakeRevision({
           workspaceId: parsed.data.workspace_id,
@@ -273,7 +269,7 @@ export function createBrandIntakeActionHandler(
 
       if (name === 'resolve_brand_intake_evidence') {
         const parsed = resolveBrandIntakeEvidenceInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return validationError(parsed.error);
         const result = await dependencies.resolveBrandIntakeEvidence({
           workspaceId: parsed.data.workspace_id,
           intakeRevisionId: parsed.data.intake_revision_id,
@@ -305,7 +301,7 @@ export function createBrandIntakeActionHandler(
 
       return unknownToolError();
     } catch (error) {
-      if (error instanceof ZodError) return validationError();
+      if (error instanceof ZodError) return validationError(error);
       if (error instanceof BrandIntakeNotFoundError) return notFoundError();
       if (error instanceof BrandIntakeConflictError) return revisionConflictError(error);
       if (error instanceof BrandIntakeIdempotencyConflictError) {

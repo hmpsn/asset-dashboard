@@ -271,11 +271,24 @@ function strictCurrentVoice(
   }
 }
 
+export function brandGenerationPromptPreconditionReason(
+  message: string,
+): BrandGenerationPreconditionError['reason'] {
+  return message.startsWith('Required ')
+      ? 'stage_closure_failed'
+      : message.includes('candidate envelope')
+          || message.includes('durable candidate snapshot')
+        ? 'output_envelope_too_small'
+        : message.includes('voice authority')
+          ? 'voice_authority_invalid'
+          : 'input_too_large';
+}
+
 function throwPromptPrecondition(err: unknown): never {
   if (err instanceof BrandGenerationPromptContractError) {
     throw new BrandGenerationPreconditionError(
-      'input_too_large',
-      'The frozen brand input is too large for bounded generation. Reduce the intake or approved-source content before retrying.',
+      brandGenerationPromptPreconditionReason(err.message),
+      err.message,
       { cause: err },
     );
   }

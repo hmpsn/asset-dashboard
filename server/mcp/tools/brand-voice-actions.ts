@@ -1,4 +1,5 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
+import type { ZodError } from 'zod';
 import {
   addBrandVoiceSampleMcpInputSchema,
   createBrandVoiceProfileMcpInputSchema,
@@ -47,7 +48,7 @@ import {
 import { getWorkspace } from '../../workspaces.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
-import { mcpJsonV1Error } from '../tool-errors.js';
+import { mcpJsonV1Error, mcpZodValidationError } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-brand-voice-actions');
@@ -284,8 +285,8 @@ function executionActor(context: McpToolExecutionContext) {
   };
 }
 
-function validationError(): CallToolResult {
-  return mcpJsonV1Error({
+function validationError(error?: ZodError): CallToolResult {
+  return error ? mcpZodValidationError(error) : mcpJsonV1Error({
     code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
     message: 'The tool input is invalid.',
     retryable: false,
@@ -383,7 +384,7 @@ export function createBrandVoiceActionHandler(
     try {
       if (name === 'create_brand_voice_profile') {
         const parsed = createBrandVoiceProfileMcpInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return validationError(parsed.error);
         if (!dependencies.getWorkspace(parsed.data.workspace_id)) return notFoundError();
         const existing = dependencies.getVoiceProfile(parsed.data.workspace_id);
         if (existing) {
@@ -396,7 +397,7 @@ export function createBrandVoiceActionHandler(
 
       if (name === 'update_brand_voice_draft') {
         const parsed = updateBrandVoiceDraftMcpInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return validationError(parsed.error);
         const result = dependencies.updateVoiceProfileWithResult(
           parsed.data.workspace_id,
           {
@@ -437,7 +438,7 @@ export function createBrandVoiceActionHandler(
 
       if (name === 'add_brand_voice_sample') {
         const parsed = addBrandVoiceSampleMcpInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return validationError(parsed.error);
         const sample = dependencies.addVoiceSample(
           parsed.data.workspace_id,
           parsed.data.content,
@@ -455,7 +456,7 @@ export function createBrandVoiceActionHandler(
 
       if (name === 'get_brand_voice') {
         const parsed = getBrandVoiceInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return validationError(parsed.error);
         const result = await dependencies.getBrandVoicePage({
           workspaceId: parsed.data.workspace_id,
           anchorLimit: parsed.data.anchor_limit,
@@ -466,7 +467,7 @@ export function createBrandVoiceActionHandler(
 
       if (name === 'finalize_brand_voice') {
         const parsed = finalizeBrandVoiceMcpInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return validationError(parsed.error);
         const result = await dependencies.consumeVoiceFinalizationAuthorization({
           workspaceId: parsed.data.workspace_id,
           authorizationToken: parsed.data.authorization_token,
