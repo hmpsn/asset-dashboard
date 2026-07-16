@@ -76,6 +76,13 @@ authority. The workflow pauses at `awaiting_voice_finalization` until an
 operator supplies/selects authentic anchors and finalizes a later immutable
 voice version; no dependent brand or content generation may run first.
 
+Operator-authored brand identity does not need to pass through paid generation.
+`create_brand_deliverable` may create one workspace/type row from supplied
+content, but it always persists version 1 as `draft`, conflicts rather than
+overwriting an existing type, and uses the existing human approval mutation as
+the only path into downstream approved identity. It cannot finalize voice,
+approve, send, or publish.
+
 Preview returns the selected item count, blockers, placeholder-eligible gaps,
 estimated paid calls/tokens/cost, and an effective-input fingerprint. Start must
 present that fingerprint so the approved selection cannot drift before dispatch.
@@ -242,10 +249,11 @@ never sufficient to dispatch paid work.
   structured response-format selection. Successful provenance must match the
   successful reservation's fingerprint; candidate and audit prompts are
   expected to differ while sharing one source.
-- Provider holds are derived pessimistically from the rendered prompt's UTF-8
-  bytes plus bounded framing overhead, the requested output ceiling, and the
-  selected provider's token rates. Reported successful usage must fit inside
-  that durable hold; fixed token guesses are not a budget boundary.
+- Provider holds derive input tokens from the rendered prompt's UTF-8 bytes at
+  the shared 4-bytes-per-token estimate plus bounded framing overhead, then add
+  the requested output ceiling and selected provider's token rates. Preview and
+  runtime use the same conversion so the accepted estimate is reachable and the
+  exact dispatch cannot reserve against a different formula.
 - Before command acceptance, brand generation proves the complete required-stage
   provider closure after JSON/research/message-placement wrapping. Resume and
   revision acceptance also checks `reserved + command estimate <= run limits`

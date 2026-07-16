@@ -42,7 +42,8 @@ For workspace-scoped tools, the parameter name is **not** uniform:
 - A number of **read** tools use **`workspaceId`** (camelCase): `get_workspace_overview`, insights,
   intelligence, the content analysis reads (`get_content_decay` / `get_keyword_analysis` /
   `get_seo_context` / `get_content_performance`), client signals (`get_client_signals` /
-  `get_pending_work`), and brand (`get_brand_identity` / `update_brand_deliverable`).
+  `get_pending_work`), and brand (`get_brand_identity` / `create_brand_deliverable` /
+  `update_brand_deliverable`).
 
 Match each tool's own schema. The registry records the one workspace field each tool actually
 declares and rejects conflicting aliases, so an undeclared decoy field cannot authorize access to
@@ -113,7 +114,7 @@ failure classes; unknown names and mismatched workspace values are never logged 
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
 dispatch, workspace scope, and error compatibility. It composes **18 categories** for a total of
-**101 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+**102 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
 name with inert invalid input, asserts the exact 18 family-array→handler identities, and pins the
@@ -158,6 +159,7 @@ increments the paid-call counter.
 | Tool | R/W | Purpose |
 |------|-----|---------|
 | `get_brand_identity` | R | Structured approved identity + voice status, with approved/pending/total deliverable counts; `includeDeliverables:true` adds every deliverable with `version`. |
+| `create_brand_deliverable` | W | Store operator-authored content as a new draft. Duplicate workspace/type conflicts; human approval remains required. |
 | `update_brand_deliverable` | W | Edit a deliverable's content. Optimistic concurrency via `expectedVersion`; resets to `draft`. |
 
 ### brand-intake-actions (`tools/brand-intake-actions.ts`) — immutable evidence authority
