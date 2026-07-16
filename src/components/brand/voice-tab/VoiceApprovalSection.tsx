@@ -101,6 +101,20 @@ export function VoiceApprovalSection({
     },
   });
 
+  const attestAllMutation = useMutation({
+    mutationFn: (sampleIds: string[]) =>
+      voice.attestSamples(workspaceId, sampleIds, profile.revision),
+    onSuccess: (result) => {
+      setAuthorization(null);
+      onChanged();
+      toast(`${result.samples.length} voice proposal${result.samples.length === 1 ? '' : 's'} approved`);
+    },
+    onError: (error) => {
+      toast(extractErrorMessage(error, 'Failed to approve voice proposals'), 'error');
+      onChanged();
+    },
+  });
+
   const finalizeMutation = useMutation({
     mutationFn: (command: VoiceProfileFinalizationInput) => voice.finalize(workspaceId, command),
     onSuccess: () => {
@@ -212,6 +226,22 @@ export function VoiceApprovalSection({
             MCP can propose examples, but cannot declare its own writing authentic. Confirm only
             samples that accurately represent the voice you want to authorize.
           </p>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="t-caption text-[var(--brand-text-muted)]">
+              This approves exactly the {proposedSamples.length} full proposal{proposedSamples.length === 1 ? '' : 's'} shown below.
+            </p>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              icon={Check}
+              onClick={() => attestAllMutation.mutate(proposedSamples.map(sample => sample.id))}
+              disabled={attestMutation.isPending || attestAllMutation.isPending}
+              loading={attestAllMutation.isPending}
+            >
+              Approve all {proposedSamples.length} proposal{proposedSamples.length === 1 ? '' : 's'}
+            </Button>
+          </div>
           <div className="divide-y divide-[var(--brand-border)] border-y border-[var(--brand-border)]">
             {proposedSamples.map(sample => (
               <div key={sample.id} className="py-3 space-y-2">
@@ -226,7 +256,7 @@ export function VoiceApprovalSection({
                     size="sm"
                     icon={Check}
                     onClick={() => setAttestSampleId(sample.id)}
-                    disabled={attestMutation.isPending}
+                    disabled={attestMutation.isPending || attestAllMutation.isPending}
                   >
                     Confirm as authentic
                   </Button>

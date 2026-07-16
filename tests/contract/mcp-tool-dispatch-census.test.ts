@@ -252,7 +252,7 @@ describe('MCP definition-to-handler dispatch census', () => {
   });
 
   it('routes every registered production definition into its family handler', async () => {
-    expect(MCP_TOOL_REGISTRY.size).toBe(94);
+    expect(MCP_TOOL_REGISTRY.size).toBe(96);
     for (const entry of MCP_TOOL_REGISTRY.values()) {
       await assertDefinitionIsDispatched(entry);
     }

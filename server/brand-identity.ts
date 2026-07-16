@@ -443,6 +443,7 @@ export function setDeliverableStatus(
   workspaceId: string,
   id: string,
   status: 'approved' | 'draft',
+  expectedVersion?: number,
 ): BrandDeliverable | null {
   // Read + write + side-effect decision MUST be atomic. Two concurrent
   // `setDeliverableStatus(wsId, id, 'approved')` calls without a transaction
@@ -463,7 +464,7 @@ export function setDeliverableStatus(
     return setDeliverableStatusCasInTransaction(
       workspaceId,
       id,
-      row.version,
+      expectedVersion ?? row.version,
       row.status as BrandDeliverable['status'],
       status,
     );

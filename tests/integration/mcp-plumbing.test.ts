@@ -126,7 +126,8 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       // B0 durable brand intake
       'get_brand_intake', 'resolve_brand_intake_evidence',
       // B1 operator-authorized brand voice
-      'get_brand_voice', 'finalize_brand_voice',
+      'get_brand_voice', 'get_pending_approvals',
+      'add_brand_voice_samples', 'finalize_brand_voice',
       // B2 grounded brand deliverable generation
       'start_brand_deliverable_generation', 'get_brand_generation',
       'resume_brand_deliverable_generation', 'start_brand_deliverable_revision',
@@ -324,6 +325,56 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     });
     expect(JSON.stringify(payload)).not.toContain('raw_intake');
     expect(JSON.stringify(payload)).not.toContain('authorization_token');
+  });
+
+  it('adds a voice-sample set with one revision bump and exposes the pending approval queue', async () => {
+    const created = await callTool(
+      'create_brand_voice_profile',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(created.result?.isError).toBeFalsy();
+    const createdPayload = JSON.parse(created.result!.content[0].text) as {
+      profile: { revision: number };
+    };
+
+    const added = await callTool(
+      'add_brand_voice_samples',
+      {
+        workspace_id: wsA.workspaceId,
+        expected_profile_revision: createdPayload.profile.revision,
+        samples: [
+          { content: 'First complete chat-proposed voice sample.', context: 'body' },
+          { content: 'Second complete chat-proposed voice sample.', context: 'headline' },
+        ],
+      },
+      MASTER_KEY,
+    );
+    expect(added.result?.isError).toBeFalsy();
+    const addedPayload = JSON.parse(added.result!.content[0].text) as {
+      count: number;
+      profile_revision: number;
+    };
+    expect(addedPayload).toEqual(expect.objectContaining({
+      count: 2,
+      profile_revision: createdPayload.profile.revision + 1,
+    }));
+
+    const pending = await callTool(
+      'get_pending_approvals',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(pending.result?.isError).toBeFalsy();
+    const pendingPayload = JSON.parse(pending.result!.content[0].text) as {
+      counts: { voice_samples: number };
+      items: Array<{ type: string; content: { content?: string } }>;
+    };
+    expect(pendingPayload.counts.voice_samples).toBe(2);
+    expect(pendingPayload.items.filter(item => item.type === 'voice_sample')).toEqual([
+      expect.objectContaining({ content: expect.objectContaining({ content: 'First complete chat-proposed voice sample.' }) }),
+      expect.objectContaining({ content: expect.objectContaining({ content: 'Second complete chat-proposed voice sample.' }) }),
+    ]);
   });
 
   it('dispatches brand-generation reads through the registered json_v1 family', async () => {

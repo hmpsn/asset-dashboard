@@ -2127,7 +2127,7 @@
           "createdAt": "2026-07-15",
           "shippedAt": "2026-07-15",
           "owner": "platform-foundation",
-          "notes": "Adds the missing chat entry points without weakening human approval: immutable MCP intake submission with durable caller-key replay, bounded collection blueprint/entry discovery, and revision-safe voice profile/DNA/guardrail/context/sample writes. MCP-added samples remain proposed and cannot enter the authentic anchor pool until a human attests them in the platform. The separate follow-up owns that attestation, the clear approval surface, and one-time MCP authorization handoff."
+          "notes": "Adds the missing chat entry points without weakening human approval: immutable MCP intake submission with durable caller-key replay, bounded collection blueprint/entry discovery, and revision-safe voice profile/DNA/guardrail/context/sample writes. MCP-added samples remain proposed and cannot enter the authentic anchor pool until a human attests them in the platform. The follow-up added one-revision batch sample writes, pending-proposal reads, exact readiness blockers, and a unified read of every Brand & AI item awaiting a human."
         },
         {
           "id": "brand-voice-approval-surface",
@@ -2139,7 +2139,7 @@
           "createdAt": "2026-07-15",
           "shippedAt": "2026-07-15",
           "owner": "brand-engine",
-          "notes": "Makes voice approval explicit and reachable in the platform while preserving the human gate. Review & approve is the default voice section; the checklist exposes missing DNA, guardrails, authentic anchors, and MCP proposals. MCP-proposed samples require a revision-safe human attestation before they become finalization evidence. The operator may finalize directly or create the existing 15-minute, one-use, exact-command bearer code for MCP to consume. MCP cannot mint the code, attest its own samples, or use a reusable approval password."
+          "notes": "Makes voice approval explicit and reachable in the platform while preserving the human gate. Review & approve is the default voice section; the checklist exposes missing DNA, guardrails, authentic anchors, and MCP proposals. MCP-proposed samples require a revision-safe human attestation before they become finalization evidence. The operator may finalize directly or create the existing 15-minute, one-use, exact-command bearer code for MCP to consume. The Brand & AI top bar now exposes one pending-count modal with full voice proposals and draft deliverables plus exact visible-set batch approval; the Voice review surface adds a full-set batch proposal action. MCP cannot mint the code, attest its own samples, or use a reusable approval password."
         }
       ],
       "shippedAt": "2026-07-14"

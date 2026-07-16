@@ -22,6 +22,7 @@ import type {
   VoiceDNA, VoiceGuardrails, ContextModifier, VoiceProfileStatus,
   VoiceSampleContext, VoiceSampleSource,
 } from '../shared/types/brand-engine.js';
+import { VOICE_FINALIZATION_LIMITS } from '../shared/types/voice-finalization.js';
 
 const log = createLogger('voice-calibration');
 export { getVoiceProfile } from './voice-profile-read-model.js';
@@ -375,6 +376,77 @@ export function addVoiceSample(
   };
 }
 
+/** Add a chat-proposed sample set with one optimistic revision check and one revision bump. */
+export function addVoiceSamples(
+  workspaceId: string,
+  samples: Array<{ content: string; context?: VoiceSampleContext }>,
+  expectedRevision: number,
+): VoiceSample[] {
+  if (samples.length < 1 || samples.length > VOICE_FINALIZATION_LIMITS.maxAnchors) {
+    throw new VoiceSampleValidationError(
+      `Voice sample batch must contain 1–${VOICE_FINALIZATION_LIMITS.maxAnchors} samples`,
+    );
+  }
+  const normalized = samples.map((sample) => {
+    const parsed = voiceSampleInputSchema.safeParse({
+      content: sample.content,
+      contextTag: sample.context,
+      source: 'mcp_proposed',
+    });
+    if (!parsed.success) {
+      throw new VoiceSampleValidationError(
+        parsed.error.issues[0]?.message ?? 'Voice sample is invalid',
+      );
+    }
+    return parsed.data;
+  });
+  const now = new Date().toISOString();
+  const ids = normalized.map(() => `vs_${randomUUID().slice(0, 8)}`);
+
+  const insertBatch = db.transaction((): { voiceProfileId: string; firstSortOrder: number } => {
+    const profile = getVoiceProfile(workspaceId);
+    if (!profile) throw new Error('No voice profile exists for this workspace');
+    if (profile.revision !== expectedRevision) {
+      throw new VoiceProfileRevisionConflictError(expectedRevision, profile.revision);
+    }
+    const { max } = stmts().maxSampleSortOrder.get(profile.id) as { max: number };
+    normalized.forEach((sample, index) => {
+      stmts().insertSample.run({
+        id: ids[index],
+        voice_profile_id: profile.id,
+        content: sample.content,
+        context_tag: sample.contextTag ?? null,
+        source: 'mcp_proposed',
+        sort_order: max + 1 + index,
+        created_at: now,
+      });
+    });
+    const touched = stmts().touchProfileAfterSampleMutation.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      updated_at: now,
+    });
+    if (touched.changes !== 1) {
+      throw new VoiceProfileRevisionConflictError(expectedRevision, profile.revision + 1);
+    }
+    return { voiceProfileId: profile.id, firstSortOrder: max + 1 };
+  });
+
+  const { voiceProfileId, firstSortOrder } = insertBatch.immediate();
+  invalidateMonthlyDigestCache(workspaceId);
+  clearIntelligenceCache(workspaceId);
+  return normalized.map((sample, index) => ({
+    id: ids[index]!,
+    voiceProfileId,
+    content: sample.content,
+    contextTag: sample.contextTag,
+    source: 'mcp_proposed',
+    sortOrder: firstSortOrder + index,
+    createdAt: now,
+  }));
+}
+
 /** Human-only promotion of an MCP proposal into finalization-eligible evidence. */
 export function attestVoiceSample(
   workspaceId: string,
@@ -413,6 +485,59 @@ export function attestVoiceSample(
   invalidateMonthlyDigestCache(workspaceId);
   clearIntelligenceCache(workspaceId);
   return sample;
+}
+
+/** Human-only batch promotion of the exact visible MCP proposal set. */
+export function attestVoiceSamples(
+  workspaceId: string,
+  sampleIds: string[],
+  expectedRevision: number,
+): VoiceSample[] {
+  const uniqueIds = [...new Set(sampleIds)];
+  if (
+    uniqueIds.length !== sampleIds.length
+    || uniqueIds.length < 1
+  ) {
+    throw new VoiceSampleAttestationError(
+      'Voice sample approval must contain unique samples',
+    );
+  }
+  const doAttest = db.transaction((): VoiceSample[] => {
+    const profile = getVoiceProfile(workspaceId);
+    if (!profile) throw new Error('No voice profile exists for this workspace');
+    if (profile.revision !== expectedRevision) {
+      throw new VoiceProfileRevisionConflictError(expectedRevision, profile.revision);
+    }
+    const byId = new Map(profile.samples.map(sample => [sample.id, sample]));
+    const samples = uniqueIds.map((sampleId) => {
+      const sample = byId.get(sampleId);
+      if (!sample) throw new VoiceSampleAttestationError('Voice sample not found');
+      if (sample.source !== 'mcp_proposed') {
+        throw new VoiceSampleAttestationError('Only MCP-proposed samples can be attested');
+      }
+      return sample;
+    });
+    for (const sample of samples) {
+      const updated = stmts().attestSample.run(sample.id, profile.id);
+      if (updated.changes !== 1) {
+        throw new VoiceSampleAttestationError('Voice sample could not be attested');
+      }
+    }
+    const touched = stmts().touchProfileAfterSampleMutation.run({
+      id: profile.id,
+      workspace_id: workspaceId,
+      expected_revision: profile.revision,
+      updated_at: new Date().toISOString(),
+    });
+    if (touched.changes !== 1) {
+      throw new VoiceProfileRevisionConflictError(expectedRevision, profile.revision + 1);
+    }
+    return samples.map(sample => ({ ...sample, source: 'operator_attested' }));
+  });
+  const samples = doAttest.immediate();
+  invalidateMonthlyDigestCache(workspaceId);
+  clearIntelligenceCache(workspaceId);
+  return samples;
 }
 
 export function deleteVoiceSample(workspaceId: string, sampleId: string): boolean {

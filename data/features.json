@@ -733,7 +733,7 @@
     {
       "id": 74,
       "title": "Chat-Driven Brand Voice Approval",
-      "oneLiner": "Draft voice DNA, guardrails, context rules, and samples through MCP chat, then visibly review and lock the exact authority in the platform or with a one-time human-issued code",
+      "oneLiner": "Draft voice DNA, guardrails, context rules, samples, and brand pieces through MCP chat, then review the complete pending set in one platform modal, batch-approve visible changes, and explicitly lock voice authority",
       "category": "content",
       "painPoints": ["brand-voice", "onboarding", "content-quality", "approval-workflow"],
       "tier": "premium",

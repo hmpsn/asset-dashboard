@@ -83,6 +83,11 @@ export const voice = {
   deleteSample: (wsId: string, sampleId: string) => del(`/api/voice/${wsId}/samples/${sampleId}`),
   attestSample: (wsId: string, sampleId: string, expectedProfileRevision: number) =>
     post<VoiceSample>(`/api/voice/${wsId}/samples/${sampleId}/attest`, { expectedProfileRevision }),
+  attestSamples: (wsId: string, sampleIds: string[], expectedProfileRevision: number) =>
+    post<{ samples: VoiceSample[]; profileRevision: number }>(
+      `/api/voice/${wsId}/samples/attest-batch`,
+      { sampleIds, expectedProfileRevision },
+    ),
   finalize: (wsId: string, body: VoiceProfileFinalizationInput) =>
     post<FinalizeBrandVoiceResult>(`/api/voice/${wsId}/finalize`, body),
   createFinalizationAuthorization: (wsId: string, body: VoiceProfileFinalizationInput) =>
@@ -109,8 +114,11 @@ export const identity = {
     post<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}/refine`, body),
   updateContent: (wsId: string, id: string, content: string) =>
     patch<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}`, { content }),
-  updateStatus: (wsId: string, id: string, status: 'approved' | 'draft') =>
-    patch<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}`, { status }),
+  updateStatus: (wsId: string, id: string, status: 'approved' | 'draft', expectedVersion?: number) =>
+    patch<BrandDeliverable>(`/api/brand-identity/${wsId}/${id}`, {
+      status,
+      ...(expectedVersion === undefined ? {} : { expectedVersion }),
+    }),
   /**
    * Export approved deliverables. Server responds with raw `text/markdown`, not
    * JSON — we wrap the string in `{ markdown }` here so callers keep a stable

@@ -8,6 +8,7 @@ import { ToastProvider } from '../../src/components/Toast';
 
 const voiceMocks = vi.hoisted(() => ({
   attestSample: vi.fn(),
+  attestSamples: vi.fn(),
   finalize: vi.fn(),
   createFinalizationAuthorization: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock('../../src/api/brand-engine', async importOriginal => {
     voice: {
       ...actual.voice,
       attestSample: voiceMocks.attestSample,
+      attestSamples: voiceMocks.attestSamples,
       finalize: voiceMocks.finalize,
       createFinalizationAuthorization: voiceMocks.createFinalizationAuthorization,
     },
@@ -126,6 +128,10 @@ describe('VoiceApprovalSection', () => {
       ...profile.samples[0],
       source: 'operator_attested',
     });
+    voiceMocks.attestSamples.mockResolvedValue({
+      samples: [{ ...profile.samples[0], source: 'operator_attested' }],
+      profileRevision: 8,
+    });
     voiceMocks.finalize.mockResolvedValue({ created: true });
     voiceMocks.createFinalizationAuthorization.mockResolvedValue({
       authorization: {
@@ -160,6 +166,18 @@ describe('VoiceApprovalSection', () => {
 
     await waitFor(() => {
       expect(voiceMocks.attestSample).toHaveBeenCalledWith('ws_review', 'vs_proposed', 7);
+    });
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('batch-approves exactly the full visible proposal set', async () => {
+    const { onChanged } = renderApproval();
+
+    expect(screen.getByText(/This approves exactly the 1 full proposal shown below/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Approve all 1 proposal' }));
+
+    await waitFor(() => {
+      expect(voiceMocks.attestSamples).toHaveBeenCalledWith('ws_review', ['vs_proposed'], 7);
     });
     expect(onChanged).toHaveBeenCalled();
   });

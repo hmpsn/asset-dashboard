@@ -52,6 +52,13 @@ export const attestVoiceSampleSchema = z.object({
   expectedProfileRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 }).strict();
 
+export const attestVoiceSamplesSchema = z.object({
+  expectedProfileRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  sampleIds: z.array(z.string().trim().min(1).max(VOICE_FINALIZATION_LIMITS.maxIdLength))
+    .min(1)
+    .refine(ids => new Set(ids).size === ids.length, 'sampleIds must be unique'),
+}).strict();
+
 export const updateVoiceProfileSchema = z.object({
   // Keep the complete persisted status vocabulary at the validation boundary.
   // The domain service rejects attempts to claim `calibrated` so callers retain
