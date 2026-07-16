@@ -1,4 +1,5 @@
 import db from '../../../db/index.js';
+import { parseJsonFallback } from '../../../db/json-validation.js';
 import {
   createMatrix,
   getMatrix,
@@ -7,14 +8,16 @@ import {
 } from '../../../content-matrices.js';
 import { getTemplate } from '../../../content-templates.js';
 import { hasExactMatrixKeywordConflict } from '../../../cannibalization-detection.js';
-import { getEntry, updateEntry } from '../../../page-strategy.js';
+import { getEntry, listBlueprints, updateEntry } from '../../../page-strategy.js';
 import type { ContentMatrix, ContentTemplate, MatrixDimension } from '../../../../shared/types/content.js';
 import type {
   BlueprintEntry,
   CreatePseoMatrixFromPlanInput,
   PseoMatrixMaterializationResult,
   PseoMatrixPlanResult,
+  ListPseoBlueprintEntriesResult,
 } from '../../../../shared/types/page-strategy.js';
+import { MATRIX_READ_LIMITS } from '../../../../shared/types/matrix-generation.js';
 import {
   MatrixGenerationSchemaTypeContractError,
   MatrixGenerationSourceLimitError,
@@ -61,6 +64,74 @@ interface PreparedPlan {
 interface PseoPlanSource {
   entry: BlueprintEntry;
   template: ContentTemplate;
+}
+
+interface BlueprintEntryCursor {
+  version: 1;
+  workspaceId: string;
+  offset: number;
+}
+
+function encodeBlueprintEntryCursor(cursor: BlueprintEntryCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodeBlueprintEntryCursor(workspaceId: string, cursor?: string): number {
+  if (!cursor) return 0;
+  const parsed = parseJsonFallback<Partial<BlueprintEntryCursor> | null>(
+    Buffer.from(cursor, 'base64url').toString('utf8'),
+    null,
+  );
+  if (
+    parsed?.version !== 1
+    || parsed.workspaceId !== workspaceId
+    || !Number.isSafeInteger(parsed.offset)
+    || (parsed.offset ?? -1) < 0
+  ) {
+    throw new PseoMatrixBridgeError(
+      'precondition_failed',
+      'invalid_matrix_definition',
+      'The blueprint entry cursor is invalid for this workspace.',
+    );
+  }
+  return parsed.offset as number;
+}
+
+export function listPseoBlueprintEntries(input: {
+  workspaceId: string;
+  cursor?: string;
+  limit?: number;
+}): ListPseoBlueprintEntriesResult {
+  const limit = Math.min(
+    Math.max(input.limit ?? MATRIX_READ_LIMITS.defaultPageSize, 1),
+    MATRIX_READ_LIMITS.maxPageSize,
+  );
+  const offset = decodeBlueprintEntryCursor(input.workspaceId, input.cursor);
+  const items = listBlueprints(input.workspaceId)
+    .flatMap(blueprint => (blueprint.entries ?? [])
+      .filter(entry => entry.isCollection)
+      .map(entry => ({
+        blueprintId: blueprint.id,
+        blueprintName: blueprint.name,
+        blueprintStatus: blueprint.status,
+        blueprintUpdatedAt: blueprint.updatedAt,
+        entryId: entry.id,
+        entryName: entry.name,
+        entryUpdatedAt: entry.updatedAt,
+        pageType: entry.pageType,
+        templateId: entry.templateId ?? null,
+        matrixId: entry.matrixId ?? null,
+      })))
+    .sort((left, right) => left.blueprintId.localeCompare(right.blueprintId)
+      || left.entryId.localeCompare(right.entryId));
+  const page = items.slice(offset, offset + limit);
+  const nextOffset = offset + page.length;
+  return {
+    items: page,
+    nextCursor: nextOffset < items.length
+      ? encodeBlueprintEntryCursor({ version: 1, workspaceId: input.workspaceId, offset: nextOffset })
+      : null,
+  };
 }
 
 function normalizedValueKey(value: string): string {

@@ -1,7 +1,10 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
 import {
+  addBrandVoiceSampleMcpInputSchema,
+  createBrandVoiceProfileMcpInputSchema,
   finalizeBrandVoiceMcpInputSchema,
   getBrandVoiceInputSchema,
+  updateBrandVoiceDraftMcpInputSchema,
 } from '../../../shared/types/mcp-brand-voice-schemas.js';
 import {
   MCP_TOOL_ERROR_CODES,
@@ -28,7 +31,21 @@ import {
   VoiceFinalizationReadCursorError,
 } from '../../domains/brand/voice-finalization.js';
 import { applyVoiceFinalizationPostCommitEffects } from '../../domains/brand/voice-finalization-effects.js';
+import { addActivity } from '../../activity-log.js';
+import { broadcastToWorkspace } from '../../broadcast.js';
+import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
 import { createLogger } from '../../logger.js';
+import {
+  addVoiceSample,
+  createVoiceProfile,
+  getVoiceProfile,
+  updateVoiceProfileWithResult,
+  VoiceProfileRevisionConflictError,
+  VoiceProfileValidationError,
+  VoiceSampleValidationError,
+} from '../../voice-calibration.js';
+import { getWorkspace } from '../../workspaces.js';
+import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import { mcpJsonV1Error } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
@@ -43,6 +60,24 @@ export const brandVoiceActionTools: Tool[] = [
     inputSchema: toMcpJsonSchema(getBrandVoiceInputSchema),
   },
   {
+    name: 'create_brand_voice_profile',
+    description:
+      'Idempotently ensure a mutable brand-voice profile exists for the workspace. Returns the existing profile unchanged when one already exists.',
+    inputSchema: toMcpJsonSchema(createBrandVoiceProfileMcpInputSchema),
+  },
+  {
+    name: 'update_brand_voice_draft',
+    description:
+      'Replace one or more proposed voice-DNA, guardrail, or context-modifier fields at an exact profile revision. This reopens finalized voice for human review and never finalizes it.',
+    inputSchema: toMcpJsonSchema(updateBrandVoiceDraftMcpInputSchema),
+  },
+  {
+    name: 'add_brand_voice_sample',
+    description:
+      'Add an exact proposed voice sample at an exact profile revision. MCP-added samples are always ineligible as finalization anchors until a human operator explicitly attests them in the platform.',
+    inputSchema: toMcpJsonSchema(addBrandVoiceSampleMcpInputSchema),
+  },
+  {
     name: 'finalize_brand_voice',
     description:
       'Consume one short-lived operator authorization bound to the exact brand-voice fields, profile revision, authentic anchors, ratings, and idempotency key. The MCP key is recorded only as internal execution provenance, is never returned, and cannot act as the finalizing operator.',
@@ -53,6 +88,14 @@ export const brandVoiceActionTools: Tool[] = [
 type MaybePromise<T> = T | Promise<T>;
 
 export interface BrandVoiceActionDependencies {
+  getWorkspace: typeof getWorkspace;
+  getVoiceProfile: typeof getVoiceProfile;
+  createVoiceProfile: typeof createVoiceProfile;
+  updateVoiceProfileWithResult: typeof updateVoiceProfileWithResult;
+  addVoiceSample: typeof addVoiceSample;
+  addActivity: typeof addActivity;
+  broadcastToWorkspace: typeof broadcastToWorkspace;
+  invalidateIntelligenceCache: typeof invalidateIntelligenceCache;
   getBrandVoicePage: (
     request: Parameters<typeof getBrandVoicePage>[0],
   ) => MaybePromise<GetBrandVoicePageResult>;
@@ -63,10 +106,65 @@ export interface BrandVoiceActionDependencies {
 }
 
 const defaultDependencies: BrandVoiceActionDependencies = {
+  getWorkspace,
+  getVoiceProfile,
+  createVoiceProfile,
+  updateVoiceProfileWithResult,
+  addVoiceSample,
+  addActivity,
+  broadcastToWorkspace,
+  invalidateIntelligenceCache,
   getBrandVoicePage,
   consumeVoiceFinalizationAuthorization,
   applyVoiceFinalizationPostCommitEffects,
 };
+
+function projectMutableProfile(profile: NonNullable<ReturnType<typeof getVoiceProfile>>) {
+  return {
+    id: profile.id,
+    revision: profile.revision,
+    status: profile.status,
+    voiceDNA: profile.voiceDNA,
+    guardrails: profile.guardrails,
+    contextModifiers: profile.contextModifiers,
+    updatedAt: profile.updatedAt,
+  };
+}
+
+function runDraftPostCommitEffects(
+  workspaceId: string,
+  action: 'created' | 'updated' | 'sample_added',
+  dependencies: BrandVoiceActionDependencies,
+): void {
+  const run = (effect: string, callback: () => void) => {
+    try {
+      callback();
+    } catch (error) {
+      log.warn({ error, workspaceId, effect }, 'Brand voice MCP post-commit effect failed');
+    }
+  };
+  run('activity', () => dependencies.addActivity(
+    workspaceId,
+    action === 'created'
+      ? 'voice_profile_created'
+      : action === 'sample_added'
+        ? 'voice_sample_added'
+        : 'voice_profile_updated',
+    action === 'created'
+      ? 'Created brand voice profile'
+      : action === 'sample_added'
+        ? 'Added brand voice sample'
+        : 'Updated brand voice draft',
+    undefined,
+    { source: 'mcp-chat', action },
+  ));
+  run('broadcast', () => dependencies.broadcastToWorkspace(
+    workspaceId,
+    WS_EVENTS.VOICE_PROFILE_UPDATED,
+    { action },
+  ));
+  run('intelligence', () => dependencies.invalidateIntelligenceCache(workspaceId));
+}
 
 function snakeCaseKey(key: string): string {
   return key
@@ -214,6 +312,18 @@ function revisionConflictError(error: VoiceFinalizationConflictError): CallToolR
   });
 }
 
+function draftRevisionConflictError(error: VoiceProfileRevisionConflictError): CallToolResult {
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.CONFLICT,
+    message: 'The brand voice changed. Re-read it and retry against the current profile revision.',
+    retryable: true,
+    details: {
+      expected_revision: error.expectedRevision,
+      actual_revision: error.actualRevision,
+    },
+  });
+}
+
 function readConflictError(): CallToolResult {
   return mcpJsonV1Error({
     code: MCP_TOOL_ERROR_CODES.CONFLICT,
@@ -271,6 +381,78 @@ export function createBrandVoiceActionHandler(
     context: McpToolExecutionContext,
   ): Promise<CallToolResult> {
     try {
+      if (name === 'create_brand_voice_profile') {
+        const parsed = createBrandVoiceProfileMcpInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        if (!dependencies.getWorkspace(parsed.data.workspace_id)) return notFoundError();
+        const existing = dependencies.getVoiceProfile(parsed.data.workspace_id);
+        if (existing) {
+          return mcpSuccess(toMcpPayload({ profile: projectMutableProfile(existing), created: false }));
+        }
+        const profile = dependencies.createVoiceProfile(parsed.data.workspace_id);
+        runDraftPostCommitEffects(parsed.data.workspace_id, 'created', dependencies);
+        return mcpSuccess(toMcpPayload({ profile: projectMutableProfile(profile), created: true }));
+      }
+
+      if (name === 'update_brand_voice_draft') {
+        const parsed = updateBrandVoiceDraftMcpInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        const result = dependencies.updateVoiceProfileWithResult(
+          parsed.data.workspace_id,
+          {
+            ...(parsed.data.voice_dna ? {
+              voiceDNA: {
+                personalityTraits: parsed.data.voice_dna.personality_traits,
+                toneSpectrum: parsed.data.voice_dna.tone_spectrum,
+                sentenceStyle: parsed.data.voice_dna.sentence_style,
+                vocabularyLevel: parsed.data.voice_dna.vocabulary_level,
+                humorStyle: parsed.data.voice_dna.humor_style,
+              },
+            } : {}),
+            ...(parsed.data.guardrails ? {
+              guardrails: {
+                forbiddenWords: parsed.data.guardrails.forbidden_words,
+                requiredTerminology: parsed.data.guardrails.required_terminology.map(item => ({
+                  use: item.use,
+                  insteadOf: item.instead_of,
+                })),
+                toneBoundaries: parsed.data.guardrails.tone_boundaries,
+                antiPatterns: parsed.data.guardrails.anti_patterns,
+              },
+            } : {}),
+            ...(parsed.data.context_modifiers
+              ? { contextModifiers: parsed.data.context_modifiers }
+              : {}),
+          },
+          parsed.data.expected_profile_revision,
+        );
+        if (result.changed) {
+          runDraftPostCommitEffects(parsed.data.workspace_id, 'updated', dependencies);
+        }
+        return mcpSuccess(toMcpPayload({
+          profile: projectMutableProfile(result.profile),
+          changed: result.changed,
+        }));
+      }
+
+      if (name === 'add_brand_voice_sample') {
+        const parsed = addBrandVoiceSampleMcpInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        const sample = dependencies.addVoiceSample(
+          parsed.data.workspace_id,
+          parsed.data.content,
+          parsed.data.context,
+          'mcp_proposed',
+          parsed.data.expected_profile_revision,
+        );
+        runDraftPostCommitEffects(parsed.data.workspace_id, 'sample_added', dependencies);
+        return mcpSuccess(toMcpPayload({
+          sample,
+          profileRevision: parsed.data.expected_profile_revision + 1,
+          eligibleAsFinalizationAnchor: false,
+        }));
+      }
+
       if (name === 'get_brand_voice') {
         const parsed = getBrandVoiceInputSchema.safeParse(args);
         if (!parsed.success) return validationError();
@@ -300,6 +482,15 @@ export function createBrandVoiceActionHandler(
       return unknownToolError();
     } catch (error) {
       if (error instanceof VoiceFinalizationReadCursorError) return validationError();
+      if (error instanceof VoiceProfileRevisionConflictError) {
+        return draftRevisionConflictError(error);
+      }
+      if (error instanceof VoiceProfileValidationError || error instanceof VoiceSampleValidationError) {
+        return validationError();
+      }
+      if (error instanceof Error && error.message === 'No voice profile exists for this workspace') {
+        return notFoundError();
+      }
       if (error instanceof VoiceFinalizationReadConflictError) return readConflictError();
       if (error instanceof VoiceFinalizationNotFoundError) return notFoundError();
       if (error instanceof VoiceFinalizationConflictError) return revisionConflictError(error);

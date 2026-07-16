@@ -31,10 +31,14 @@ import {
   updateVoiceProfile,
   updateVoiceProfileWithResult,
   addVoiceSample,
+  attestVoiceSample,
   deleteVoiceSample,
   listCalibrationSessions,
   VoiceProfileValidationError,
+  VoiceProfileRevisionConflictError,
   VoiceProfileStateTransitionError,
+  VoiceSampleAttestationError,
+  VoiceSampleValidationError,
 } from '../../server/voice-calibration.js';
 import db from '../../server/db/index.js';
 import type { VoiceDNA, VoiceGuardrails, ContextModifier } from '../../shared/types/brand-engine.js';
@@ -375,6 +379,16 @@ describe('updateVoiceProfile — field updates', () => {
     ).toThrow(/no voice profile/i);
   });
 
+  it('rejects an update prepared from a stale profile revision', () => {
+    const current = getVoiceProfile(ws.workspaceId)!;
+    expect(() => updateVoiceProfileWithResult(
+      ws.workspaceId,
+      { voiceDNA: SAMPLE_DNA },
+      current.revision - 1,
+    )).toThrow(VoiceProfileRevisionConflictError);
+    expect(getVoiceProfile(ws.workspaceId)!.revision).toBe(current.revision);
+  });
+
   it('rejects count, text, and UTF-8 JSON overflow before mutating the profile', () => {
     const before = getVoiceProfile(ws.workspaceId)!;
     const assertUnchanged = (): void => {
@@ -476,6 +490,36 @@ describe('addVoiceSample', () => {
     expect(sample.source).toBe('transcript_extraction');
   });
 
+  it('stores MCP-proposed samples without treating them as manual evidence', () => {
+    const sample = addVoiceSample(ws.workspaceId, 'Draft example from MCP chat', 'body', 'mcp_proposed');
+    expect(sample.source).toBe('mcp_proposed');
+    expect(getVoiceProfile(ws.workspaceId)!.samples.find(item => item.id === sample.id)?.source)
+      .toBe('mcp_proposed');
+  });
+
+  it('does not allow generic sample creation to forge operator attestation', () => {
+    expect(() => addVoiceSample(
+      ws.workspaceId,
+      'This did not pass through human confirmation.',
+      'body',
+      'operator_attested',
+    )).toThrow(VoiceSampleValidationError);
+  });
+
+  it('rejects a sample prepared from a stale profile revision', () => {
+    const current = getVoiceProfile(ws.workspaceId)!;
+    expect(() => addVoiceSample(
+      ws.workspaceId,
+      'Stale sample must not be stored',
+      'body',
+      'mcp_proposed',
+      current.revision - 1,
+    )).toThrow(VoiceProfileRevisionConflictError);
+    expect(getVoiceProfile(ws.workspaceId)!.samples.some(
+      item => item.content === 'Stale sample must not be stored',
+    )).toBe(false);
+  });
+
   it('defaults source to "manual" when not provided', () => {
     const sample = addVoiceSample(ws.workspaceId, 'Manual sample without explicit source');
     expect(sample.source).toBe('manual');
@@ -507,6 +551,53 @@ describe('addVoiceSample', () => {
     } finally {
       ws2.cleanup();
     }
+  });
+});
+
+describe('attestVoiceSample', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeAll(() => {
+    ws = seedWorkspace({ tier: 'growth', clientPassword: '' });
+    createVoiceProfile(ws.workspaceId);
+  });
+  afterAll(() => { ws?.cleanup(); });
+
+  it('promotes only an MCP proposal and advances the profile revision', () => {
+    const proposed = addVoiceSample(
+      ws.workspaceId,
+      'A human-reviewed chat proposal.',
+      'body',
+      'mcp_proposed',
+    );
+    const before = getVoiceProfile(ws.workspaceId)!;
+
+    const attested = attestVoiceSample(ws.workspaceId, proposed.id, before.revision);
+
+    expect(attested.source).toBe('operator_attested');
+    const after = getVoiceProfile(ws.workspaceId)!;
+    expect(after.revision).toBe(before.revision + 1);
+    expect(after.samples.find(sample => sample.id === proposed.id)?.source)
+      .toBe('operator_attested');
+  });
+
+  it('rejects stale revisions and non-MCP samples without changing provenance', () => {
+    const proposed = addVoiceSample(
+      ws.workspaceId,
+      'A proposal addressed from a stale screen.',
+      'body',
+      'mcp_proposed',
+    );
+    const current = getVoiceProfile(ws.workspaceId)!;
+    expect(() => attestVoiceSample(ws.workspaceId, proposed.id, current.revision - 1))
+      .toThrow(VoiceProfileRevisionConflictError);
+
+    const manual = addVoiceSample(ws.workspaceId, 'Already authentic.', 'body', 'manual');
+    const latest = getVoiceProfile(ws.workspaceId)!;
+    expect(() => attestVoiceSample(ws.workspaceId, manual.id, latest.revision))
+      .toThrow(VoiceSampleAttestationError);
+    expect(getVoiceProfile(ws.workspaceId)!.samples.find(sample => sample.id === manual.id)?.source)
+      .toBe('manual');
   });
 });
 

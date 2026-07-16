@@ -148,6 +148,7 @@ function legacyUpgradeProposal(): ContentTemplateGenerationUpgradeProposal {
 
 function dependencies() {
   return {
+    listPseoBlueprintEntries: vi.fn(() => ({ items: [], nextCursor: null })),
     listContentMatrices: vi.fn(() => ({
       items: [{
         id: 'mtx_1',
@@ -273,8 +274,9 @@ function textPayload(result: Awaited<ReturnType<ReturnType<typeof createContentM
 }
 
 describe('MCP content matrix read tools', () => {
-  it('advertises one dedicated eleven-tool snake_case family with described bounded inputs', () => {
+  it('advertises one dedicated twelve-tool snake_case family with described bounded inputs', () => {
     expect(contentMatrixActionTools.map(tool => tool.name)).toEqual([
+      'list_pseo_blueprint_entries',
       'list_content_matrices',
       'get_content_matrix',
       'resolve_content_matrix_cells',
@@ -304,11 +306,47 @@ describe('MCP content matrix read tools', () => {
         limit: { minimum: 1, maximum: 100 },
       },
     });
-    const resolveSchema = contentMatrixActionTools[2].inputSchema as Record<string, unknown>;
+    const resolveSchema = contentMatrixActionTools[3].inputSchema as Record<string, unknown>;
     expect(resolveSchema).toMatchObject({
       properties: {
         selections: { minItems: 1, maxItems: 25 },
       },
+    });
+  });
+
+  it('lists bounded pSEO collection entry identities before plan lookup', async () => {
+    const deps = dependencies();
+    deps.listPseoBlueprintEntries.mockReturnValue({
+      items: [{
+        blueprintId: 'blueprint_1',
+        blueprintName: 'Local services',
+        blueprintStatus: 'active',
+        blueprintUpdatedAt: '2026-07-14T00:00:00.000Z',
+        entryId: 'entry_1',
+        entryName: 'Service locations',
+        entryUpdatedAt: '2026-07-14T00:00:00.000Z',
+        pageType: 'location',
+        templateId: 'tpl_1',
+        matrixId: null,
+      }],
+      nextCursor: 'next-blueprint-page',
+    });
+    const result = await createContentMatrixActionHandler(deps)(
+      'list_pseo_blueprint_entries',
+      { workspace_id: 'ws_1', limit: 10 },
+      context,
+    );
+
+    expect(deps.listPseoBlueprintEntries).toHaveBeenCalledWith({
+      workspaceId: 'ws_1', cursor: undefined, limit: 10,
+    });
+    expect(textPayload(result)).toMatchObject({
+      items: [{
+        blueprint_id: 'blueprint_1',
+        entry_id: 'entry_1',
+        template_id: 'tpl_1',
+      }],
+      next_cursor: 'next-blueprint-page',
     });
   });
 

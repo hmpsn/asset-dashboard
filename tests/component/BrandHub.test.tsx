@@ -214,10 +214,10 @@ describe('BrandHub', () => {
     expect(screen.getByTestId('discovery-tab')).toBeInTheDocument();
   });
 
-  it('switches to Voice tab and renders stub', () => {
+  it('switches to Voice tab and renders stub', async () => {
     renderBrandHub();
     fireEvent.click(screen.getByRole('tab', { name: /voice/i }));
-    expect(screen.getByTestId('voice-tab')).toBeInTheDocument();
+    expect(await screen.findByTestId('voice-tab')).toBeInTheDocument();
   });
 
   it('switches to Identity tab and renders stub', () => {

@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import {
   getBrandIntakeInputSchema,
   resolveBrandIntakeEvidenceInputSchema,
+  submitBrandIntakeInputSchema,
 } from '../../../shared/types/mcp-brand-intake-schemas.js';
 import {
   MCP_TOOL_ERROR_CODES,
@@ -17,6 +18,7 @@ import {
   BrandIntakePersistenceContractError,
   getBrandIntakeRevision,
   resolveBrandIntakeEvidence,
+  submitBrandIntake,
   type BrandIntakePostCommitEffect,
 } from '../../domains/brand/intake/index.js';
 import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidation.js';
@@ -30,6 +32,12 @@ import { mcpSuccess } from '../tool-helpers.js';
 const log = createLogger('mcp-tools-brand-intake-actions');
 
 export const brandIntakeActionTools: Tool[] = [
+  {
+    name: 'submit_brand_intake',
+    description:
+      'Submit the brand-intake questionnaire from MCP chat as a normalized immutable revision. Empty fields stay empty, never-invent rules apply, and a caller-stable idempotency key safely replays delayed retries.',
+    inputSchema: toMcpJsonSchema(submitBrandIntakeInputSchema),
+  },
   {
     name: 'get_brand_intake',
     description:
@@ -48,6 +56,7 @@ type MaybePromise<T> = T | Promise<T>;
 
 export interface BrandIntakeActionDependencies {
   getWorkspace: typeof getWorkspace;
+  submitBrandIntake: typeof submitBrandIntake;
   getBrandIntakeRevision: typeof getBrandIntakeRevision;
   resolveBrandIntakeEvidence: (
     request: Parameters<typeof resolveBrandIntakeEvidence>[0],
@@ -59,6 +68,7 @@ export interface BrandIntakeActionDependencies {
 
 const defaultDependencies: BrandIntakeActionDependencies = {
   getWorkspace,
+  submitBrandIntake,
   getBrandIntakeRevision,
   resolveBrandIntakeEvidence,
   addActivity,
@@ -192,6 +202,61 @@ export function createBrandIntakeActionHandler(
     context: McpToolExecutionContext,
   ): Promise<CallToolResult> {
     try {
+      if (name === 'submit_brand_intake') {
+        const parsed = submitBrandIntakeInputSchema.safeParse(args);
+        if (!parsed.success) return validationError();
+        if (!dependencies.getWorkspace(parsed.data.workspace_id)) return notFoundError();
+        const questionnaire = parsed.data.questionnaire;
+        const result = dependencies.submitBrandIntake({
+          workspaceId: parsed.data.workspace_id,
+          source: 'mcp',
+          submitter: resolverAttribution(context),
+          idempotencyKey: parsed.data.idempotency_key,
+          payload: {
+            schemaVersion: 1,
+            business: {
+              businessName: questionnaire.business.business_name,
+              industry: questionnaire.business.industry,
+              description: questionnaire.business.description,
+              services: questionnaire.business.services,
+              locations: questionnaire.business.locations,
+              differentiators: questionnaire.business.differentiators,
+              website: questionnaire.business.website,
+            },
+            audience: {
+              primaryAudience: questionnaire.audience.primary_audience,
+              painPoints: questionnaire.audience.pain_points,
+              goals: questionnaire.audience.goals,
+              objections: questionnaire.audience.objections,
+              buyingStage: questionnaire.audience.buying_stage,
+              secondaryAudience: questionnaire.audience.secondary_audience,
+            },
+            brand: {
+              tone: questionnaire.brand.tone,
+              personality: questionnaire.brand.personality,
+              avoidWords: questionnaire.brand.avoid_words,
+              contentFormats: questionnaire.brand.content_formats,
+              existingExamples: questionnaire.brand.existing_examples,
+            },
+            competitors: {
+              competitors: questionnaire.competitors.competitors,
+              whatTheyDoBetter: questionnaire.competitors.what_they_do_better,
+              whatYouDoBetter: questionnaire.competitors.what_you_do_better,
+              referenceUrls: questionnaire.competitors.reference_urls,
+            },
+            authenticSamples: [],
+          },
+        });
+        if (result.created && !result.replayed && result.postCommitEffect) {
+          applyPostCommitEffect(parsed.data.workspace_id, result.postCommitEffect, dependencies);
+        }
+        return mcpSuccess(toMcpPayload({
+          revision: result.revision,
+          created: result.created,
+          replayed: result.replayed,
+        }));
+      }
+
       if (name === 'get_brand_intake') {
         const parsed = getBrandIntakeInputSchema.safeParse(args);
         if (!parsed.success) return validationError();

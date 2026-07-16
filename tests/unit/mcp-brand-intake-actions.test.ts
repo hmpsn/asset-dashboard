@@ -169,6 +169,7 @@ function sideEffectDependencies() {
   const invalidateIntelligenceCache = vi.fn();
   const dependencies: BrandIntakeActionDependencies = {
     getWorkspace,
+    submitBrandIntake,
     getBrandIntakeRevision,
     resolveBrandIntakeEvidence,
     addActivity,
@@ -185,8 +186,9 @@ function sideEffectDependencies() {
 }
 
 describe('MCP brand intake actions', () => {
-  it('advertises one dedicated two-tool snake_case family', () => {
+  it('advertises one dedicated three-tool snake_case family', () => {
     expect(brandIntakeActionTools.map(tool => tool.name)).toEqual([
+      'submit_brand_intake',
       'get_brand_intake',
       'resolve_brand_intake_evidence',
     ]);
@@ -196,6 +198,98 @@ describe('MCP brand intake actions', () => {
       expect(tool.inputSchema.properties).not.toHaveProperty('workspaceId');
       expect(tool.description).toEqual(expect.any(String));
     }
+  });
+
+  it('submits an immutable MCP intake idempotently and emits effects once', async () => {
+    const workspaceId = createTestWorkspace('submit');
+    const effects = sideEffectDependencies();
+    const handle = createBrandIntakeActionHandler(effects.dependencies);
+    const args = {
+      workspace_id: workspaceId,
+      questionnaire: {
+        business: {
+          business_name: 'Northstar Dental',
+          industry: 'Dentistry',
+          description: 'Patient-first dental care.',
+          services: 'Preventive care',
+          locations: 'Austin, Texas',
+        },
+        brand: {
+          tone: 'Warm and direct',
+          personality: ['Patient', 'Clear'],
+          avoid_words: 'Guaranteed',
+        },
+      },
+      idempotency_key: 'mcp-intake-submit-1',
+    };
+
+    const first = await handle('submit_brand_intake', args, workspaceContext(workspaceId));
+    const replay = await handle('submit_brand_intake', args, workspaceContext(workspaceId));
+
+    expect(textPayload(first)).toMatchObject({
+      revision: {
+        workspace_id: workspaceId,
+        source: 'mcp',
+        submitter: { actor_type: 'mcp', actor_id: 'mcp_key_brand_intake' },
+        payload: { business: { business_name: 'Northstar Dental' } },
+      },
+      created: true,
+      replayed: false,
+    });
+    expect(textPayload(replay)).toMatchObject({ created: false, replayed: true });
+    expect(effects.addActivity).toHaveBeenCalledTimes(1);
+    expect(effects.broadcastToWorkspace).toHaveBeenCalledTimes(1);
+    expect(effects.invalidateIntelligenceCache).toHaveBeenCalledTimes(1);
+  });
+
+  it('replays a delayed intake retry without restoring stale questionnaire content', async () => {
+    const workspaceId = createTestWorkspace('delayed-replay');
+    const handle = createBrandIntakeActionHandler();
+    const firstArgs = {
+      workspace_id: workspaceId,
+      questionnaire: { business: { business_name: 'First Brand' } },
+      idempotency_key: 'mcp-intake-delayed-first',
+    };
+    const first = await handle('submit_brand_intake', firstArgs, workspaceContext(workspaceId));
+    await handle('submit_brand_intake', {
+      workspace_id: workspaceId,
+      questionnaire: { business: { business_name: 'Current Brand' } },
+      idempotency_key: 'mcp-intake-delayed-second',
+    }, workspaceContext(workspaceId));
+    const replay = await handle('submit_brand_intake', firstArgs, workspaceContext(workspaceId));
+    const current = await handle('get_brand_intake', {
+      workspace_id: workspaceId,
+    }, workspaceContext(workspaceId));
+
+    expect(textPayload(replay)).toMatchObject({
+      revision: { id: (textPayload(first).revision as { id: string }).id },
+      created: false,
+      replayed: true,
+    });
+    expect(textPayload(current)).toMatchObject({
+      revision: { revision: 2, payload: { business: { business_name: 'Current Brand' } } },
+    });
+  });
+
+  it('conflicts when an intake idempotency key is reused for different content', async () => {
+    const workspaceId = createTestWorkspace('submit-conflict');
+    const handle = createBrandIntakeActionHandler();
+    const base = {
+      workspace_id: workspaceId,
+      questionnaire: { business: { business_name: 'Northstar Dental' } },
+      idempotency_key: 'mcp-intake-submit-conflict',
+    };
+    await handle('submit_brand_intake', base, workspaceContext(workspaceId));
+    const conflict = await handle('submit_brand_intake', {
+      ...base,
+      questionnaire: { business: { business_name: 'Changed Brand' } },
+    }, workspaceContext(workspaceId));
+
+    expect(isValidatedMcpJsonV1ErrorResult(conflict)).toBe(true);
+    expect(textPayload(conflict)).toMatchObject({
+      code: MCP_TOOL_ERROR_CODES.CONFLICT,
+      retryable: false,
+    });
   });
 
   it('reads the current or named immutable revision and returns an empty current read', async () => {

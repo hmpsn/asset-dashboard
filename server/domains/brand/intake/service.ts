@@ -43,10 +43,12 @@ import {
 import {
   computeBrandIntakeFingerprint,
   computeBrandIntakeRevisionFingerprint,
+  getBrandIntakeSubmissionCommand,
   getCurrentStoredBrandIntakeRevision,
   getStoredBrandIntakeRevisionById,
   getStoredBrandIntakeRevisionByIdempotencyKey,
   insertStoredBrandIntakeRevision,
+  insertBrandIntakeSubmissionCommand,
   type StoredBrandIntakeRevision,
 } from './repository.js';
 
@@ -55,6 +57,8 @@ const submissionRequestSchema = z.object({
   payload: brandIntakePayloadSchema,
   source: brandIntakeSourceSchema,
   submitter: brandIntakeSubmitterSchema,
+  idempotencyKey: z.string().trim().min(1)
+    .max(BRAND_INTAKE_LIMITS.maxIdempotencyKeyLength).optional(),
 }).strict().superRefine((value, ctx) => {
   const expectedActorType = BRAND_INTAKE_SOURCE_ACTOR_POLICY[value.source];
   if (value.submitter.actorType !== expectedActorType) {
@@ -270,8 +274,37 @@ export function submitBrandIntake(
 ): BrandIntakeSubmissionServiceResult {
   const parsed = submissionRequestSchema.parse(request);
   const targetRevisionFingerprint = computeBrandIntakeRevisionFingerprint(parsed.payload, []);
+  const commandFingerprint = computeBrandIntakeFingerprint({
+    payload: parsed.payload,
+    source: parsed.source,
+    submitter: {
+      actorType: parsed.submitter.actorType,
+      actorId: parsed.submitter.actorId,
+    },
+  });
 
   const transaction = db.transaction((): BrandIntakeSubmissionServiceResult => {
+    if (parsed.idempotencyKey) {
+      const command = getBrandIntakeSubmissionCommand(
+        parsed.workspaceId,
+        parsed.idempotencyKey,
+      );
+      if (command) {
+        if (command.mutationFingerprint !== commandFingerprint) {
+          throw new BrandIntakeIdempotencyConflictError(
+            parsed.workspaceId,
+            parsed.idempotencyKey,
+          );
+        }
+        return {
+          revision: command.revision.revision,
+          created: false,
+          replayed: true,
+          projectionChanged: false,
+          postCommitEffect: null,
+        };
+      }
+    }
     const current = getCurrentStoredBrandIntakeRevision(parsed.workspaceId);
     const sameSubmissionProvenance = current?.revision.mutationKind === 'submission'
       && current.revision.source === parsed.source
@@ -282,9 +315,19 @@ export function submitBrandIntake(
       && current.revision.fingerprint === targetRevisionFingerprint
       && sameSubmissionProvenance
     ) {
+      if (parsed.idempotencyKey) {
+        insertBrandIntakeSubmissionCommand({
+          workspaceId: parsed.workspaceId,
+          idempotencyKey: parsed.idempotencyKey,
+          mutationFingerprint: commandFingerprint,
+          intakeRevisionId: current.revision.id,
+          createdAt: new Date().toISOString(),
+        });
+      }
       return {
         revision: current.revision,
         created: false,
+        replayed: true,
         projectionChanged: false,
         postCommitEffect: null,
       };
@@ -310,6 +353,15 @@ export function submitBrandIntake(
       createdAt,
     });
     const revision = requireInsertedRevision(parsed.workspaceId, id);
+    if (parsed.idempotencyKey) {
+      insertBrandIntakeSubmissionCommand({
+        workspaceId: parsed.workspaceId,
+        idempotencyKey: parsed.idempotencyKey,
+        mutationFingerprint: commandFingerprint,
+        intakeRevisionId: revision.id,
+        createdAt,
+      });
+    }
     const projectionChanged = projectBrandIntakeCompatibility({
       workspaceId: parsed.workspaceId,
       revision,
@@ -318,6 +370,7 @@ export function submitBrandIntake(
     return {
       revision,
       created: true,
+      replayed: false,
       projectionChanged,
       postCommitEffect: postCommitEffectFor(revision),
     };

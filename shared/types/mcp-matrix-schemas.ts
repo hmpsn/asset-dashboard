@@ -51,6 +51,14 @@ export const getPseoMatrixPlanInputSchema = z.object({
     .describe('Durable collection blueprint-entry ID to inspect.'),
 }).strict();
 
+export const listPseoBlueprintEntriesInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  cursor: cursorSchema.optional()
+    .describe('Opaque collection-entry cursor bound to this workspace.'),
+  limit: z.number().int().min(1).max(MATRIX_READ_LIMITS.maxPageSize).optional()
+    .describe(`Page size; defaults to ${MATRIX_READ_LIMITS.defaultPageSize} and caps at ${MATRIX_READ_LIMITS.maxPageSize}.`),
+}).strict();
+
 export const createContentMatrixFromPseoPlanInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   blueprint_id: durableIdSchema

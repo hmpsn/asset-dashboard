@@ -19,6 +19,13 @@ import type {
   ExportRequest, ExportResult,
 } from '../../shared/types/copy-pipeline';
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs';
+import type {
+  CreateVoiceFinalizationAuthorizationResult,
+  FinalizeBrandVoiceResult,
+  GetBrandVoicePageResult,
+  VoiceProfileFinalizationInput,
+} from '../../shared/types/voice-finalization';
+import { VOICE_FINALIZATION_LIMITS } from '../../shared/types/voice-finalization';
 
 // ═══ BRANDSCRIPT ═══
 
@@ -67,9 +74,22 @@ export const voice = {
   /** Explicitly create a new draft voice profile. Throws on 409 if one already exists. */
   createProfile: (wsId: string) => post<VoiceProfile>(`/api/voice/${wsId}`, {}),
   updateProfile: (wsId: string, body: Partial<Pick<VoiceProfile, 'voiceDNA' | 'guardrails' | 'contextModifiers'>>) => patch<VoiceProfile>(`/api/voice/${wsId}`, body),
+  getReadiness: (wsId: string) =>
+    get<GetBrandVoicePageResult>(
+      `/api/voice/${wsId}/readiness?anchorLimit=${VOICE_FINALIZATION_LIMITS.maxAnchors}`,
+    ),
   addSample: (wsId: string, body: { content: string; contextTag?: string; source?: string }) =>
     post<VoiceSample>(`/api/voice/${wsId}/samples`, body),
   deleteSample: (wsId: string, sampleId: string) => del(`/api/voice/${wsId}/samples/${sampleId}`),
+  attestSample: (wsId: string, sampleId: string, expectedProfileRevision: number) =>
+    post<VoiceSample>(`/api/voice/${wsId}/samples/${sampleId}/attest`, { expectedProfileRevision }),
+  finalize: (wsId: string, body: VoiceProfileFinalizationInput) =>
+    post<FinalizeBrandVoiceResult>(`/api/voice/${wsId}/finalize`, body),
+  createFinalizationAuthorization: (wsId: string, body: VoiceProfileFinalizationInput) =>
+    post<CreateVoiceFinalizationAuthorizationResult>(
+      `/api/voice/${wsId}/finalization-authorizations`,
+      body,
+    ),
   calibrate: (wsId: string, body: { promptType: string; steeringNotes?: string }) =>
     post<CalibrationSession>(`/api/voice/${wsId}/calibrate`, body),
   refine: (wsId: string, sessionId: string, body: { variationIndex: number; direction: string }) =>

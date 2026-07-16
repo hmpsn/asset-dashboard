@@ -9,6 +9,9 @@ describe('brand engine factory entries', () => {
   it('voiceProfile key matches legacy literal', () => {
     expect(queryKeys.admin.voiceProfile('ws-1')).toEqual(['admin-voice-profile', 'ws-1']);
   });
+  it('voiceReadiness key is workspace-scoped', () => {
+    expect(queryKeys.admin.voiceReadiness('ws-1')).toEqual(['admin-voice-readiness', 'ws-1']);
+  });
   it('brandIdentity key matches legacy literal', () => {
     expect(queryKeys.admin.brandIdentity('ws-1')).toEqual(['admin-brand-identity', 'ws-1']);
   });
