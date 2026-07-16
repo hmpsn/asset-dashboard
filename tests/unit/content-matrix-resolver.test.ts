@@ -199,6 +199,101 @@ describe('resolveMatrixStructure', () => {
     expect(first.target.structuralFingerprint).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it('omits an optional section without evidence and records the omission in the manifest', () => {
+    const optionalProof = section({
+      id: 'section-proof',
+      name: 'Results and proof',
+      headingTemplate: 'Why patients choose {service}',
+      generationRole: 'proof',
+      optional: true,
+      order: 1,
+    });
+    const targetTemplate = template({
+      sections: [section(), optionalProof],
+    });
+
+    const result = resolveMatrixStructure(input({ template: targetTemplate }));
+
+    expect(result.status).toBe('resolved');
+    if (result.status !== 'resolved') return;
+    expect(result.target.blockManifest.blocks.map(block => block.id)).toEqual([
+      'system:introduction',
+      'template:section-body',
+      'system:conclusion',
+    ]);
+    expect(result.target.blockManifest.omittedOptionalSections).toEqual([{
+      sourceSectionId: 'section-proof',
+      name: 'Results and proof',
+      generationRole: 'proof',
+      evidenceRequirementId: 'matrix-cell:cell-1:section:section-proof',
+      reason: 'missing_section_evidence',
+    }]);
+    expect(result.target.renderedHeadings).toEqual(['Dental Implants in San José']);
+  });
+
+  it('includes an optional section when its exact section evidence is current', () => {
+    const targetTemplate = template({
+      sections: [
+        section(),
+        section({
+          id: 'section-proof',
+          name: 'Results and proof',
+          headingTemplate: 'Why patients choose {service}',
+          generationRole: 'proof',
+          optional: true,
+          order: 1,
+        }),
+      ],
+    });
+    const withoutEvidence = resolveMatrixStructure(input({ template: targetTemplate }));
+    const withEvidence = resolveMatrixStructure(input({
+      template: targetTemplate,
+      currentEvidenceRequirementIds: ['matrix-cell:cell-1:section:section-proof'],
+    }));
+
+    expect(withEvidence.status).toBe('resolved');
+    if (withEvidence.status !== 'resolved' || withoutEvidence.status !== 'resolved') return;
+    expect(withEvidence.target.blockManifest.blocks.map(block => block.id)).toContain(
+      'template:section-proof',
+    );
+    expect(withEvidence.target.blockManifest.blocks.find(
+      block => block.id === 'template:section-proof',
+    )).toMatchObject({ optional: true });
+    expect(withEvidence.target.blockManifest.omittedOptionalSections).toEqual([]);
+    expect(withEvidence.target.blockManifest.fingerprint).not.toBe(
+      withoutEvidence.target.blockManifest.fingerprint,
+    );
+  });
+
+  it('falls back to the system primary CTA when an optional primary CTA is omitted', () => {
+    const result = resolveMatrixStructure(input({
+      template: template({
+        sections: [
+          section(),
+          section({
+            id: 'section-cta',
+            name: 'CTA',
+            headingTemplate: 'Book {service}',
+            generationRole: 'cta',
+            ctaContract: { role: 'primary', required: true },
+            optional: true,
+            order: 1,
+          }),
+        ],
+      }),
+    }));
+
+    expect(result.status).toBe('resolved');
+    if (result.status !== 'resolved') return;
+    expect(result.target.blockManifest.blocks.at(-1)).toMatchObject({
+      id: 'system:conclusion',
+      ctaContract: { role: 'primary', required: true },
+    });
+    expect(result.target.blockManifest.blocks.filter(block => (
+      block.ctaContract.required && block.ctaContract.role === 'primary'
+    ))).toHaveLength(1);
+  });
+
   it('uses an explicitly validated per-cell planned URL override without treating it as drift', () => {
     const overridden = cell({
       plannedUrl: '/urgent-dental-care',

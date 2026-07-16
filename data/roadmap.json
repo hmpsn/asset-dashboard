@@ -23,10 +23,10 @@
           "source": "2026-07-16 productized templates spec item 2",
           "est": "M",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-16",
           "owner": "content-pipeline",
-          "notes": "Add optional?: boolean with false-by-default compatibility, section-addressed evidence requirements, omission-aware manifest fingerprints, explicit preview/resolution omission reporting, non-empty-template and primary-CTA post-resolution validation, and legacy upgrade acceptance. Evidence decides; no per-cell manual section toggles."
+          "notes": "Complete 2026-07-16. Adds false-by-default optional template sections driven only by stable matrix-cell section evidence requirements. Missing evidence produces a visible non-blocking optional_omit and omission-aware manifest fingerprint; resolving exact evidence advances the cell revision and restores the block. All-optional generation templates fail closed, optional primary CTA omission preserves the single system fallback CTA, legacy upgrades default false, and pre-feature durable fingerprints remain readable. MCP template schemas and guidance expose the flow without adding manual cell toggles or changing human gates."
         },
         {
           "id": "productized-template-vertical-library",

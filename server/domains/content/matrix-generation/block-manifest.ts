@@ -3,6 +3,7 @@ import {
   RESOLVED_SYSTEM_BLOCK_IDS,
   type ResolvedPageBlockManifest,
   type ResolvedPageBlockSequence,
+  type ResolvedOptionalTemplateSectionOmission,
   type ResolvedSystemConclusionBlock,
   type ResolvedSystemIntroductionBlock,
   type ResolvedTemplatePageBlock,
@@ -15,12 +16,14 @@ import {
 } from '../../../../shared/types/content.js';
 import { computeBlockManifestFingerprint } from './fingerprint.js';
 import { renderMatrixPattern, type MatrixPatternIssue } from './renderer.js';
+import { matrixCellSectionEvidenceRequirementId } from './requirements.js';
 
 export interface BlockManifestIssue {
   code:
     | 'duplicate_section_id'
     | 'duplicate_section_order'
     | 'empty_template_sections'
+    | 'all_sections_optional'
     | 'invalid_section'
     | 'missing_generation_role'
     | 'invalid_aeo_contract'
@@ -130,6 +133,7 @@ interface BuildSequenceOptions {
   headingValues?: Readonly<Record<string, string>>;
   allowedVariableNames: readonly string[];
   preserveHeadingTemplates: boolean;
+  includeOptionalSectionIds?: ReadonlySet<string>;
 }
 
 export function buildResolvedBlockSequence(
@@ -151,6 +155,9 @@ export function buildResolvedBlockSequence(
     }
   }
   if (issues.length > 0) return { status: 'blocked', issues };
+  if (sections.every(section => section.optional === true)) {
+    return { status: 'blocked', issues: [{ code: 'all_sections_optional' }] };
+  }
 
   const ids = new Set<string>();
   const orders = new Set<number>();
@@ -173,7 +180,12 @@ export function buildResolvedBlockSequence(
   }
   if (issues.length > 0) return { status: 'blocked', issues };
 
-  const templatePrimaryCtaCount = sorted.filter(section => (
+  const includedSections = sorted.filter(section => (
+    section.optional !== true
+      || options.includeOptionalSectionIds === undefined
+      || options.includeOptionalSectionIds.has(section.id)
+  ));
+  const templatePrimaryCtaCount = includedSections.filter(section => (
     section.ctaContract?.required && section.ctaContract.role === 'primary'
   )).length;
   if (templatePrimaryCtaCount > 1) {
@@ -189,7 +201,7 @@ export function buildResolvedBlockSequence(
   for (const variableName of options.allowedVariableNames) {
     headingValidationValues[variableName] = variableName;
   }
-  for (const section of sorted) {
+  for (const section of includedSections) {
     let renderedHeading: string | null = null;
     if (section.headingTemplate.length > 0) {
       if (options.preserveHeadingTemplates) {
@@ -243,6 +255,7 @@ export function buildResolvedBlockSequence(
       wordCountTarget: section.wordCountTarget,
       aeoContract: section.aeoContract!,
       ctaContract: section.ctaContract!,
+      ...(section.optional === true ? { optional: true } : {}),
     });
   }
   if (issues.length > 0) return { status: 'blocked', issues };
@@ -263,13 +276,36 @@ export function buildResolvedPageBlockManifest(
   sections: readonly TemplateSection[],
   variableValues: Readonly<Record<string, string>>,
   allowedVariableNames: readonly string[],
+  cellId: string,
+  currentEvidenceRequirementIds: readonly string[] = [],
 ): BuildResolvedPageBlockManifestResult {
+  const currentEvidenceIds = new Set(currentEvidenceRequirementIds);
+  const includedOptionalSectionIds = new Set(
+    sections
+      .filter(section => (
+        section.optional === true
+        && currentEvidenceIds.has(matrixCellSectionEvidenceRequirementId(cellId, section.id))
+      ))
+      .map(section => section.id),
+  );
   const sequence = buildResolvedBlockSequence(sections, {
     headingValues: variableValues,
     allowedVariableNames,
     preserveHeadingTemplates: false,
+    includeOptionalSectionIds: includedOptionalSectionIds,
   });
   if (sequence.status === 'blocked') return sequence;
+
+  const omittedOptionalSections: ResolvedOptionalTemplateSectionOmission[] = sections
+    .filter(section => section.optional === true && !includedOptionalSectionIds.has(section.id))
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+    .map(section => ({
+      sourceSectionId: section.id,
+      name: section.name,
+      generationRole: section.generationRole!,
+      evidenceRequirementId: matrixCellSectionEvidenceRequirementId(cellId, section.id),
+      reason: 'missing_section_evidence',
+    }));
 
   const totalWordCountTarget = sequence.blocks.reduce(
     (sum, block) => sum + (block.wordCountTarget ?? 0),
@@ -278,6 +314,7 @@ export function buildResolvedPageBlockManifest(
   const fingerprint = computeBlockManifestFingerprint({
     generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
     blocks: sequence.blocks,
+    omittedOptionalSections,
     totalWordCountTarget,
   });
 
@@ -286,6 +323,7 @@ export function buildResolvedPageBlockManifest(
     manifest: {
       generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
       blocks: sequence.blocks,
+      omittedOptionalSections,
       totalWordCountTarget,
       fingerprint,
     },

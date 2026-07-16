@@ -3,6 +3,13 @@ import type {
   GenerationEvidenceSourceRef,
 } from '../../../../shared/types/generation-evidence.js';
 
+export function matrixCellSectionEvidenceRequirementId(
+  cellId: string,
+  sectionId: string,
+): string {
+  return `matrix-cell:${cellId}:section:${sectionId}`;
+}
+
 export function structuralBlocker(
   id: string,
   fieldPath: string,

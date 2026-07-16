@@ -238,12 +238,12 @@ export const contentMatrixActionTools: Tool[] = [
   },
   {
     name: 'create_content_template',
-    description: 'Create a reusable page structure through the same validated template service used by the admin UI. Pattern variables use a single brace pair, for example /{service}-{city}; never use {{double_braces}}. This does not create pages, start AI work, or approve content.',
+    description: 'Create a reusable page structure through the same validated template service used by the admin UI. Mark a section optional only when evidence should decide whether it appears; missing section evidence omits it without blocking the page, and at least one section must remain required. Pattern variables use a single brace pair, for example /{service}-{city}; never use {{double_braces}}. This does not create pages, start AI work, or approve content.',
     inputSchema: toMcpJsonSchema(createContentTemplateInputSchema),
   },
   {
     name: 'update_content_template',
-    description: 'Revision-safely update one reusable content template through the existing domain service. Stale writes conflict; no generation or approval occurs.',
+    description: 'Revision-safely update one reusable content template through the existing domain service, including evidence-driven optional section markers. Stale writes conflict; no generation or approval occurs.',
     inputSchema: toMcpJsonSchema(updateContentTemplateInputSchema),
   },
   {

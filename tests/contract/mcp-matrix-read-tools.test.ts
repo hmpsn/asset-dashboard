@@ -379,9 +379,36 @@ describe('MCP content matrix read tools', () => {
       name: 'Service template',
       pageType: 'service',
       variables: [{ name: 'service', label: 'Service' }],
-      sections: [],
+      sections: [
+        {
+          id: 'body',
+          name: 'Body',
+          headingTemplate: '{service}',
+          guidance: 'Explain the service.',
+          wordCountTarget: 300,
+          order: 0,
+          generationRole: 'body',
+          aeoContract: { modes: [], required: false },
+          ctaContract: { role: 'none', required: false },
+        },
+        {
+          id: 'proof',
+          name: 'Proof',
+          headingTemplate: 'Why choose {service}',
+          guidance: 'Use supplied proof only.',
+          wordCountTarget: 150,
+          order: 1,
+          generationRole: 'proof',
+          aeoContract: { modes: [], required: false },
+          ctaContract: { role: 'none', required: false },
+          optional: true,
+        },
+      ],
       urlPattern: '/services/{service}',
       keywordPattern: '{service} service',
+      titlePattern: '{service}',
+      metaDescPattern: 'Learn about {service}.',
+      generationContractVersion: 1,
     };
 
     const created = await handle('create_content_template', {
@@ -421,6 +448,42 @@ describe('MCP content matrix read tools', () => {
     expect(deps.duplicateTemplate).toHaveBeenCalledWith('ws_1', 'tpl_1', 'Service template copy');
     expect(textPayload(duplicated)).toMatchObject({ template: { id: 'tpl_copy' } });
     expect(deps.addActivity).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects a generation-ready template whose entire authored structure is optional', async () => {
+    const deps = dependencies();
+    const result = await createContentMatrixActionHandler(deps)(
+      'create_content_template',
+      {
+        workspace_id: 'ws_1',
+        template: {
+          name: 'Invalid optional-only template',
+          pageType: 'service',
+          variables: [{ name: 'service', label: 'Service' }],
+          sections: [{
+            id: 'proof',
+            name: 'Proof',
+            headingTemplate: 'Why choose {service}',
+            guidance: 'Use supplied proof only.',
+            wordCountTarget: 150,
+            order: 0,
+            generationRole: 'proof',
+            aeoContract: { modes: [], required: false },
+            ctaContract: { role: 'none', required: false },
+            optional: true,
+          }],
+          urlPattern: '/services/{service}',
+          keywordPattern: '{service} service',
+          titlePattern: '{service}',
+          metaDescPattern: 'Learn about {service}.',
+        },
+      },
+      { ...context, toolName: 'create_content_template' },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(deps.createTemplate).not.toHaveBeenCalled();
+    expect(textPayload(result)).toMatchObject({ code: 'validation_failed' });
   });
 
   it('lists bounded template summaries without returning section blobs', async () => {

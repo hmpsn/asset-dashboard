@@ -47,6 +47,7 @@ export interface ResolveMatrixStructureInput {
   knownWorkspacePagePaths: readonly string[];
   knownWorkspacePublishedSlugs?: readonly string[];
   workspaceUrlCensusComplete?: boolean;
+  currentEvidenceRequirementIds?: readonly string[];
 }
 
 const BRIEF_PAGE_TYPE_SET = new Set<string>(BRIEF_PAGE_TYPES);
@@ -503,7 +504,13 @@ export function resolveMatrixStructure(
   let manifestResult: ReturnType<typeof buildResolvedPageBlockManifest> | null = null;
   let upgradeResult: ReturnType<typeof createContentTemplateGenerationUpgradeProposal> | null = null;
   if (input.template.generationContractVersion === MATRIX_GENERATION_CONTRACT_VERSION) {
-    manifestResult = buildResolvedPageBlockManifest(input.template.sections, input.cell.variableValues, variableNames);
+    manifestResult = buildResolvedPageBlockManifest(
+      input.template.sections,
+      input.cell.variableValues,
+      variableNames,
+      input.cell.id,
+      input.currentEvidenceRequirementIds,
+    );
     if (manifestResult.status === 'blocked') {
       blockers.push(...manifestResult.issues.map(issue => blocker(
         `invalid_template_block:${issue.sectionId ?? 'unknown'}:${issue.code}`,

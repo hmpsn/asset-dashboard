@@ -142,6 +142,30 @@ describe('content-templates store', () => {
       ctaContract: { role: 'none', required: false },
     });
 
+    const withOptionalProof = createServiceTemplate({
+      generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
+      sections: [
+        template.sections[0],
+        {
+          ...template.sections[0],
+          id: 'section-proof',
+          name: 'Proof',
+          order: 1,
+          generationRole: 'proof',
+          optional: true,
+        },
+      ],
+    });
+    expect(getTemplate(WS_ID, withOptionalProof.id)?.sections[1]?.optional).toBe(true);
+
+    expect(() => createServiceTemplate({
+      generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
+      sections: [{ ...template.sections[0], optional: true }],
+    })).toThrow(ContentTemplateGenerationContractError);
+    expect(() => createServiceTemplate({
+      sections: [{ ...template.sections[0], optional: true }],
+    })).toThrow(ContentTemplateGenerationContractError);
+
     expect(() => createServiceTemplate({
       pageType: 'provider-profile',
       generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,

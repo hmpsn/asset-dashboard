@@ -61,7 +61,12 @@ The evidence policy is typed per requirement:
   and `ready_to_publish`. Typical examples are required hours, pricing, staff,
   credentials, statistics, or CTA contact details.
 - `optional_omit` requirements are omitted cleanly. They never invite invented
-  copy or a placeholder that the page does not need.
+  copy or a placeholder that the page does not need. Evidence-driven template
+  sections use `matrix-cell:<cell_id>:section:<section_id>`; their ordered
+  omissions and reasons are part of the resolved manifest fingerprint. At least
+  one authored section remains non-optional, and omission cannot remove the
+  manifest's single required primary CTA because the system conclusion owns the
+  fallback.
 
 The voice-foundation bootstrap is the only voice exception: it may generate a
 provisional foundation from accepted intake without an already-finalized voice

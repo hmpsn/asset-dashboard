@@ -9928,3 +9928,15 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Tests:** Domain and resolver coverage pins arbitrary keyword/URL persistence, exact revision advancement, unsafe URL rejection, same- and cross-matrix collision rejection, regeneration behavior, and override-aware structural resolution. Contract and real spawned-server coverage pin strict snake-case input, field-addressed errors, workspace scope, registry discovery, one set of post-commit effects, and an end-to-end template → one-dimensional matrix → cell override call. The focused suite passes 8 files / 116 tests.
 
 **Files:** content-matrix stored cell contract/read model/writer/resolver; existing matrix HTTP schema and MCP adapter; MCP instructions/inventory; focused domain, resolver, contract, and integration tests; productized-template plan and roadmap.
+
+### 703. Evidence-driven optional content-template sections 2026-07-16
+
+**Status:** Complete. Template authors can mark a section optional through the existing HTTP/MCP template contract; evidence, not a manual per-cell toggle, decides whether it appears in each resolved page.
+
+**What it does:** Every optional section receives a stable `matrix-cell:<cell_id>:section:<section_id>` factual requirement. Without current evidence, resolution removes the block, records its name, generation role, requirement ID, and `missing_section_evidence` reason, and preview reports the same omission as non-blocking `optional_omit`. Resolving that exact requirement uses the existing evidence ledger and cell-revision invalidation path; the next resolution includes the block and its verified facts in the generation context.
+
+**Integrity and compatibility:** Required sections behave exactly as before, all-optional generation templates are rejected, and omitting an optional primary CTA transfers the sole required primary CTA to the system conclusion. New manifest fingerprints cover the ordered omission census. Legacy templates default `optional` to false, while durable pre-feature manifests without omission metadata preserve their original fingerprint contract. No voice-finalization, identity approval, content review, send, or publish authority changed.
+
+**Tests:** Domain, persistence, preview/evidence, route-schema, and MCP contract coverage pins omission/inclusion, revision invalidation, visible reasons, fingerprint changes, CTA fallback, all-optional rejection, optional marker persistence, and legacy stored-manifest compatibility.
+
+**Files:** shared template/matrix generation contracts; content-template validation/storage/upgrade; matrix manifest resolver, evidence/read/preview/persistence services; MCP descriptions/instructions; focused unit and contract tests; productized-template plan, roadmap, features, and audit.

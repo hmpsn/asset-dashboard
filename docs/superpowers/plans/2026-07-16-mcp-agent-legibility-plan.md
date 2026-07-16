@@ -131,3 +131,29 @@ Acceptance checklist:
 - [x] Real HTTP/MCP dispatch returns the updated cell and exact advanced revision.
 - [x] Registry, workspace-scope, instructions, and tool-count contracts include
   the new tool; no human gate changes.
+
+### PR C implementation closure
+
+Dependency order: section contract and stored-schema compatibility → deterministic
+manifest omission → current evidence read-through → preview/MCP projection →
+boundary tests. `optional` remains absent/false for existing sections. New optional
+sections use one stable `matrix-cell:<cell_id>:section:<section_id>` requirement;
+missing evidence is an `optional_omit`, not a paid-work blocker or placeholder.
+Supplying exact factual evidence advances the cell revision and includes the block
+on the next resolution. New fingerprints cover the omission census, while legacy
+stored manifests without that field retain their original fingerprint contract.
+
+Acceptance checklist:
+
+- [x] Missing optional-section evidence omits only that section and reports its
+  stable requirement ID and reason in resolution and preview.
+- [x] Current exact section evidence restores the block after a cell-revision
+  advance; no per-cell inclusion toggle exists.
+- [x] Required sections retain existing behavior, and an all-optional generation
+  template is rejected.
+- [x] Omitting an optional primary CTA transfers the one required primary CTA to
+  the system conclusion.
+- [x] Legacy upgrade proposals default `optional` to false, and old durable
+  fingerprints remain readable.
+- [x] MCP create/update discovery exposes the section marker and omission flow;
+  voice, evidence, approval, review, send, and publish gates are unchanged.
