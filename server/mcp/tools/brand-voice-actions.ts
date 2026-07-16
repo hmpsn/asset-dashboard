@@ -2,9 +2,11 @@ import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
 import type { ZodError } from 'zod';
 import {
   addBrandVoiceSampleMcpInputSchema,
+  addBrandVoiceSamplesMcpInputSchema,
   createBrandVoiceProfileMcpInputSchema,
   finalizeBrandVoiceMcpInputSchema,
   getBrandVoiceInputSchema,
+  getPendingApprovalsMcpInputSchema,
   updateBrandVoiceDraftMcpInputSchema,
 } from '../../../shared/types/mcp-brand-voice-schemas.js';
 import {
@@ -38,6 +40,7 @@ import { invalidateIntelligenceCache } from '../../intelligence/cache-invalidati
 import { createLogger } from '../../logger.js';
 import {
   addVoiceSample,
+  addVoiceSamples,
   createVoiceProfile,
   getVoiceProfile,
   updateVoiceProfileWithResult,
@@ -45,6 +48,7 @@ import {
   VoiceProfileValidationError,
   VoiceSampleValidationError,
 } from '../../voice-calibration.js';
+import { listDeliverables } from '../../brand-deliverable-read-model.js';
 import { getWorkspace } from '../../workspaces.js';
 import { WS_EVENTS } from '../../ws-events.js';
 import { toMcpJsonSchema } from '../json-schema.js';
@@ -57,8 +61,14 @@ export const brandVoiceActionTools: Tool[] = [
   {
     name: 'get_brand_voice',
     description:
-      'Read structured brand-voice readiness, a byte-bounded current profile, one bounded page of eligible authentic anchors, and a summary of the latest immutable finalization. The opaque anchor cursor is bound to the workspace plus current voice-profile and brand-intake revisions. Never returns raw brand intake or frozen snapshot content and never creates an authorization.',
+      'Read structured brand-voice readiness with exact missing prerequisites, all pending chat proposals, a byte-bounded current profile, one bounded page of eligible authentic anchors, and a summary of the latest immutable finalization. The opaque anchor cursor is bound to the workspace plus current voice-profile and brand-intake revisions. Never returns raw brand intake or frozen snapshot content and never creates an authorization.',
     inputSchema: toMcpJsonSchema(getBrandVoiceInputSchema),
+  },
+  {
+    name: 'get_pending_approvals',
+    description:
+      'Read every Brand & AI item currently awaiting a human decision: voice finalization, full chat-proposed voice samples, and full draft brand deliverables. Each item explains why it is pending. Read-only; it cannot attest, approve, or finalize anything.',
+    inputSchema: toMcpJsonSchema(getPendingApprovalsMcpInputSchema),
   },
   {
     name: 'create_brand_voice_profile',
@@ -79,6 +89,12 @@ export const brandVoiceActionTools: Tool[] = [
     inputSchema: toMcpJsonSchema(addBrandVoiceSampleMcpInputSchema),
   },
   {
+    name: 'add_brand_voice_samples',
+    description:
+      'Add a set of exact proposed voice samples with one optimistic revision check and one profile revision bump. Every sample remains ineligible as finalization evidence until a human operator approves it in the platform.',
+    inputSchema: toMcpJsonSchema(addBrandVoiceSamplesMcpInputSchema),
+  },
+  {
     name: 'finalize_brand_voice',
     description:
       'Consume one short-lived operator authorization bound to the exact brand-voice fields, profile revision, authentic anchors, ratings, and idempotency key. The MCP key is recorded only as internal execution provenance, is never returned, and cannot act as the finalizing operator.',
@@ -94,6 +110,8 @@ export interface BrandVoiceActionDependencies {
   createVoiceProfile: typeof createVoiceProfile;
   updateVoiceProfileWithResult: typeof updateVoiceProfileWithResult;
   addVoiceSample: typeof addVoiceSample;
+  addVoiceSamples: typeof addVoiceSamples;
+  listDeliverables: typeof listDeliverables;
   addActivity: typeof addActivity;
   broadcastToWorkspace: typeof broadcastToWorkspace;
   invalidateIntelligenceCache: typeof invalidateIntelligenceCache;
@@ -112,6 +130,8 @@ const defaultDependencies: BrandVoiceActionDependencies = {
   createVoiceProfile,
   updateVoiceProfileWithResult,
   addVoiceSample,
+  addVoiceSamples,
+  listDeliverables,
   addActivity,
   broadcastToWorkspace,
   invalidateIntelligenceCache,
@@ -227,7 +247,48 @@ function projectSnapshotSummary(
   };
 }
 
-function projectBrandVoiceReadiness(result: GetBrandVoicePageResult) {
+function specificBlockingReasons(
+  result: GetBrandVoicePageResult,
+  pendingProposalCount: number,
+): string[] {
+  if (result.readiness.state !== 'missing' || !result.profile) {
+    return result.readiness.blockingReasons;
+  }
+  if (result.profile.status === 'calibrated') {
+    return result.readiness.blockingReasons;
+  }
+  const reasons: string[] = [];
+  if (!result.profile.voiceDNA) reasons.push('Voice DNA is missing.');
+  if (!result.profile.guardrails) reasons.push('Voice guardrails are missing.');
+  if (result.eligibleAnchors.items.length === 0 && !result.eligibleAnchors.hasMore) {
+    reasons.push(pendingProposalCount > 0
+      ? `${pendingProposalCount} chat-proposed voice sample${pendingProposalCount === 1 ? '' : 's'} ${pendingProposalCount === 1 ? 'requires' : 'require'} human approval before any can be used as an authentic anchor.`
+      : 'At least one human-authenticated voice anchor is missing.');
+  }
+  if (reasons.length === 0) {
+    reasons.push('Voice DNA, guardrails, and authentic anchors are ready for human finalization.');
+  }
+  return reasons;
+}
+
+function pendingVoiceProposals(
+  profile: ReturnType<typeof getVoiceProfile>,
+) {
+  return (profile?.samples ?? [])
+    .filter(sample => sample.source === 'mcp_proposed')
+    .map(sample => ({
+      id: sample.id,
+      content: sample.content,
+      context: sample.contextTag,
+      source: sample.source,
+      createdAt: sample.createdAt,
+    }));
+}
+
+function projectBrandVoiceReadiness(
+  result: GetBrandVoicePageResult,
+  proposals: ReturnType<typeof pendingVoiceProposals>,
+) {
   const profile = result.profile
     ? {
         id: result.profile.id,
@@ -241,7 +302,7 @@ function projectBrandVoiceReadiness(result: GetBrandVoicePageResult) {
     : null;
   const readiness = result.readiness.state === 'finalized' || result.readiness.state === 'stale'
     ? { ...result.readiness, snapshot: projectSnapshotSummary(result.readiness.snapshot) }
-    : result.readiness;
+    : { ...result.readiness, blockingReasons: specificBlockingReasons(result, proposals.length) };
   return {
     profile,
     readiness,
@@ -257,6 +318,60 @@ function projectBrandVoiceReadiness(result: GetBrandVoicePageResult) {
       hasMore: result.eligibleAnchors.hasMore,
     },
     latestSnapshot: projectSnapshotSummary(result.latestSnapshot),
+    pendingProposals: {
+      count: proposals.length,
+      items: proposals,
+    },
+  };
+}
+
+function projectPendingApprovals(
+  result: GetBrandVoicePageResult,
+  proposals: ReturnType<typeof pendingVoiceProposals>,
+  deliverables: ReturnType<typeof listDeliverables>,
+) {
+  const items: Array<Record<string, unknown>> = [];
+  if (result.profile && result.readiness.state !== 'finalized') {
+    items.push({
+      id: `voice-finalization:${result.profile.id}:${result.profile.revision}`,
+      type: 'voice_finalization',
+      content: {
+        profileRevision: result.profile.revision,
+        voiceDNA: result.profile.voiceDNA ?? null,
+        guardrails: result.profile.guardrails ?? null,
+        contextModifiers: result.profile.contextModifiers,
+      },
+      whyPending: specificBlockingReasons(result, proposals.length).join(' '),
+    });
+  }
+  for (const proposal of proposals) {
+    items.push({
+      id: proposal.id,
+      type: 'voice_sample',
+      content: proposal,
+      whyPending: 'A human operator must confirm this chat proposal as authentic brand voice.',
+    });
+  }
+  for (const deliverable of deliverables.filter(item => item.status === 'draft')) {
+    items.push({
+      id: deliverable.id,
+      type: 'brand_deliverable',
+      content: {
+        deliverableType: deliverable.deliverableType,
+        content: deliverable.content,
+        version: deliverable.version,
+      },
+      whyPending: 'This brand deliverable is still a draft and requires human approval.',
+    });
+  }
+  return {
+    count: items.length,
+    counts: {
+      voiceFinalization: items.filter(item => item.type === 'voice_finalization').length,
+      voiceSamples: proposals.length,
+      brandDeliverables: deliverables.filter(item => item.status === 'draft').length,
+    },
+    items,
   };
 }
 
@@ -454,6 +569,23 @@ export function createBrandVoiceActionHandler(
         }));
       }
 
+      if (name === 'add_brand_voice_samples') {
+        const parsed = addBrandVoiceSamplesMcpInputSchema.safeParse(args);
+        if (!parsed.success) return validationError(parsed.error);
+        const samples = dependencies.addVoiceSamples(
+          parsed.data.workspace_id,
+          parsed.data.samples,
+          parsed.data.expected_profile_revision,
+        );
+        runDraftPostCommitEffects(parsed.data.workspace_id, 'sample_added', dependencies);
+        return mcpSuccess(toMcpPayload({
+          samples,
+          count: samples.length,
+          profileRevision: parsed.data.expected_profile_revision + 1,
+          eligibleAsFinalizationAnchor: false,
+        }));
+      }
+
       if (name === 'get_brand_voice') {
         const parsed = getBrandVoiceInputSchema.safeParse(args);
         if (!parsed.success) return validationError(parsed.error);
@@ -462,7 +594,27 @@ export function createBrandVoiceActionHandler(
           anchorLimit: parsed.data.anchor_limit,
           anchorCursor: parsed.data.anchor_cursor,
         });
-        return mcpSuccess(toMcpPayload(projectBrandVoiceReadiness(result)));
+        const proposals = pendingVoiceProposals(
+          dependencies.getVoiceProfile(parsed.data.workspace_id),
+        );
+        return mcpSuccess(toMcpPayload(projectBrandVoiceReadiness(result, proposals)));
+      }
+
+      if (name === 'get_pending_approvals') {
+        const parsed = getPendingApprovalsMcpInputSchema.safeParse(args);
+        if (!parsed.success) return validationError(parsed.error);
+        const result = await dependencies.getBrandVoicePage({
+          workspaceId: parsed.data.workspace_id,
+          anchorLimit: 1,
+        });
+        const proposals = pendingVoiceProposals(
+          dependencies.getVoiceProfile(parsed.data.workspace_id),
+        );
+        return mcpSuccess(toMcpPayload(projectPendingApprovals(
+          result,
+          proposals,
+          dependencies.listDeliverables(parsed.data.workspace_id),
+        )));
       }
 
       if (name === 'finalize_brand_voice') {
@@ -502,7 +654,9 @@ export function createBrandVoiceActionHandler(
       if (error instanceof VoiceFinalizationAuthorizationError) return authorizationError();
       log.error(
         {
-          tool: name === 'get_brand_voice' || name === 'finalize_brand_voice'
+          tool: name === 'get_brand_voice'
+            || name === 'get_pending_approvals'
+            || name === 'finalize_brand_voice'
             ? name
             : 'unknown_brand_voice_tool',
           failureClass: 'handler_exception',

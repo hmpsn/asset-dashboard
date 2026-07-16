@@ -1051,6 +1051,14 @@ describe('identity.updateStatus', () => {
     await identity.updateStatus('ws-1', 'del-1', 'approved');
     expect(mockPatch).toHaveBeenCalledWith('/api/brand-identity/ws-1/del-1', { status: 'approved' });
   });
+
+  it('includes the reviewed version when supplied', async () => {
+    await identity.updateStatus('ws-1', 'del-1', 'approved', 3);
+    expect(mockPatch).toHaveBeenCalledWith('/api/brand-identity/ws-1/del-1', {
+      status: 'approved',
+      expectedVersion: 3,
+    });
+  });
 });
 
 describe('identity.export', () => {

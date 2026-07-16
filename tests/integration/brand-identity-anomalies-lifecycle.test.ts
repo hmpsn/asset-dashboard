@@ -234,6 +234,25 @@ describe('PATCH /api/brand-identity/:workspaceId/:id — content update', () => 
     expect(body.status).toBe('approved');
   });
 
+  it('rejects approval when the reviewed deliverable version is stale', async () => {
+    const id = seedDeliverable({ workspaceId: wsA, content: 'Reviewed draft.', status: 'draft' });
+    await patchJson(`/api/brand-identity/${wsA}/${id}`, {
+      content: 'Changed after the review modal opened.',
+    });
+
+    const res = await patchJson(`/api/brand-identity/${wsA}/${id}`, {
+      status: 'approved',
+      expectedVersion: 1,
+    });
+
+    expect(res.status).toBe(409);
+    const body = await res.json() as { expectedVersion: number; actualVersion: number };
+    expect(body).toMatchObject({ expectedVersion: 1, actualVersion: 2 });
+    const getRes = await api(`/api/brand-identity/${wsA}/${id}`);
+    const current = await getRes.json() as { status: string; version: number };
+    expect(current).toMatchObject({ status: 'draft', version: 2 });
+  });
+
   it('persists updates — subsequent GET returns the new content', async () => {
     const id = seedDeliverable({ workspaceId: wsA, content: 'Pre-patch content.', status: 'draft' });
 

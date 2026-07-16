@@ -497,7 +497,44 @@ describe('POST /api/voice/:workspaceId/samples — add sample', () => {
 // POST /api/voice/:workspaceId/samples/:sampleId/attest
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('POST /api/voice/:workspaceId/samples/:sampleId/attest', () => {
+describe('voice-sample human attestation routes', () => {
+  it('attests the exact visible proposal set with one profile revision bump', async () => {
+    const first = await postJson(`/api/voice/${wsId}/samples`, {
+      content: 'First batch proposal awaiting human review.',
+      contextTag: 'body',
+      source: 'mcp_proposed',
+    });
+    const second = await postJson(`/api/voice/${wsId}/samples`, {
+      content: 'Second batch proposal awaiting human review.',
+      contextTag: 'headline',
+      source: 'mcp_proposed',
+    });
+    const firstSample = await first.json() as { id: string };
+    const secondSample = await second.json() as { id: string };
+    const beforeResponse = await api(`/api/voice/${wsId}`);
+    const before = await beforeResponse.json() as { revision: number };
+
+    const attested = await postJson(`/api/voice/${wsId}/samples/attest-batch`, {
+      expectedProfileRevision: before.revision,
+      sampleIds: [firstSample.id, secondSample.id],
+    });
+
+    expect(attested.status).toBe(200);
+    await expect(attested.json()).resolves.toMatchObject({
+      profileRevision: before.revision + 1,
+      samples: [
+        { id: firstSample.id, source: 'operator_attested' },
+        { id: secondSample.id, source: 'operator_attested' },
+      ],
+    });
+    const afterResponse = await api(`/api/voice/${wsId}`);
+    const after = await afterResponse.json() as { revision: number };
+    expect(after.revision).toBe(before.revision + 1);
+    expect(listActivity(wsId)).toContainEqual(expect.objectContaining({
+      title: 'Confirmed 2 chat-proposed voice samples',
+    }));
+  });
+
   it('promotes a chat proposal with human attribution and invalidates readers', async () => {
     const created = await postJson(`/api/voice/${wsId}/samples`, {
       content: 'A chat-proposed sample awaiting a human decision.',

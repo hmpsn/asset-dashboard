@@ -22,6 +22,7 @@ import { WS_EVENTS } from '../ws-events.js';
 import {
   getVoiceProfile, createVoiceProfile, updateVoiceProfileWithResult,
   attestVoiceSample,
+  attestVoiceSamples,
   VoiceProfileRevisionConflictError,
   VoiceProfileStateTransitionError,
   VoiceSampleAttestationError,
@@ -39,6 +40,7 @@ import {
   createVoiceFinalizationAuthorizationBodySchema,
   createVoiceProfileSchema,
   attestVoiceSampleSchema,
+  attestVoiceSamplesSchema,
   finalizeBrandVoiceBodySchema,
   getBrandVoiceReadinessQuerySchema,
   saveVariationFeedbackSchema,
@@ -370,6 +372,58 @@ router.post('/api/voice/:workspaceId/samples', requireWorkspaceAccess('workspace
 
 // Human operator attestation is the only path that promotes an MCP proposal
 // into finalization-eligible voice evidence.
+router.post(
+  '/api/voice/:workspaceId/samples/attest-batch',
+  requireWorkspaceAccess('workspaceId'),
+  validate(attestVoiceSamplesSchema),
+  (req, res) => {
+    const workspaceId = req.params.workspaceId;
+    try {
+      const samples = attestVoiceSamples(
+        workspaceId,
+        req.body.sampleIds,
+        req.body.expectedProfileRevision,
+      );
+      const operator = operatorFromRequest(req);
+      runVoicePostCommitEffect(workspaceId, 'activity', () => {
+        addActivity(
+          workspaceId,
+          'voice_profile_updated',
+          `Confirmed ${samples.length} chat-proposed voice samples`,
+          'A human operator confirmed the visible chat-proposed samples as authentic brand voice.',
+          { sampleIds: samples.map(sample => sample.id), source: 'operator_attested' },
+          { id: operator.actorId, name: operator.actorLabel },
+        );
+      });
+      runVoicePostCommitEffect(workspaceId, 'broadcast', () => {
+        broadcastToWorkspace(workspaceId, WS_EVENTS.VOICE_PROFILE_UPDATED, {
+          sampleIds: samples.map(sample => sample.id),
+          attested: true,
+        });
+      });
+      runVoicePostCommitEffect(workspaceId, 'intelligence-cache', () => {
+        invalidateIntelligenceCache(workspaceId);
+      });
+      res.json({ samples, profileRevision: req.body.expectedProfileRevision + 1 });
+    } catch (err) {
+      if (err instanceof VoiceProfileRevisionConflictError) {
+        return res.status(409).json({
+          error: err.message,
+          expectedRevision: err.expectedRevision,
+          actualRevision: err.actualRevision,
+        });
+      }
+      if (err instanceof VoiceSampleAttestationError) {
+        return res.status(422).json({ error: err.message });
+      }
+      if (err instanceof Error && err.message === 'No voice profile exists for this workspace') {
+        return res.status(404).json({ error: 'Voice profile not found' });
+      }
+      throw err;
+    }
+  },
+);
+
 router.post(
   '/api/voice/:workspaceId/samples/:sampleId/attest',
   requireWorkspaceAccess('workspaceId'),

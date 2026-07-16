@@ -484,18 +484,20 @@ describe('mcp read-model tools', () => {
       identity: Record<string, string>;
       voice_status: string;
       identity_prompt_block: string;
+      deliverable_counts: { approved: number; pending: number; total: number };
       deliverables?: unknown;
     };
     expect(payload.availability).toBe('ready');
     expect(payload.identity).toEqual({ mission: 'Make SEO simple', tagline: 'Grow with clarity' });
     expect(payload.voice_status).toBe('calibrated');
     expect(payload.identity_prompt_block).toBe('IDENTITY: Make SEO simple');
+    expect(payload.deliverable_counts).toEqual({ approved: 1, pending: 1, total: 2 });
     expect(payload).not.toHaveProperty('deliverables');
     // Voice content must NOT leak from this identity-scoped tool.
     expect(payload).not.toHaveProperty('voicePromptBlock');
     expect(payload).not.toHaveProperty('voiceDnaBlock');
     expect(h.buildWorkspaceIntelligence).toHaveBeenCalledWith('ws-1', { slices: ['brand'] });
-    expect(h.listDeliverables).not.toHaveBeenCalled();
+    expect(h.listDeliverables).toHaveBeenCalledWith('ws-1');
   });
 
   it('brand tool returns full deliverable list (draft + approved) when includeDeliverables is true', async () => {
@@ -515,13 +517,13 @@ describe('mcp read-model tools', () => {
     });
   });
 
-  it('brand tool falls back to no_data / empty identity when slice is absent', async () => {
+  it('brand tool reports pending approval instead of ready/no-data beside an empty identity', async () => {
     h.buildWorkspaceIntelligence.mockResolvedValueOnce({ requestedSlices: ['brand'] });
     const result = await handleBrandTool('get_brand_identity', { workspaceId: 'ws-1' });
     const payload = parseContent(result) as {
       availability: string; identity: Record<string, string>; voice_status: string; identity_prompt_block: string;
     };
-    expect(payload.availability).toBe('no_data');
+    expect(payload.availability).toBe('pending_approval');
     expect(payload.identity).toEqual({});
     expect(payload.voice_status).toBe('none');
     expect(payload.identity_prompt_block).toBe('');

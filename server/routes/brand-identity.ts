@@ -8,6 +8,7 @@ import {
   listDeliverables, getDeliverable,
   generateDeliverable, refineDeliverable,
   setDeliverableStatus, updateDeliverableContent, exportDeliverables,
+  BrandDeliverableVersionConflictError,
 } from '../brand-identity.js';
 import {
   isReleasedBrandDeliverableType,
@@ -69,6 +70,7 @@ const refineDeliverableSchema = z.object({
 const patchDeliverableSchema = z.object({
   status: z.enum(['approved', 'draft']).optional(),
   content: z.string().trim().min(1).optional(),
+  expectedVersion: z.number().int().positive().optional(),
 }).refine(
   (data) => typeof data.status !== 'undefined' || typeof data.content !== 'undefined',
   { message: 'Provide at least one field to update' },
@@ -178,7 +180,11 @@ router.post('/api/brand-identity/:workspaceId/:id/refine', requireWorkspaceAcces
 
 // Update status (approve / revert to draft)
 router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('workspaceId'), validate(patchDeliverableSchema), (req, res) => {
-  const { status, content } = req.body as { status?: 'approved' | 'draft'; content?: string };
+  const { status, content, expectedVersion } = req.body as {
+    status?: 'approved' | 'draft';
+    content?: string;
+    expectedVersion?: number;
+  };
   const workspaceId = req.params.workspaceId;
   const deliverableId = req.params.id;
 
@@ -192,8 +198,15 @@ router.patch('/api/brand-identity/:workspaceId/:id', requireWorkspaceAccess('wor
 
   if (typeof status !== 'undefined') {
     try {
-      result = setDeliverableStatus(workspaceId, deliverableId, status);
+      result = setDeliverableStatus(workspaceId, deliverableId, status, expectedVersion);
     } catch (err) {
+      if (err instanceof BrandDeliverableVersionConflictError) {
+        return res.status(409).json({
+          error: err.message,
+          expectedVersion: err.expectedVersion,
+          actualVersion: err.actualVersion,
+        });
+      }
       if (err instanceof InvalidTransitionError) return res.status(409).json({ error: err.message });
       throw err;
     }
