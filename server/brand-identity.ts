@@ -76,6 +76,17 @@ export class BrandDeliverableStatusConflictError extends Error {
   }
 }
 
+export class BrandDeliverableAlreadyExistsError extends Error {
+  readonly code = 'conflict' as const;
+  readonly existing: BrandDeliverable;
+
+  constructor(existing: BrandDeliverable) {
+    super(`A ${existing.deliverableType} brand deliverable already exists in this workspace`);
+    this.name = 'BrandDeliverableAlreadyExistsError';
+    this.existing = existing;
+  }
+}
+
 function buildBrandContext(workspaceId: string): string {
   const parts: string[] = [];
 
@@ -241,6 +252,57 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
     });
     return retryAsUpdate.immediate();
   }
+}
+
+/**
+ * Create operator-authored brand identity without invoking generation.
+ *
+ * The row deliberately starts in `draft`; only the existing human approval
+ * mutation may move it to `approved`. The workspace/type unique constraint is
+ * treated as an explicit conflict so this path can never overwrite prior work.
+ */
+export function createOperatorAuthoredDeliverable(
+  workspaceId: string,
+  deliverableType: BrandDeliverableType,
+  content: string,
+): BrandDeliverable {
+  const create = db.transaction((): BrandDeliverable => {
+    const existing = stmts().getByType.get(
+      workspaceId,
+      deliverableType,
+    ) as DeliverableRow | undefined;
+    if (existing) {
+      throw new BrandDeliverableAlreadyExistsError(rowToDeliverable(existing));
+    }
+
+    const id = `bid_${randomUUID().slice(0, 8)}`;
+    const now = new Date().toISOString();
+    const tier = DEFAULT_TIER_MAP[deliverableType];
+    stmts().insert.run({
+      id,
+      workspace_id: workspaceId,
+      deliverable_type: deliverableType,
+      content,
+      status: 'draft',
+      version: 1,
+      tier,
+      created_at: now,
+      updated_at: now,
+    });
+    return {
+      id,
+      workspaceId,
+      deliverableType,
+      content,
+      status: 'draft',
+      version: 1,
+      tier,
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+
+  return create.immediate();
 }
 
 export async function refineDeliverable(workspaceId: string, id: string, direction: string): Promise<BrandDeliverable | null> {

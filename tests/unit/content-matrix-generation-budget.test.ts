@@ -36,6 +36,7 @@ vi.mock('../../server/abort-helpers.js', async importOriginal => ({
 }));
 
 import {
+  matrixGenerationInputReservationCeiling,
   matrixGenerationProviderReservation,
 } from '../../server/domains/content/matrix-generation/budget.js';
 import {
@@ -197,6 +198,42 @@ function generationContext(): ContentGenerationContextV2Result {
   };
 }
 
+function expandedServiceTarget(sectionCount: number, index: number): MatrixGenerationPreviewTarget {
+  const base = legalGuidanceHeavyTarget();
+  const introduction = base.blockManifest.blocks[0]!;
+  const source = base.blockManifest.blocks.find(block => block.source === 'template')!;
+  const conclusion = base.blockManifest.blocks.at(-1)!;
+  const body = Array.from({ length: sectionCount }, (_, bodyIndex) => ({
+    ...source,
+    id: `template:section-${bodyIndex + 1}`,
+    sourceSectionId: `section-${bodyIndex + 1}`,
+    order: bodyIndex + 1,
+    heading: {
+      ...source.heading,
+      renderedText: `Service section ${bodyIndex + 1}`,
+    },
+  }));
+  return {
+    ...base,
+    cellId: `cell-budget-${index + 1}`,
+    plannedUrl: `/service-${index + 1}`,
+    targetKeyword: {
+      ...base.targetKeyword,
+      value: `service ${index + 1}`,
+    },
+    blockManifest: {
+      ...base.blockManifest,
+      blocks: [
+        introduction,
+        ...body,
+        { ...conclusion, order: sectionCount + 1 },
+      ],
+      totalWordCountTarget: sectionCount * 250,
+      fingerprint: `${index + 1}`.repeat(64).slice(0, 64),
+    },
+  };
+}
+
 function auditAuthority(): MatrixGenerationAuditAuthority {
   return {
     voiceSnapshot: {
@@ -262,6 +299,38 @@ beforeEach(() => {
 });
 
 describe('content matrix preview budget', () => {
+  it('converts serialized English input bytes with the shared 4:1 token estimate', () => {
+    expect(matrixGenerationInputReservationCeiling(4_000)).toBe(1_512);
+    expect(matrixGenerationInputReservationCeiling(1)).toBe(513);
+  });
+
+  it('keeps a six-page, fifteen-section service batch inside the accepted hard ceilings', () => {
+    const context = generationContext();
+    context.authority.systemVoiceBlock = 'Finalized voice authority. '.repeat(1_200);
+    context.authority.identityPromptBlock = 'Approved positioning. '.repeat(600);
+    context.projections.draft = 'Grounded generation context. '.repeat(400);
+
+    const targets = Array.from({ length: 6 }, (_, index) => {
+      const target = expandedServiceTarget(15, index);
+      target.estimatedPaidBudget = estimateMatrixGenerationCellBudget(target, context, []);
+      return target;
+    });
+    const estimate = estimateMatrixGenerationBatchBudget(targets);
+
+    expect(estimate.inputTokens).toBeLessThanOrEqual(
+      MATRIX_GENERATION_BATCH_LIMITS.maxInputTokens,
+    );
+    expect(estimate.outputTokens).toBeLessThanOrEqual(
+      MATRIX_GENERATION_BATCH_LIMITS.maxOutputTokens,
+    );
+    expect(estimate.estimatedUsd).toBeLessThanOrEqual(
+      MATRIX_GENERATION_BATCH_LIMITS.maxEstimatedUsd,
+    );
+    expect(estimate.providerCalls).toBeLessThanOrEqual(
+      MATRIX_GENERATION_BATCH_LIMITS.maxProviderCalls,
+    );
+  });
+
   it('does not reject its exact preview ceiling across every mocked provider stage', async () => {
     const target = legalGuidanceHeavyTarget();
     const context = generationContext();

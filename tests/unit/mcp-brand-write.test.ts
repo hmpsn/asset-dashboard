@@ -1,8 +1,8 @@
 /**
- * DB-backed tests for the `update_brand_deliverable` MCP write tool (brand slice P5).
+ * DB-backed tests for the brand-deliverable MCP write tools (brand slice P5).
  *
- * Exercises the real write path (server/brand-identity.ts `updateDeliverableContent`
- * + read-model `getDeliverable` against a seeded SQLite workspace) while spying on the
+ * Exercises the real create/update paths in server/brand-identity.ts plus the
+ * read-model `getDeliverable` against a seeded SQLite workspace while spying on the
  * side-effect modules (activity log, broadcast, intelligence cache) so we can assert the
  * data-flow contract:
  *   - success  → content persisted, version bumped, status='draft', version snapshot,
@@ -318,5 +318,81 @@ describe('update_brand_deliverable MCP tool', () => {
     const result = await handleBrandTool('get_brand_identity', { workspaceId: ws.workspaceId });
     expect(result.isError).toBeFalsy();
     expect(parse(result)).toMatchObject({ availability: 'no_data', voice_status: 'none' });
+  });
+});
+
+describe('create_brand_deliverable MCP tool', () => {
+  let ws: SeededFullWorkspace;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ws = seedWorkspace({ tier: 'growth', clientPassword: '' });
+  });
+  afterEach(() => { ws?.cleanup(); });
+
+  it('creates operator-authored content as a new draft and fires the brand data-flow contract', async () => {
+    const result = await handleBrandTool('create_brand_deliverable', {
+      workspace_id: ws.workspaceId,
+      deliverable_type: 'differentiators',
+      content: 'We show every option and explain the tradeoffs before treatment begins.',
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = parse(result);
+    expect(payload).toMatchObject({
+      deliverable_type: 'differentiators',
+      content: 'We show every option and explain the tradeoffs before treatment begins.',
+      status: 'draft',
+      version: 1,
+      tier: 'professional',
+      created: true,
+    });
+    expect(payload.id).toMatch(/^bid_/);
+
+    const stored = getDeliverable(ws.workspaceId, payload.id);
+    expect(stored).toMatchObject({
+      deliverableType: 'differentiators',
+      status: 'draft',
+      version: 1,
+    });
+    expect(stored?.versions).toHaveLength(0);
+    expect(h.addActivity).toHaveBeenCalledWith(
+      ws.workspaceId,
+      'brand_deliverable_generated',
+      expect.stringContaining('differentiators'),
+      undefined,
+      expect.objectContaining({
+        source: 'mcp-chat',
+        deliverableId: payload.id,
+        action: 'mcp_brand_deliverable_created',
+      }),
+    );
+    expect(h.broadcastToWorkspace).toHaveBeenCalledWith(
+      ws.workspaceId,
+      'brand-identity:updated',
+      {},
+    );
+    expect(h.invalidateIntelligenceCache).toHaveBeenCalledWith(ws.workspaceId);
+  });
+
+  it('rejects a duplicate workspace/type without overwriting the existing deliverable', async () => {
+    const existingId = insertDeliverable(ws.workspaceId, 'Existing mission', 'approved');
+
+    const result = await handleBrandTool('create_brand_deliverable', {
+      workspace_id: ws.workspaceId,
+      deliverable_type: 'mission',
+      content: 'Replacement mission',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(parse(result)).toMatchObject({ code: 'conflict', retryable: false });
+    expect(rawRow(existingId)).toMatchObject({
+      content: 'Existing mission',
+      version: 1,
+      status: 'approved',
+    });
+    expect(h.addActivity).not.toHaveBeenCalled();
+    expect(h.broadcastToWorkspace).not.toHaveBeenCalled();
+    expect(h.invalidateIntelligenceCache).not.toHaveBeenCalled();
   });
 });

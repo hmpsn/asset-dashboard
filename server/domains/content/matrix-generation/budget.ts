@@ -7,9 +7,11 @@ const PROVIDER_COST_MICROS_PER_TOKEN = {
 } as const;
 
 const PROVIDER_FRAMING_TOKEN_CEILING = 512;
+const ESTIMATED_UTF8_BYTES_PER_INPUT_TOKEN = 4;
 
 export function matrixGenerationInputReservationCeiling(serializedUtf8Bytes: number): number {
-  return serializedUtf8Bytes + PROVIDER_FRAMING_TOKEN_CEILING;
+  return Math.ceil(serializedUtf8Bytes / ESTIMATED_UTF8_BYTES_PER_INPUT_TOKEN)
+    + PROVIDER_FRAMING_TOKEN_CEILING;
 }
 
 /** OpenAI-rate ceiling used by preview so exact accepted cost never rounds below runtime. */
@@ -19,7 +21,7 @@ export function matrixGenerationEstimatedUsdCeiling(inputTokens: number, outputT
   return Math.ceil(micros / 100) / 10_000;
 }
 
-/** Pessimistic reservation for the exact rendered dispatch. UTF-8 bytes cap input tokens. */
+/** Pessimistic reservation for the exact rendered dispatch using the shared 4:1 estimate. */
 export function matrixGenerationProviderReservation(
   dispatch: BoundedProviderDispatch,
 ): MatrixGenerationBudgetUsage {
