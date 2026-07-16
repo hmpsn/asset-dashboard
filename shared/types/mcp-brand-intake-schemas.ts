@@ -60,7 +60,7 @@ export const submitBrandIntakeInputSchema = z.object({
         'Newline-separated absolute HTTP(S) reference URLs, or empty.',
       ),
     }).strict().optional().default({}),
-  }).strict().describe('Questionnaire fields to store as one immutable MCP-sourced intake revision.'),
+  }).strict().describe(`Questionnaire fields to store as one immutable MCP-sourced intake revision. The normalized payload is capped at ${BRAND_INTAKE_LIMITS.maxPayloadBytes} UTF-8 bytes; individual field and list limits are exposed in this schema and validation errors name the offending path.`),
   idempotency_key: z.string().trim().min(1)
     .max(BRAND_INTAKE_LIMITS.maxIdempotencyKeyLength)
     .describe('Caller-stable key bound to this exact intake submission across delayed retries.'),

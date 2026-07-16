@@ -739,6 +739,16 @@
       "tier": "premium",
       "impact": "high",
       "clientFacing": true
+    },
+    {
+      "id": 75,
+      "title": "Reusable Template-to-Page-Set Generation",
+      "oneLiner": "Authors a locked page structure once through MCP chat, then reuses it across explicit service, location, or other dimensions to create review-gated page sets without requiring a Page Strategy blueprint",
+      "category": "content",
+      "painPoints": ["content-production", "scale", "local-seo", "content-quality"],
+      "tier": "premium",
+      "impact": "high",
+      "clientFacing": false
     }
   ]
 }

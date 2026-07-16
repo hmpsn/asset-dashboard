@@ -667,11 +667,12 @@ describe('MCP brand generation actions', () => {
     );
 
     expect(isValidatedMcpJsonV1ErrorResult(result)).toBe(true);
-    expect(textPayload(result)).toEqual({
+    expect(textPayload(result)).toMatchObject({
       code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-      message: 'The tool input is invalid.',
       retryable: false,
+      details: { field_path: expect.any(String) },
     });
+    expect(textPayload(result).message).toMatch(/^Invalid tool input at /);
     expect(deps.startBrandGeneration).not.toHaveBeenCalled();
     expect(deps.getBrandGeneration).not.toHaveBeenCalled();
     expect(h.recordPaidCallOnce).not.toHaveBeenCalled();

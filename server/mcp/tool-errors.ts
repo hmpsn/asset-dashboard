@@ -1,4 +1,5 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import type { ZodError } from 'zod';
 import {
   MCP_TOOL_ERROR_CODES,
   type McpToolErrorEnvelope,
@@ -217,6 +218,39 @@ export function mcpJsonV1Error<TDetails extends McpToolErrorDetails>(
   };
   JSON_V1_ERROR_RESULTS.add(result);
   return deepFreeze(result);
+}
+
+function zodFieldPath(path: readonly (string | number)[]): string {
+  if (path.length === 0) return 'input';
+  return path.reduce<string>((result, segment) => (
+    typeof segment === 'number'
+      ? `${result}[${segment}]`
+      : result.length > 0
+        ? `${result}.${segment}`
+        : segment
+  ), '');
+}
+
+/** Public, field-addressed validation error without echoing rejected input. */
+export function mcpZodValidationError(error: ZodError): CallToolResult {
+  const issue = error.issues[0];
+  const issuePath = issue?.path.length
+    ? issue.path
+    : issue?.code === 'unrecognized_keys'
+      ? [issue.keys[0] ?? 'input']
+      : [];
+  const fieldPath = zodFieldPath(issuePath);
+  const constraint = issue?.message ?? 'The supplied value is invalid.';
+  return mcpJsonV1Error({
+    code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+    message: `Invalid tool input at ${fieldPath}: ${constraint}`,
+    retryable: false,
+    details: {
+      field_path: fieldPath,
+      constraint,
+      issue_code: issue?.code ?? 'invalid_input',
+    },
+  });
 }
 
 /**

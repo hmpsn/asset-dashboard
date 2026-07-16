@@ -109,6 +109,9 @@ export const BRAND_GENERATION_PRECONDITION_REASONS = [
   'invalid_lifecycle',
   'missing_evidence',
   'input_too_large',
+  'output_envelope_too_small',
+  'stage_closure_failed',
+  'voice_authority_invalid',
   'approved_deliverable',
 ] as const;
 

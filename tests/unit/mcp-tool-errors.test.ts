@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { MCP_TOOL_ERROR_CODES } from '../../shared/types/mcp-runtime.js';
 import {
   MCP_TOOL_ERROR_CONTRACTS,
   isValidatedMcpJsonV1ErrorResult,
   mcpJsonV1Error,
+  mcpZodValidationError,
   mcpToolError,
   mcpUnexpectedToolError,
 } from '../../server/mcp/tool-errors.js';
@@ -45,6 +47,29 @@ describe('MCP tool error contracts', () => {
     expect(Object.isFrozen(result.content)).toBe(true);
     expect(Object.isFrozen(result.content[0])).toBe(true);
     expect(isValidatedMcpJsonV1ErrorResult({ ...result })).toBe(false);
+  });
+
+  it('turns Zod failures into field-addressed constraints without echoing input', () => {
+    const parsed = z.object({
+      questionnaire: z.object({
+        business: z.object({ description: z.string().max(5) }),
+      }),
+    }).safeParse({ questionnaire: { business: { description: 'private oversized input' } } });
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+
+    const payload = parseTextPayload(mcpZodValidationError(parsed.error));
+    expect(payload).toEqual({
+      code: 'validation_failed',
+      message: expect.stringContaining('questionnaire.business.description'),
+      retryable: false,
+      details: {
+        field_path: 'questionnaire.business.description',
+        constraint: expect.stringContaining('5'),
+        issue_code: 'too_big',
+      },
+    });
+    expect(JSON.stringify(payload)).not.toContain('private oversized input');
   });
 
   it('keeps legacy text byte-compatible while selecting JSON v1 for new tools', () => {

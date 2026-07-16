@@ -148,6 +148,28 @@ function legacyUpgradeProposal(): ContentTemplateGenerationUpgradeProposal {
 
 function dependencies() {
   return {
+    listTemplates: vi.fn(() => [template()]),
+    getTemplate: vi.fn(() => template()),
+    createTemplate: vi.fn(() => template()),
+    updateTemplate: vi.fn(() => ({ ...template(), revision: 5, name: 'Updated service template' })),
+    duplicateTemplate: vi.fn(() => ({ ...template(), id: 'tpl_copy', name: 'Service template copy' })),
+    createMatrix: vi.fn(() => ({
+      id: 'mtx_direct',
+      workspaceId: 'ws_1',
+      revision: 1,
+      name: 'Direct services',
+      templateId: 'tpl_1',
+      dimensions: [{ variableName: 'service', values: ['Laundry', 'Dry Cleaning'] }],
+      urlPattern: '/services/{service}',
+      keywordPattern: '{service} service',
+      cells: [
+        { id: 'cell_laundry', revision: 1, variableValues: { service: 'Laundry' }, targetKeyword: 'Laundry service', plannedUrl: '/services/laundry', status: 'planned' as const },
+        { id: 'cell_dry_cleaning', revision: 1, variableValues: { service: 'Dry Cleaning' }, targetKeyword: 'Dry Cleaning service', plannedUrl: '/services/dry-cleaning', status: 'planned' as const },
+      ],
+      stats: { total: 2, planned: 2, briefGenerated: 0, drafted: 0, reviewed: 0, published: 0 },
+      createdAt: '2026-07-15T00:00:00.000Z',
+      updatedAt: '2026-07-15T00:00:00.000Z',
+    })),
     listPseoBlueprintEntries: vi.fn(() => ({ items: [], nextCursor: null })),
     listContentMatrices: vi.fn(() => ({
       items: [{
@@ -274,8 +296,14 @@ function textPayload(result: Awaited<ReturnType<ReturnType<typeof createContentM
 }
 
 describe('MCP content matrix read tools', () => {
-  it('advertises one dedicated twelve-tool snake_case family with described bounded inputs', () => {
+  it('advertises the template and direct-matrix surface with described bounded inputs', () => {
     expect(contentMatrixActionTools.map(tool => tool.name)).toEqual([
+      'list_content_templates',
+      'get_content_template',
+      'create_content_template',
+      'update_content_template',
+      'duplicate_content_template',
+      'create_content_matrix',
       'list_pseo_blueprint_entries',
       'list_content_matrices',
       'get_content_matrix',
@@ -306,12 +334,108 @@ describe('MCP content matrix read tools', () => {
         limit: { minimum: 1, maximum: 100 },
       },
     });
-    const resolveSchema = contentMatrixActionTools[3].inputSchema as Record<string, unknown>;
+    const resolveSchema = contentMatrixActionTools[9].inputSchema as Record<string, unknown>;
     expect(resolveSchema).toMatchObject({
       properties: {
         selections: { minItems: 1, maxItems: 25 },
       },
     });
+  });
+
+  it('authors, reads, revises, and duplicates a content template through the existing domain functions', async () => {
+    const deps = dependencies();
+    const handle = createContentMatrixActionHandler(deps);
+    const templateInput = {
+      name: 'Service template',
+      pageType: 'service',
+      variables: [{ name: 'service', label: 'Service' }],
+      sections: [],
+      urlPattern: '/services/{service}',
+      keywordPattern: '{service} service',
+    };
+
+    const created = await handle('create_content_template', {
+      workspace_id: 'ws_1',
+      template: templateInput,
+      idempotency_key: 'template-create-1',
+    }, { ...context, toolName: 'create_content_template' });
+    expect(created.isError).not.toBe(true);
+    expect(deps.createTemplate).toHaveBeenCalledWith('ws_1', templateInput);
+    expect(textPayload(created)).toMatchObject({ template: { id: 'tpl_1', revision: 4 } });
+
+    const read = await handle('get_content_template', {
+      workspace_id: 'ws_1',
+      template_id: 'tpl_1',
+    }, { ...context, toolName: 'get_content_template' });
+    expect(textPayload(read)).toMatchObject({ id: 'tpl_1', revision: 4, sections: [] });
+
+    const updated = await handle('update_content_template', {
+      workspace_id: 'ws_1',
+      template_id: 'tpl_1',
+      patch: { name: 'Updated service template' },
+      expected_revision: 4,
+    }, { ...context, toolName: 'update_content_template' });
+    expect(deps.updateTemplate).toHaveBeenCalledWith(
+      'ws_1',
+      'tpl_1',
+      { name: 'Updated service template' },
+      { expectedTemplateRevision: 4 },
+    );
+    expect(textPayload(updated)).toMatchObject({ template: { revision: 5 } });
+
+    const duplicated = await handle('duplicate_content_template', {
+      workspace_id: 'ws_1',
+      template_id: 'tpl_1',
+      new_name: 'Service template copy',
+    }, { ...context, toolName: 'duplicate_content_template' });
+    expect(deps.duplicateTemplate).toHaveBeenCalledWith('ws_1', 'tpl_1', 'Service template copy');
+    expect(textPayload(duplicated)).toMatchObject({ template: { id: 'tpl_copy' } });
+    expect(deps.addActivity).toHaveBeenCalledTimes(3);
+  });
+
+  it('lists bounded template summaries without returning section blobs', async () => {
+    const deps = dependencies();
+    const result = await createContentMatrixActionHandler(deps)(
+      'list_content_templates',
+      { workspace_id: 'ws_1', limit: 10 },
+      context,
+    );
+
+    expect(textPayload(result)).toMatchObject({
+      items: [{ id: 'tpl_1', revision: 4, section_count: 0, variable_count: 0 }],
+      next_cursor: null,
+    });
+    expect(JSON.stringify(textPayload(result))).not.toContain('"sections"');
+  });
+
+  it('creates a direct matrix from template defaults with no blueprint prerequisite', async () => {
+    const deps = dependencies();
+    const result = await createContentMatrixActionHandler(deps)(
+      'create_content_matrix',
+      {
+        workspace_id: 'ws_1',
+        name: 'Direct services',
+        template_id: 'tpl_1',
+        dimensions: [{ variableName: 'service', values: ['Laundry', 'Dry Cleaning'] }],
+      },
+      { ...context, toolName: 'create_content_matrix' },
+    );
+
+    expect(deps.createMatrix).toHaveBeenCalledWith('ws_1', {
+      name: 'Direct services',
+      templateId: 'tpl_1',
+      dimensions: [{ variableName: 'service', values: ['Laundry', 'Dry Cleaning'] }],
+      urlPattern: '/services/{service}',
+      keywordPattern: '{service} service',
+      expectedSchemaTypes: undefined,
+    }, { validateTemplate: true });
+    expect(textPayload(result)).toMatchObject({
+      matrix: { id: 'mtx_direct', template_id: 'tpl_1', revision: 1 },
+      materialized_cell_count: 2,
+    });
+    expect(JSON.stringify(textPayload(result))).not.toContain('"cells"');
+    expect(deps.getPseoMatrixPlan).not.toHaveBeenCalled();
+    expect(deps.createMatrixFromPseoPlan).not.toHaveBeenCalled();
   });
 
   it('lists bounded pSEO collection entry identities before plan lookup', async () => {
@@ -509,16 +633,47 @@ describe('MCP content matrix read tools', () => {
     expect(JSON.stringify(textPayload(result))).not.toContain('sensitive detail');
   });
 
-  it('returns only branded json_v1 validation errors', async () => {
+  it('returns field-addressed json_v1 validation errors', async () => {
     const handle = createContentMatrixActionHandler(dependencies());
     const result = await handle('get_content_matrix', { workspace_id: 'ws_1' }, context);
 
     expect(result.isError).toBe(true);
     expect(isValidatedMcpJsonV1ErrorResult(result)).toBe(true);
-    expect(textPayload(result)).toEqual({
+    expect(textPayload(result)).toMatchObject({
       code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-      message: 'The tool input is invalid.',
       retryable: false,
+      details: { field_path: 'matrix_id' },
+    });
+    expect((textPayload(result) as { message: string }).message).toContain('matrix_id');
+  });
+
+  it('keeps direct-template not-found and cursor rejections field-addressed', async () => {
+    const deps = dependencies();
+    deps.getTemplate.mockReturnValue(null);
+    const handle = createContentMatrixActionHandler(deps);
+
+    const missing = await handle('get_content_template', {
+      workspace_id: 'ws_1',
+      template_id: 'tpl_missing',
+    }, context);
+    expect(textPayload(missing)).toMatchObject({
+      code: MCP_TOOL_ERROR_CODES.NOT_FOUND,
+      details: {
+        field_path: 'template_id',
+        constraint: 'must identify an existing content template in this workspace',
+      },
+    });
+
+    const invalidCursor = await handle('list_content_templates', {
+      workspace_id: 'ws_1',
+      cursor: 'e30',
+    }, context);
+    expect(textPayload(invalidCursor)).toMatchObject({
+      code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+      details: {
+        field_path: 'cursor',
+        constraint: 'must be an opaque cursor returned by list_content_templates for this workspace',
+      },
     });
   });
 

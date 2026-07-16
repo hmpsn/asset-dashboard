@@ -120,7 +120,7 @@ const cmsFieldMapSchema = z.record(boundedUtf8String(
   });
 });
 
-const templateWriteFieldsBaseSchema = z.object({
+export const templateWriteFieldsBaseSchema = z.object({
   name: boundedUtf8String(templateLimits.maxNameBytes, 'name', 1),
   description: boundedUtf8String(templateLimits.maxDescriptionBytes, 'description').optional(),
   pageType: z.enum(contentPageTypeValues).optional(),
@@ -159,7 +159,7 @@ function addTotalTemplateWordCountIssue(
 const templateWriteFieldsSchema = templateWriteFieldsBaseSchema
   .superRefine(addTotalTemplateWordCountIssue);
 
-const createTemplateSchema = templateWriteFieldsSchema.superRefine((value, ctx) => {
+export const createTemplateSchema = templateWriteFieldsSchema.superRefine((value, ctx) => {
   if (value.generationContractVersion === undefined) return;
   if (!value.sections || value.sections.length === 0) {
     ctx.addIssue({
@@ -180,14 +180,15 @@ const createTemplateSchema = templateWriteFieldsSchema.superRefine((value, ctx) 
   });
 });
 
-const updateTemplateSchema = templateWriteFieldsBaseSchema
+export const updateTemplateFieldsSchema = templateWriteFieldsBaseSchema
   .omit({ generationContractVersion: true })
-  .partial()
-  .extend({
-    expectedTemplateRevision: z.number().int().nonnegative().optional(),
-    // Compatibility for the existing editor, which submits the read DTO.
-    revision: z.number().int().nonnegative().optional(),
-  }).superRefine((value, ctx) => {
+  .partial();
+
+export const updateTemplateSchema = updateTemplateFieldsSchema.extend({
+  expectedTemplateRevision: z.number().int().nonnegative().optional(),
+  // Compatibility for the existing editor, which submits the read DTO.
+  revision: z.number().int().nonnegative().optional(),
+}).superRefine((value, ctx) => {
     addTotalTemplateWordCountIssue(value, ctx);
     const generationFields = [
       'pageType', 'variables', 'sections', 'urlPattern', 'keywordPattern',
@@ -204,7 +205,7 @@ const updateTemplateSchema = templateWriteFieldsBaseSchema
     }
   });
 
-const duplicateTemplateSchema = z.object({
+export const duplicateTemplateSchema = z.object({
   name: boundedUtf8String(templateLimits.maxNameBytes, 'name').optional(),
 });
 

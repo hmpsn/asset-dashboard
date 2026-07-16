@@ -67,9 +67,9 @@ function parseErrorText(result: Awaited<ReturnType<ReturnType<typeof createMcpTo
 const masterAuth = { scope: 'all' as const, label: 'master' };
 
 describe('canonical MCP tool registry', () => {
-  it('is the sole 18-family, 88-tool discovery source with exact global tools', () => {
+  it('is the sole 18-family, 94-tool discovery source with exact global tools', () => {
     const definitions = listMcpToolDefinitions();
-    expect(definitions).toHaveLength(88);
+    expect(definitions).toHaveLength(94);
     expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(18);
     expect(
       [...MCP_TOOL_REGISTRY.values()]
@@ -96,6 +96,12 @@ describe('canonical MCP tool registry', () => {
         .filter(entry => entry.errorContract === 'json_v1')
         .map(entry => entry.definition.name),
     ).toEqual([
+      'list_content_templates',
+      'get_content_template',
+      'create_content_template',
+      'update_content_template',
+      'duplicate_content_template',
+      'create_content_matrix',
       'list_pseo_blueprint_entries',
       'list_content_matrices',
       'get_content_matrix',

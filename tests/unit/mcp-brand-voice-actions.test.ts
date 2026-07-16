@@ -423,10 +423,10 @@ describe('MCP brand voice actions', () => {
       workspace_id: WORKSPACE_ID,
       anchor_limit: 101,
     }, workspaceContext());
-    expect(textPayload(invalid)).toEqual({
+    expect(textPayload(invalid)).toMatchObject({
       code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-      message: 'The tool input is invalid.',
       retryable: false,
+      details: { field_path: 'anchor_limit' },
     });
     expect(deps.getBrandVoicePage).not.toHaveBeenCalled();
   });
@@ -563,10 +563,10 @@ describe('MCP brand voice actions', () => {
 
     expect(result.isError).toBe(true);
     expect(isValidatedMcpJsonV1ErrorResult(result)).toBe(true);
-    expect(textPayload(result)).toEqual({
+    expect(textPayload(result)).toMatchObject({
       code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-      message: 'The tool input is invalid.',
       retryable: false,
+      details: { field_path: 'finalized_by' },
     });
     expect(deps.consumeVoiceFinalizationAuthorization).not.toHaveBeenCalled();
   });

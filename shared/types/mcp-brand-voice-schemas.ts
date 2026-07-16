@@ -31,10 +31,13 @@ const mcpVoiceDnaSchema = z.object({
   personality_traits: z.array(shortTextSchema).max(VOICE_FINALIZATION_LIMITS.maxTraitCount)
     .describe('Specific voice personality traits; empty values remain empty.'),
   tone_spectrum: z.object({
-    formal_casual: z.number().min(1).max(10),
-    serious_playful: z.number().min(1).max(10),
-    technical_accessible: z.number().min(1).max(10),
-  }).strict().describe('Three calibrated tone axes on a 1–10 scale.'),
+    formal_casual: z.number().min(1).max(10)
+      .describe('1 = most formal; 10 = most casual.'),
+    serious_playful: z.number().min(1).max(10)
+      .describe('1 = most serious; 10 = most playful.'),
+    technical_accessible: z.number().min(1).max(10)
+      .describe('1 = most technical; 10 = most accessible.'),
+  }).strict().describe('Three calibrated tone axes on the platform 1–10 scale; higher values move toward the second named pole.'),
   sentence_style: contentTextSchema.describe('Sentence rhythm and construction guidance.'),
   vocabulary_level: contentTextSchema.describe('Vocabulary and reading-level guidance.'),
   humor_style: contentTextSchema.optional().describe('Optional humor guidance.'),

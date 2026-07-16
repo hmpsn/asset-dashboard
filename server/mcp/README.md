@@ -117,7 +117,7 @@ failure classes; unknown names and mismatched workspace values are never logged 
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
 dispatch, workspace scope, and error compatibility. It composes **18 categories** for a total of
-**88 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+**94 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
 name with inert invalid input, asserts the exact 18 family-array→handler identities, and pins the
@@ -265,7 +265,13 @@ The coordinator does not replace the underlying generators or review systems. A 
 ### content-matrix-actions (`tools/content-matrix-actions.ts`) — structural planning and bounded generation
 | Tool | R/W | Purpose |
 |------|-----|---------|
-| `list_pseo_blueprint_entries` | R | Cursor-page collection blueprint/entry IDs and template/matrix links before authoritative plan validation. |
+| `list_content_templates` | R | Cursor-paged template summaries without full section blobs. |
+| `get_content_template` | R | Complete reusable template, including variables, sections, contracts, patterns, mapping, and revision. |
+| `create_content_template` | W | Create a reusable template through the same validation as the admin route. |
+| `update_content_template` | W | Revision-safe partial template update. |
+| `duplicate_content_template` | W | Duplicate a template as a new starting point. |
+| `create_content_matrix` | W | Create a matrix directly from a template plus Cartesian dimensions; Page Strategy is not required. |
+| `list_pseo_blueprint_entries` | R | Cursor-page Page Strategy collection entries and template/matrix links; empty means no collection entries have been generated. |
 | `list_content_matrices` | R | Cursor-paged matrix summaries, optionally filtered by template. |
 | `get_content_matrix` | R | Matrix metadata plus a revision-bound cursor page of cells. |
 | `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
@@ -276,7 +282,7 @@ The coordinator does not replace the underlying generators or review systems. A 
 | `get_content_matrix_generation` | R | Read one durable batch plus cursor-paged item outcomes, audit findings, artifact revisions, and approval evidence. |
 | `retry_content_matrix_generation` | W | **[Paid API]** Resume selected failed or needs-attention checkpoints from exact revisions. |
 | `get_pseo_matrix_plan` | R | Read one collection entry, linked template variables, and exact source authority for safe materialization. |
-| `create_content_matrix_from_pseo_plan` | W | Idempotently create and link one validated matrix from exact source authority plus explicit dimensions. Never starts generation. |
+| `create_content_matrix_from_pseo_plan` | W | Blueprint-linked convenience route that idempotently creates and links one validated matrix. Never starts generation. |
 
 ### schema-actions (`tools/schema-actions.ts`)
 | Tool | R/W | Purpose |

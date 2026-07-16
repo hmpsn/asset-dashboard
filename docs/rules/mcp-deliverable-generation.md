@@ -7,6 +7,12 @@ deliverables, especially multi-item runs. It complements
 
 ## 1. Address the durable source, never a display value
 
+- MCP may author and read reusable content templates, then create a matrix
+  directly from a durable `templateId` plus explicit dimensions. Page Strategy
+  is an optional source of that template/dimension plan, not a prerequisite.
+  Direct creation reuses the same validated template and matrix domain functions
+  as HTTP, defaults URL/keyword/schema patterns from the template, and stops
+  before preview, generation, approval, send, or publish.
 - A matrix page target is identified by `(workspaceId, matrixId, cellId)`.
   Keyword equality is not an identity and must never select a cell.
 - A brand generation target is identified by a durable intake revision and an

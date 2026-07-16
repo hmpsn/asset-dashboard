@@ -44,6 +44,7 @@ vi.mock('../../server/domains/brand/generation/effects.js', () => ({
 }));
 
 import {
+  brandGenerationPromptPreconditionReason,
   getBrandGeneration,
   resumeBrandGeneration,
   reviseBrandGenerationItem,
@@ -403,6 +404,16 @@ beforeEach(() => {
 });
 
 describe('brand generation service orchestration', () => {
+  it('classifies precise prompt preconditions instead of collapsing them into input_too_large', () => {
+    expect(brandGenerationPromptPreconditionReason('Effective brand-generation prompt exceeds the byte limit.'))
+      .toBe('input_too_large');
+    expect(brandGenerationPromptPreconditionReason('Frozen requirements leave no bounded candidate envelope for automatic review.'))
+      .toBe('output_envelope_too_small');
+    expect(brandGenerationPromptPreconditionReason('Required generation envelope cannot fit: Exact provider input exceeds the per-dispatch byte limit.'))
+      .toBe('stage_closure_failed');
+    expect(brandGenerationPromptPreconditionReason('Dependent prompts require exact finalized voice authority.'))
+      .toBe('voice_authority_invalid');
+  });
   it('replays before the flag check and repairs the missing accepted job exactly once', () => {
     const replay = accepted('start', true);
     replay.run = runFixture({
@@ -753,7 +764,7 @@ describe('brand generation service orchestration', () => {
     }
 
     expect(thrown).toBeInstanceOf(BrandGenerationPreconditionError);
-    expect(thrown).toMatchObject({ reason: 'input_too_large' });
+    expect(thrown).toMatchObject({ reason: 'stage_closure_failed' });
     expect(repository.acceptBrandGenerationStartCommand).not.toHaveBeenCalled();
   });
 
@@ -807,7 +818,7 @@ describe('brand generation service orchestration', () => {
     }
 
     expect(thrown).toBeInstanceOf(BrandGenerationPreconditionError);
-    expect(thrown).toMatchObject({ reason: 'input_too_large' });
+    expect(thrown).toMatchObject({ reason: 'stage_closure_failed' });
     expect(repository.acceptBrandGenerationStartCommand).not.toHaveBeenCalled();
   });
 
