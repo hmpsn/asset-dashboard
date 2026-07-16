@@ -12,10 +12,10 @@
           "source": "2026-07-16 productized templates spec item 1",
           "est": "S",
           "priority": "P0",
-          "status": "pending",
+          "status": "done",
           "createdAt": "2026-07-16",
           "owner": "content-pipeline",
-          "notes": "Expose the existing updateMatrixCell service through snake-case MCP. Patch target keyword, planned URL, variables, and schema types with expected cell revision; reuse rendered-path and workspace collision validation. No list mode or generation bypass."
+          "notes": "Complete 2026-07-16. Exposes the existing updateMatrixCell service through snake-case MCP for target keyword, planned URL, variables, and schema types with exact cell-revision CAS. Intentional URL/schema overrides retain small provenance markers so generation does not misclassify them as pattern drift or legacy snapshots; unsafe paths plus same- and cross-matrix workspace collisions fail before mutation. Real MCP dispatch, resolver, registry, instruction, stale-write, and no-gate-bypass coverage added. No list mode, generation start, approval, send, or publish authority."
         },
         {
           "id": "productized-template-optional-sections",

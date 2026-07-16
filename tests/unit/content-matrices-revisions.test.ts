@@ -159,6 +159,7 @@ describe('content matrix source revisions', () => {
       status: 'keyword_validated',
     }, { expectedCellRevision: sourceCell.revision });
     expect(updated?.cells[0].expectedSchemaTypes).toEqual(['Service', 'FAQPage']);
+    expect(updated?.cells[0].expectedSchemaTypesOverridden).toBe(true);
     expect(updated?.cells[0].status).toBe('keyword_validated');
 
     expect(() => updateMatrixCell(workspaceId, matrix.id, sourceCell.id, {
@@ -166,6 +167,56 @@ describe('content matrix source revisions', () => {
     }, { expectedCellRevision: updated?.cells[0].revision })).toThrow(
       MatrixGenerationSchemaTypeContractError,
     );
+  });
+
+  it('stores revision-safe keyword and planned URL overrides on one cell', () => {
+    const { workspaceId, matrix } = seedMatrix(['Austin']);
+    const [cell] = matrix.cells;
+
+    const updated = updateMatrixCell(workspaceId, matrix.id, cell.id, {
+      targetKeyword: 'best emergency dentist near me',
+      plannedUrl: '/urgent-dental-care',
+    }, {
+      expectedCellRevision: cell.revision,
+      requireExpectedCellRevision: true,
+    });
+
+    expect(updated?.cells[0]).toMatchObject({
+      revision: (cell.revision ?? 0) + 1,
+      targetKeyword: 'best emergency dentist near me',
+      plannedUrl: '/urgent-dental-care',
+      plannedUrlOverridden: true,
+    });
+  });
+
+  it('rejects unsafe and workspace-colliding planned URL overrides', () => {
+    const { workspaceId, template, matrix } = seedMatrix(['Austin', 'Dallas']);
+    const [austin, dallas] = matrix.cells;
+    const otherMatrix = createMatrix(workspaceId, {
+      name: 'Other local services',
+      templateId: template.id,
+      dimensions: [{ variableName: 'city', values: ['Houston'] }],
+      urlPattern: '/other-service/{city}',
+      keywordPattern: 'other dentist',
+    }, { validateTemplate: true });
+    cleanups.push(() => deleteMatrix(workspaceId, otherMatrix.id));
+
+    expect(() => updateMatrixCell(workspaceId, matrix.id, austin.id, {
+      plannedUrl: 'https://example.com/not-a-workspace-path',
+    }, { expectedCellRevision: austin.revision })).toThrow();
+
+    expect(() => updateMatrixCell(workspaceId, matrix.id, austin.id, {
+      plannedUrl: `${dallas.plannedUrl.toUpperCase()}/`,
+    }, { expectedCellRevision: austin.revision })).toThrow();
+
+    expect(() => updateMatrixCell(workspaceId, matrix.id, austin.id, {
+      plannedUrl: otherMatrix.cells[0].plannedUrl,
+    }, { expectedCellRevision: austin.revision })).toThrow();
+
+    expect(getMatrix(workspaceId, matrix.id)?.cells[0]).toMatchObject({
+      revision: austin.revision,
+      plannedUrl: austin.plannedUrl,
+    });
   });
 
   it('allows an oversized legacy cell to be read, repaired, and deleted', () => {

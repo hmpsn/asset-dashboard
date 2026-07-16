@@ -16,6 +16,10 @@ import {
 } from '../../server/mcp/tools/content-matrix-actions.js';
 import { isValidatedMcpJsonV1ErrorResult } from '../../server/mcp/tool-errors.js';
 import { PseoMatrixBridgeError } from '../../server/domains/content/matrix-generation/pseo-bridge.js';
+import {
+  MatrixCellPlannedUrlError,
+  MatrixCellRevisionConflictError,
+} from '../../server/content-matrices.js';
 
 const pseoExpectedSource = {
   entry_updated_at: '2026-07-14T00:00:00.000Z',
@@ -170,6 +174,30 @@ function dependencies() {
       createdAt: '2026-07-15T00:00:00.000Z',
       updatedAt: '2026-07-15T00:00:00.000Z',
     })),
+    updateMatrixCell: vi.fn((_workspaceId, _matrixId, cellId, updates) => ({
+      id: 'mtx_direct',
+      workspaceId: 'ws_1',
+      revision: 1,
+      name: 'Direct services',
+      templateId: 'tpl_1',
+      dimensions: [{ variableName: 'feature', values: ['Projects'] }],
+      urlPattern: '/features/{feature}',
+      keywordPattern: '{feature} software',
+      cells: [{
+        id: cellId,
+        revision: 2,
+        variableValues: { feature: 'Projects' },
+        targetKeyword: updates.targetKeyword ?? 'Projects software',
+        plannedUrl: updates.plannedUrl ?? '/features/projects',
+        plannedUrlOverridden: updates.plannedUrl === undefined ? undefined : true,
+        expectedSchemaTypes: updates.expectedSchemaTypes,
+        expectedSchemaTypesOverridden: updates.expectedSchemaTypes === undefined ? undefined : true,
+        status: 'planned' as const,
+      }],
+      stats: { total: 1, planned: 1, briefGenerated: 0, drafted: 0, reviewed: 0, published: 0 },
+      createdAt: '2026-07-15T00:00:00.000Z',
+      updatedAt: '2026-07-15T00:00:00.000Z',
+    })),
     listPseoBlueprintEntries: vi.fn(() => ({ items: [], nextCursor: null })),
     listContentMatrices: vi.fn(() => ({
       items: [{
@@ -304,6 +332,7 @@ describe('MCP content matrix read tools', () => {
       'update_content_template',
       'duplicate_content_template',
       'create_content_matrix',
+      'update_content_matrix_cell',
       'list_pseo_blueprint_entries',
       'list_content_matrices',
       'get_content_matrix',
@@ -334,7 +363,8 @@ describe('MCP content matrix read tools', () => {
         limit: { minimum: 1, maximum: 100 },
       },
     });
-    const resolveSchema = contentMatrixActionTools[9].inputSchema as Record<string, unknown>;
+    const resolveSchema = contentMatrixActionTools
+      .find(tool => tool.name === 'resolve_content_matrix_cells')?.inputSchema as Record<string, unknown>;
     expect(resolveSchema).toMatchObject({
       properties: {
         selections: { minItems: 1, maxItems: 25 },
@@ -436,6 +466,114 @@ describe('MCP content matrix read tools', () => {
     expect(JSON.stringify(textPayload(result))).not.toContain('"cells"');
     expect(deps.getPseoMatrixPlan).not.toHaveBeenCalled();
     expect(deps.createMatrixFromPseoPlan).not.toHaveBeenCalled();
+  });
+
+  it('revision-safely overrides one matrix cell and emits workspace feedback once', async () => {
+    const deps = dependencies();
+    const result = await createContentMatrixActionHandler(deps)(
+      'update_content_matrix_cell',
+      {
+        workspace_id: 'ws_1',
+        matrix_id: 'mtx_direct',
+        cell_id: 'cell_projects',
+        patch: {
+          target_keyword: 'asana alternative',
+          planned_url: '/asana-alternative',
+          variable_values: { feature: 'Projects' },
+          expected_schema_types: ['SoftwareApplication', 'FAQPage'],
+        },
+        expected_cell_revision: 1,
+      },
+      { ...context, toolName: 'update_content_matrix_cell' },
+    );
+
+    expect(result.isError).not.toBe(true);
+    expect(deps.updateMatrixCell).toHaveBeenCalledWith(
+      'ws_1',
+      'mtx_direct',
+      'cell_projects',
+      {
+        targetKeyword: 'asana alternative',
+        plannedUrl: '/asana-alternative',
+        variableValues: { feature: 'Projects' },
+        expectedSchemaTypes: ['SoftwareApplication', 'FAQPage'],
+      },
+      { expectedCellRevision: 1, requireExpectedCellRevision: true },
+    );
+    expect(textPayload(result)).toMatchObject({
+      matrix_id: 'mtx_direct',
+      cell: {
+        id: 'cell_projects',
+        revision: 2,
+        target_keyword: 'asana alternative',
+        planned_url: '/asana-alternative',
+      },
+    });
+    expect(deps.invalidateContentPipelineIntelligence).toHaveBeenCalledWith('ws_1');
+    expect(deps.broadcastToWorkspace).toHaveBeenCalledOnce();
+    expect(deps.addActivity).toHaveBeenCalledOnce();
+  });
+
+  it('returns a field-addressed conflict for a stale cell override', async () => {
+    const deps = dependencies();
+    deps.updateMatrixCell.mockImplementation(() => {
+      throw new MatrixCellRevisionConflictError('cell_projects', 1, 2);
+    });
+    const result = await createContentMatrixActionHandler(deps)(
+      'update_content_matrix_cell',
+      {
+        workspace_id: 'ws_1',
+        matrix_id: 'mtx_direct',
+        cell_id: 'cell_projects',
+        patch: { target_keyword: 'asana alternative' },
+        expected_cell_revision: 1,
+      },
+      { ...context, toolName: 'update_content_matrix_cell' },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(textPayload(result)).toMatchObject({
+      code: MCP_TOOL_ERROR_CODES.CONFLICT,
+      retryable: true,
+      details: {
+        field_path: 'expected_cell_revision',
+        constraint: 'must equal the current cell revision',
+        expected_revision: 1,
+        actual_revision: 2,
+      },
+    });
+  });
+
+  it('returns a field-addressed validation error for a colliding planned URL', async () => {
+    const deps = dependencies();
+    deps.updateMatrixCell.mockImplementation(() => {
+      throw new MatrixCellPlannedUrlError('planned_url_collision', {
+        matrixId: 'mtx_other',
+        cellId: 'cell_other',
+      });
+    });
+    const result = await createContentMatrixActionHandler(deps)(
+      'update_content_matrix_cell',
+      {
+        workspace_id: 'ws_1',
+        matrix_id: 'mtx_direct',
+        cell_id: 'cell_projects',
+        patch: { planned_url: '/duplicate' },
+        expected_cell_revision: 1,
+      },
+      { ...context, toolName: 'update_content_matrix_cell' },
+    );
+
+    expect(textPayload(result)).toMatchObject({
+      code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+      retryable: false,
+      details: {
+        field_path: 'patch.planned_url',
+        constraint: 'must be unique across all content matrix cells in this workspace',
+        conflicting_matrix_id: 'mtx_other',
+        conflicting_cell_id: 'cell_other',
+      },
+    });
   });
 
   it('lists bounded pSEO collection entry identities before plan lookup', async () => {

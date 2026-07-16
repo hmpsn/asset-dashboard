@@ -363,21 +363,30 @@ export function resolveMatrixStructure(
     blockers.push(blocker('invalid_meta_description_pattern', 'template.metaDescPattern', 'The meta description pattern resolves every declared placeholder.', patternIssueReason(metaRender.issues)));
   }
 
-  let renderedCanonicalPath: string | null = null;
+  let effectiveCanonicalPath: string | null = null;
   if (urlRender.status === 'rendered') {
     const pathValidation = validateRenderedMatrixPath(urlRender.value);
     if (pathValidation.status === 'blocked') {
       blockers.push(blocker('invalid_planned_url', 'matrix.urlPattern', 'The rendered URL is a safe absolute workspace path.', `Rendered URL failed validation: ${pathValidation.code}.`));
     } else {
-      renderedCanonicalPath = pathValidation.canonicalPath;
-      const storedCanonicalPath = canonicalizeMatrixPath(input.cell.plannedUrl);
-      if (storedCanonicalPath !== renderedCanonicalPath) {
-        blockers.push(blocker('planned_url_drift', 'cell.plannedUrl', 'The stored cell URL matches deterministic matrix rendering.', 'The stored planned URL differs from the rendered matrix URL.'));
+      if (input.cell.plannedUrlOverridden === true) {
+        const overrideValidation = validateRenderedMatrixPath(input.cell.plannedUrl);
+        if (overrideValidation.status === 'blocked') {
+          blockers.push(blocker('invalid_planned_url_override', 'cell.plannedUrl', 'The overridden cell URL is a safe absolute workspace path.', `Overridden URL failed validation: ${overrideValidation.code}.`));
+        } else {
+          effectiveCanonicalPath = overrideValidation.canonicalPath;
+        }
+      } else {
+        effectiveCanonicalPath = pathValidation.canonicalPath;
+        const storedCanonicalPath = canonicalizeMatrixPath(input.cell.plannedUrl);
+        if (storedCanonicalPath !== effectiveCanonicalPath) {
+          blockers.push(blocker('planned_url_drift', 'cell.plannedUrl', 'The stored cell URL matches deterministic matrix rendering.', 'The stored planned URL differs from the rendered matrix URL.'));
+        }
       }
     }
   }
 
-  if (renderedCanonicalPath !== null) {
+  if (effectiveCanonicalPath !== null) {
     let censusIsValid = input.matrixUrlCensusComplete !== false
       && Array.isArray(input.matrixPlannedUrls)
       && input.matrixPlannedUrls.length >= input.matrix.cells.length;
@@ -418,7 +427,7 @@ export function resolveMatrixStructure(
       const canonicalCandidate = canonicalizeMatrixPath(matrixCell.plannedUrl);
       if (canonicalCandidate === null) {
         blockers.push(blocker(`invalid_matrix_cell_planned_url:${matrixCell.id}`, `matrix.cells.${matrixCell.id}.plannedUrl`, 'Every matrix cell has a safe canonical planned URL.', `Matrix cell ${matrixCell.id} has an invalid planned URL.`));
-      } else if (canonicalCandidate === renderedCanonicalPath) {
+      } else if (canonicalCandidate === effectiveCanonicalPath) {
         blockers.push(blocker('planned_url_collision', 'cell.plannedUrl', 'The planned URL is unique across the matrix.', `Another durable matrix cell (${matrixCell.id}) has the same canonical URL.`));
       }
     }
@@ -431,7 +440,7 @@ export function resolveMatrixStructure(
           continue;
         }
         const canonicalCandidate = canonicalizeMatrixPath(candidate.plannedUrl);
-        if (canonicalCandidate === renderedCanonicalPath) {
+        if (canonicalCandidate === effectiveCanonicalPath) {
           blockers.push(blocker('planned_url_collision', 'cell.plannedUrl', 'The planned URL is unique across the workspace matrix census.', `Another durable matrix cell (${candidate.cellId}) has the same canonical URL.`));
         }
       }
@@ -447,7 +456,7 @@ export function resolveMatrixStructure(
         const canonicalKnownPath = canonicalizeMatrixPath(path);
         if (canonicalKnownPath === null) {
           blockers.push(blocker('malformed_workspace_url_census', 'knownWorkspacePagePaths', 'The collision census includes safe known workspace paths.', 'A known workspace page path is malformed.'));
-        } else if (canonicalKnownPath === renderedCanonicalPath) {
+        } else if (canonicalKnownPath === effectiveCanonicalPath) {
           blockers.push(blocker('workspace_url_collision', 'cell.plannedUrl', 'The planned URL does not collide with a known workspace page.', 'A known workspace page has the same canonical path.'));
         }
       }
@@ -465,7 +474,7 @@ export function resolveMatrixStructure(
           blockers.push(blocker('malformed_workspace_url_census', 'knownWorkspacePublishedSlugs', 'The collision census includes safe durable published page identities.', 'A published page identity is malformed.'));
           continue;
         }
-        if (canonicalPublishedIdentity === renderedCanonicalPath) {
+        if (canonicalPublishedIdentity === effectiveCanonicalPath) {
           blockers.push(blocker('workspace_url_collision', 'cell.plannedUrl', 'The planned URL does not collide with a published workspace page.', 'A published content page has the same canonical path.'));
         }
       }
@@ -568,14 +577,18 @@ export function resolveMatrixStructure(
     slugSubstitutions,
     proseSubstitutions,
     targetKeyword: resolvedKeyword,
-    plannedUrl: urlRender.value,
+    plannedUrl: input.cell.plannedUrlOverridden === true
+      ? input.cell.plannedUrl
+      : urlRender.value,
     title: titleRender.value,
     metaDescription: metaRender.value,
     renderedHeadings: manifestResult.renderedHeadings,
     pageType: input.template.pageType as BriefPageType,
-    schemaTypes: input.template.schemaTypes?.length
-      ? [...input.template.schemaTypes]
-      : [...(input.cell.expectedSchemaTypes ?? [])],
+    schemaTypes: input.cell.expectedSchemaTypesOverridden === true
+      ? [...(input.cell.expectedSchemaTypes ?? [])]
+      : input.template.schemaTypes?.length
+        ? [...input.template.schemaTypes]
+        : [...(input.cell.expectedSchemaTypes ?? [])],
     blockManifest: manifestResult.manifest,
     generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
     structuralRequirements,
