@@ -116,6 +116,9 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       'start_brief_generation', 'start_post_generation',
       'get_search_performance',
       // M0 matrix structural planning
+      'list_content_templates', 'get_content_template',
+      'create_content_template', 'update_content_template',
+      'duplicate_content_template', 'create_content_matrix',
       'list_content_matrices', 'get_content_matrix',
       'resolve_content_matrix_cells', 'accept_content_template_generation_upgrade',
       'preview_content_matrix_generation', 'resolve_content_matrix_evidence',
@@ -123,7 +126,8 @@ describe('MCP plumbing — P1+P2 tools are registered', () => {
       // B0 durable brand intake
       'get_brand_intake', 'resolve_brand_intake_evidence',
       // B1 operator-authorized brand voice
-      'get_brand_voice', 'finalize_brand_voice',
+      'get_brand_voice', 'get_pending_approvals',
+      'add_brand_voice_samples', 'finalize_brand_voice',
       // B2 grounded brand deliverable generation
       'start_brand_deliverable_generation', 'get_brand_generation',
       'resume_brand_deliverable_generation', 'start_brand_deliverable_revision',
@@ -175,6 +179,116 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     expect(detailPayload.cells.items).toHaveLength(1);
   });
 
+  it('authors one template and reuses it for larger direct matrices without a pSEO blueprint', async () => {
+    const created = await callTool(
+      'create_content_template',
+      {
+        workspace_id: wsA.workspaceId,
+        template: {
+          name: 'Direct MCP service template',
+          pageType: 'service',
+          variables: [{ name: 'service', label: 'Service' }],
+          sections: [{
+            id: 'intro',
+            name: 'Introduction',
+            headingTemplate: '{service}',
+            guidance: 'Introduce the service without inventing claims.',
+            wordCountTarget: 120,
+            order: 0,
+            generationRole: 'answer_first',
+            aeoContract: { modes: ['answer_first'], required: true },
+          }],
+          urlPattern: '/services/{service}',
+          keywordPattern: '{service}',
+          titlePattern: '{service} | Test',
+          metaDescPattern: 'Learn about {service}.',
+          cmsFieldMap: { intro: 'intro' },
+        },
+      },
+      MASTER_KEY,
+    );
+    expect(created.result?.isError).toBeFalsy();
+    const createdPayload = JSON.parse(created.result!.content[0].text) as {
+      template: { id: string; revision: number };
+    };
+
+    const read = await callTool(
+      'get_content_template',
+      { workspace_id: wsA.workspaceId, template_id: createdPayload.template.id },
+      MASTER_KEY,
+    );
+    expect(read.result?.isError).toBeFalsy();
+    const readPayload = JSON.parse(read.result!.content[0].text) as {
+      id: string;
+      variables: Array<{ name: string }>;
+      sections: Array<{ id: string; generation_role: string }>;
+      url_pattern: string;
+      keyword_pattern: string;
+      title_pattern: string;
+      meta_desc_pattern: string;
+      cms_field_map: Record<string, string>;
+    };
+    expect(readPayload).toMatchObject({
+      id: createdPayload.template.id,
+      variables: [{ name: 'service' }],
+      sections: [{ id: 'intro', generation_role: 'answer_first' }],
+      url_pattern: '/services/{service}',
+      keyword_pattern: '{service}',
+      title_pattern: '{service} | Test',
+      meta_desc_pattern: 'Learn about {service}.',
+      cms_field_map: { intro: 'intro' },
+    });
+
+    const createDirectMatrix = async (name: string, values: string[]) => {
+      const response = await callTool(
+        'create_content_matrix',
+        {
+          workspace_id: wsA.workspaceId,
+          name,
+          template_id: createdPayload.template.id,
+          dimensions: [{ variableName: 'service', values }],
+        },
+        MASTER_KEY,
+      );
+      expect(response.result?.isError).toBeFalsy();
+      return JSON.parse(response.result!.content[0].text) as {
+        matrix: { id: string; template_id: string; url_pattern: string; keyword_pattern: string };
+        materialized_cell_count: number;
+      };
+    };
+
+    const firstMatrix = await createDirectMatrix('Two services', ['Cleaning', 'Whitening']);
+    expect(firstMatrix).toMatchObject({
+      matrix: {
+        template_id: createdPayload.template.id,
+        url_pattern: '/services/{service}',
+        keyword_pattern: '{service}',
+      },
+      materialized_cell_count: 2,
+    });
+
+    const expandedMatrix = await createDirectMatrix(
+      'Three services',
+      ['Cleaning', 'Whitening', 'Invisalign'],
+    );
+    expect(expandedMatrix.materialized_cell_count).toBe(3);
+
+    const expandedRead = await callTool(
+      'get_content_matrix',
+      { workspace_id: wsA.workspaceId, matrix_id: expandedMatrix.matrix.id },
+      MASTER_KEY,
+    );
+    expect(expandedRead.result?.isError).toBeFalsy();
+    const expandedPayload = JSON.parse(expandedRead.result!.content[0].text) as {
+      cells: { items: Array<{ variable_values: { service: string } }> };
+    };
+    expect(expandedPayload.cells.items.map(item => item.variable_values.service).sort()).toEqual([
+      'Cleaning',
+      'Invisalign',
+      'Whitening',
+    ]);
+  });
+
   it('reads an empty durable brand intake through the registered json_v1 family', async () => {
     const body = await callTool(
       'get_brand_intake',
@@ -211,6 +325,56 @@ describe('MCP plumbing — new tools dispatch over real HTTP', () => {
     });
     expect(JSON.stringify(payload)).not.toContain('raw_intake');
     expect(JSON.stringify(payload)).not.toContain('authorization_token');
+  });
+
+  it('adds a voice-sample set with one revision bump and exposes the pending approval queue', async () => {
+    const created = await callTool(
+      'create_brand_voice_profile',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(created.result?.isError).toBeFalsy();
+    const createdPayload = JSON.parse(created.result!.content[0].text) as {
+      profile: { revision: number };
+    };
+
+    const added = await callTool(
+      'add_brand_voice_samples',
+      {
+        workspace_id: wsA.workspaceId,
+        expected_profile_revision: createdPayload.profile.revision,
+        samples: [
+          { content: 'First complete chat-proposed voice sample.', context: 'body' },
+          { content: 'Second complete chat-proposed voice sample.', context: 'headline' },
+        ],
+      },
+      MASTER_KEY,
+    );
+    expect(added.result?.isError).toBeFalsy();
+    const addedPayload = JSON.parse(added.result!.content[0].text) as {
+      count: number;
+      profile_revision: number;
+    };
+    expect(addedPayload).toEqual(expect.objectContaining({
+      count: 2,
+      profile_revision: createdPayload.profile.revision + 1,
+    }));
+
+    const pending = await callTool(
+      'get_pending_approvals',
+      { workspace_id: wsA.workspaceId },
+      MASTER_KEY,
+    );
+    expect(pending.result?.isError).toBeFalsy();
+    const pendingPayload = JSON.parse(pending.result!.content[0].text) as {
+      counts: { voice_samples: number };
+      items: Array<{ type: string; content: { content?: string } }>;
+    };
+    expect(pendingPayload.counts.voice_samples).toBe(2);
+    expect(pendingPayload.items.filter(item => item.type === 'voice_sample')).toEqual([
+      expect.objectContaining({ content: expect.objectContaining({ content: 'First complete chat-proposed voice sample.' }) }),
+      expect.objectContaining({ content: expect.objectContaining({ content: 'Second complete chat-proposed voice sample.' }) }),
+    ]);
   });
 
   it('dispatches brand-generation reads through the registered json_v1 family', async () => {

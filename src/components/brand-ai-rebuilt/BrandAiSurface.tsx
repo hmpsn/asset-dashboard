@@ -36,6 +36,7 @@ import {
   Skeleton,
 } from '../ui';
 import { mutationErrorMessage } from './brandAiMutationFeedback';
+import { BrandPendingChanges } from './BrandPendingChanges';
 import {
   type BrandAiTab,
   useBrandAiSurfaceState,
@@ -1063,6 +1064,10 @@ export function BrandAiSurface({ workspaceId }: BrandAiSurfaceProps) {
   const topbarActions = (
     <div className="flex max-w-full items-center justify-end gap-2 overflow-x-auto">
       {lastUpdated && <span className="hidden t-caption-sm text-[var(--brand-text-muted)] sm:inline">Data as of {lastUpdated}</span>}
+      <BrandPendingChanges
+        workspaceId={workspaceId}
+        onReviewVoice={() => state.setTab('voice')}
+      />
       <Button
         size="sm"
         variant="secondary"

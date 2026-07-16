@@ -75,7 +75,7 @@ function boundedUtf8String(limit: number, label: string, minimum = 0) {
   );
 }
 
-const boundedDimensionSchema = matrixDimensionSchema.extend({
+export const boundedDimensionSchema = matrixDimensionSchema.extend({
   variableName: boundedUtf8String(
     MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxDimensionNameBytes,
     'variableName',
@@ -106,7 +106,7 @@ function addGeneratedCellProductIssue(
   }
 }
 
-const createMatrixSchema = z.object({
+export const createMatrixFieldsSchema = z.object({
   name: boundedUtf8String(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxNameBytes, 'name', 1),
   templateId: boundedUtf8String(
     MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes,
@@ -125,7 +125,9 @@ const createMatrixSchema = z.object({
     MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxPatternBytes,
     'keywordPattern',
   ).optional().default(''),
-}).superRefine(addGeneratedCellProductIssue);
+});
+
+export const createMatrixSchema = createMatrixFieldsSchema.superRefine(addGeneratedCellProductIssue);
 
 const updateMatrixSchema = z.object({
   name: boundedUtf8String(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxNameBytes, 'name', 1).optional(),

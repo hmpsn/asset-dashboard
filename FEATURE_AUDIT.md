@@ -9882,3 +9882,25 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Tests and delivery:** Unit, integration, contract, component, query-key, and workspace-event tests cover attestation provenance, anti-forgery, revision conflicts, finalization eligibility, exact approval payloads, token disclosure, and cache invalidation. Independent adversarial review found and closed omitted tone-spectrum review, an over-25-anchor rejection path, and snapshot-codec rollback drift by introducing frozen V2 writes alongside V1 reads. The existing brand/content generation gates remain unchanged.
 
 **Files:** `shared/types/brand-engine.ts`; voice calibration domain/schema/HTTP adapter; brand voice finalization read model; Brand Voice approval UI and API client; query/event invalidation; focused unit, integration, contract, and component tests; `BRAND_DESIGN_LANGUAGE.md`; `data/{roadmap,features}.json`; `FEATURE_AUDIT.md`.
+
+### 699. Direct MCP template-to-matrix surface and discoverable validation 2026-07-15
+
+**Status:** Complete. The existing template and matrix domain capabilities are now reachable through MCP chat without adding a parallel generation path or weakening human gates.
+
+**What it does:** Adds bounded list/read/create/revision-update/duplicate tools for reusable content templates plus direct matrix creation from a durable template and explicit dimensions. Direct creation defaults URL, keyword, and schema targets from the template, validates template ownership, materializes the Cartesian cells, and stops before preview or paid work. Page Strategy remains an optional blueprint-linked convenience route rather than a prerequisite.
+
+**Operator clarity:** New and existing guarded MCP actions now return field-addressed Zod failures with the actual constraint. Brand prompt preconditions distinguish oversized input, undersized output envelopes, failed stage closure, and invalid voice authority instead of calling every failure `input_too_large`. Tool discovery documents the exact brand-generation selection shapes, the real 1–10 tone-axis directions, the normalized intake cap, and where empty Page Strategy results come from. No agent approval, voice-finalization, content-review, send, or publish authority was added.
+
+**Verification:** Real spawned-server coverage drives auth, MCP discovery/dispatch, template creation/readback, a direct two-cell matrix, and reuse of the same template for a larger three-cell matrix with no blueprint. Focused HTTP, domain, MCP schema/registry, validation, brand, and pSEO regressions preserve the existing callers.
+
+**Files:** existing template/matrix HTTP schemas and domain functions; content-matrix, brand intake/voice/generation/onboarding MCP adapters; shared MCP descriptions; focused unit/contract/integration tests; `server/mcp/{README,instructions}.md`; `docs/rules/mcp-deliverable-generation.md`; `data/{roadmap,features}.json`; `FEATURE_AUDIT.md`.
+
+### 700. Unified Brand & AI pending review and MCP approval reads 2026-07-15
+
+**Status:** Complete. Human approval and finalization gates remain intact.
+
+**What it does:** Adds `get_pending_approvals(workspace_id)` as the single read for voice finalization, full chat-proposed voice samples, and full draft brand deliverables, with a reason for every pending item. `get_brand_voice` now exposes all pending proposals and reports the actual missing DNA, guardrails, or authentic-anchor prerequisite instead of repeating only the finalization state. `add_brand_voice_samples` accepts a bounded sample set at one expected profile revision and persists it with one revision bump. `get_brand_identity` always reports approved/pending/total deliverable counts and returns `pending_approval` instead of `ready` beside an empty approved identity.
+
+**Human review surface:** Brand & AI now has one visible pending-count action that opens a compact review modal containing every pending voice proposal and draft deliverable in full. `Approve all N changes` is scoped to the exact visible IDs; voice proposals use one revision-safe human attestation, while draft deliverables use the existing platform approval mutation. The Voice review surface also offers `Approve all N proposals` above the complete untruncated set. Voice finalization remains a separate explicit human lock because it establishes downstream generation authority; MCP still cannot attest, approve, mint authorization, or bypass the one-time token boundary.
+
+**Files:** MCP voice schemas/handler/registry docs; voice sample batch domain and authenticated HTTP route; Brand & AI pending-review modal and Voice approval surface; brand identity count projection; focused unit/integration/component/registry tests; `BRAND_DESIGN_LANGUAGE.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

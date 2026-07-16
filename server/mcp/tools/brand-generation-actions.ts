@@ -42,7 +42,7 @@ import {
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import { recordPaidCallOnce } from '../paid-call-counter.js';
-import { mcpJsonV1Error } from '../tool-errors.js';
+import { mcpJsonV1Error, mcpZodValidationError } from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-brand-generation-actions');
@@ -173,14 +173,6 @@ function mcpAttribution(context: McpToolExecutionContext) {
   };
 }
 
-function validationError(): CallToolResult {
-  return mcpJsonV1Error({
-    code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-    message: 'The tool input is invalid.',
-    retryable: false,
-  });
-}
-
 function notFoundError(): CallToolResult {
   return mcpJsonV1Error({
     code: MCP_TOOL_ERROR_CODES.NOT_FOUND,
@@ -236,9 +228,17 @@ function budgetError(error: BrandGenerationBudgetExceededError): CallToolResult 
 }
 
 function preconditionError(error: BrandGenerationPreconditionError): CallToolResult {
+  const publicPromptReasons = new Set([
+    'input_too_large',
+    'output_envelope_too_small',
+    'stage_closure_failed',
+    'voice_authority_invalid',
+  ]);
   return mcpJsonV1Error({
     code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
-    message: 'The brand-generation prerequisites are not satisfied.',
+    message: publicPromptReasons.has(error.reason)
+      ? error.message
+      : 'The brand-generation prerequisites are not satisfied.',
     retryable: false,
     details: { reason: error.reason },
   });
@@ -337,14 +337,14 @@ export function createBrandGenerationActionHandler(
     try {
       if (name === 'start_brand_deliverable_generation') {
         const parsed = startBrandDeliverableGenerationInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
         const result = await dependencies.startBrandGeneration(toStartRequest(parsed.data, context));
         return paidCommandSuccess(result, parsed.data.workspace_id);
       }
 
       if (name === 'get_brand_generation') {
         const parsed = getBrandGenerationInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
         const result = await dependencies.getBrandGeneration({
           workspaceId: parsed.data.workspace_id,
           runId: parsed.data.run_id,
@@ -356,7 +356,7 @@ export function createBrandGenerationActionHandler(
 
       if (name === 'resume_brand_deliverable_generation') {
         const parsed = resumeBrandDeliverableGenerationInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
         const result = await dependencies.resumeBrandGeneration({
           workspaceId: parsed.data.workspace_id,
           runId: parsed.data.run_id,
@@ -372,7 +372,7 @@ export function createBrandGenerationActionHandler(
 
       if (name === 'start_brand_deliverable_revision') {
         const parsed = startBrandDeliverableRevisionInputSchema.safeParse(args);
-        if (!parsed.success) return validationError();
+        if (!parsed.success) return mcpZodValidationError(parsed.error);
         const result = await dependencies.reviseBrandGenerationItem({
           workspaceId: parsed.data.workspace_id,
           runId: parsed.data.run_id,

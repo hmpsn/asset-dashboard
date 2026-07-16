@@ -67,9 +67,9 @@ function parseErrorText(result: Awaited<ReturnType<ReturnType<typeof createMcpTo
 const masterAuth = { scope: 'all' as const, label: 'master' };
 
 describe('canonical MCP tool registry', () => {
-  it('is the sole 18-family, 88-tool discovery source with exact global tools', () => {
+  it('is the sole 18-family, 96-tool discovery source with exact global tools', () => {
     const definitions = listMcpToolDefinitions();
-    expect(definitions).toHaveLength(88);
+    expect(definitions).toHaveLength(96);
     expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(18);
     expect(
       [...MCP_TOOL_REGISTRY.values()]
@@ -86,6 +86,7 @@ describe('canonical MCP tool registry', () => {
     expect(getDeclaredWorkspaceField('get_workspace_overview')).toBe('workspaceId');
     expect(getDeclaredWorkspaceField('update_workspace')).toBe('workspace_id');
     expect(getDeclaredWorkspaceField('get_brand_voice')).toBe('workspace_id');
+    expect(getDeclaredWorkspaceField('get_pending_approvals')).toBe('workspace_id');
     expect(getDeclaredWorkspaceField('finalize_brand_voice')).toBe('workspace_id');
     expect(getDeclaredWorkspaceField('list_workspaces')).toBeUndefined();
     const entries = [...MCP_TOOL_REGISTRY.values()];
@@ -96,6 +97,12 @@ describe('canonical MCP tool registry', () => {
         .filter(entry => entry.errorContract === 'json_v1')
         .map(entry => entry.definition.name),
     ).toEqual([
+      'list_content_templates',
+      'get_content_template',
+      'create_content_template',
+      'update_content_template',
+      'duplicate_content_template',
+      'create_content_matrix',
       'list_pseo_blueprint_entries',
       'list_content_matrices',
       'get_content_matrix',
@@ -112,9 +119,11 @@ describe('canonical MCP tool registry', () => {
       'get_brand_intake',
       'resolve_brand_intake_evidence',
       'get_brand_voice',
+      'get_pending_approvals',
       'create_brand_voice_profile',
       'update_brand_voice_draft',
       'add_brand_voice_sample',
+      'add_brand_voice_samples',
       'finalize_brand_voice',
       'start_brand_deliverable_generation',
       'get_brand_generation',

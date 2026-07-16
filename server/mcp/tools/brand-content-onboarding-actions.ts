@@ -32,7 +32,11 @@ import {
 import { createLogger } from '../../logger.js';
 import { toMcpJsonSchema } from '../json-schema.js';
 import { recordPaidCallOnce } from '../paid-call-counter.js';
-import { mcpJsonV1Error, type McpToolErrorDetails } from '../tool-errors.js';
+import {
+  mcpJsonV1Error,
+  mcpZodValidationError,
+  type McpToolErrorDetails,
+} from '../tool-errors.js';
 import { mcpSuccess } from '../tool-helpers.js';
 
 const log = createLogger('mcp-tools-brand-content-onboarding');
@@ -138,7 +142,7 @@ export function createBrandContentOnboardingActionHandler(
       if (name === 'start_brand_content_onboarding') {
         const parsed = startBrandContentOnboardingInputSchema.safeParse(args);
         if (!parsed.success) {
-          return error(MCP_TOOL_ERROR_CODES.VALIDATION_FAILED, 'The tool input is invalid.', false);
+          return mcpZodValidationError(parsed.error);
         }
         const data = parsed.data;
         const mappedSelection = data.matrix_selection.map(selection => ({
@@ -179,7 +183,7 @@ export function createBrandContentOnboardingActionHandler(
       if (name === 'get_brand_content_onboarding') {
         const parsed = getBrandContentOnboardingInputSchema.safeParse(args);
         if (!parsed.success) {
-          return error(MCP_TOOL_ERROR_CODES.VALIDATION_FAILED, 'The tool input is invalid.', false);
+          return mcpZodValidationError(parsed.error);
         }
         const result = await dependencies.getBrandContentOnboarding({
           workspaceId: parsed.data.workspace_id,
@@ -191,7 +195,7 @@ export function createBrandContentOnboardingActionHandler(
       if (name === 'resume_brand_content_onboarding') {
         const parsed = resumeBrandContentOnboardingInputSchema.safeParse(args);
         if (!parsed.success) {
-          return error(MCP_TOOL_ERROR_CODES.VALIDATION_FAILED, 'The tool input is invalid.', false);
+          return mcpZodValidationError(parsed.error);
         }
         const data = parsed.data;
         const result = await dependencies.resumeBrandContentOnboarding({

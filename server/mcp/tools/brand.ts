@@ -66,14 +66,26 @@ async function handleGetBrandIdentity(args: Record<string, unknown>): Promise<Mc
 
     const intel = await buildWorkspaceIntelligence(workspaceId, { slices: ['brand'] });
     const brand = intel.brand;
+    const deliverables = listDeliverables(workspaceId);
+    const approved = deliverables.filter(item => item.status === 'approved').length;
+    const pending = deliverables.length - approved;
+    const identity = brand?.identity ?? {};
+    const hasIdentity = Object.keys(identity).length > 0;
     const payload: Record<string, unknown> = {
-      availability: brand?.availability ?? 'no_data',
-      identity: brand?.identity ?? {},
+      availability: !hasIdentity && pending > 0
+        ? 'pending_approval'
+        : brand?.availability ?? 'no_data',
+      identity,
       voice_status: brand?.voice.status ?? 'none',
       identity_prompt_block: brand?.identityPromptBlock ?? '',
+      deliverable_counts: {
+        approved,
+        pending,
+        total: deliverables.length,
+      },
     };
     if (includeDeliverables) {
-      payload.deliverables = listDeliverables(workspaceId).map(d => ({
+      payload.deliverables = deliverables.map(d => ({
         id: d.id,
         deliverableType: d.deliverableType,
         content: d.content,

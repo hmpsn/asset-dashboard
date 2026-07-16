@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "updatedAt": "2026-07-15T23:24:17.492Z",
+  "updatedAt": "2026-07-16T05:27:59.000Z",
   "tolerance": 0.05,
-  "total": 1826611,
+  "total": 1828017,
   "entries": {
     "css:assets/index.css": 37315,
     "css:vendor/fontawesome/fontawesome-sharp-regular-subset.min.css": 1203,
@@ -166,7 +166,7 @@
     "js:src/components/AeoReview.tsx": 4961,
     "js:src/components/AnalyticsHub.tsx": 8802,
     "js:src/components/asset-manager-rebuilt/AssetManagerSurface.tsx": 16290,
-    "js:src/components/brand-ai-rebuilt/BrandAiSurface.tsx": 8847,
+    "js:src/components/brand-ai-rebuilt/BrandAiSurface.tsx": 10253,
     "js:src/components/brand/voice-tab/VoiceApprovalSection.tsx": 3253,
     "js:src/components/brand/VoiceTab.tsx": 6661,
     "js:src/components/BrandHub.tsx": 38080,

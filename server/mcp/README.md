@@ -100,7 +100,7 @@ The registry assigns each tool an explicit error contract:
 - The original **61 tools** remain `legacy_text`; registered handler-owned responses are unchanged.
   Registry-owned unknown-tool and authorization rejections are deliberately generic so caller
   tool/workspace values cannot be reflected as secrets.
-- The eleven content-matrix tools, two brand-intake tools, two brand-voice tools, four
+- The eleven content-matrix tools, three brand-intake tools, seven brand-voice tools, four
   brand-generation tools, and three brand-content-onboarding tools use `json_v1`: an error is a text content item containing a JSON
   `{ code, message, retryable, details? }` envelope.
 
@@ -117,7 +117,7 @@ failure classes; unknown names and mismatched workspace values are never logged 
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
 dispatch, workspace scope, and error compatibility. It composes **18 categories** for a total of
-**88 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+**96 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
 name with inert invalid input, asserts the exact 18 family-array→handler identities, and pins the
@@ -161,7 +161,7 @@ increments the paid-call counter.
 ### brand (`tools/brand.ts`)
 | Tool | R/W | Purpose |
 |------|-----|---------|
-| `get_brand_identity` | R | Structured brand identity + voice status; `includeDeliverables:true` adds every deliverable with `version`. |
+| `get_brand_identity` | R | Structured approved identity + voice status, with approved/pending/total deliverable counts; `includeDeliverables:true` adds every deliverable with `version`. |
 | `update_brand_deliverable` | W | Edit a deliverable's content. Optimistic concurrency via `expectedVersion`; resets to `draft`. |
 
 ### brand-intake-actions (`tools/brand-intake-actions.ts`) — immutable evidence authority
@@ -174,16 +174,18 @@ increments the paid-call counter.
 ### brand-voice-actions (`tools/brand-voice-actions.ts`) — operator-authorized voice authority
 | Tool | R/W | Purpose |
 |------|-----|---------|
-| `get_brand_voice` | R | Read the current profile, authority readiness, one bounded page of eligible authentic anchors, and a bounded latest-finalization summary without returning raw intake or frozen snapshot detail. |
+| `get_brand_voice` | R | Read the current profile, exact missing authority prerequisites, all pending chat proposals, one bounded page of eligible authentic anchors, and a bounded latest-finalization summary. |
+| `get_pending_approvals` | R | Read every Brand & AI item awaiting a human decision, with full content and the reason it is pending. It cannot approve anything. |
 | `create_brand_voice_profile` | W | Idempotently ensure a mutable voice profile exists without overwriting an existing draft. |
 | `update_brand_voice_draft` | W | Replace proposed DNA, guardrails, or context modifiers at an exact profile revision; never finalizes. |
 | `add_brand_voice_sample` | W | Add a revision-safe proposed sample. MCP-added samples cannot become finalization anchors until a human attests them in the platform. |
+| `add_brand_voice_samples` | W | Add 1–25 proposed samples with one revision guard and one profile revision bump. All remain human-attestation gated. |
 | `finalize_brand_voice` | W | Consume a short-lived, one-time authorization created by a human operator and bound to the exact profile revision, voice fields, anchors, ratings, and idempotency key. The MCP key remains internal execution provenance only and is never returned. |
 
 Voice finalization is deliberately a two-boundary workflow:
 
-1. Use `create_brand_voice_profile`, `update_brand_voice_draft`, and `add_brand_voice_sample` to prepare the exact draft through chat. Every MCP-added sample remains proposed and cannot enter the authentic anchor pool until a human explicitly attests it in the platform.
-2. Call `get_brand_voice` and present the current readiness plus eligible authentic samples to the operator. It returns one page in `eligible_anchors.items`; while `eligible_anchors.has_more` is true, pass `eligible_anchors.next_cursor` back as `anchor_cursor`. Generated, MCP-proposed, calibration-loop, identity-approved, and copy-approved samples are forbidden as anchors.
+1. Use `create_brand_voice_profile`, `update_brand_voice_draft`, and `add_brand_voice_samples` to prepare the exact draft through chat. Every MCP-added sample remains proposed and cannot enter the authentic anchor pool until a human explicitly attests it in the platform.
+2. Call `get_pending_approvals` to present the complete Brand & AI review queue, or `get_brand_voice` for voice-specific readiness, pending proposals, and eligible authentic samples. `get_brand_voice` returns one page in `eligible_anchors.items`; while `eligible_anchors.has_more` is true, pass `eligible_anchors.next_cursor` back as `anchor_cursor`. Generated, MCP-proposed, calibration-loop, identity-approved, and copy-approved samples are forbidden as anchors.
 3. A human operator creates the exact, short-lived authorization through the authenticated `POST /api/voice/:workspaceId/finalization-authorizations` HTTP boundary. MCP cannot create it or submit a caller-authored operator identity.
 4. Call `finalize_brand_voice` with only `workspace_id` and the one-time `authorization_token`. A replay returns the original finalization without duplicating activity or broadcasts. On a revision conflict, or when an anchor cursor conflicts because its profile/intake revision changed, restart `get_brand_voice` from the first page and request a new authorization; never retry the stale authorization.
 
@@ -265,7 +267,13 @@ The coordinator does not replace the underlying generators or review systems. A 
 ### content-matrix-actions (`tools/content-matrix-actions.ts`) — structural planning and bounded generation
 | Tool | R/W | Purpose |
 |------|-----|---------|
-| `list_pseo_blueprint_entries` | R | Cursor-page collection blueprint/entry IDs and template/matrix links before authoritative plan validation. |
+| `list_content_templates` | R | Cursor-paged template summaries without full section blobs. |
+| `get_content_template` | R | Complete reusable template, including variables, sections, contracts, patterns, mapping, and revision. |
+| `create_content_template` | W | Create a reusable template through the same validation as the admin route. |
+| `update_content_template` | W | Revision-safe partial template update. |
+| `duplicate_content_template` | W | Duplicate a template as a new starting point. |
+| `create_content_matrix` | W | Create a matrix directly from a template plus Cartesian dimensions; Page Strategy is not required. |
+| `list_pseo_blueprint_entries` | R | Cursor-page Page Strategy collection entries and template/matrix links; empty means no collection entries have been generated. |
 | `list_content_matrices` | R | Cursor-paged matrix summaries, optionally filtered by template. |
 | `get_content_matrix` | R | Matrix metadata plus a revision-bound cursor page of cells. |
 | `resolve_content_matrix_cells` | R | Resolve selected durable cell IDs into deterministic structural targets, blockers, or an exact legacy-template upgrade proposal. No AI call or generation run. |
@@ -276,7 +284,7 @@ The coordinator does not replace the underlying generators or review systems. A 
 | `get_content_matrix_generation` | R | Read one durable batch plus cursor-paged item outcomes, audit findings, artifact revisions, and approval evidence. |
 | `retry_content_matrix_generation` | W | **[Paid API]** Resume selected failed or needs-attention checkpoints from exact revisions. |
 | `get_pseo_matrix_plan` | R | Read one collection entry, linked template variables, and exact source authority for safe materialization. |
-| `create_content_matrix_from_pseo_plan` | W | Idempotently create and link one validated matrix from exact source authority plus explicit dimensions. Never starts generation. |
+| `create_content_matrix_from_pseo_plan` | W | Blueprint-linked convenience route that idempotently creates and links one validated matrix. Never starts generation. |
 
 ### schema-actions (`tools/schema-actions.ts`)
 | Tool | R/W | Purpose |

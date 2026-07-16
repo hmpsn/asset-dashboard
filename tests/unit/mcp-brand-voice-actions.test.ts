@@ -207,6 +207,17 @@ function dependencies() {
     sortOrder: 1,
     createdAt: '2026-07-14T12:00:00.000Z',
   }));
+  const addVoiceSamples = vi.fn((_workspaceId, samples: Array<{ content: string; context?: string }>) =>
+    samples.map((sample, index) => ({
+      id: `voice_sample_batch_${index + 1}`,
+      voiceProfileId: profile.id,
+      content: sample.content,
+      contextTag: sample.context as 'body' | undefined,
+      source: 'mcp_proposed' as const,
+      sortOrder: index + 1,
+      createdAt: '2026-07-14T12:00:00.000Z',
+    })));
+  const listDeliverables = vi.fn(() => []);
   const addActivity = vi.fn();
   const broadcastToWorkspace = vi.fn();
   const invalidateIntelligenceCache = vi.fn();
@@ -216,6 +227,8 @@ function dependencies() {
     createVoiceProfile,
     updateVoiceProfileWithResult,
     addVoiceSample,
+    addVoiceSamples,
+    listDeliverables,
     addActivity,
     broadcastToWorkspace,
     invalidateIntelligenceCache,
@@ -232,6 +245,8 @@ function dependencies() {
     createVoiceProfile,
     updateVoiceProfileWithResult,
     addVoiceSample,
+    addVoiceSamples,
+    listDeliverables,
     addActivity,
     broadcastToWorkspace,
     invalidateIntelligenceCache,
@@ -245,12 +260,14 @@ function textPayload(result: Awaited<ReturnType<ReturnType<typeof createBrandVoi
 }
 
 describe('MCP brand voice actions', () => {
-  it('advertises one dedicated five-tool snake_case json-v1 family', () => {
+  it('advertises one dedicated seven-tool snake_case json-v1 family', () => {
     expect(brandVoiceActionTools.map(tool => tool.name)).toEqual([
       'get_brand_voice',
+      'get_pending_approvals',
       'create_brand_voice_profile',
       'update_brand_voice_draft',
       'add_brand_voice_sample',
+      'add_brand_voice_samples',
       'finalize_brand_voice',
     ]);
     for (const tool of brandVoiceActionTools as Tool[]) {
@@ -262,7 +279,7 @@ describe('MCP brand voice actions', () => {
         expect(property.description).toEqual(expect.any(String));
       }
     }
-    expect(brandVoiceActionTools[4]?.inputSchema).toMatchObject({
+    expect(brandVoiceActionTools[6]?.inputSchema).toMatchObject({
       additionalProperties: false,
       required: ['workspace_id', 'authorization_token'],
     });
@@ -342,6 +359,38 @@ describe('MCP brand voice actions', () => {
     expect(textPayload(draft)).toMatchObject({ eligible_as_finalization_anchor: false });
   });
 
+  it('adds a sample set with one revision guard and one reported revision bump', async () => {
+    const deps = dependencies();
+    const result = await createBrandVoiceActionHandler(deps.value)(
+      'add_brand_voice_samples',
+      {
+        workspace_id: WORKSPACE_ID,
+        expected_profile_revision: 3,
+        samples: [
+          { content: 'First authentic example.', context: 'body' },
+          { content: 'Second authentic example.', context: 'body' },
+        ],
+      },
+      workspaceContext(),
+    );
+
+    expect(result.isError).not.toBe(true);
+    expect(deps.addVoiceSamples).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      [
+        { content: 'First authentic example.', context: 'body' },
+        { content: 'Second authentic example.', context: 'body' },
+      ],
+      3,
+    );
+    expect(textPayload(result)).toMatchObject({
+      count: 2,
+      profile_revision: 4,
+      eligible_as_finalization_anchor: false,
+    });
+    expect(deps.addActivity).toHaveBeenCalledTimes(1);
+  });
+
   it('returns only the safe readiness projection in snake_case', async () => {
     const deps = dependencies();
     const fullSnapshot = snapshot();
@@ -388,6 +437,7 @@ describe('MCP brand voice actions', () => {
         voice_profile_id: 'voice_profile_1',
         anchor_count: 1,
       },
+      pending_proposals: { count: 0, items: [] },
     });
     const payload = textPayload(result);
     const serialized = JSON.stringify(payload);
@@ -400,6 +450,97 @@ describe('MCP brand voice actions', () => {
     expect(payload.latest_snapshot).not.toHaveProperty('guardrails');
     expect(payload.latest_snapshot).not.toHaveProperty('anchors');
     expect(payload.latest_snapshot).not.toHaveProperty('calibration_selections');
+  });
+
+  it('exposes full pending proposals and exact missing readiness prerequisites', async () => {
+    const deps = dependencies();
+    deps.getBrandVoicePage.mockReturnValue({
+      ...readResult(),
+      profile: {
+        ...readResult().profile!,
+        voiceDNA: undefined,
+        guardrails: undefined,
+      },
+      readiness: { state: 'missing', blockingReasons: ['Brand voice has not been finalized.'] },
+      eligibleAnchors: { items: [], nextCursor: null, hasMore: false },
+    });
+    const current = deps.getVoiceProfile();
+    deps.getVoiceProfile.mockReturnValue({
+      ...current,
+      samples: [{
+        id: 'voice_sample_pending',
+        voiceProfileId: current!.id,
+        content: 'Full pending sample content.',
+        contextTag: 'body',
+        source: 'mcp_proposed',
+        sortOrder: 1,
+        createdAt: '2026-07-14T12:00:00.000Z',
+      }],
+    } as never);
+
+    const result = await createBrandVoiceActionHandler(deps.value)(
+      'get_brand_voice',
+      { workspace_id: WORKSPACE_ID },
+      workspaceContext(),
+    );
+
+    expect(textPayload(result)).toMatchObject({
+      readiness: {
+        blocking_reasons: [
+          'Voice DNA is missing.',
+          'Voice guardrails are missing.',
+          '1 chat-proposed voice sample requires human approval before any can be used as an authentic anchor.',
+        ],
+      },
+      pending_proposals: {
+        count: 1,
+        items: [{ id: 'voice_sample_pending', content: 'Full pending sample content.' }],
+      },
+    });
+  });
+
+  it('returns one unified read of every Brand and AI approval wait', async () => {
+    const deps = dependencies();
+    const current = deps.getVoiceProfile();
+    deps.getVoiceProfile.mockReturnValue({
+      ...current,
+      samples: [{
+        id: 'voice_sample_pending',
+        voiceProfileId: current!.id,
+        content: 'Approve this complete voice sample.',
+        contextTag: 'headline',
+        source: 'mcp_proposed',
+        sortOrder: 1,
+        createdAt: '2026-07-14T12:00:00.000Z',
+      }],
+    } as never);
+    deps.listDeliverables.mockReturnValue([{
+      id: 'deliverable_pending',
+      workspaceId: WORKSPACE_ID,
+      deliverableType: 'tagline',
+      content: 'A complete draft tagline.',
+      status: 'draft',
+      version: 2,
+      tier: 'essentials',
+      createdAt: '2026-07-14T12:00:00.000Z',
+      updatedAt: '2026-07-14T12:00:00.000Z',
+    }]);
+
+    const result = await createBrandVoiceActionHandler(deps.value)(
+      'get_pending_approvals',
+      { workspace_id: WORKSPACE_ID },
+      workspaceContext(),
+    );
+
+    expect(textPayload(result)).toMatchObject({
+      count: 3,
+      counts: { voice_finalization: 1, voice_samples: 1, brand_deliverables: 1 },
+      items: [
+        { type: 'voice_finalization' },
+        { type: 'voice_sample', content: { content: 'Approve this complete voice sample.' } },
+        { type: 'brand_deliverable', content: { content: 'A complete draft tagline.' } },
+      ],
+    });
   });
 
   it('forwards the bounded anchor page contract and rejects oversized input', async () => {
@@ -423,10 +564,10 @@ describe('MCP brand voice actions', () => {
       workspace_id: WORKSPACE_ID,
       anchor_limit: 101,
     }, workspaceContext());
-    expect(textPayload(invalid)).toEqual({
+    expect(textPayload(invalid)).toMatchObject({
       code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-      message: 'The tool input is invalid.',
       retryable: false,
+      details: { field_path: 'anchor_limit' },
     });
     expect(deps.getBrandVoicePage).not.toHaveBeenCalled();
   });
@@ -563,10 +704,10 @@ describe('MCP brand voice actions', () => {
 
     expect(result.isError).toBe(true);
     expect(isValidatedMcpJsonV1ErrorResult(result)).toBe(true);
-    expect(textPayload(result)).toEqual({
+    expect(textPayload(result)).toMatchObject({
       code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
-      message: 'The tool input is invalid.',
       retryable: false,
+      details: { field_path: 'finalized_by' },
     });
     expect(deps.consumeVoiceFinalizationAuthorization).not.toHaveBeenCalled();
   });

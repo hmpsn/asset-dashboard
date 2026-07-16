@@ -23,6 +23,10 @@ export const getBrandVoiceInputSchema = z.object({
     .describe('Opaque eligible-anchor cursor bound to the workspace, current voice-profile revision, current brand-intake revision, and stable page position.'),
 }).strict();
 
+export const getPendingApprovalsMcpInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+}).strict();
+
 export const createBrandVoiceProfileMcpInputSchema = z.object({
   workspace_id: workspaceIdSchema,
 }).strict();
@@ -31,10 +35,13 @@ const mcpVoiceDnaSchema = z.object({
   personality_traits: z.array(shortTextSchema).max(VOICE_FINALIZATION_LIMITS.maxTraitCount)
     .describe('Specific voice personality traits; empty values remain empty.'),
   tone_spectrum: z.object({
-    formal_casual: z.number().min(1).max(10),
-    serious_playful: z.number().min(1).max(10),
-    technical_accessible: z.number().min(1).max(10),
-  }).strict().describe('Three calibrated tone axes on a 1–10 scale.'),
+    formal_casual: z.number().min(1).max(10)
+      .describe('1 = most formal; 10 = most casual.'),
+    serious_playful: z.number().min(1).max(10)
+      .describe('1 = most serious; 10 = most playful.'),
+    technical_accessible: z.number().min(1).max(10)
+      .describe('1 = most technical; 10 = most accessible.'),
+  }).strict().describe('Three calibrated tone axes on the platform 1–10 scale; higher values move toward the second named pole.'),
   sentence_style: contentTextSchema.describe('Sentence rhythm and construction guidance.'),
   vocabulary_level: contentTextSchema.describe('Vocabulary and reading-level guidance.'),
   humor_style: contentTextSchema.optional().describe('Optional humor guidance.'),
@@ -85,6 +92,22 @@ export const addBrandVoiceSampleMcpInputSchema = z.object({
     .optional().describe('Optional writing context for this sample.'),
 }).strict();
 
+const mcpVoiceSampleSchema = z.object({
+  content: z.string().trim().min(1).max(VOICE_FINALIZATION_LIMITS.maxTextLength)
+    .describe('Exact sample text to add to the voice profile.'),
+  context: z.enum(['headline', 'body', 'cta', 'about', 'service', 'social', 'seo'])
+    .optional().describe('Optional writing context for this sample.'),
+}).strict();
+
+export const addBrandVoiceSamplesMcpInputSchema = z.object({
+  workspace_id: workspaceIdSchema,
+  expected_profile_revision: expectedRevisionSchema,
+  samples: z.array(mcpVoiceSampleSchema)
+    .min(1)
+    .max(VOICE_FINALIZATION_LIMITS.maxAnchors)
+    .describe(`Voice samples to add together in one revision-safe write; accepts 1–${VOICE_FINALIZATION_LIMITS.maxAnchors} items.`),
+}).strict();
+
 export const finalizeBrandVoiceMcpInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   authorization_token: z.string().trim().min(1)
@@ -93,7 +116,9 @@ export const finalizeBrandVoiceMcpInputSchema = z.object({
 }).strict();
 
 export type GetBrandVoiceInput = z.infer<typeof getBrandVoiceInputSchema>;
+export type GetPendingApprovalsMcpInput = z.infer<typeof getPendingApprovalsMcpInputSchema>;
 export type CreateBrandVoiceProfileMcpInput = z.infer<typeof createBrandVoiceProfileMcpInputSchema>;
 export type UpdateBrandVoiceDraftMcpInput = z.infer<typeof updateBrandVoiceDraftMcpInputSchema>;
 export type AddBrandVoiceSampleMcpInput = z.infer<typeof addBrandVoiceSampleMcpInputSchema>;
+export type AddBrandVoiceSamplesMcpInput = z.infer<typeof addBrandVoiceSamplesMcpInputSchema>;
 export type FinalizeBrandVoiceMcpInput = z.infer<typeof finalizeBrandVoiceMcpInputSchema>;

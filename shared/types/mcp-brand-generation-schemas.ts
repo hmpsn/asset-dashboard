@@ -60,7 +60,7 @@ export const startBrandDeliverableGenerationInputSchema = z.object({
   expected_intake_fingerprint: fingerprintSchema
     .describe('Fingerprint of the exact immutable intake revision.'),
   selection: selectionSchema
-    .describe('One atomic target or one ordered preset; arrays and mixed selections are invalid.'),
+    .describe(`Exactly one selection object: {kind:'atomic', target:<one of ${BRAND_GENERATION_ATOMIC_TARGETS.join(' | ')}>} or {kind:'preset', preset:<identity_messaging | audience | full_brand_system>}. Arrays and mixed selections are invalid.`),
   expected_voice_version: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional()
     .describe('Required exact finalized voice version for every durable target; omitted for voice foundation/full-suite bootstrap.'),
   expected_voice_fingerprint: fingerprintSchema.optional()
