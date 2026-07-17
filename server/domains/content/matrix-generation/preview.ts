@@ -36,7 +36,10 @@ import {
 import { getMatrix } from '../../../content-matrices.js';
 import { getTemplate } from '../../../content-templates.js';
 import { getPost } from '../../../content-posts-db.js';
-import { buildContentGenerationContextV2 } from '../../../intelligence/generation-context-builders.js';
+import {
+  buildContentGenerationContextV2,
+  ContentGenerationContextBudgetError,
+} from '../../../intelligence/generation-context-builders.js';
 import {
   getCustomPromptNotes,
   renderSystemVoiceAuthorityBlock,
@@ -48,10 +51,22 @@ import {
 } from './evidence.js';
 import { canonicalGenerationFingerprint } from './fingerprint.js';
 import {
+  assertMatrixGenerationEstimatedProviderInput,
+  MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET,
+  MATRIX_GENERATION_AUTHORITY_UTF8_BYTE_CEILING,
+  MatrixGenerationProviderInputEnvelopeError,
   matrixGenerationEstimatedUsdCeiling,
   matrixGenerationInputReservationCeiling,
+  matrixGenerationProjectionTokenEstimate,
+  matrixGenerationRenderedInputUtf8Bytes,
 } from './budget.js';
 import { resolveMatrixStructures } from './read-service.js';
+import {
+  MATRIX_GENERATION_SET_AUDIT_MAX_ITEM_ID_UTF8_BYTES,
+  MATRIX_GENERATION_SET_AUDIT_MAX_PAGE_TEXT_CHARS,
+  projectMatrixGenerationSetAuditPage,
+  renderMatrixGenerationSetAuditProviderInput,
+} from './set-audit-input.js';
 
 export const MATRIX_PAGE_TYPE_IDENTITY_ALLOWLIST = {
   blog: ['messaging_pillars', 'personas'],
@@ -72,6 +87,163 @@ interface FrozenIdentity {
 export interface PreparedMatrixGenerationCell {
   result: MatrixGenerationPreviewResult;
   context?: ContentGenerationContextV2Result;
+}
+
+export const MATRIX_GENERATION_PREVIEW_STAGES = [
+  'generation_context',
+  'cell_budget',
+  'evidence_range',
+  'preview_fingerprint',
+  'batch_budget',
+  'mcp_projection',
+] as const;
+
+export type MatrixGenerationPreviewStage =
+  (typeof MATRIX_GENERATION_PREVIEW_STAGES)[number];
+
+export const MATRIX_GENERATION_CONTEXT_BUDGETS = {
+  brief: MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET,
+  draft: MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET,
+  voiceReview: MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET,
+} as const;
+
+type MatrixGenerationPreviewFailureCode = 'precondition_failed' | 'internal_error';
+
+class MatrixGenerationAuthorityBudgetError extends Error {
+  constructor() {
+    super('Matrix generation authority exceeds its UTF-8 byte ceiling');
+    this.name = 'MatrixGenerationAuthorityBudgetError';
+  }
+}
+
+class MatrixGenerationBatchBudgetLimitError extends Error {
+  readonly dimension: 'provider_calls' | 'input_tokens' | 'output_tokens'
+    | 'estimated_usd' | 'max_concurrency';
+
+  constructor(dimension: MatrixGenerationBatchBudgetLimitError['dimension']) {
+    super('Matrix generation batch estimate exceeds its accepted hard limit');
+    this.name = 'MatrixGenerationBatchBudgetLimitError';
+    this.dimension = dimension;
+  }
+}
+
+function safeFailureClassification(error: unknown): string {
+  if (error instanceof ContentGenerationContextBudgetError) {
+    return 'content_generation_context_budget';
+  }
+  if (error instanceof MatrixGenerationAuthorityBudgetError) {
+    return 'matrix_generation_authority_budget';
+  }
+  if (error instanceof MatrixGenerationProviderInputEnvelopeError) {
+    return 'matrix_generation_provider_input_envelope';
+  }
+  if (error instanceof MatrixGenerationBatchBudgetLimitError) {
+    return 'matrix_generation_batch_budget_limit';
+  }
+  if (error instanceof TypeError) return 'type_error';
+  if (error instanceof RangeError) return 'range_error';
+  if (error instanceof SyntaxError) return 'syntax_error';
+  return 'unexpected_error';
+}
+
+/**
+ * Safe stage boundary for the preview-only ready tail. Raw exceptions are
+ * deliberately not retained so MCP logging cannot accidentally serialize
+ * prompts, evidence, causes, messages, or stacks.
+ */
+export class MatrixGenerationPreviewStageError extends Error {
+  readonly code: MatrixGenerationPreviewFailureCode;
+  readonly stage: MatrixGenerationPreviewStage;
+  readonly cellId: string;
+  readonly classification: string;
+  readonly fieldPath: string | null;
+  readonly constraint: string | null;
+
+  private constructor(input: {
+    code: MatrixGenerationPreviewFailureCode;
+    stage: MatrixGenerationPreviewStage;
+    cellId: string;
+    classification: string;
+    fieldPath?: string;
+    constraint?: string;
+  }) {
+    super(input.code === 'precondition_failed'
+      ? 'The matrix generation preview exceeds a safe generation limit.'
+      : 'The matrix generation preview could not complete.');
+    this.name = 'MatrixGenerationPreviewStageError';
+    this.code = input.code;
+    this.stage = input.stage;
+    this.cellId = input.cellId;
+    this.classification = input.classification;
+    this.fieldPath = input.fieldPath ?? null;
+    this.constraint = input.constraint ?? null;
+  }
+
+  static from(
+    stage: MatrixGenerationPreviewStage,
+    cellId: string,
+    error: unknown,
+  ): MatrixGenerationPreviewStageError {
+    if (error instanceof MatrixGenerationPreviewStageError) return error;
+    if (error instanceof ContentGenerationContextBudgetError) {
+      return new MatrixGenerationPreviewStageError({
+        code: 'precondition_failed',
+        stage,
+        cellId,
+        classification: safeFailureClassification(error),
+        fieldPath: `generation_context.${error.stage}`,
+        constraint: `required frozen authority and target evidence must fit within the ${MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET}-token matrix context budget`,
+      });
+    }
+    if (error instanceof MatrixGenerationAuthorityBudgetError) {
+      return new MatrixGenerationPreviewStageError({
+        code: 'precondition_failed',
+        stage,
+        cellId,
+        classification: safeFailureClassification(error),
+        fieldPath: 'generation_context.authority',
+        constraint: `serialized frozen voice, approved identity, and custom notes must not exceed ${MATRIX_GENERATION_AUTHORITY_UTF8_BYTE_CEILING} UTF-8 bytes`,
+      });
+    }
+    if (error instanceof MatrixGenerationProviderInputEnvelopeError) {
+      return new MatrixGenerationPreviewStageError({
+        code: 'precondition_failed',
+        stage,
+        cellId,
+        classification: safeFailureClassification(error),
+        fieldPath: 'generation_context.provider_input',
+        constraint: 'every rendered matrix provider input must fit the shared per-dispatch application envelope',
+      });
+    }
+    if (error instanceof MatrixGenerationBatchBudgetLimitError) {
+      return new MatrixGenerationPreviewStageError({
+        code: 'precondition_failed',
+        stage,
+        cellId,
+        classification: safeFailureClassification(error),
+        fieldPath: `accepted_budget.${error.dimension}`,
+        constraint: 'the complete batch estimate must fit the start-content-matrix-generation hard limits',
+      });
+    }
+    return new MatrixGenerationPreviewStageError({
+      code: 'internal_error',
+      stage,
+      cellId,
+      classification: safeFailureClassification(error),
+    });
+  }
+}
+
+async function runPreviewStage<T>(
+  stage: MatrixGenerationPreviewStage,
+  cellId: string,
+  operation: () => T | Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    throw MatrixGenerationPreviewStageError.from(stage, cellId, error);
+  }
 }
 
 function approvedRef(deliverable: BrandDeliverable): ApprovedBrandDeliverableRef {
@@ -238,7 +410,6 @@ function renderVoiceAnchors(
 const PREVIEW_PROMPT_OVERHEAD_BYTES = 16 * 1_024;
 const GENERATED_OUTPUT_BYTES_PER_TOKEN = 8;
 const PREVIOUS_SECTION_CONTEXT_BYTES = 3_200;
-const SET_AUDIT_PAGE_TEXT_BYTES = 48_000;
 const BRIEF_OUTPUT_TOKENS = 7_000;
 const ITEM_AUDIT_OUTPUT_TOKENS = 2_500;
 const ITEM_REVISION_OUTPUT_TOKENS = 12_000;
@@ -320,20 +491,34 @@ export function estimateMatrixGenerationCellBudget(
     * bodyBlocks.length
     * Math.max(0, bodyBlocks.length - 1)
     / 2;
+  const maximumPriorSectionInput = matrixGenerationInputReservationCeiling(
+    PREVIOUS_SECTION_CONTEXT_BYTES * Math.max(0, bodyBlocks.length - 1),
+  ) - matrixGenerationInputReservationCeiling(0);
+  const maximumProseStageInputPerDispatch = draftStageInput + maximumPriorSectionInput;
   const proseStageInput = (draftStageInput * 2 * (bodyBlocks.length + 2))
     + (priorSectionInput * 2);
-  const unificationInput = promptInputCeiling(
+  const unificationInputPerDispatch = promptInputCeiling(
     authorityBytes,
     draftProjectionBytes,
     briefOutputBytes,
     adoptedPostBytes,
-  ) * 2;
+  );
+  const unificationInput = unificationInputPerDispatch * 2;
   const seoInput = promptInputCeiling(authorityBytes, briefOutputBytes);
-  const itemOperationInput = promptInputCeiling(
+  const itemOperationInputPerDispatch = promptInputCeiling(
     targetBytes,
     authorityBytes,
     auditPostBytes,
-  ) * 3;
+  );
+  const itemOperationInput = itemOperationInputPerDispatch * 3;
+  [
+    briefInput,
+    draftStageInput,
+    maximumProseStageInputPerDispatch,
+    unificationInputPerDispatch,
+    seoInput,
+    itemOperationInputPerDispatch,
+  ].forEach(assertMatrixGenerationEstimatedProviderInput);
   const inputTokens = briefInput
     + proseStageInput
     + unificationInput
@@ -364,23 +549,15 @@ export function estimateMatrixGenerationBatchBudget(
   const generationInput = estimates.reduce((sum, estimate) => sum + estimate.inputTokens, 0);
   const generationOutput = estimates.reduce((sum, estimate) => sum + estimate.outputTokens, 0);
   const setAuditPasses = targets.length >= 2 ? 2 : 0;
-  const setAuditCandidateInput = setAuditPasses === 0
+  const setAuditInputPerDispatch = setAuditPasses === 0
     ? 0
-    : targets.reduce((sum, target) => {
-        const { adoptedPostBytes } = matrixPostOutputEstimate(target);
-        const candidateBytes = serializedUtf8Bytes({
-          plannedUrl: target.plannedUrl,
-          targetKeyword: target.targetKeyword.value,
-          variableValues: target.variableValues,
-          evidenceRequirements: target.evidenceRequirements,
-          allowedTargetIds: target.blockManifest.blocks.map(block => block.id),
-        }) + Math.min(adoptedPostBytes, SET_AUDIT_PAGE_TEXT_BYTES);
-        return sum + matrixGenerationInputReservationCeiling(candidateBytes);
-      }, 0) * setAuditPasses;
-  const setAuditFramingInput = promptInputCeiling() * setAuditPasses;
-  const inputTokens = generationInput + setAuditCandidateInput + setAuditFramingInput;
+    : estimateMatrixGenerationSetAuditInputReservation(targets);
+  if (setAuditInputPerDispatch > 0) {
+    assertMatrixGenerationEstimatedProviderInput(setAuditInputPerDispatch);
+  }
+  const inputTokens = generationInput + (setAuditInputPerDispatch * setAuditPasses);
   const outputTokens = generationOutput + (SET_AUDIT_OUTPUT_TOKENS * setAuditPasses);
-  return {
+  const estimate = {
     providerCalls: estimates.reduce((sum, estimate) => sum + estimate.providerCalls, 0)
       + setAuditPasses,
     inputTokens,
@@ -388,6 +565,45 @@ export function estimateMatrixGenerationBatchBudget(
     estimatedUsd: matrixGenerationEstimatedUsdCeiling(inputTokens, outputTokens),
     maxConcurrency: Math.min(MATRIX_GENERATION_BATCH_LIMITS.maxConcurrency, targets.length),
   };
+  const limits = [
+    ['provider_calls', estimate.providerCalls, MATRIX_GENERATION_BATCH_LIMITS.maxProviderCalls],
+    ['input_tokens', estimate.inputTokens, MATRIX_GENERATION_BATCH_LIMITS.maxInputTokens],
+    ['output_tokens', estimate.outputTokens, MATRIX_GENERATION_BATCH_LIMITS.maxOutputTokens],
+    ['estimated_usd', estimate.estimatedUsd, MATRIX_GENERATION_BATCH_LIMITS.maxEstimatedUsd],
+    ['max_concurrency', estimate.maxConcurrency, MATRIX_GENERATION_BATCH_LIMITS.maxConcurrency],
+  ] as const;
+  const exceeded = limits.find(([, actual, limit]) => actual > limit);
+  if (exceeded) throw new MatrixGenerationBatchBudgetLimitError(exceeded[0]);
+  return estimate;
+}
+
+function previewSetAuditItemId(index: number): string {
+  const suffix = index.toString().padStart(4, '0');
+  const emojiBytes = Buffer.byteLength('🧭', 'utf8');
+  const count = Math.floor(
+    (MATRIX_GENERATION_SET_AUDIT_MAX_ITEM_ID_UTF8_BYTES
+      - Buffer.byteLength(suffix, 'utf8')) / emojiBytes,
+  );
+  return `${'🧭'.repeat(count)}${suffix}`;
+}
+
+export function estimateMatrixGenerationSetAuditInputReservation(
+  targets: readonly MatrixGenerationPreviewTarget[],
+): number {
+  const maximumPageText = '🧭'.repeat(MATRIX_GENERATION_SET_AUDIT_MAX_PAGE_TEXT_CHARS);
+  const pages = targets.map((target, index) => projectMatrixGenerationSetAuditPage({
+    itemId: previewSetAuditItemId(index),
+    target,
+    text: maximumPageText,
+  }));
+  const { renderedInput } = renderMatrixGenerationSetAuditProviderInput(pages);
+  const serializedUtf8Bytes = matrixGenerationRenderedInputUtf8Bytes({
+    provider: 'openai',
+    fallback: false,
+    renderedInput,
+    maxOutputTokens: SET_AUDIT_OUTPUT_TOKENS,
+  });
+  return matrixGenerationInputReservationCeiling(serializedUtf8Bytes);
 }
 
 function evidenceRange(timestamps: readonly string[], fallback: string) {
@@ -474,39 +690,44 @@ export async function prepareMatrixGenerationCell(
     };
   }
 
-  const systemVoiceBlock = renderSystemVoiceAuthorityBlock(
-    voiceSnapshot.voiceDNA,
-    voiceSnapshot.guardrails,
-  );
-  const context = await buildContentGenerationContextV2(workspaceId, {
-    targetKeyword: target.targetKeyword.value,
-    pagePath: target.plannedUrl,
-    allowKeywordTargetMatch: false,
-    providerMetricsObservedAt: target.targetKeyword.validation?.validatedAt ?? null,
-    authority: {
-      systemVoiceBlock,
+  const context = await runPreviewStage('generation_context', target.cellId, () => {
+    const authority = {
+      systemVoiceBlock: renderSystemVoiceAuthorityBlock(
+        voiceSnapshot.voiceDNA,
+        voiceSnapshot.guardrails,
+      ),
       userVoiceBlock: renderVoiceAnchors(voiceSnapshot),
       identityPromptBlock: identity.promptBlock,
       customNotes: getCustomPromptNotes(workspaceId),
       voice: {
-        status: 'calibrated',
-        readiness: 'finalized',
+        status: 'calibrated' as const,
+        readiness: 'finalized' as const,
         profileRevision: voiceSnapshot.profileRevision,
         voiceVersion: voiceSnapshot.voiceVersion,
       },
-    },
+    };
+    if (serializedUtf8Bytes(authority) > MATRIX_GENERATION_AUTHORITY_UTF8_BYTE_CEILING) {
+      throw new MatrixGenerationAuthorityBudgetError();
+    }
+    return buildContentGenerationContextV2(workspaceId, {
+      targetKeyword: target.targetKeyword.value,
+      pagePath: target.plannedUrl,
+      allowKeywordTargetMatch: false,
+      providerMetricsObservedAt: target.targetKeyword.validation?.validatedAt ?? null,
+      authority,
+      budgets: MATRIX_GENERATION_CONTEXT_BUDGETS,
+      projectionTokenEstimator: matrixGenerationProjectionTokenEstimate,
+    });
   });
-  const estimatedPaidBudget = estimateMatrixGenerationCellBudget(
-    target,
-    context,
-    resolutions,
-  );
-  const evidence = evidenceRange([
+  const estimatedPaidBudget = await runPreviewStage('cell_budget', target.cellId, () => (
+    estimateMatrixGenerationCellBudget(target, context, resolutions)
+  ));
+  const evidence = await runPreviewStage('evidence_range', target.cellId, () => evidenceRange([
     ...context.evidence.observedAt,
     voiceSnapshot.finalizedAt,
     ...identity.evidenceTimestamps,
     ...resolutions.map(resolution => resolution.sourceRef.capturedAt),
-  ], context.evidence.capturedAt);
+  ], context.evidence.capturedAt));
   const previewCore = {
     structuralFingerprint: target.structuralFingerprint,
     blockManifestFingerprint: target.blockManifest.fingerprint,
@@ -524,6 +745,11 @@ export async function prepareMatrixGenerationCell(
     contextFingerprint: context.effectiveInputFingerprint,
     estimatedPaidBudget,
   };
+  const effectiveInputFingerprint = await runPreviewStage(
+    'preview_fingerprint',
+    target.cellId,
+    () => canonicalGenerationFingerprint(previewCore),
+  );
   const previewTarget: MatrixGenerationPreviewTarget = {
     ...target,
     voiceSnapshot: previewCore.voiceSnapshot,
@@ -532,7 +758,7 @@ export async function prepareMatrixGenerationCell(
     evidenceCapturedAt: evidence.capturedAt,
     evidenceFreshThrough: evidence.freshThrough,
     expectedArtifactRevisions,
-    effectiveInputFingerprint: canonicalGenerationFingerprint(previewCore),
+    effectiveInputFingerprint,
     blockingRequirementIds: [],
     estimatedPaidBudget,
   };
@@ -594,13 +820,18 @@ export async function previewMatrixGeneration(
       result.status === 'ready'
     ),
   );
+  const estimatedBatchBudget = readyResults.length === results.length
+    ? await runPreviewStage(
+        'batch_budget',
+        readyResults[0]?.cellId ?? request.selections[0]?.cellId ?? 'unknown',
+        () => estimateMatrixGenerationBatchBudget(
+          readyResults.map(result => result.target),
+        ),
+      )
+    : null;
   return {
     results,
-    estimatedBatchBudget: readyResults.length === results.length
-      ? estimateMatrixGenerationBatchBudget(
-          readyResults.map(result => result.target),
-        )
-      : null,
+    estimatedBatchBudget,
   };
 }
 

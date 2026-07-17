@@ -13,6 +13,7 @@ import {
   type StartMatrixGenerationResult,
 } from '../../shared/types/matrix-generation.js';
 import { MCP_TOOL_ERROR_CODES } from '../../shared/types/mcp-runtime.js';
+import { ContentGenerationContextBudgetError } from '../../server/intelligence/generation-context-builders.js';
 import {
   contentMatrixActionTools,
   createContentMatrixActionHandler,
@@ -23,6 +24,10 @@ import {
   MatrixCellPlannedUrlError,
   MatrixCellRevisionConflictError,
 } from '../../server/content-matrices.js';
+import {
+  MatrixGenerationPreviewStageError,
+} from '../../server/domains/content/matrix-generation/preview.js';
+import { MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET } from '../../server/domains/content/matrix-generation/budget.js';
 
 const pseoExpectedSource = {
   entry_updated_at: '2026-07-14T00:00:00.000Z',
@@ -352,6 +357,7 @@ function dependencies() {
     broadcastToWorkspace: vi.fn(),
     invalidateContentPipelineIntelligence: vi.fn(),
     recordPaidCallOnce: vi.fn(() => ({ count: 1 })),
+    logPreviewFailure: vi.fn(),
   };
 }
 
@@ -1323,6 +1329,197 @@ describe('MCP content matrix read tools', () => {
       }],
       upgrade_proposals: [],
     });
+  });
+
+  it('projects a generation-ready target and finite batch estimate without starting paid work', async () => {
+    const deps = dependencies();
+    deps.previewMatrixGeneration.mockResolvedValue({
+      results: [{
+        status: 'ready',
+        matrixId: 'mtx_1',
+        templateId: 'tpl_1',
+        cellId: 'cell_1',
+        sourceRevision: { matrixRevision: 2, templateRevision: 4, cellRevision: 1 },
+        target: {
+          cellId: 'cell_1',
+          variableValues: { serviceType: 'SEO Audit' },
+          blockingRequirementIds: [],
+          effectiveInputFingerprint: 'a'.repeat(64),
+          estimatedPaidBudget: {
+            providerCalls: 15,
+            inputTokens: 31_000,
+            outputTokens: 27_500,
+            estimatedUsd: 0.98,
+            maxConcurrency: 1,
+          },
+        },
+      }],
+      estimatedBatchBudget: {
+        providerCalls: 15,
+        inputTokens: 31_000,
+        outputTokens: 27_500,
+        estimatedUsd: 0.98,
+        maxConcurrency: 1,
+      },
+    } as never);
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('preview_content_matrix_generation', {
+      workspace_id: 'ws_1',
+      matrix_id: 'mtx_1',
+      selections: [{
+        cell_id: 'cell_1',
+        expected_source_revision: {
+          matrix_revision: 2,
+          template_revision: 4,
+          cell_revision: 1,
+        },
+      }],
+    }, { ...context, toolName: 'preview_content_matrix_generation' });
+
+    expect(textPayload(result)).toMatchObject({
+      results: [{
+        status: 'ready',
+        target: {
+          cell_id: 'cell_1',
+          blocking_requirement_ids: [],
+          effective_input_fingerprint: 'a'.repeat(64),
+        },
+      }],
+      estimated_batch_budget: {
+        input_tokens: 31_000,
+        max_concurrency: 1,
+      },
+    });
+    expect(deps.startMatrixGeneration).not.toHaveBeenCalled();
+    expect(deps.recordPaidCallOnce).not.toHaveBeenCalled();
+    expect(deps.addActivity).not.toHaveBeenCalled();
+    expect(deps.broadcastToWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('classifies projection and JSON serialization failures at the MCP boundary', async () => {
+    const deps = dependencies();
+    const circularTarget: Record<string, unknown> = { cellId: 'cell_1' };
+    circularTarget.self = circularTarget;
+    deps.previewMatrixGeneration.mockResolvedValue({
+      results: [{
+        status: 'ready',
+        matrixId: 'mtx_1',
+        templateId: 'tpl_1',
+        cellId: 'cell_1',
+        sourceRevision: { matrixRevision: 2, templateRevision: 4, cellRevision: 1 },
+        target: circularTarget,
+      }],
+      estimatedBatchBudget: null,
+    } as never);
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('preview_content_matrix_generation', {
+      workspace_id: 'ws_1',
+      matrix_id: 'mtx_1',
+      selections: [{
+        cell_id: 'cell_1',
+        expected_source_revision: {
+          matrix_revision: 2,
+          template_revision: 4,
+          cell_revision: 1,
+        },
+      }],
+    }, { ...context, requestId: 'request_projection', toolName: 'preview_content_matrix_generation' });
+
+    expect(textPayload(result)).toEqual({
+      code: MCP_TOOL_ERROR_CODES.INTERNAL_ERROR,
+      message: 'The tool could not complete because of an internal error.',
+      retryable: false,
+    });
+    expect(deps.logPreviewFailure).toHaveBeenCalledWith({
+      requestId: 'request_projection',
+      tool: 'preview_content_matrix_generation',
+      stage: 'mcp_projection',
+      classification: 'range_error',
+    });
+  });
+
+  it('maps a known ready-tail authority overflow to a field-addressed precondition error', async () => {
+    const deps = dependencies();
+    deps.previewMatrixGeneration.mockRejectedValue(MatrixGenerationPreviewStageError.from(
+      'generation_context',
+      'cell_1',
+      new ContentGenerationContextBudgetError(
+        'brief',
+        MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET,
+        MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET + 1,
+      ),
+    ));
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('preview_content_matrix_generation', {
+      workspace_id: 'ws_1',
+      matrix_id: 'mtx_1',
+      selections: [{
+        cell_id: 'cell_1',
+        expected_source_revision: {
+          matrix_revision: 2,
+          template_revision: 4,
+          cell_revision: 1,
+        },
+      }],
+    }, { ...context, requestId: 'request_budget', toolName: 'preview_content_matrix_generation' });
+
+    expect(result.isError).toBe(true);
+    expect(textPayload(result)).toMatchObject({
+      code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
+      retryable: false,
+      details: {
+        field_path: 'generation_context.brief',
+        stage: 'generation_context',
+        cell_id: 'cell_1',
+      },
+    });
+    expect(deps.logPreviewFailure).toHaveBeenCalledWith({
+      requestId: 'request_budget',
+      tool: 'preview_content_matrix_generation',
+      stage: 'generation_context',
+      classification: 'content_generation_context_budget',
+    });
+  });
+
+  it('redacts unexpected ready-tail exception content while logging request and safe classification', async () => {
+    const deps = dependencies();
+    const injectedSecret = 'sk-proj-this-must-never-escape-123456789';
+    deps.previewMatrixGeneration.mockRejectedValue(MatrixGenerationPreviewStageError.from(
+      'evidence_range',
+      'cell_1',
+      new TypeError(`bad evidence ${injectedSecret}`),
+    ));
+    const handle = createContentMatrixActionHandler(deps);
+
+    const result = await handle('preview_content_matrix_generation', {
+      workspace_id: 'ws_1',
+      matrix_id: 'mtx_1',
+      selections: [{
+        cell_id: 'cell_1',
+        expected_source_revision: {
+          matrix_revision: 2,
+          template_revision: 4,
+          cell_revision: 1,
+        },
+      }],
+    }, { ...context, requestId: 'request_secret', toolName: 'preview_content_matrix_generation' });
+
+    expect(textPayload(result)).toEqual({
+      code: MCP_TOOL_ERROR_CODES.INTERNAL_ERROR,
+      message: 'The tool could not complete because of an internal error.',
+      retryable: false,
+    });
+    expect(deps.logPreviewFailure).toHaveBeenCalledWith({
+      requestId: 'request_secret',
+      tool: 'preview_content_matrix_generation',
+      stage: 'evidence_range',
+      classification: 'type_error',
+    });
+    expect(JSON.stringify(result)).not.toContain(injectedSecret);
+    expect(JSON.stringify(vi.mocked(deps.logPreviewFailure).mock.calls)).not.toContain(injectedSecret);
   });
 
   it('attributes one evidence mutation to the MCP key and keeps replays side-effect free', async () => {

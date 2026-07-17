@@ -90,6 +90,18 @@ A paid run selection is a non-empty tuple of previewed cells and every selection
 has a non-null preview fingerprint; a looser pre-preview onboarding selection is
 never sufficient to dispatch paid work.
 
+The generation-ready preview tail has explicit safe stage boundaries for context
+assembly, per-cell budget, evidence range, fingerprinting, batch budget, and MCP
+projection. Expected authority-budget failures return a field-addressed
+precondition without reflecting source content. Unexpected failures remain a
+generic internal error while server logs retain only request correlation, tool,
+stage, and a safe exception classification. Matrix preview may use a dedicated
+bounded context budget, but it must preserve finalized voice and approved
+identity completely below a fixed UTF-8 authority ceiling, apart from the
+existing boundary-whitespace normalization, and fail closed above it; it must
+never silently truncate frozen authority to satisfy a budget. Global
+intelligence context defaults remain unchanged.
+
 ## 3. Structure is code; prose is generated
 
 - URL, keyword, title, metadata, and section templates are rendered by one
