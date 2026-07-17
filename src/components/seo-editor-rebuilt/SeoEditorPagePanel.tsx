@@ -33,6 +33,7 @@ import type {
 } from './seoEditorSurfaceTypes';
 import {
   fieldLengthLabel,
+  formatFreshness,
   formatOptionalText,
   formatRank,
   formatTargetTypeForSentence,
@@ -161,6 +162,7 @@ export function SeoEditorPagePanel({
   const { toast } = useToast();
   const [pageTitleDraft, setPageTitleDraft] = useState('');
   const [cmsNote, setCmsNote] = useState('');
+  const [approvalHistoryOpen, setApprovalHistoryOpen] = useState(false);
   const [wide, setWide] = useState(false);
 
   useEffect(() => {
@@ -169,6 +171,7 @@ export function SeoEditorPagePanel({
 
   useEffect(() => {
     setCmsNote('');
+    setApprovalHistoryOpen(false);
     setWide(false);
   }, [row?.id]);
 
@@ -184,10 +187,13 @@ export function SeoEditorPagePanel({
   const staticVariation = staticTarget ? staticWorkflow.variations[staticTarget.pageId] : undefined;
   const cmsVariation = cmsTarget ? cmsWorkflow.variations[cmsTarget.itemId] : undefined;
 
+  const cmsSeoFields = useMemo(
+    () => (row?.cmsCollection ? getExtraSeoFields(row.cmsCollection.seoFields) : []),
+    [row?.cmsCollection],
+  );
   const cmsFields = useMemo(() => {
-    if (!row?.cmsCollection) return { titleField: undefined, descField: undefined };
-    return getTitleAndDescriptionFields(getExtraSeoFields(row.cmsCollection.seoFields));
-  }, [row?.cmsCollection]);
+    return getTitleAndDescriptionFields(cmsSeoFields);
+  }, [cmsSeoFields]);
 
   const footer = (
     <Toolbar label="SEO page detail actions" className="w-full border-none bg-transparent p-0">
@@ -375,18 +381,42 @@ export function SeoEditorPagePanel({
                 )}
 
                 <div className="grid gap-3">
-                  <label className="block">
-                    <span className="flex items-center justify-between gap-2 t-label text-[var(--brand-text-muted)]">
-                      SEO title <CharacterCounter current={row.edit.seoTitle.length} max={60} size="sm" />
-                    </span>
-                    <FormInput value={row.edit.seoTitle} onChange={(value) => staticWorkflow.updateField(row.staticPage!.id, 'seoTitle', value)} className="mt-1" />
-                  </label>
-                  <label className="block">
-                    <span className="flex items-center justify-between gap-2 t-label text-[var(--brand-text-muted)]">
-                      Meta description <CharacterCounter current={row.edit.seoDescription.length} max={160} size="sm" />
-                    </span>
-                    <FormTextarea rows={4} value={row.edit.seoDescription} onChange={(value) => staticWorkflow.updateField(row.staticPage!.id, 'seoDescription', value)} className="mt-1" />
-                  </label>
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="t-label text-[var(--brand-text-muted)]">
+                        SEO title <CharacterCounter current={row.edit.seoTitle.length} max={60} size="sm" />
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Rewrite SEO title with AI"
+                        loading={staticWorkflow.aiLoading[row.staticPage.id] === 'title'}
+                        onClick={() => staticWorkflow.aiRewrite(row.staticPage!.id, 'title')}
+                      >
+                        <Icon name="sparkle" size="xs" />
+                        Rewrite
+                      </Button>
+                    </div>
+                    <FormInput aria-label="SEO title" value={row.edit.seoTitle} onChange={(value) => staticWorkflow.updateField(row.staticPage!.id, 'seoTitle', value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="t-label text-[var(--brand-text-muted)]">
+                        Meta description <CharacterCounter current={row.edit.seoDescription.length} max={160} size="sm" />
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Rewrite meta description with AI"
+                        loading={staticWorkflow.aiLoading[row.staticPage.id] === 'description'}
+                        onClick={() => staticWorkflow.aiRewrite(row.staticPage!.id, 'description')}
+                      >
+                        <Icon name="sparkle" size="xs" />
+                        Rewrite
+                      </Button>
+                    </div>
+                    <FormTextarea aria-label="Meta description" rows={4} value={row.edit.seoDescription} onChange={(value) => staticWorkflow.updateField(row.staticPage!.id, 'seoDescription', value)} className="mt-1" />
+                  </div>
                 </div>
 
                 {staticVariation && (
@@ -463,29 +493,72 @@ export function SeoEditorPagePanel({
               {cmsWorkflow.aiError && <InlineBanner tone="warning" size="sm" title="AI rewrite failed">{cmsWorkflow.aiError}</InlineBanner>}
 
               <div className="grid gap-3">
-                <label className="block">
-                  <span className="t-label text-[var(--brand-text-muted)]">Item name</span>
-                  <FormInput value={row.cmsEdit?.name ?? String(row.cmsItem.fieldData.name ?? '')} onChange={(value) => cmsWorkflow.updateField(cmsTarget!.itemId, 'name', value)} className="mt-1" />
-                </label>
-                {cmsFields.titleField ? (
-                  <label className="block">
-                    <span className="flex items-center justify-between gap-2 t-label text-[var(--brand-text-muted)]">
-                      {cmsFields.titleField.displayName} <span>{fieldLengthLabel(row.cmsEdit?.[cmsFields.titleField.slug] ?? '', 60)}</span>
-                    </span>
-                    <FormInput value={row.cmsEdit?.[cmsFields.titleField.slug] ?? ''} onChange={(value) => cmsWorkflow.updateField(cmsTarget!.itemId, cmsFields.titleField!.slug, value)} className="mt-1" />
-                  </label>
-                ) : (
-                  <InlineBanner tone="warning" size="sm" title="No SEO title field">Add a title field in the Webflow collection schema before editing SEO titles here.</InlineBanner>
-                )}
-                {cmsFields.descField ? (
-                  <label className="block">
-                    <span className="flex items-center justify-between gap-2 t-label text-[var(--brand-text-muted)]">
-                      {cmsFields.descField.displayName} <span>{fieldLengthLabel(row.cmsEdit?.[cmsFields.descField.slug] ?? '', 160)}</span>
-                    </span>
-                    <FormTextarea rows={4} value={row.cmsEdit?.[cmsFields.descField.slug] ?? ''} onChange={(value) => cmsWorkflow.updateField(cmsTarget!.itemId, cmsFields.descField!.slug, value)} className="mt-1" />
-                  </label>
-                ) : (
-                  <InlineBanner tone="warning" size="sm" title="No meta description field">Add a description field in the Webflow collection schema before editing meta descriptions here.</InlineBanner>
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="t-label text-[var(--brand-text-muted)]">Item name</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label="Rewrite Item name with AI"
+                      loading={cmsWorkflow.aiLoading[`${cmsTarget!.itemId}-name`]}
+                      onClick={() => cmsWorkflow.aiRewrite(cmsTarget!.collectionId, cmsTarget!.itemId, 'name')}
+                    >
+                      <Icon name="sparkle" size="xs" />
+                      Rewrite
+                    </Button>
+                  </div>
+                  <FormInput aria-label="Item name" value={row.cmsEdit?.name ?? String(row.cmsItem.fieldData.name ?? '')} onChange={(value) => cmsWorkflow.updateField(cmsTarget!.itemId, 'name', value)} className="mt-1" />
+                </div>
+                <div>
+                  <span className="t-label text-[var(--brand-text-muted)]">Slug</span>
+                  <FormInput
+                    aria-label="Slug"
+                    value={row.cmsEdit?.slug ?? String(row.cmsItem.fieldData.slug ?? '')}
+                    onChange={(value) => cmsWorkflow.updateField(cmsTarget!.itemId, 'slug', value)}
+                    className="mt-1 t-mono"
+                  />
+                </div>
+                {cmsSeoFields.length > 0 ? cmsSeoFields.map((field) => {
+                  const value = row.cmsEdit?.[field.slug] ?? String(row.cmsItem!.fieldData[field.slug] ?? '');
+                  const titleLike = field.slug.includes('title');
+                  const maxLength = titleLike ? 60 : 160;
+                  return (
+                    <div key={field.slug}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="t-label text-[var(--brand-text-muted)]">
+                          {field.displayName} <span>{fieldLengthLabel(value, maxLength)}</span>
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Rewrite ${field.displayName} with AI`}
+                          loading={cmsWorkflow.aiLoading[`${cmsTarget!.itemId}-${field.slug}`]}
+                          onClick={() => cmsWorkflow.aiRewrite(cmsTarget!.collectionId, cmsTarget!.itemId, field.slug)}
+                        >
+                          <Icon name="sparkle" size="xs" />
+                          Rewrite
+                        </Button>
+                      </div>
+                      {titleLike ? (
+                        <FormInput
+                          aria-label={field.displayName}
+                          value={value}
+                          onChange={(next) => cmsWorkflow.updateField(cmsTarget!.itemId, field.slug, next)}
+                          className="mt-1"
+                        />
+                      ) : (
+                        <FormTextarea
+                          aria-label={field.displayName}
+                          rows={4}
+                          value={value}
+                          onChange={(next) => cmsWorkflow.updateField(cmsTarget!.itemId, field.slug, next)}
+                          className="mt-1"
+                        />
+                      )}
+                    </div>
+                  );
+                }) : (
+                  <InlineBanner tone="warning" size="sm" title="No SEO fields">Add SEO fields in the Webflow collection schema before editing metadata here.</InlineBanner>
                 )}
               </div>
 
@@ -508,7 +581,6 @@ export function SeoEditorPagePanel({
                 <div className="grid gap-2">
                   <KeyValueRow label="Collection" value={row.target.collectionName} />
                   <KeyValueRow label="Item ID" value={cmsTarget!.itemId} />
-                  <KeyValueRow label="Slug" value={formatOptionalText(String(row.cmsItem.fieldData.slug ?? ''))} />
                 </div>
                 <div className="mt-3">
                   <FormTextarea
@@ -528,6 +600,48 @@ export function SeoEditorPagePanel({
                   </InlineBanner>
                 )}
               </div>
+
+              {(row.approvalHistory?.length ?? 0) > 0 && (
+                <GroupBlock
+                  title="Approval history"
+                  meta={`${row.approvalHistory!.length} ${row.approvalHistory!.length === 1 ? 'change' : 'changes'} for this CMS item`}
+                >
+                  <div className="grid gap-2 p-1">
+                    {(approvalHistoryOpen ? row.approvalHistory! : row.approvalHistory!.slice(0, 1)).map((approval, index) => (
+                      <div
+                        key={approval.id}
+                        className="grid gap-1 rounded-[var(--radius-md)] border border-[var(--brand-border)] bg-[var(--surface-1)] px-3 py-2"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="t-caption-sm font-semibold text-[var(--brand-text-bright)]">
+                            {index === 0 ? 'Latest · ' : ''}{approval.batchName}
+                          </span>
+                          <StatusBadge status={approval.status} size="sm" />
+                          <span className="ml-auto t-micro text-[var(--brand-text-dim)]">{formatFreshness(approval.updatedAt)}</span>
+                        </div>
+                        <span className="t-caption-sm capitalize text-[var(--brand-text-muted)]">{approval.field.replace(/[-_]/g, ' ')}</span>
+                        <div className="flex min-w-0 items-start gap-2 t-caption-sm">
+                          <span className="min-w-0 break-words text-[var(--brand-text-muted)] line-through">{approval.currentValue || '(empty)'}</span>
+                          <Icon name="arrowRight" size="xs" className="mt-0.5 shrink-0 text-[var(--brand-text-dim)]" />
+                          <span className="min-w-0 break-words text-[var(--brand-text-bright)]">{approval.clientValue || approval.proposedValue || '(empty)'}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {row.approvalHistory!.length > 1 && (
+                      <Button
+                        size="sm"
+                        variant="link"
+                        className="justify-self-start"
+                        onClick={() => setApprovalHistoryOpen((open) => !open)}
+                      >
+                        {approvalHistoryOpen
+                          ? 'Hide earlier changes'
+                          : `Show ${row.approvalHistory!.length - 1} earlier ${row.approvalHistory!.length === 2 ? 'change' : 'changes'}`}
+                      </Button>
+                    )}
+                  </div>
+                </GroupBlock>
+              )}
 
               <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-4">
                 <div className="mb-3 t-ui font-semibold text-[var(--brand-text-bright)]">Preview</div>

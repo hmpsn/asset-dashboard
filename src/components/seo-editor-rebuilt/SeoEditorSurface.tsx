@@ -265,8 +265,8 @@ export function SeoEditorSurface({ workspaceId }: SeoEditorSurfaceProps) {
     `avg on-page ${averageScore ?? '—'}`,
     `${statusCounts.needWork} need work`,
   ].join(' · ');
-  const missingTitleCount = filterCounts.get('needs-title') ?? 0;
-  const missingDescriptionCount = filterCounts.get('needs-meta') ?? 0;
+  const missingTitleCount = workflows.bulkWorkflow.missingTitles;
+  const missingDescriptionCount = workflows.bulkWorkflow.missingDescs;
   const selectedCount = workflows.staticWorkflow.approvalSelected.size + workflows.cmsWorkflow.approvalSelected.size;
 
   return (

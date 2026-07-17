@@ -190,6 +190,7 @@ export function SeoEditorWorksheet({
   const staticSelectedCount = staticWorkflow.approvalSelected.size;
   const cmsSelectedCount = cmsWorkflow.approvalSelected.size;
   const selectedCount = staticSelectedCount + cmsSelectedCount;
+  const sendingSelected = staticWorkflow.sendingApproval || cmsWorkflow.sendingApproval;
 
   useEffect(() => {
     if (cmsWorkflow.approvalError) {
@@ -494,40 +495,43 @@ export function SeoEditorWorksheet({
           <span className="shrink-0 whitespace-nowrap t-ui font-semibold text-[var(--brand-text-bright)]" aria-live="polite">
             <span className="text-[var(--teal)]">{selectedCount}</span> selected
           </span>
+          <span className="shrink-0 whitespace-nowrap t-caption-sm text-[var(--brand-text-muted)]">
+            {staticSelectedCount} static · {cmsSelectedCount} CMS
+          </span>
+          <Button
+            size="sm"
+            variant="primary"
+            loading={sendingSelected}
+            onClick={() => void Promise.all([
+              staticSelectedCount > 0 ? staticWorkflow.sendForApproval() : Promise.resolve(),
+              cmsSelectedCount > 0 ? cmsWorkflow.sendForApproval() : Promise.resolve(),
+            ])}
+          >
+            <Icon name="send" size="xs" />
+            Send {selectedCount} to client
+          </Button>
           {staticSelectedCount > 0 && (
-            <>
-              <Button size="sm" variant="primary" loading={staticWorkflow.sendingApproval} onClick={staticWorkflow.sendForApproval}>
-                <Icon name="send" size="xs" />
-                Send static to client
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => staticBulkWorkflow.bulkAiRewrite('both')}>
-                <Icon name="sparkle" size="xs" />
-                Rewrite static
-              </Button>
-            </>
+            <Button size="sm" variant="secondary" onClick={() => staticBulkWorkflow.bulkAiRewrite('both')}>
+              <Icon name="sparkle" size="xs" />
+              Rewrite static
+            </Button>
           )}
           {cmsSelectedCount > 0 && (
-            <>
-              <Button size="sm" variant="primary" loading={cmsWorkflow.sendingApproval} onClick={() => cmsWorkflow.sendForApproval()}>
-                <Icon name="send" size="xs" />
-                Send CMS to client
-              </Button>
-              <Menu
-                align="end"
-                trigger={(
-                  <Button size="sm" variant="secondary">
-                    <Icon name="sparkle" size="xs" />
-                    Rewrite CMS
-                  </Button>
-                )}
-                items={[
-                  { label: 'Names', onSelect: () => cmsWorkflow.bulkAiRewrite('name') },
-                  { label: 'Titles', onSelect: () => cmsWorkflow.bulkAiRewrite('title') },
-                  { label: 'Descriptions', onSelect: () => cmsWorkflow.bulkAiRewrite('description') },
-                  { label: 'All CMS fields', onSelect: () => cmsWorkflow.bulkAiRewrite('all') },
-                ]}
-              />
-            </>
+            <Menu
+              align="end"
+              trigger={(
+                <Button size="sm" variant="secondary">
+                  <Icon name="sparkle" size="xs" />
+                  Rewrite CMS
+                </Button>
+              )}
+              items={[
+                { label: 'Names', onSelect: () => cmsWorkflow.bulkAiRewrite('name') },
+                { label: 'Titles', onSelect: () => cmsWorkflow.bulkAiRewrite('title') },
+                { label: 'Descriptions', onSelect: () => cmsWorkflow.bulkAiRewrite('description') },
+                { label: 'All CMS fields', onSelect: () => cmsWorkflow.bulkAiRewrite('all') },
+              ]}
+            />
           )}
         </Toolbar>
       )}
