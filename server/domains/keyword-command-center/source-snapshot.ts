@@ -9,7 +9,11 @@ import { safeLostVisibilityRows } from './read-model.js';
 import type { CommandCenterSourceBundle, FeedbackRow, LostVisibilityQuery } from './types.js';
 import { buildKeywordCommandCenterReadProjection } from './read-projection.js';
 import { LOCAL_SEO_MARKET_STATUS, type LocalSeoKeywordVisibilitySummary } from '../../../shared/types/local-seo.js';
-import { KEYWORD_RANK_FRESHNESS_STATUS, type KeywordRankFreshness } from '../../../shared/types/keyword-command-center.js';
+import {
+  KEYWORD_RANK_FRESHNESS_STATUS,
+  type KeywordRankFreshness,
+  type KeywordRankKpis,
+} from '../../../shared/types/keyword-command-center.js';
 import type { Workspace } from '../../../shared/types/workspace.js';
 import type { LatestRank, TrackedKeyword } from '../../../shared/types/rank-tracking.js';
 import type { ScoringContext } from '../../scoring/keyword-value-score.js';
@@ -17,6 +21,7 @@ import {
   countLocalSeoKeywordCandidatesFromLoadedContext,
   type LocalSeoKeywordCandidateLoadedContext,
 } from '../local-seo/candidate-service.js';
+import { buildKeywordRankKpis } from './rank-summary-rollup.js';
 
 export interface KeywordCommandCenterSourceSnapshot {
   workspace: Workspace;
@@ -38,6 +43,7 @@ export interface KeywordCommandCenterSourceSnapshot {
   topicClusters?: import('../../../shared/types/workspace.js').TopicCluster[];
   cannibalization?: import('../../../shared/types/workspace.js').CannibalizationItem[];
   rankFreshness: KeywordRankFreshness;
+  rankKpis?: KeywordRankKpis;
   scoringContext?: ScoringContext;
 }
 
@@ -132,6 +138,7 @@ export function buildKeywordCommandCenterSourceSnapshot(
     topicClusters: projection.topicClusters,
     cannibalization: projection.cannibalization,
     rankFreshness: rankFreshness(latestSnapshot.snapshotDate),
+    rankKpis: options.includeSummary ? buildKeywordRankKpis(workspace.id) : undefined,
     scoringContext: options.includeScoring ? {
       posture: posture ?? getLocalSeoPosture(workspace.id),
       markets: localMarkets,

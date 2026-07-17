@@ -1,16 +1,15 @@
 // @ds-rebuilt
-import { normalizePageUrl } from '../../../shared/page-address-utils';
-import { keywordTrackingKey } from '../../lib/keywordTracking';
-import { useKeywordCommandCenterRows } from '../../hooks/admin/useKeywordCommandCenter';
+import { useKeywordCommandCenterGroupedView, useKeywordCommandCenterRows } from '../../hooks/admin/useKeywordCommandCenter';
 import type {
+  KeywordCommandCenterGroup,
   KeywordCommandCenterRow,
   KeywordCommandCenterSummaryResponse,
 } from '../../../shared/types/keyword-command-center';
+import { KEYWORD_COMMAND_CENTER_GROUP_BY } from '../../../shared/types/keyword-command-center';
 import { KEYWORD_LIFECYCLE_STAGES } from '../../../shared/types/keyword-command-center';
 import { Badge, BoardCard, BoardColumn, Button, ClickableRow, GroupBlock, InlineBanner, IntentTag, Segmented, Skeleton, Toolbar } from '../ui';
 import type { KeywordIntent } from '../ui';
 import { KeywordsTable, type KeywordRowsQueryResult } from './KeywordsTable';
-import { KEYWORDS_SAY_IT_ALOUD } from './keywordVocabulary';
 import type { UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
 
 interface KeywordsLensesProps {
@@ -18,14 +17,6 @@ interface KeywordsLensesProps {
   state: UseKeywordsSurfaceStateReturn;
   summary?: KeywordCommandCenterSummaryResponse;
   initialRowsResult?: KeywordRowsQueryResult;
-}
-
-interface KeywordGroup {
-  id: string;
-  title: string;
-  rows: KeywordCommandCenterRow[];
-  flag?: string;
-  meta?: string;
 }
 
 const LIFECYCLE_META: Array<{
@@ -53,96 +44,9 @@ function lifecycleAccent(row: KeywordCommandCenterRow): string {
   return LIFECYCLE_META.find((meta) => meta.stage === stage)?.accent ?? 'var(--blue)';
 }
 
-// Sum of the group's last-window Search Console impressions. Labeled honestly as
-// "Impressions" — this is realized search exposure, NOT projected opportunity/upside
-// traffic (the platform has no per-row estimated-gain field, so a mislabel here would
-// present delivered impressions as future upside — see the design-parity audit).
-function impressionsTotal(rows: KeywordCommandCenterRow[]): string {
-  const impressions = rows
-    .map((row) => row.metrics.impressions)
-    .filter((value): value is number => typeof value === 'number');
-  if (impressions.length === 0) return '—';
-  const total = impressions.reduce((sum, value) => sum + value, 0);
-  return new Intl.NumberFormat('en-US', { notation: total >= 10_000 ? 'compact' : 'standard' }).format(total);
-}
-
-function normalizedPath(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  return normalizePageUrl(value).toLowerCase();
-}
-
-function groupRowsByPage(rows: KeywordCommandCenterRow[], summary?: KeywordCommandCenterSummaryResponse): KeywordGroup[] {
-  const cannibalizedPaths = new Set<string>();
-  for (const issue of summary?.cannibalization ?? []) {
-    for (const page of issue.pages) {
-      const path = normalizedPath(page.path);
-      if (path) cannibalizedPaths.add(path);
-    }
-  }
-
-  const groups = new Map<string, KeywordGroup>();
-  for (const row of rows) {
-    const pagePath = row.assignment?.pagePath ?? 'unassigned';
-    const pageKey = normalizedPath(row.assignment?.pagePath) ?? pagePath;
-    const title = row.assignment?.pageTitle ?? row.assignment?.pagePath ?? 'Unassigned keywords';
-    const existing = groups.get(pageKey) ?? {
-      id: pageKey,
-      title,
-      rows: [],
-      flag: cannibalizedPaths.has(pageKey) ? 'Cannibalization risk' : undefined,
-    };
-    existing.rows.push(row);
-    groups.set(pageKey, existing);
-  }
-  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
-}
-
-function groupRowsByCluster(rows: KeywordCommandCenterRow[], summary?: KeywordCommandCenterSummaryResponse): KeywordGroup[] {
-  const rowsByKeyword = new Map(rows.map((row) => [keywordTrackingKey(row.keyword), row]));
-  const cannibalizedKeywords = new Set((summary?.cannibalization ?? []).map((issue) => keywordTrackingKey(issue.keyword)));
-  const used = new Set<string>();
-
-  const groups: KeywordGroup[] = [];
-  for (const cluster of summary?.topicClusters ?? []) {
-    const clusterRows = cluster.keywords
-      .map((keyword) => rowsByKeyword.get(keywordTrackingKey(keyword)))
-      .filter((row): row is KeywordCommandCenterRow => row != null);
-    for (const row of rows) {
-      if (row.assignment?.topicCluster === cluster.topic && !clusterRows.some((existing) => existing.normalizedKeyword === row.normalizedKeyword)) {
-        clusterRows.push(row);
-      }
-    }
-    for (const row of clusterRows) used.add(row.normalizedKeyword);
-    groups.push({
-      id: cluster.topic,
-      title: cluster.topic,
-      rows: clusterRows,
-      flag: clusterRows.some((row) => cannibalizedKeywords.has(keywordTrackingKey(row.keyword)))
-        ? 'Cannibalization risk'
-        : undefined,
-      meta: `${cluster.ownedCount}/${cluster.totalCount} covered`,
-    });
-  }
-
-  const uncategorized = rows.filter((row) => !used.has(row.normalizedKeyword));
-  const assignmentGroups = new Map<string, KeywordCommandCenterRow[]>();
-  for (const row of uncategorized) {
-    const topic = row.assignment?.topicCluster;
-    if (!topic) continue;
-    const next = assignmentGroups.get(topic) ?? [];
-    next.push(row);
-    assignmentGroups.set(topic, next);
-  }
-  for (const [topic, groupRows] of assignmentGroups) {
-    groups.push({ id: `assignment:${topic}`, title: topic, rows: groupRows });
-  }
-
-  const stillUncategorized = uncategorized.filter((row) => !row.assignment?.topicCluster);
-  if (stillUncategorized.length > 0) {
-    groups.push({ id: 'uncategorized', title: KEYWORDS_SAY_IT_ALOUD.unclustered, rows: stillUncategorized });
-  }
-
-  return groups;
+function formatRollup(value: number | null): string {
+  if (value == null) return '—';
+  return new Intl.NumberFormat('en-US', { notation: value >= 10_000 ? 'compact' : 'standard' }).format(value);
 }
 
 function GroupedKeywordRow({
@@ -196,7 +100,7 @@ function GroupedLens({
   groups,
   onOpen,
 }: {
-  groups: KeywordGroup[];
+  groups: KeywordCommandCenterGroup[];
   onOpen: (row: KeywordCommandCenterRow) => void;
 }) {
   if (groups.length === 0) {
@@ -211,8 +115,8 @@ function GroupedLens({
           title={group.title}
           meta={group.meta}
           stats={[
-            { label: 'Keywords', value: group.rows.length },
-            { label: 'Impressions', value: impressionsTotal(group.rows) },
+            { label: 'Keywords', value: group.rollup.keywordCount },
+            { label: 'Impressions', value: formatRollup(group.rollup.impressions) },
           ]}
           flag={group.flag ? { label: group.flag } : undefined}
           collapsible
@@ -230,18 +134,19 @@ function GroupedLens({
 }
 
 function LifecycleLens({
-  rows,
+  groups,
   onOpen,
 }: {
-  rows: KeywordCommandCenterRow[];
+  groups: KeywordCommandCenterGroup[];
   onOpen: (row: KeywordCommandCenterRow) => void;
 }) {
   return (
     <div className="grid gap-3 xl:grid-cols-5">
       {LIFECYCLE_META.map((meta) => {
-        const stageRows = rows.filter((row) => (row.lifecycleStage ?? KEYWORD_LIFECYCLE_STAGES.DISCOVERED) === meta.stage);
+        const group = groups.find((candidate) => candidate.id === meta.stage);
+        const stageRows = group?.rows ?? [];
         return (
-          <BoardColumn key={meta.stage} title={meta.title} count={stageRows.length} accent={meta.accent} className="max-h-[680px]">
+          <BoardColumn key={meta.stage} title={meta.title} count={group?.rollup.keywordCount ?? 0} accent={meta.accent} className="max-h-[680px]">
             {stageRows.map((row) => (
               <LifecycleKeywordCard key={row.normalizedKeyword} row={row} onOpen={onOpen} />
             ))}
@@ -262,22 +167,33 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
     enabled: initialRowsResult == null,
   });
   const rowsResult = initialRowsResult ?? ownedRowsResult;
-  const rows = rowsResult.data?.rows ?? [];
+  const groupedQuery = state.groupedQuery ?? {
+    groupBy: KEYWORD_COMMAND_CENTER_GROUP_BY.PAGE,
+    filter: state.filter,
+  };
+  const groupedResult = useKeywordCommandCenterGroupedView(workspaceId, groupedQuery, {
+    enabled: state.groupedQuery != null,
+  });
+  const groups = groupedResult.data?.groups ?? [];
 
-  // Page/Cluster grouping and Lifecycle group the CURRENT PAGE of rows, not the whole workspace.
-  // Be honest when that is a subset — never present a page-1 board as the full universe
-  // (review PR #1480). Full server-side grouping over all keywords is a tracked follow-up.
-  // Use the FILTER/SEARCH-scoped total (pageInfo.totalRows) so "N more hidden" is correct
-  // when a filter or search narrows the set — the workspace-global counts.total would
-  // overstate the hidden figure whenever a filter is active.
-  const totalCount = rowsResult.data?.pageInfo?.totalRows ?? summary?.counts?.total ?? rows.length;
-  const hiddenFromGroups = Math.max(0, totalCount - rows.length);
-  const truncationBanner = hiddenFromGroups > 0 ? (
-    <InlineBanner tone="warning" title={`Grouped from the first ${rows.length} keywords`}>
-      {hiddenFromGroups} more keywords are not shown here — these lenses group the current
-      page, not the full set. Return to ungrouped rows to page through every keyword.
-    </InlineBanner>
-  ) : null;
+  if (state.groupedQuery && groupedResult.isLoading && !groupedResult.data) {
+    return (
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="keywords-grouped-loading">
+        {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[116px] w-full" />)}
+      </div>
+    );
+  }
+
+  if (state.groupedQuery && groupedResult.isError && !groupedResult.data) {
+    return (
+      <InlineBanner tone="error" title="Could not load complete keyword groups">
+        <div className="flex flex-wrap items-center gap-2">
+          <span>Try again to reload this grouped view.</span>
+          <Button size="sm" variant="secondary" onClick={() => groupedResult.refetch()}>Retry</Button>
+        </div>
+      </InlineBanner>
+    );
+  }
 
   if (rowsResult.isLoading && !rowsResult.data) {
     return (
@@ -303,12 +219,7 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
   }
 
   if (state.lens === 'lifecycle') {
-    return (
-      <div className="flex flex-col gap-3">
-        {truncationBanner}
-        <LifecycleLens rows={rows} onOpen={(row) => state.openKeyword(row.keyword)} />
-      </div>
-    );
+    return <LifecycleLens groups={groups} onOpen={(row) => state.openKeyword(row.keyword)} />;
   }
 
   const presentationControls = (
@@ -341,8 +252,7 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
     return (
       <div className="flex flex-col gap-3">
         {presentationControls}
-        {truncationBanner}
-        <GroupedLens groups={groupRowsByPage(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />
+        <GroupedLens groups={groups} onOpen={(row) => state.openKeyword(row.keyword)} />
       </div>
     );
   }
@@ -351,8 +261,7 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
     return (
       <div className="flex flex-col gap-3">
         {presentationControls}
-        {truncationBanner}
-        <GroupedLens groups={groupRowsByCluster(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />
+        <GroupedLens groups={groups} onOpen={(row) => state.openKeyword(row.keyword)} />
       </div>
     );
   }

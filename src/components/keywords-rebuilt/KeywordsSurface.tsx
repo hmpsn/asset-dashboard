@@ -135,6 +135,19 @@ function SummaryCell({
   );
 }
 
+function formatRankMetric(value: number | null | undefined): string | number {
+  if (value == null) return '—';
+  return Number.isInteger(value) ? value : value.toFixed(1);
+}
+
+function formatPositionDelta(value: number | null | undefined): string {
+  if (value == null) return '—';
+  const formatted = Math.abs(value).toFixed(1).replace(/\.0$/, '');
+  if (value > 0) return `+${formatted}`;
+  if (value < 0) return `−${formatted}`;
+  return '0';
+}
+
 function FeedbackRow({
   row,
   onAdd,
@@ -229,6 +242,8 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
   };
   const counts = summary?.counts;
   const trafficValue = summary?.trafficValueMonthly;
+  const averagePosition = summary?.rankKpis?.currentPeriod.averagePosition;
+  const positionDelta = summary?.rankKpis?.deltas.averagePosition;
   const advancedFilterOptions = useMemo(() => (
     summary?.filters
       .filter((filter) => !PRIMARY_FILTER_IDS.has(filter.id))
@@ -326,9 +341,9 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
           />
         </div>
       ) : (
-        <div data-testid="keywords-summary" className="mt-[18px] grid grid-cols-2 gap-[10px] xl:grid-cols-4">
+        <div data-testid="keywords-summary" className="mt-[18px] grid grid-cols-2 gap-[10px] md:grid-cols-3 xl:grid-cols-6">
           {summaryIsLoading && !summary ? (
-            Array.from({ length: 4 }).map((_, index) => (
+            Array.from({ length: 6 }).map((_, index) => (
               <Skeleton key={index} className="h-[80px] w-full" />
             ))
           ) : (
@@ -341,6 +356,18 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
                 value={typeof trafficValue === 'number' ? MONEY_FORMAT.format(trafficValue) : '—'}
                 accent={typeof trafficValue === 'number' ? 'var(--blue)' : 'var(--brand-text-dim)'}
                 sub={typeof trafficValue === 'number' ? undefined : 'Unavailable'}
+              />
+              <SummaryCell
+                label="Avg. position"
+                value={formatRankMetric(averagePosition)}
+                accent={typeof averagePosition === 'number' ? 'var(--blue)' : 'var(--brand-text-dim)'}
+                sub={typeof averagePosition === 'number' ? `${summary?.rankKpis?.windowDays ?? 28}d` : 'Unavailable'}
+              />
+              <SummaryCell
+                label="Position change"
+                value={formatPositionDelta(positionDelta)}
+                accent={typeof positionDelta === 'number' ? 'var(--blue)' : 'var(--brand-text-dim)'}
+                sub={typeof positionDelta === 'number' ? `${summary?.rankKpis?.windowDays ?? 28}d` : 'Unavailable'}
               />
             </>
           )}

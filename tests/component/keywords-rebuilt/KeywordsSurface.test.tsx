@@ -26,6 +26,7 @@ const mockUnlink = vi.fn();
 const initialHookMock = vi.fn();
 const summaryHookMock = vi.fn();
 const rowsHookMock = vi.fn();
+const groupedHookMock = vi.fn();
 const detailHookMock = vi.fn();
 const bulkMutateMock = vi.fn();
 const rowActionMutateMock = vi.fn();
@@ -79,6 +80,7 @@ vi.mock('../../../src/hooks/admin/useKeywordCommandCenter', () => ({
   useKeywordCommandCenterInitialView: (...args: unknown[]) => initialHookMock(...args),
   useKeywordCommandCenterSummary: (...args: unknown[]) => summaryHookMock(...args),
   useKeywordCommandCenterRows: (...args: unknown[]) => rowsHookMock(...args),
+  useKeywordCommandCenterGroupedView: (...args: unknown[]) => groupedHookMock(...args),
   useKeywordCommandCenterBulkAction: () => ({ mutate: bulkMutateMock, isPending: false }),
   useKeywordCommandCenterDetail: (...args: unknown[]) => detailHookMock(...args),
   useKeywordCommandCenterAction: () => ({ mutate: rowActionMutateMock, isPending: false, error: null, variables: undefined }),
@@ -206,6 +208,30 @@ const summaryPayload: KeywordCommandCenterSummaryResponse = {
     status: 'stale',
   },
   trafficValueMonthly: 1234,
+  rankKpis: {
+    windowDays: 28,
+    currentPeriod: {
+      startDate: '2026-06-13',
+      endDate: '2026-07-10',
+      snapshotDate: '2026-07-10',
+      averagePosition: 8.5,
+      clicks: 47,
+      impressions: 1140,
+    },
+    comparisonPeriod: {
+      startDate: '2026-05-16',
+      endDate: '2026-06-12',
+      snapshotDate: '2026-06-12',
+      averagePosition: 11,
+      clicks: 40,
+      impressions: 1000,
+    },
+    deltas: {
+      averagePosition: 2.5,
+      clicksPercent: 17.5,
+      impressionsPercent: 14,
+    },
+  },
   topicClusters: [
     {
       topic: 'Dental services',
@@ -388,6 +414,15 @@ const rows: KeywordCommandCenterRow[] = [
   },
 ];
 
+const groupedOnlyRow: KeywordCommandCenterRow = {
+  ...rows[1],
+  keyword: 'after hours dentist',
+  normalizedKeyword: 'after hours dentist',
+  assignment: { pagePath: '/emergency-dentist', pageTitle: 'Emergency Dentist', topicCluster: 'Dental services' },
+  metrics: { ...rows[1].metrics, currentPosition: 18, clicks: 3, impressions: 120 },
+  lifecycleStage: KEYWORD_LIFECYCLE_STAGES.RANKING,
+};
+
 function setupKeywordHooks() {
   capturedWorkspaceHandlers = {};
   summaryHookMock.mockReturnValue({
@@ -425,6 +460,33 @@ function setupKeywordHooks() {
     const response = rowsResponse(query);
     return {
       data: response,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  });
+  groupedHookMock.mockImplementation((_workspaceId: string, query: { groupBy: string }) => {
+    const groupedRows = [...rows, groupedOnlyRow];
+    const lifecycleGroups = [
+      { id: 'discovered', title: 'Discovered', rollup: { keywordCount: 0, clicks: null, impressions: null, averagePosition: null }, rows: [] },
+      { id: 'targeted', title: 'Targeted', rollup: { keywordCount: 0, clicks: null, impressions: null, averagePosition: null }, rows: [] },
+      { id: 'published', title: 'Published', rollup: { keywordCount: 0, clicks: null, impressions: null, averagePosition: null }, rows: [] },
+      { id: 'ranking', title: 'Ranking', rollup: { keywordCount: 2, clicks: 45, impressions: 1020, averagePosition: 7.41 }, rows: [rows[0], groupedOnlyRow] },
+      { id: 'winning', title: 'Winning', rollup: { keywordCount: 1, clicks: 5, impressions: 240, averagePosition: 14 }, rows: [rows[1]] },
+    ];
+    const groups = query.groupBy === 'lifecycleStage'
+      ? lifecycleGroups
+      : [{
+          id: query.groupBy === 'page' ? '/cosmetic-dentistry' : 'Dental services',
+          title: query.groupBy === 'page' ? 'Cosmetic Dentistry' : 'Dental services',
+          meta: query.groupBy === 'cluster' ? '3/3 covered' : undefined,
+          flag: 'Cannibalization risk',
+          rollup: { keywordCount: 3, clicks: 50, impressions: 1260, averagePosition: 8.29 },
+          rows: groupedRows,
+        }];
+    return {
+      data: { groupBy: query.groupBy, groups, totalRows: 3, groupedAt: '2026-07-10T12:00:00.000Z', rankFreshness: summaryPayload.rankFreshness },
       isLoading: false,
       isError: false,
       error: null,
@@ -645,7 +707,7 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ filter: KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES });
   });
 
-  it('composes four truthful summary cells before the lens tray and separate working tools', () => {
+  it('composes server-owned rank KPI cells before the lens tray and separate working tools', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
     const surface = screen.getByTestId('keywords-surface');
@@ -654,11 +716,16 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     const tools = within(surface).getByTestId('keywords-tools');
 
     expect(surface).toHaveClass('max-w-[1128px]');
-    expect(within(summary).getAllByTestId('keywords-summary-cell')).toHaveLength(4);
+    expect(within(summary).getAllByTestId('keywords-summary-cell')).toHaveLength(6);
     expect(within(summary).getByText('Total keywords')).toBeInTheDocument();
     expect(within(summary).getByText('Rank tracked')).toBeInTheDocument();
     expect(within(summary).getByText('Needs review')).toBeInTheDocument();
     expect(within(summary).getByText('Monthly value')).toBeInTheDocument();
+    expect(within(summary).getByText('Avg. position')).toBeInTheDocument();
+    expect(within(summary).getByText('Position change')).toBeInTheDocument();
+    expect(within(summary).getByText('8.5')).toBeInTheDocument();
+    expect(within(summary).getByText('+2.5')).toBeInTheDocument();
+    expect(within(summary).getAllByText('28d').length).toBe(2);
     expect(summary.compareDocumentPosition(lensTray) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(lensTray.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(tools).getByRole('searchbox')).toBeInTheDocument();
@@ -691,6 +758,35 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
 
     const summary = screen.getByTestId('keywords-summary');
     expect(within(summary).getByText('$1,234')).toBeInTheDocument();
+  });
+
+  it('renders rank KPI empty states without fabricating a zero or delta', () => {
+    summaryHookMock.mockReturnValue({
+      data: {
+        ...summaryPayload,
+        rankKpis: {
+          ...summaryPayload.rankKpis!,
+          currentPeriod: { ...summaryPayload.rankKpis!.currentPeriod, averagePosition: null },
+          comparisonPeriod: { ...summaryPayload.rankKpis!.comparisonPeriod, averagePosition: null },
+          deltas: { averagePosition: null, clicksPercent: null, impressionsPercent: null },
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    const summary = screen.getByTestId('keywords-summary');
+    for (const label of ['Avg. position', 'Position change']) {
+      const cell = within(summary).getByText(label).closest('[data-testid="keywords-summary-cell"]');
+      expect(cell).not.toBeNull();
+      expect(within(cell as HTMLElement).getByText('—')).toBeInTheDocument();
+      expect(within(cell as HTMLElement).getByText('Unavailable')).toBeInTheDocument();
+      expect(within(cell as HTMLElement).queryByText('0')).not.toBeInTheDocument();
+    }
   });
 
   it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
@@ -830,13 +926,17 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
       expect(screen.getAllByText('Cosmetic Dentistry').length).toBeGreaterThan(0);
     });
     expect(screen.getByText('Cannibalization risk')).toBeInTheDocument();
+    expect(screen.getByText('after hours dentist')).toBeInTheDocument();
+    expect(groupedHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ groupBy: 'page' });
+    expect(screen.queryByText(/Grouped from the first/)).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
 
     fireEvent.click(screen.getByRole('radio', { name: 'Cluster' }));
     await waitFor(() => {
       expect(screen.getByText('Dental services')).toBeInTheDocument();
     });
-    expect(screen.getByText('2/3 covered')).toBeInTheDocument();
+    expect(screen.getByText('3/3 covered')).toBeInTheDocument();
+    expect(groupedHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ groupBy: 'cluster' });
     await expectNoA11yViolations(container);
 
     fireEvent.click(screen.getByRole('radio', { name: /Lifecycle/ }));
@@ -846,6 +946,8 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     });
     expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
     expect(screen.getByText('emergency dentist')).toBeInTheDocument();
+    expect(screen.getByText('after hours dentist')).toBeInTheDocument();
+    expect(groupedHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ groupBy: 'lifecycleStage' });
     await expectNoA11yViolations(container);
   }, 15_000);
 

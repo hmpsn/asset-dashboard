@@ -8,6 +8,7 @@ import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs';
 import type {
   KeywordCommandCenterActionRequest,
   KeywordCommandCenterBulkActionRequest,
+  KeywordCommandCenterGroupedViewQuery,
   KeywordCommandCenterRowsQuery,
 } from '../../../shared/types/keyword-command-center';
 
@@ -87,6 +88,21 @@ export function useKeywordCommandCenterRows(
   return useQuery({
     queryKey: queryKeys.admin.keywordCommandCenterRows(workspaceId, query),
     queryFn: () => keywordCommandCenter.rows(workspaceId, query),
+    enabled: !!workspaceId && enabled,
+    staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useKeywordCommandCenterGroupedView(
+  workspaceId: string,
+  query: KeywordCommandCenterGroupedViewQuery,
+  options: { enabled?: boolean } = {},
+) {
+  const enabled = options.enabled ?? true;
+  return useQuery({
+    queryKey: queryKeys.admin.keywordCommandCenterGrouped(workspaceId, query),
+    queryFn: () => keywordCommandCenter.grouped(workspaceId, query),
     enabled: !!workspaceId && enabled,
     staleTime: 2 * 60 * 1000,
     placeholderData: keepPreviousData,

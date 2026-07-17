@@ -239,6 +239,17 @@
           "completedAt": "2026-07-17",
           "owner": "seo-health",
           "notes": "Completed 2026-07-17. Added a one-statement skinny read over existing rank snapshots for up to 100 visible keyword queries, typed per-keyword series, and a server-owned 7-day position delta that is omitted when fewer than two real points exist in the window. The rebuilt full Rankings DataTable now makes one React Query keyed by the canonical visible set and renders the shared Sparkline plus honest loading/error/establishing states. The existing drawer endpoint and behavior remain unchanged; no full keyword-universe builder, client-side delta fabrication, or database migration was introduced."
+        },
+        {
+          "id": "admin-ux-w42b-keyword-summary-rollups-grouped-views",
+          "title": "W4.2b — server-owned keyword summary rollups and complete grouped views",
+          "source": "Admin UX campaign Wave 4; DEF-kw-002 and DEF-kw-003",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-17",
+          "owner": "seo-health",
+          "notes": "Completed locally on 2026-07-17: KCC summary now serves impression-weighted average position plus explicit current/prior adjacent 28-day snapshot windows and server deltas with honest missing-current/missing-prior semantics. Added a skinny, unpaginated grouped endpoint for page/cluster/lifecycleStage with complete row membership and server-owned count/click/impression/average-position rollups. Rebuilt Keywords consumes both contracts, adds blue Avg. position/Position change MetricTiles, and removes current-page grouping plus its truncation banner. No migration and no W4.2a rank-history changes."
         }
       ],
       "shippedAt": "2026-07-17"

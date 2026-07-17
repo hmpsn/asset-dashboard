@@ -12,6 +12,7 @@ import {
   applyKeywordCommandCenterAction,
   applyKeywordCommandCenterBulkAction,
   buildKeywordCommandCenterDetail,
+  buildKeywordCommandCenterGroupedView,
   buildKeywordCommandCenterInitialView,
   buildKeywordCommandCenterRows,
   buildKeywordCommandCenterSummary,
@@ -23,6 +24,7 @@ import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
   KEYWORD_COMMAND_CENTER_BULK_ACTIONS,
   KEYWORD_COMMAND_CENTER_FILTERS,
+  KEYWORD_COMMAND_CENTER_GROUP_BY,
 } from '../../shared/types/keyword-command-center.js';
 
 const router = Router();
@@ -84,6 +86,17 @@ const initialRowsQuerySchema = rowsQuerySchema.refine(
   { path: ['filter'], message: 'Initial Keyword Hub read does not support local_candidates' },
 );
 
+const groupedViewQuerySchema = rowsQuerySchema
+  .omit({ page: true, pageSize: true })
+  .extend({
+    groupBy: z.enum([
+      KEYWORD_COMMAND_CENTER_GROUP_BY.PAGE,
+      KEYWORD_COMMAND_CENTER_GROUP_BY.CLUSTER,
+      KEYWORD_COMMAND_CENTER_GROUP_BY.LIFECYCLE_STAGE,
+    ]),
+  })
+  .strict();
+
 const detailQuerySchema = z.object({
   keyword: z.string().min(1),
 }).strict();
@@ -119,6 +132,20 @@ router.get('/api/webflow/keyword-command-center/:workspaceId/rows', requireWorks
     const parsed = rowsQuerySchema.safeParse(req.query);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid query' });
     const payload = await buildKeywordCommandCenterRows(req.params.workspaceId, parsed.data, {
+      includeLocalSeo: true,
+    });
+    if (!payload) return res.status(404).json({ error: 'Workspace not found' });
+    res.json(payload);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/api/webflow/keyword-command-center/:workspaceId/grouped', requireWorkspaceAccess('workspaceId'), async (req, res, next) => {
+  try {
+    const parsed = groupedViewQuerySchema.safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid query' });
+    const payload = await buildKeywordCommandCenterGroupedView(req.params.workspaceId, parsed.data, {
       includeLocalSeo: true,
     });
     if (!payload) return res.status(404).json({ error: 'Workspace not found' });

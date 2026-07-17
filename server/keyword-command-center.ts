@@ -51,6 +51,10 @@ export {
 } from './domains/keyword-command-center/summary-service.js';
 
 export {
+  buildKeywordCommandCenterGroupedView,
+} from './domains/keyword-command-center/grouped-view-service.js';
+
+export {
   buildKeywordCommandCenterDetail,
 } from './domains/keyword-command-center/detail-service.js';
 

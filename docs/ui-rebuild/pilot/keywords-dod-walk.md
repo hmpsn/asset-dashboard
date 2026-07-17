@@ -13,7 +13,7 @@
 | 2 | `?tab=` receiver | Preserved | `useKeywordsSurfaceState` accepts rebuilt lenses and legacy segment tabs, mapping legacy tabs to filters. |
 | 3 | `?q=` drawer deep link | Preserved | `useKeywordsSurfaceState` reads the hub query param and `KeywordDrawer` opens from the selected keyword. |
 | 4 | Cross-surface deep-link senders | Preserved | Existing `buildHubDeepLinkQuery` senders remain compatible because the receiver still supports `?tab=` and `?q=`. |
-| 5 | KPI summary cards | Improved with deferral | Existing count/value KPIs ship with DS `MetricTile`; avg-position/delta KPI variants are deferred in `DEF-kw-002`. |
+| 5 | KPI summary cards | Improved | Existing count/value KPIs plus server-owned Avg. position and Position change ship with DS `MetricTile`; missing rank/prior evidence remains unavailable rather than zero. `DEF-kw-002` is complete. |
 | 6 | Summary loading skeletons | Preserved | Summary and initial-view loading render `Skeleton` tiles, never zero-value placeholders. |
 | 7 | Summary-fetch error with usable rows | Preserved | Summary/initial error states render retry affordances and stale data warnings when cached data exists. |
 | 8 | Truncation honesty banner | Preserved | Table renders the display-cap banner from `rawEvidenceTotal - rawEvidenceReturned`. |

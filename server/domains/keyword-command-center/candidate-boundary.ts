@@ -441,18 +441,7 @@ export function rowCandidateKeysForQuery(
   query: KeywordCommandCenterRowsQuery,
   valueScoring: ValueScoringConfig = { on: false },
 ): { keys: Set<string>; page: number; pageSize: number; totalRows: number; totalPages: number } {
-  const candidates = new Map<string, RowCandidateKey>();
-  addCandidateKeysFromBundle(candidates, bundle, localVisibility, valueScoring);
-  const rawSearch = query.search?.trim().toLowerCase();
-  const normalizedSearch = keywordComparisonKey(query.search ?? '');
-  const filtered = [...candidates.values()]
-    .filter(candidate =>
-      !rawSearch
-      || candidate.keyword.toLowerCase().includes(rawSearch)
-      || (normalizedSearch ? candidate.key.includes(normalizedSearch) : false)
-      || candidate.searchText?.includes(rawSearch)
-    )
-    .sort(candidateSortForQuery(query.sort, query.direction));
+  const filtered = candidateKeysForQuery(bundle, localVisibility, query, valueScoring);
   const pageSize = Math.min(Math.max(query.pageSize ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
   const requestedPage = Math.max(query.page ?? 1, 1);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -465,6 +454,36 @@ export function rowCandidateKeysForQuery(
     totalRows: filtered.length,
     totalPages,
   };
+}
+
+function candidateKeysForQuery(
+  bundle: CommandCenterSourceBundle,
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
+  query: KeywordCommandCenterRowsQuery,
+  valueScoring: ValueScoringConfig,
+): RowCandidateKey[] {
+  const candidates = new Map<string, RowCandidateKey>();
+  addCandidateKeysFromBundle(candidates, bundle, localVisibility, valueScoring);
+  const rawSearch = query.search?.trim().toLowerCase();
+  const normalizedSearch = keywordComparisonKey(query.search ?? '');
+  return [...candidates.values()]
+    .filter(candidate =>
+      !rawSearch
+      || candidate.keyword.toLowerCase().includes(rawSearch)
+      || (normalizedSearch ? candidate.key.includes(normalizedSearch) : false)
+      || candidate.searchText?.includes(rawSearch)
+    )
+    .sort(candidateSortForQuery(query.sort, query.direction));
+}
+
+/** Complete filter/search/sort-scoped candidate set for server-owned grouping. */
+export function allRowCandidateKeysForQuery(
+  bundle: CommandCenterSourceBundle,
+  localVisibility: Map<string, LocalSeoKeywordVisibilitySummary>,
+  query: KeywordCommandCenterRowsQuery,
+  valueScoring: ValueScoringConfig = { on: false },
+): Set<string> {
+  return new Set(candidateKeysForQuery(bundle, localVisibility, query, valueScoring).map(candidate => candidate.key));
 }
 
 export function sourceKeysForRows(input: {

@@ -125,6 +125,7 @@ export const queryKeys = {
     keywordCommandCenterInitialGuard: (wsId: string) => ['admin-keyword-command-center', wsId, 'initial-guard'] as const,
     keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
+    keywordCommandCenterGrouped: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'grouped', query] as const,
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,
     localSeo: (wsId: string) => ['admin-local-seo', wsId] as const,
     localSeoVariant: (wsId: string, includeSnapshots: boolean) =>

@@ -115,8 +115,9 @@ Keep these capabilities reachable exactly once:
 
 Owner-decision / deferred items:
 
-- `DEF-kw-001`: Inline row sparkline and 7-day rank delta require a batched history-by-keyword read model. Recommended default: keep trend in the drawer until the read model exists.
-- `DEF-kw-002`: Average-position, winning delta, and period-over-period KPI variants require server-owned rollups/deltas. Recommended default: keep the current count/value KPIs and do not compute these client-side.
+- `DEF-kw-001` is complete: the batched visible-row history model serves real seven-day trends.
+- `DEF-kw-002` is complete: adjacent 28-day server snapshot windows serve average position and comparison delta with null empty states.
+- `DEF-kw-003` is complete: Pages/Clusters/Lifecycle consume complete server groups and rollups instead of grouping the current list page.
 - Exact prototype `Intent` / `Stage` toolbar filters remain deferred because the current server filter taxonomy is broader and protects real lifecycle/local/client-feedback workflows.
 - Exact SERP external-link button remains optional; current production evidence and refresh controls already preserve the paid SERP workflow.
 

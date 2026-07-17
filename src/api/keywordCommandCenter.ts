@@ -5,6 +5,8 @@ import type {
   KeywordCommandCenterBulkActionRequest,
   KeywordCommandCenterBulkActionResult,
   KeywordCommandCenterDetailResponse,
+  KeywordCommandCenterGroupedViewQuery,
+  KeywordCommandCenterGroupedViewResponse,
   KeywordCommandCenterInitialViewResponse,
   KeywordCommandCenterRowsQuery,
   KeywordCommandCenterRowsResponse,
@@ -47,6 +49,17 @@ export const keywordCommandCenter = {
     const suffix = params.toString();
     return get<KeywordCommandCenterRowsResponse>(
       `/api/webflow/keyword-command-center/${wsId}/rows${suffix ? `?${suffix}` : ''}`,
+    );
+  },
+
+  grouped: (wsId: string, query: KeywordCommandCenterGroupedViewQuery) => {
+    const params = new URLSearchParams({ groupBy: query.groupBy });
+    if (query.filter) params.set('filter', query.filter);
+    if (query.search) params.set('search', query.search);
+    if (query.sort) params.set('sort', query.sort);
+    if (query.direction) params.set('direction', query.direction);
+    return get<KeywordCommandCenterGroupedViewResponse>(
+      `/api/webflow/keyword-command-center/${wsId}/grouped?${params.toString()}`,
     );
   },
 
