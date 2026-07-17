@@ -697,14 +697,37 @@ describe('EngineSurface rebuilt', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('renders one ordered strategy spine without a top-level Engine lens switcher', async () => {
+  it('renders one ordered strategy spine with a compact Engine jump navigation', async () => {
     renderSurface();
 
     await screen.findByTestId('engine-section-operations');
     expectSpineOrder(SPINE_SECTION_TEST_IDS);
-    expect(screen.queryByRole('radio', { name: 'Spine' })).not.toBeInTheDocument();
+    const jumpNav = screen.getByRole('navigation', { name: 'Engine sections' });
+    expect(within(jumpNav).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Changes',
+      'Signals',
+      'POV',
+      'Moves',
+      'Operations',
+    ]);
+    expect(within(jumpNav).queryByRole('button', { name: 'Spine' })).not.toBeInTheDocument();
     expect(screen.getByText('Average position')).toBeInTheDocument();
     expect(screen.getByText('#9.2')).toBeInTheDocument();
+  });
+
+  it('keeps jump navigation sticky at the top and sends clicks through the existing focus receiver', async () => {
+    renderSurface();
+
+    const controls = await screen.findByRole('toolbar', { name: 'Insights Engine controls' });
+    expect(controls).toHaveClass('sticky', 'top-0', 'z-[var(--z-sticky)]');
+
+    const jumpNav = within(controls).getByRole('navigation', { name: 'Engine sections' });
+    fireEvent.click(within(jumpNav).getByRole('button', { name: 'Moves' }));
+
+    const moves = screen.getByTestId('engine-section-backing-moves');
+    await waitFor(() => expect(moves).toHaveFocus());
+    expect(scrollIntoViewMock).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-engine/seo-strategy?lens=moves');
   });
 
   it('uses the prototype opening order, hierarchy, labels, and calm queue density', async () => {
