@@ -13,7 +13,16 @@ import type { WorkQueueClassification, WorkQueueItem, WorkQueueSourceType } from
 const mocks = vi.hoisted(() => ({
   featureFlagsList: vi.fn(),
   cockpitState: null as UseCockpitRebuiltResult | null,
+  navigate: vi.fn(),
 }));
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mocks.navigate,
+  };
+});
 
 vi.mock('../../../src/api/misc', async () => {
   const actual = await vi.importActual<typeof import('../../../src/api/misc')>('../../../src/api/misc');
@@ -406,6 +415,39 @@ describe('CockpitSurface rebuilt', () => {
     expect(screen.getByText('Refresh decaying service page')).toBeInTheDocument();
     expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
     expect(within(filters).getByRole('button', { name: /^Decay/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('labels navigating queue actions as Review or Open while preserving their routes', async () => {
+    renderSurface();
+
+    const queue = await screen.findByTestId('cockpit-work-queue');
+    const actionFor = (title: string) => {
+      const titleNode = within(queue).getByText(title);
+      const row = titleNode.parentElement?.parentElement;
+      expect(row).not.toBeNull();
+      return within(row as HTMLElement).getByRole('button');
+    };
+
+    const sendAction = actionFor('Approve July content plan');
+    const optimizationAction = actionFor('Refresh decaying service page');
+    const moneyAction = actionFor('Review measured value frame');
+    const riskAction = actionFor('Client has not viewed the portal');
+
+    fireEvent.click(sendAction);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/requests?tab=requests`);
+    fireEvent.click(optimizationAction);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+    fireEvent.click(moneyAction);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+    fireEvent.click(riskAction);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/requests?tab=requests`);
+
+    expect(within(queue).queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
+    expect(within(queue).queryByRole('button', { name: 'Propose' })).not.toBeInTheDocument();
+    expect(sendAction).toHaveAccessibleName('Review');
+    expect(optimizationAction).toHaveAccessibleName('Open');
+    expect(moneyAction).toHaveAccessibleName('Open');
+    expect(riskAction).toHaveAccessibleName('Open');
   });
 
   it('keeps weekly accomplishments as supporting evidence after the core queue and rail', async () => {
