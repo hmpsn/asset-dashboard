@@ -169,6 +169,27 @@ const issueGroups: AuditIssueGroup[] = [
   },
 ];
 
+function makeThreePageTitleGroup(): AuditIssueGroup {
+  const titleGroup = issueGroups[0];
+  const additionalPages = [
+    { ...sampleAudit.pages[0], pageId: 'page-about', page: 'About', slug: 'about', url: '/about' },
+    { ...sampleAudit.pages[0], pageId: 'page-contact', page: 'Contact', slug: 'contact', url: '/contact' },
+  ];
+
+  return {
+    ...titleGroup,
+    affectedPages: 3,
+    instances: [
+      titleGroup.instances[0],
+      ...additionalPages.map((page) => ({
+        id: `${page.pageId}-title-Missing title`,
+        page,
+        issue: page.issues[0],
+      })),
+    ],
+  };
+}
+
 function makeAuditState() {
   return {
     workspace: { id: 'ws-1', name: 'Acme', webflowSiteId: 'site-1', webflowSiteName: 'Acme Site' },
@@ -227,6 +248,7 @@ function makeAuditState() {
     suppressPattern: vi.fn(),
     unsuppressAll: vi.fn(),
     acceptSuggestion: vi.fn(),
+    acceptIssueGroupSuggestions: vi.fn(async () => []),
     openQuickFix: vi.fn(),
     openDeadLinks: vi.fn(),
     createTaskFromIssue: vi.fn(),
@@ -454,25 +476,65 @@ describe('SiteAuditSurface rebuilt', () => {
     expectTextWithClass('Home', 't-ui');
   });
 
-  it('states the first-page action scope and the filter-selective batch semantics in the issue drawer', async () => {
+  it('accepts a suggestion for the selected affected page id', async () => {
     const audit = makeAuditState();
-    const titleGroup = issueGroups[0];
-    const additionalPages = [
-      { ...sampleAudit.pages[0], pageId: 'page-about', page: 'About', slug: 'about', url: '/about' },
-      { ...sampleAudit.pages[0], pageId: 'page-contact', page: 'Contact', slug: 'contact', url: '/contact' },
-    ];
-    const threePageGroup: AuditIssueGroup = {
-      ...titleGroup,
-      affectedPages: 3,
-      instances: [
-        titleGroup.instances[0],
-        ...additionalPages.map((page) => ({
-          id: `${page.pageId}-title-Missing title`,
-          page,
-          issue: page.issues[0],
-        })),
-      ],
-    };
+    const threePageGroup = makeThreePageTitleGroup();
+    const acceptSuggestion = vi.fn(async () => true);
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      issueGroups: [threePageGroup, issueGroups[1]],
+      acceptSuggestion,
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+    fireEvent.click(await screen.findByText('Missing title'));
+
+    const drawer = screen.getByRole('dialog', { name: 'title' });
+    const aboutRow = within(drawer).getByTestId('site-audit-instance-page-about');
+    fireEvent.click(within(aboutRow).getByRole('button', { name: 'Accept suggestion for /about' }));
+
+    await waitFor(() => expect(acceptSuggestion).toHaveBeenCalledTimes(1));
+    expect(acceptSuggestion.mock.calls[0]?.[0].pageId).toBe('page-about');
+  });
+
+  it('previews every affected page before apply-to-all and reports each page outcome', async () => {
+    const audit = makeAuditState();
+    const threePageGroup = makeThreePageTitleGroup();
+    const acceptIssueGroupSuggestions = vi.fn(async () => [
+      { instanceId: threePageGroup.instances[0].id, pageId: 'page-home', pagePath: '/home', status: 'applied' as const },
+      { instanceId: threePageGroup.instances[1].id, pageId: 'page-about', pagePath: '/about', status: 'failed' as const, error: 'Webflow rejected this update' },
+      { instanceId: threePageGroup.instances[2].id, pageId: 'page-contact', pagePath: '/contact', status: 'applied' as const },
+    ]);
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      issueGroups: [threePageGroup, issueGroups[1]],
+      acceptIssueGroupSuggestions,
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+    fireEvent.click(await screen.findByText('Missing title'));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to all 3 pages' }));
+
+    const preview = screen.getByRole('dialog', { name: 'Apply suggestion to all 3 affected pages?' });
+    expect(within(preview).getByText('/home')).toBeVisible();
+    expect(within(preview).getByText('/about')).toBeVisible();
+    expect(within(preview).getByText('/contact')).toBeVisible();
+    expect(within(preview).getByText(/Each page is updated separately/i)).toBeVisible();
+    expect(acceptIssueGroupSuggestions).not.toHaveBeenCalled();
+
+    fireEvent.click(within(preview).getByRole('button', { name: 'Apply to 3 pages' }));
+
+    await waitFor(() => expect(acceptIssueGroupSuggestions).toHaveBeenCalledTimes(1));
+    expect(acceptIssueGroupSuggestions).toHaveBeenCalledWith(threePageGroup.instances);
+    expect(within(screen.getByTestId('site-audit-instance-page-home')).getByText('Applied')).toBeVisible();
+    expect(within(screen.getByTestId('site-audit-instance-page-about')).getByText('Failed')).toBeVisible();
+    expect(within(screen.getByTestId('site-audit-instance-page-about')).getByText('Webflow rejected this update')).toBeVisible();
+    expect(within(screen.getByTestId('site-audit-instance-page-contact')).getByText('Applied')).toBeVisible();
+  });
+
+  it('matches drawer scope copy to per-page actions while preserving filter-truthful batch copy', async () => {
+    const audit = makeAuditState();
+    const threePageGroup = makeThreePageTitleGroup();
     mockUseSiteAuditRebuilt.mockReturnValue({
       ...audit,
       issueGroups: [threePageGroup, issueGroups[1]],
@@ -482,10 +544,13 @@ describe('SiteAuditSurface rebuilt', () => {
     fireEvent.click(await screen.findByText('Missing title'));
 
     const drawer = screen.getByRole('dialog', { name: 'title' });
-    const actions = within(drawer).getByTestId('site-audit-issue-actions');
-    expect(within(actions).getByText('Applies to /home only')).toBeVisible();
-    expect(within(actions).getByRole('button', { name: 'Accept suggestion' })).toBeInTheDocument();
-    expect(within(actions).getByRole('button', { name: 'Send to client' })).toBeInTheDocument();
+    expect(within(drawer).getByText(
+      'Choose actions page by page, or preview the same suggestion across all 3 affected pages.',
+    )).toBeVisible();
+    expect(within(drawer).queryByText(/Applies to \/home only/i)).not.toBeInTheDocument();
+    expect(within(drawer).getAllByRole('button', { name: /Accept suggestion for \/(?:home|about|contact)/ })).toHaveLength(3);
+    expect(within(drawer).getAllByRole('button', { name: /Send to client for \/(?:home|about|contact)/ })).toHaveLength(3);
+    expect(within(drawer).getAllByRole('button', { name: /Add task for \/(?:home|about|contact)/ })).toHaveLength(3);
     expect(within(drawer).getByText(
       'Add visible tasks uses the current table filters. Add error tasks, Add all tasks, and Accept all use the full audit.',
     )).toBeVisible();
