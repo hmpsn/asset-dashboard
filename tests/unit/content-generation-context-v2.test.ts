@@ -32,6 +32,10 @@ import {
 } from '../../server/intelligence/generation-context-builders.js';
 import { buildWorkspaceIntelligence } from '../../server/workspace-intelligence.js';
 import { formatPageMapForPrompt } from '../../server/intelligence/formatters.js';
+import {
+  matrixGenerationInputReservationCeiling,
+  matrixGenerationProjectionTokenEstimate,
+} from '../../server/domains/content/matrix-generation/budget.js';
 
 const intelligence = {
   version: 1,
@@ -259,5 +263,77 @@ describe('buildContentGenerationContextV2', () => {
         voice: intelligence.brand!.voice,
       },
     })).rejects.toBeInstanceOf(ContentGenerationContextBudgetError);
+  });
+
+  it('reproduces the production-shaped authority overflow and preserves it under an explicit matrix ceiling', async () => {
+    const differentiators = `DIFFERENTIATORS\n${'Evidence-backed differentiator detail. '.repeat(360)}`;
+    const objectionHandling = `OBJECTION HANDLING\n${'Verified objection and approved response. '.repeat(360)}`;
+    const authenticAnchor = `FINALIZED VOICE ANCHOR\n${'Clear operator-authored voice example. '.repeat(220)}`;
+    const authority = {
+      systemVoiceBlock: `FINALIZED VOICE DNA\n${'Calm, direct, evidence-led. '.repeat(80)}`,
+      userVoiceBlock: authenticAnchor,
+      identityPromptBlock: `${differentiators}\n${objectionHandling}`,
+      customNotes: null,
+      voice: intelligence.brand!.voice,
+    };
+
+    await expect(buildContentGenerationContextV2('ws-context-v2', {
+      targetKeyword: 'seo platform pricing',
+      authority,
+    })).rejects.toMatchObject({
+      name: 'ContentGenerationContextBudgetError',
+      stage: 'brief',
+      budget: CONTENT_GENERATION_CONTEXT_V2_BUDGETS.brief,
+    });
+
+    const matrixContextBudget = matrixGenerationInputReservationCeiling(128 * 1_024)
+      - matrixGenerationInputReservationCeiling(0);
+    const matrixBudgets = {
+      brief: matrixContextBudget,
+      draft: matrixContextBudget,
+      voiceReview: matrixContextBudget,
+    };
+    const result = await buildContentGenerationContextV2('ws-context-v2', {
+      targetKeyword: 'seo platform pricing',
+      authority,
+      budgets: matrixBudgets,
+    });
+
+    expect(result.projections.brief).toContain(differentiators.trim());
+    expect(result.projections.brief).toContain(objectionHandling.trim());
+    expect(result.projections.draft).toContain(differentiators.trim());
+    expect(result.projections.draft).toContain(objectionHandling.trim());
+    expect(result.projections.voiceReview).toContain(authenticAnchor.trim());
+    expect(result.tokenEstimates.brief).toBeLessThanOrEqual(matrixBudgets.brief);
+    expect(result.tokenEstimates.draft).toBeLessThanOrEqual(matrixBudgets.draft);
+    expect(result.tokenEstimates.voiceReview).toBeLessThanOrEqual(matrixBudgets.voiceReview);
+  });
+
+  it('lets the matrix caller enforce UTF-8 projection budgets without changing global defaults', async () => {
+    const authority = {
+      systemVoiceBlock: '',
+      userVoiceBlock: '🧭'.repeat(20),
+      identityPromptBlock: '',
+      customNotes: null,
+      voice: intelligence.brand!.voice,
+    };
+
+    await expect(buildContentGenerationContextV2('ws-context-v2', {
+      targetKeyword: 'seo platform pricing',
+      authority,
+      budgets: { voiceReview: 10 },
+    })).resolves.toMatchObject({ tokenEstimates: { voiceReview: 10 } });
+
+    await expect(buildContentGenerationContextV2('ws-context-v2', {
+      targetKeyword: 'seo platform pricing',
+      authority,
+      budgets: { voiceReview: 10 },
+      projectionTokenEstimator: matrixGenerationProjectionTokenEstimate,
+    })).rejects.toMatchObject({
+      name: 'ContentGenerationContextBudgetError',
+      stage: 'voiceReview',
+      budget: 10,
+      estimatedTokens: 20,
+    });
   });
 });

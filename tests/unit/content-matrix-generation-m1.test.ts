@@ -8,6 +8,7 @@ import type {
   MatrixGenerationPreviewTarget,
   ResolvedMatrixStructuralTarget,
 } from '../../shared/types/matrix-generation.js';
+import { MATRIX_GENERATION_BATCH_LIMITS } from '../../shared/types/matrix-generation.js';
 import db from '../../server/db/index.js';
 import { getBrief } from '../../server/content-brief.js';
 import { createMatrix, getMatrix, updateMatrixCell } from '../../server/content-matrices.js';
@@ -19,7 +20,15 @@ import {
   renderMatrixCellEvidencePrompt,
   resolveContentMatrixEvidence,
 } from '../../server/domains/content/matrix-generation/evidence.js';
-import { previewMatrixGeneration } from '../../server/domains/content/matrix-generation/preview.js';
+import {
+  previewMatrixGeneration,
+} from '../../server/domains/content/matrix-generation/preview.js';
+import {
+  MATRIX_GENERATION_AUTHORITY_UTF8_BYTE_CEILING,
+  MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES,
+  MATRIX_GENERATION_PROVIDER_INPUT_TOKEN_RESERVATION_CEILING,
+  matrixGenerationInputReservationCeiling,
+} from '../../server/domains/content/matrix-generation/budget.js';
 import {
   commitMatrixGenerationDraft,
   createMatrixGenerationRun,
@@ -119,11 +128,17 @@ function sourceRevision(fixture: Fixture, cellId: string) {
   };
 }
 
-function seedBrandAuthority(workspaceId: string): void {
+function seedBrandAuthority(
+  workspaceId: string,
+  options: { productionShaped?: boolean; authorityOverCeiling?: boolean } = {},
+): void {
   createVoiceProfile(workspaceId);
+  const voiceSample = options.productionShaped
+    ? `FINALIZED VOICE ANCHOR\n${'We explain the useful truth clearly and let the customer decide. '.repeat(130)}`
+    : 'We explain the useful truth clearly, then let the customer decide.';
   const sample = addVoiceSample(
     workspaceId,
-    'We explain the useful truth clearly, then let the customer decide.',
+    voiceSample,
     'body',
     'manual',
   );
@@ -157,17 +172,53 @@ function seedBrandAuthority(workspaceId: string): void {
   });
 
   const now = new Date().toISOString();
-  db.prepare(`
-    INSERT INTO brand_identity_deliverables (
-      id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at
-    ) VALUES (?, ?, 'messaging_pillars', ?, 'approved', 1, 'professional', ?, ?)
-  `).run(
-    `identity_${randomUUID()}`,
-    workspaceId,
-    'Clarity before complexity. Ground every recommendation in evidence.',
-    now,
-    now,
-  );
+  const deliverables = options.productionShaped
+    ? [
+        {
+          type: 'differentiators',
+          content: options.authorityOverCeiling
+            ? `DIFFERENTIATORS\n${'D'.repeat(64_000)}`
+            : `DIFFERENTIATORS\n${'Evidence-backed differentiator detail for the customer. '.repeat(300)}`,
+        },
+        {
+          type: 'objection_handling',
+          content: options.authorityOverCeiling
+            ? `OBJECTION HANDLING\n${'O'.repeat(64_000)}`
+            : `OBJECTION HANDLING\n${'Verified objection followed by an approved, factual response. '.repeat(300)}`,
+        },
+      ]
+    : [{
+        type: 'messaging_pillars',
+        content: 'Clarity before complexity. Ground every recommendation in evidence.',
+      }];
+  const insert = db.prepare(`
+      INSERT INTO brand_identity_deliverables (
+        id, workspace_id, deliverable_type, content, status, version, tier, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'approved', 1, 'professional', ?, ?)
+    `);
+  for (const deliverable of deliverables) {
+    insert.run(
+      `identity_${randomUUID()}`,
+      workspaceId,
+      deliverable.type,
+      deliverable.content,
+      now,
+      now,
+    );
+  }
+}
+
+function previewSideEffectCounts(workspaceId: string): Record<string, number> {
+  const count = (table: string) => (db.prepare(
+    `SELECT COUNT(*) AS count FROM ${table} WHERE workspace_id = ?`,
+  ).get(workspaceId) as { count: number }).count;
+  return {
+    runs: count('content_matrix_generation_runs'),
+    items: count('content_matrix_generation_items'),
+    jobs: count('jobs'),
+    briefs: count('content_briefs'),
+    posts: count('content_posts'),
+  };
 }
 
 async function resolveServiceAvailabilityEvidence(fixture: Fixture, cellId: string) {
@@ -410,6 +461,101 @@ function runAtGeneratingPost(
 }
 
 describe('content matrix generation M1', () => {
+  it('previews production-shaped single and multi-cell authority deterministically without paid side effects', async () => {
+    const fixture = createFixture(['Austin', 'Dallas']);
+    const [firstCell, secondCell] = fixture.matrix.cells;
+    seedBrandAuthority(fixture.workspaceId, { productionShaped: true });
+    await resolveRequiredServiceEvidence(fixture, firstCell.id);
+    await resolveRequiredServiceEvidence(fixture, secondCell.id);
+    const before = previewSideEffectCounts(fixture.workspaceId);
+
+    const singleRequest = {
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{
+        cellId: firstCell.id,
+        expectedSourceRevision: sourceRevision(fixture, firstCell.id),
+      }],
+    };
+    const single = await previewMatrixGeneration(singleRequest);
+    const singleRepeat = await previewMatrixGeneration(singleRequest);
+    expect(single.results).toHaveLength(1);
+    expect(single.results[0]?.status).toBe('ready');
+    expect(singleRepeat).toEqual(single);
+    expect(single.estimatedBatchBudget).toMatchObject({ maxConcurrency: 1 });
+    expect(Number.isFinite(single.estimatedBatchBudget?.estimatedUsd)).toBe(true);
+
+    const multiRequest = {
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [firstCell, secondCell].map(cell => ({
+        cellId: cell.id,
+        expectedSourceRevision: sourceRevision(fixture, cell.id),
+      })) as [
+        { cellId: string; expectedSourceRevision: ReturnType<typeof sourceRevision> },
+        { cellId: string; expectedSourceRevision: ReturnType<typeof sourceRevision> },
+      ],
+    };
+    const multi = await previewMatrixGeneration(multiRequest);
+    const multiRepeat = await previewMatrixGeneration(multiRequest);
+    expect(multi.results.map(result => result.status)).toEqual(['ready', 'ready']);
+    expect(multiRepeat).toEqual(multi);
+    expect(multi.estimatedBatchBudget?.maxConcurrency).toBe(2);
+    expect(Number.isFinite(multi.estimatedBatchBudget?.inputTokens)).toBe(true);
+    expect(Number.isFinite(multi.estimatedBatchBudget?.estimatedUsd)).toBe(true);
+    expect(multi.estimatedBatchBudget).toMatchObject({
+      providerCalls: expect.any(Number),
+      inputTokens: expect.any(Number),
+      outputTokens: expect.any(Number),
+      estimatedUsd: expect.any(Number),
+    });
+    expect(multi.estimatedBatchBudget!.providerCalls)
+      .toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxProviderCalls);
+    expect(multi.estimatedBatchBudget!.inputTokens)
+      .toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxInputTokens);
+    expect(multi.estimatedBatchBudget!.outputTokens)
+      .toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxOutputTokens);
+    expect(multi.estimatedBatchBudget!.estimatedUsd)
+      .toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxEstimatedUsd);
+    expect(multi.estimatedBatchBudget!.maxConcurrency)
+      .toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxConcurrency);
+    expect(MATRIX_GENERATION_PROVIDER_INPUT_TOKEN_RESERVATION_CEILING).toBe(
+      matrixGenerationInputReservationCeiling(
+        MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES,
+      ),
+    );
+    expect(MATRIX_GENERATION_PROVIDER_INPUT_TOKEN_RESERVATION_CEILING)
+      .toBeLessThan(MATRIX_GENERATION_BATCH_LIMITS.maxInputTokens);
+    expect(previewSideEffectCounts(fixture.workspaceId)).toEqual(before);
+  });
+
+  it('returns a typed ready-tail precondition above the exact UTF-8 authority ceiling', async () => {
+    const fixture = createFixture(['Austin']);
+    const [cell] = fixture.matrix.cells;
+    seedBrandAuthority(fixture.workspaceId, {
+      productionShaped: true,
+      authorityOverCeiling: true,
+    });
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+
+    await expect(previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{
+        cellId: cell.id,
+        expectedSourceRevision: sourceRevision(fixture, cell.id),
+      }],
+    })).rejects.toMatchObject({
+      name: 'MatrixGenerationPreviewStageError',
+      code: 'precondition_failed',
+      stage: 'generation_context',
+      cellId: cell.id,
+      classification: 'matrix_generation_authority_budget',
+      fieldPath: 'generation_context.authority',
+      constraint: `serialized frozen voice, approved identity, and custom notes must not exceed ${MATRIX_GENERATION_AUTHORITY_UTF8_BYTE_CEILING} UTF-8 bytes`,
+    });
+  });
+
   it('exposes optional omissions and includes the section only after exact evidence resolution', async () => {
     const fixture = createFixture(['Austin'], true);
     const cell = fixture.matrix.cells[0];
