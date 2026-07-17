@@ -123,10 +123,11 @@ export type {
   DividerProps, DividerOrientation,
 } from './layout';
 // F3 net-new layout
-export { AppShell, PageContainer, Toolbar, ToolbarSpacer, GroupBlock, NavItem, NavGroup } from './layout';
+export { AppShell, PageContainer, WorkbenchFrame, Toolbar, ToolbarSpacer, GroupBlock, NavItem, NavGroup } from './layout';
 export type {
   AppShellProps,
   PageContainerProps,
+  WorkbenchFrameProps,
   ToolbarProps,
   GroupBlockProps, GroupStat, GroupFlag,
   NavItemProps,

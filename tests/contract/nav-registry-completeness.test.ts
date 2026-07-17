@@ -45,6 +45,11 @@ function parsePageUnion(): string[] {
 describe('navRegistry completeness', () => {
   const pageUnion = parsePageUnion();
 
+  it('keeps Requests as a labeled Client-Facing rail home', () => {
+    expect(NAV_REGISTRY_BY_ID.requests.label).toBe('Requests');
+    expect(resolveRebuiltNavZoneLabel('requests')).toBe('Client-Facing');
+  });
+
   it('parses a non-empty Page union from routes.ts', () => {
     expect(pageUnion.length).toBeGreaterThan(10);
     expect(pageUnion).toContain('home');

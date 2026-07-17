@@ -1,7 +1,7 @@
 // @ds-rebuilt
 import type { SeoEditorWriteTarget } from '../../../shared/types/seo-editor-write-target';
 import type { SeoEditState, SeoEditorPage, SeoRecommendation, SeoVariationSet } from '../editor/seoEditorTypes';
-import type { CmsCollection, CmsItem } from '../cms-editor/cmsEditorModel';
+import type { ApprovalMapItem, CmsCollection, CmsItem } from '../cms-editor/cmsEditorModel';
 import type { PageEditStatus } from '../ui/statusConfig';
 
 export interface SeoEditorProjectedMetrics {
@@ -22,6 +22,7 @@ export interface SeoEditorSurfaceRow {
   staticPage?: SeoEditorPage;
   cmsCollection?: CmsCollection;
   cmsItem?: CmsItem;
+  approvalHistory?: ApprovalMapItem[];
   edit?: SeoEditState;
   cmsEdit?: Record<string, string>;
   pageState?: { status?: PageEditStatus | string | null };

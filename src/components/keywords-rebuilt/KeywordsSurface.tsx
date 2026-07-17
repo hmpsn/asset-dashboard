@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
-import { BarChart3, Clock, FileText, Network, Target, type LucideIcon } from 'lucide-react';
+import { BarChart3, Clock, type LucideIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import {
@@ -61,9 +61,6 @@ const SUMMARY_TILE_CLASS = [
 // Per-lens icon anchors for the LensSwitcher (parity with the prototype's lens tabs).
 const LENS_ICONS: Record<KeywordsSurfaceLens, LucideIcon> = {
   rankings: BarChart3,
-  opportunities: Target,
-  pages: FileText,
-  clusters: Network,
   lifecycle: Clock,
 };
 
@@ -73,13 +70,8 @@ function isLockedError(error: unknown): boolean {
 
 function lensCount(summary: KeywordCommandCenterSummaryResponse | undefined, lens: KeywordsSurfaceLens): number | undefined {
   if (!summary) return undefined;
-  // Clusters is the one lens with a truthful server-provided group count. The
-  // rankings / opportunities / pages / lifecycle lenses each organize the SAME
-  // full keyword set (just sorted or grouped differently), so every one previews
-  // counts.total — a single consistent unit instead of the old mix of filter
-  // counts (which contradicted the table) and per-lens subsets. Distinct-page and
-  // high-opportunity-subset counts await server support (DEF-kw follow-up).
-  if (lens === 'clusters') return summary.topicClusters?.length;
+  // Both lenses organize the same server-owned keyword set.
+  void lens;
   return summary.counts.total;
 }
 
@@ -287,7 +279,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
       <div className="flex min-h-full w-full max-w-[1128px] flex-col gap-5">
         <PageHeader
           title="Keywords"
-          subtitle="Rankings, opportunities, pages, clusters, and lifecycle for every tracked keyword."
+          subtitle="Rankings and lifecycle for every tracked keyword, with focused table controls for triage and grouping."
           className={KEYWORDS_HEADER_CLASS}
         />
         <ErrorState
@@ -304,7 +296,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
     <div data-testid="keywords-surface" className="flex min-h-full w-full max-w-[1128px] flex-col">
       <PageHeader
         title="Keywords"
-        subtitle="Rankings, opportunities, pages, clusters, and lifecycle for every tracked keyword."
+        subtitle="Rankings and lifecycle for every tracked keyword, with focused table controls for triage and grouping."
         className={KEYWORDS_HEADER_CLASS}
         actions={(
           <div className="flex w-full max-w-[280px] items-center gap-2 sm:min-w-[260px]">
@@ -423,11 +415,7 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
         </div>
       </div>
 
-      <div className="mt-3">
-        <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={canonicalRowsResult} />
-      </div>
-
-      <div className="mt-4">
+      <div className="mt-4" data-testid="client-keyword-feedback">
         <GroupBlock
           title="Client keyword feedback"
           meta="Requested, declined, and approved keyword direction from the client portal."
@@ -460,6 +448,10 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
             </div>
           )}
         </GroupBlock>
+      </div>
+
+      <div className="mt-3">
+        <KeywordsLenses workspaceId={workspaceId} state={state} summary={summary} initialRowsResult={canonicalRowsResult} />
       </div>
 
       {state.selectedKeyword && (

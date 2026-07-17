@@ -14,6 +14,8 @@ export { AppShell } from './AppShell';
 export type { AppShellProps } from './AppShell';
 export { PageContainer } from './PageContainer';
 export type { PageContainerProps } from './PageContainer';
+export { WorkbenchFrame } from './WorkbenchFrame';
+export type { WorkbenchFrameProps } from './WorkbenchFrame';
 export { Toolbar, ToolbarSpacer } from './Toolbar';
 export type { ToolbarProps } from './Toolbar';
 export { GroupBlock } from './GroupBlock';

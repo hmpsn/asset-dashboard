@@ -3,7 +3,7 @@
  *
  * Verifies:
  *  (a) badge count comes from the React Query cache via useWorkspaceBadges
- *  (b) CONTENT_REQUEST_CREATED / _UPDATE events invalidate the workspace-badges key
+ *  (b) content-request and client-request events invalidate the workspace-badges key
  */
 
 import React from 'react';
@@ -48,7 +48,11 @@ describe('useWorkspaceBadges', () => {
   });
 
   it('returns pendingRequests from the API response', async () => {
-    getBadgesMock.mockResolvedValue({ pendingRequests: 3, hasContent: true });
+    getBadgesMock.mockResolvedValue({
+      pendingRequests: 3,
+      hasContent: true,
+      pendingReplies: { count: 2, requestIds: ['req-2', 'req-1'], newestAt: '2026-07-17T12:00:00.000Z' },
+    });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     const { result } = renderHook(() => useWorkspaceBadges('ws-test'), {
@@ -58,6 +62,11 @@ describe('useWorkspaceBadges', () => {
     // Wait for the query to settle on the positive signal rather than a fixed delay.
     await waitFor(() => {
       expect(result.current.data?.pendingRequests).toBe(3);
+    });
+    expect(result.current.data?.pendingReplies).toEqual({
+      count: 2,
+      requestIds: ['req-2', 'req-1'],
+      newestAt: '2026-07-17T12:00:00.000Z',
     });
 
     expect(getBadgesMock).toHaveBeenCalledWith('ws-test');
@@ -113,4 +122,24 @@ describe('useWsInvalidation — workspace-badges key', () => {
 
     expect(invalidatedKeys).toContainEqual(queryKeys.admin.workspaceBadges(workspaceId));
   });
+
+  it.each([WS_EVENTS.REQUEST_CREATED, WS_EVENTS.REQUEST_UPDATE])(
+    '%s invalidates workspace-badges key',
+    (eventName) => {
+      const client = new QueryClient();
+      const invalidateSpy = vi.spyOn(client, 'invalidateQueries');
+      const workspaceId = 'ws-client-replies';
+
+      renderHook(() => useWsInvalidation(workspaceId), { wrapper: wrapper(client) });
+
+      act(() => {
+        capturedHandlers[eventName]?.();
+      });
+
+      const invalidatedKeys = invalidateSpy.mock.calls
+        .map(([arg]) => (arg as { queryKey?: readonly unknown[] }).queryKey)
+        .filter((key): key is readonly unknown[] => Array.isArray(key));
+      expect(invalidatedKeys).toContainEqual(queryKeys.admin.workspaceBadges(workspaceId));
+    },
+  );
 });

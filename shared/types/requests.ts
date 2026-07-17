@@ -62,3 +62,11 @@ export interface ClientRequest {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Server-owned summary of client request threads waiting on an operator reply. */
+export interface PendingRepliesSummary {
+  count: number;
+  /** Newest unanswered request first. */
+  requestIds: string[];
+  newestAt: string | null;
+}

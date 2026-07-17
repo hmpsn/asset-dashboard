@@ -153,6 +153,7 @@ function adminInvalidationKeys(
         queryKeys.client.requests(workspaceId),
         queryKeys.admin.requests(workspaceId),
         queryKeys.admin.workspaceHome(workspaceId),
+        queryKeys.admin.workspaceBadges(workspaceId),
         queryKeys.admin.notifications(),
       ] as const;
     case WS_EVENTS.CONTENT_REQUEST_CREATED:

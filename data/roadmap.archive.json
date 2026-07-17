@@ -128,6 +128,63 @@
           "notes": "Completed W1.3: global tabs retain a validated, localStorage-backed last-visited workspace for shell context. With no valid visit history, chrome stays unbound, global breadcrumbs omit the workspace segment, and AdminChat does not mount."
         },
         {
+          "id": "canyon-containment-site-audit",
+          "title": "Site Audit: bounded-workbench containment (47.2 folds → pinned hero + contained issues list)",
+          "source": "2026-07-16 UX-flow audit §4",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "site-health",
+          "notes": "Completed 2026-07-17 (W2.B1). Added the shared WorkbenchFrame primitive with one canonical viewport bound, a flex-none pinned region, and exactly one min-h-0 flex-1 overflow-auto collection. Site Audit now pins a compact health hero, six working category filters, utility controls, and the bulk band while the issue queue and supporting evidence stay inside the contained region. Drawer, deep-link, and bulk semantics are unchanged; focused tests and typecheck pass."
+        },
+        {
+          "id": "canyon-containment-schema",
+          "title": "Schema: containment + in-region search/filter + row cap (38.2 folds, 541 buttons)",
+          "source": "2026-07-16 UX-flow audit §4",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "site-health",
+          "notes": "Completed 2026-07-17 (W2.B2). Schema now uses WorkbenchFrame with a compact readiness strip, workflow, summary, and bulk controls pinned. Production support moved above the collection behind disclosure; the generated-page table searches title/path/type, filters truthful status groups, renders 100 rows initially, and offers Show all N. Per-row type selects were demoted to read-only labels; editing remains in the existing detail drawer. Focused tests and typecheck pass."
+        },
+        {
+          "id": "canyon-containment-media",
+          "title": "Media: contained grid + load-more batching (27.4 folds, 1,583-button DOM)",
+          "source": "2026-07-16 UX-flow audit §4",
+          "est": "M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "site-health",
+          "notes": "Completed 2026-07-17 (W2.B3). Asset Manager now pins its existing Browse toolbar above one WorkbenchFrame collection and mounts 100 assets per batch with truthful remaining counts. Grid cards retain open/select and the contextual missing-alt action while compress/rename live in the existing drawer and bulk bar. The 250-asset stress fixture mounts 208 buttons versus the audit's 1,583-button baseline; Repair, Upload, and detail overlay precedence is unchanged. Focused tests and typecheck pass."
+        },
+        {
+          "id": "keywords-lens-diet",
+          "title": "Keywords: 5 lenses → 2 + Columns preset + Group-by; surface client feedback above the table",
+          "source": "2026-07-16 UX-flow audit §7",
+          "est": "M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "keywords",
+          "notes": "Completed 2026-07-17. Rankings and Lifecycle are the only visible lenses; Full/Triage columns and None/Page/Cluster grouping preserve the same rows, all three retired ?lens= values remain compatibility receivers, and client feedback now precedes the table.",
+          "shippedAt": "2026-07-17"
+        },
+        {
+          "id": "requests-inbox-spine",
+          "title": "Requests: recency-first landing + pending-replies nav badge + labeled nav home",
+          "source": "2026-07-16 UX-flow audit §6; rebuild audit B6",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "client-comms",
+          "notes": "Completed 2026-07-17. The existing workspace-badges route now returns the server-owned pendingReplies summary; Requests and Cockpit share it, request events invalidate it, pending replies default Requests to All requests, and the already-present labeled Requests registry home is regression-pinned.",
+          "shippedAt": "2026-07-17"
+        },
+        {
           "id": "engine-actions-forward-reorder",
           "title": "Engine: actions-forward spine reorder (Option A) — owner circle-back",
           "source": "2026-07-16 UX-flow audit §3; engine-contract.md:135 trigger fired",

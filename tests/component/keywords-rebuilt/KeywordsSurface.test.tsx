@@ -591,17 +591,29 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByRole('dialog', { name: /cosmetic dentistry/i })).toBeInTheDocument();
   });
 
-  it('keeps an inbound ?tab filter when the user switches lens (review PR #1480)', () => {
+  it('keeps an inbound ?tab filter when the user changes the table presentation', () => {
     renderSurface('/ws/ws-1/seo-keywords?tab=tracked');
     expect(screen.getByRole('button', { name: /^Tracked/ })).toHaveAttribute('aria-pressed', 'true');
 
-    // Switching lens must NOT clobber the inbound filter: the lens now owns its own
-    // `?lens=` param, not the shared `?tab=` segment that carries the filter. Previously
-    // setLens overwrote `tab`, silently dropping the filter back to 'all'.
-    fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Triage' }));
 
-    expect(screen.getByRole('radio', { name: /Opportunities/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Triage' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: /^Tracked/ })).toHaveAttribute('aria-pressed', 'true');
+    const params = new URL(screen.getByTestId('location-probe').textContent ?? '', 'http://localhost').searchParams;
+    expect(params.get('tab')).toBe('tracked');
+  });
+
+  it('offers only Rankings and Lifecycle as top-level lenses', () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    const tray = screen.getByTestId('keywords-lens-tray');
+    expect(within(tray).getAllByRole('radio').map((lens) => lens.textContent?.trim())).toEqual([
+      expect.stringMatching(/^Rankings/),
+      expect.stringMatching(/^Lifecycle/),
+    ]);
+    expect(within(tray).queryByText('Opportunities')).not.toBeInTheDocument();
+    expect(within(tray).queryByText('Pages')).not.toBeInTheDocument();
+    expect(within(tray).queryByText('Clusters')).not.toBeInTheDocument();
   });
 
   it('uses the combined initial view except for the local-candidates full-model exception', () => {
@@ -686,9 +698,11 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByRole('status', { name: /45 more keywords hidden/i })).toBeInTheDocument();
   });
 
-  it('gives the Opportunities lens its own upside-focused shape (Est. gain + Fix, not the Rankings grid)', () => {
+  it('maps the legacy Opportunities lens to Rankings with Triage columns', () => {
     renderSurface('/ws/ws-1/seo-keywords?lens=opportunities');
 
+    expect(screen.getByRole('radio', { name: /Rankings/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Triage' })).toHaveAttribute('aria-checked', 'true');
     const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
     // Distinct triage columns…
     expect(headers).toContain('Est. gain');
@@ -696,6 +710,21 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     // …and NOT the wide Rankings grid re-sorted.
     expect(headers).not.toContain('Clicks');
     expect(headers).not.toContain('KD');
+  });
+
+  it.each([
+    ['opportunities', 'Triage', 'none'],
+    ['pages', 'Full', 'page'],
+    ['clusters', 'Full', 'cluster'],
+  ] as const)('keeps legacy ?lens=%s as a compatibility receiver', (legacyLens, columns, groupBy) => {
+    renderSurface(`/ws/ws-1/seo-keywords?lens=${legacyLens}`);
+
+    expect(screen.getByRole('radio', { name: /Rankings/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: columns })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: groupBy === 'none' ? 'None' : groupBy === 'page' ? 'Page' : 'Cluster' }))
+      .toHaveAttribute('aria-checked', 'true');
+    if (groupBy === 'page') expect(screen.getAllByText('Cosmetic Dentistry').length).toBeGreaterThan(0);
+    if (groupBy === 'cluster') expect(screen.getByText('Dental services')).toBeInTheDocument();
   });
 
   it('threads sort and pagination controls into the rows query', async () => {
@@ -734,10 +763,13 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText('2 selected')).toBeInTheDocument();
 
     expect(screen.getByText('Client keyword feedback')).toBeInTheDocument();
+    const feedbackPanel = screen.getByTestId('client-keyword-feedback');
+    const table = screen.getByRole('grid');
+    expect(feedbackPanel?.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('dental implants')).toHaveClass('t-ui');
     expect(screen.getByText('Client wants this service prioritized.')).toHaveClass('t-caption-sm');
     expect(screen.getByText(/Clicks & impressions:/)).toHaveClass('t-body');
-    fireEvent.click(screen.getAllByRole('button', { name: 'Add to strategy' }).at(-1)!);
+    fireEvent.click(within(feedbackPanel).getByRole('button', { name: 'Add to strategy' }));
     expect(rowActionMutateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         action: KEYWORD_COMMAND_CENTER_ACTIONS.ADD_TO_STRATEGY,
@@ -747,24 +779,24 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     );
   });
 
-  it('switches lenses, updates the URL-backed query, and renders grouped shapes', async () => {
+  it('switches table columns and grouping, then renders the Lifecycle board', async () => {
     const { container } = renderSurface('/ws/ws-1/seo-keywords');
     await expectNoA11yViolations(container);
 
-    fireEvent.click(screen.getByRole('radio', { name: /Opportunities/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Triage' }));
     await waitFor(() => {
       expect(rowsHookMock.mock.calls.at(-1)?.[1]).toMatchObject({ sort: 'opportunity', direction: 'desc' });
     });
     await expectNoA11yViolations(container);
 
-    fireEvent.click(screen.getByRole('radio', { name: /Pages/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Page' }));
     await waitFor(() => {
       expect(screen.getAllByText('Cosmetic Dentistry').length).toBeGreaterThan(0);
     });
     expect(screen.getByText('Cannibalization risk')).toBeInTheDocument();
     await expectNoA11yViolations(container);
 
-    fireEvent.click(screen.getByRole('radio', { name: /Clusters/ }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Cluster' }));
     await waitFor(() => {
       expect(screen.getByText('Dental services')).toBeInTheDocument();
     });

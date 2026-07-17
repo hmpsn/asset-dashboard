@@ -4,11 +4,13 @@ import { useAdminROI } from './useAdminROI';
 import { useWorkspaceHomeData } from './useWorkspaceHome';
 import { useWorkspaceIntelligence } from './useWorkspaceIntelligence';
 import { useWorkspaces } from './useWorkspaces';
+import { useWorkspaceBadges } from './useWorkspaceBadges';
 import type { Workspace } from '../../components/WorkspaceSelector';
 import type { WorkspaceHomeData } from '../../api/platform';
 import type { WorkQueueClassification, WorkQueueItem, WorkQueueSourceType } from '../../../shared/types/work-queue';
 import type { AdminMoneyFrame, OutcomeProvenance } from '../../../shared/types/outcome-tracking';
 import type { CockpitVerdict } from '../../../shared/types/cockpit';
+import type { PendingRepliesSummary } from '../../../shared/types/requests';
 
 export interface CockpitRankRow {
   id: string;
@@ -108,6 +110,7 @@ export interface UseCockpitRebuiltResult {
   workQueue: WorkQueueClassification | null;
   ranks: CockpitRankRow[];
   requests: CockpitRequestRow[];
+  pendingReplies: PendingRepliesSummary;
   activity: CockpitActivityEntry[];
   kpis: CockpitKpiModel;
   lastFetched: Date | null;
@@ -116,6 +119,12 @@ export interface UseCockpitRebuiltResult {
 const EMPTY_WORK_QUEUE: WorkQueueClassification = {
   streams: { opt: 0, send: 0, money: 0, unclassified: 0 },
   items: [],
+};
+
+const EMPTY_PENDING_REPLIES: PendingRepliesSummary = {
+  count: 0,
+  requestIds: [],
+  newestAt: null,
 };
 
 function numberOrNull(value: unknown): number | null {
@@ -289,6 +298,7 @@ export function useCockpitRebuilt(workspaceId: string): UseCockpitRebuiltResult 
   const auditQuery = useAuditSummary(workspaceId);
   const roiQuery = useAdminROI(workspaceId);
   const intelligenceQuery = useWorkspaceIntelligence(workspaceId, ['contentPipeline', 'clientSignals']);
+  const badgesQuery = useWorkspaceBadges(workspaceId);
 
   const workspace = useMemo(
     () => workspaceQuery.data?.find((item) => item.id === workspaceId) ?? null,
@@ -296,7 +306,11 @@ export function useCockpitRebuilt(workspaceId: string): UseCockpitRebuiltResult 
   );
 
   const ranks = useMemo(() => asRankRows(homeQuery.data?.ranks), [homeQuery.data?.ranks]);
-  const requests = useMemo(() => asRequests(homeQuery.data?.requests), [homeQuery.data?.requests]);
+  const pendingReplies = badgesQuery.data?.pendingReplies ?? EMPTY_PENDING_REPLIES;
+  const requests = useMemo(() => {
+    const pendingIds = new Set(pendingReplies.requestIds);
+    return asRequests(homeQuery.data?.requests).filter((request) => pendingIds.has(request.id));
+  }, [homeQuery.data?.requests, pendingReplies.requestIds]);
   const activity = useMemo(() => asActivity(homeQuery.data?.activity), [homeQuery.data?.activity]);
 
   const coverageGaps = intelligenceQuery.data?.contentPipeline?.coverageGaps?.length ?? 0;
@@ -329,6 +343,7 @@ export function useCockpitRebuilt(workspaceId: string): UseCockpitRebuiltResult 
     workQueue: homeQuery.data?.workQueue ?? EMPTY_WORK_QUEUE,
     ranks,
     requests,
+    pendingReplies,
     activity,
     kpis,
     lastFetched: homeQuery.dataUpdatedAt ? new Date(homeQuery.dataUpdatedAt) : null,

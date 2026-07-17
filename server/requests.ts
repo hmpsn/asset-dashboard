@@ -11,11 +11,12 @@ import { parseJsonFallback } from './db/json-validation.js';
 import { getUploadRoot } from './data-dir.js';
 import { sanitizePlainText } from './html-sanitize.js';
 import { validateTransition, REQUEST_TRANSITIONS } from './state-machines.js';
+import { STUDIO_NAME } from './constants.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 
 export type { RequestPriority, RequestStatus, RequestCategory, RequestAttachment, RequestNote, ClientRequest } from '../shared/types/requests.ts';
-import type { RequestPriority, RequestStatus, RequestCategory, RequestAttachment, RequestNote, ClientRequest } from '../shared/types/requests.ts';
+import type { RequestPriority, RequestStatus, RequestCategory, RequestAttachment, RequestNote, ClientRequest, PendingRepliesSummary } from '../shared/types/requests.ts';
 
 // --- SQLite row shape ---
 
@@ -98,6 +99,32 @@ export function listRequests(workspaceId?: string): ClientRequest[] {
     rows = stmts().selectAll.all() as RequestRow[];
   }
   return rows.map(rowToRequest);
+}
+
+/**
+ * Returns the authoritative set of request threads whose newest message came
+ * from the client. A client-created thread with no notes is itself an
+ * unanswered client message; an operator-created thread is not.
+ */
+export function getPendingRepliesSummary(workspaceId: string): PendingRepliesSummary {
+  const pending = listRequests(workspaceId)
+    .flatMap((request) => {
+      if (request.status === 'completed' || request.status === 'closed') return [];
+      const lastNote = request.notes[request.notes.length - 1];
+      const waitingOnTeam = lastNote ? lastNote.author === 'client' : request.submittedBy !== STUDIO_NAME;
+      if (!waitingOnTeam) return [];
+      return [{
+        id: request.id,
+        newestAt: lastNote?.createdAt ?? request.createdAt,
+      }];
+    })
+    .sort((a, b) => b.newestAt.localeCompare(a.newestAt));
+
+  return {
+    count: pending.length,
+    requestIds: pending.map((request) => request.id),
+    newestAt: pending[0]?.newestAt ?? null,
+  };
 }
 
 export interface ListRequestsPagedResult {
