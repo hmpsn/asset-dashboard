@@ -476,7 +476,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
   ], [selectedKeys, toggleKey]);
 
-  const activeColumns = state.lens === 'opportunities' ? opportunityColumns : columns;
+  const activeColumns = state.columns === 'triage' ? opportunityColumns : columns;
 
   return (
     <div className="flex flex-col gap-2">

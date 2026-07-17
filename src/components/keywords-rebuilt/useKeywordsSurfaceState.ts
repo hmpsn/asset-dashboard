@@ -21,13 +21,13 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 export const KEYWORDS_SURFACE_LENSES = [
   { id: 'rankings', label: 'Rankings' },
-  { id: 'opportunities', label: 'Opportunities' },
-  { id: 'pages', label: 'Pages' },
-  { id: 'clusters', label: 'Clusters' },
   { id: 'lifecycle', label: 'Lifecycle' },
 ] as const;
 
 export type KeywordsSurfaceLens = typeof KEYWORDS_SURFACE_LENSES[number]['id'];
+export type KeywordColumnsMode = 'full' | 'triage';
+export type KeywordGroupBy = 'none' | 'page' | 'cluster';
+type LegacyKeywordsSurfaceLens = 'opportunities' | 'pages' | 'clusters';
 
 export const KEYWORDS_SURFACE_FILTERS = [
   { id: KEYWORD_COMMAND_CENTER_FILTERS.ALL, label: 'All' },
@@ -40,6 +40,7 @@ export const KEYWORDS_SURFACE_FILTERS = [
 ] as const satisfies ReadonlyArray<{ id: KeywordCommandCenterFilter; label: string }>;
 
 const LENS_VALUES = new Set<string>(KEYWORDS_SURFACE_LENSES.map((lens) => lens.id));
+const LEGACY_LENS_VALUES = new Set<LegacyKeywordsSurfaceLens>(['opportunities', 'pages', 'clusters']);
 const FILTER_VALUES = new Set<string>(Object.values(KEYWORD_COMMAND_CENTER_FILTERS));
 const SORT_VALUES = new Set<string>(KEYWORD_HUB_SORT_KEYS);
 
@@ -49,6 +50,8 @@ const DEFAULT_LENS: KeywordsSurfaceLens = 'rankings';
 // 'tab' for both silently dropped an inbound filter the moment the user switched lens
 // (review PR #1480).
 const LENS_PARAM = 'lens';
+const COLUMNS_PARAM = 'columns';
+const GROUP_PARAM = 'group';
 const DEFAULT_FILTER = KEYWORD_COMMAND_CENTER_FILTERS.ALL;
 const DEFAULT_SORT: KeywordHubSortState = { key: 'position', direction: 'asc' };
 const DEFAULT_PAGE = 1;
@@ -57,6 +60,10 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 function isKeywordsSurfaceLens(value: string | null | undefined): value is KeywordsSurfaceLens {
   return typeof value === 'string' && LENS_VALUES.has(value);
+}
+
+function isLegacyKeywordsSurfaceLens(value: string | null | undefined): value is LegacyKeywordsSurfaceLens {
+  return typeof value === 'string' && LEGACY_LENS_VALUES.has(value as LegacyKeywordsSurfaceLens);
 }
 
 function isKeywordHubSortKey(value: string | null | undefined): value is KeywordHubSortKey {
@@ -85,21 +92,38 @@ function filterFromParams(params: URLSearchParams): KeywordCommandCenterFilter {
 
 function lensFromParams(params: URLSearchParams): KeywordsSurfaceLens {
   const lensParam = params.get(LENS_PARAM);
-  return isKeywordsSurfaceLens(lensParam) ? lensParam : DEFAULT_LENS;
+  if (isKeywordsSurfaceLens(lensParam)) return lensParam;
+  if (isLegacyKeywordsSurfaceLens(lensParam)) return DEFAULT_LENS;
+  return DEFAULT_LENS;
+}
+
+function columnsFromParams(params: URLSearchParams): KeywordColumnsMode {
+  const explicit = params.get(COLUMNS_PARAM);
+  if (explicit === 'triage' || explicit === 'full') return explicit;
+  return params.get(LENS_PARAM) === 'opportunities' ? 'triage' : 'full';
+}
+
+function groupByFromParams(params: URLSearchParams): KeywordGroupBy {
+  const explicit = params.get(GROUP_PARAM);
+  if (explicit === 'page' || explicit === 'cluster' || explicit === 'none') return explicit;
+  const legacyLens = params.get(LENS_PARAM);
+  if (legacyLens === 'pages') return 'page';
+  if (legacyLens === 'clusters') return 'cluster';
+  return 'none';
 }
 
 function sortFromParams(params: URLSearchParams): KeywordHubSortState {
   const key = params.get('sort');
   const direction = params.get('direction');
-  const lensDefault = defaultSortForLens(lensFromParams(params));
+  const lensDefault = defaultSortForColumns(columnsFromParams(params));
   return {
     key: isKeywordHubSortKey(key) ? key : lensDefault.key,
     direction: isSortDirection(direction) ? direction : lensDefault.direction,
   };
 }
 
-function defaultSortForLens(lens: KeywordsSurfaceLens): KeywordHubSortState {
-  if (lens === 'opportunities') return { key: 'opportunity', direction: 'desc' };
+function defaultSortForColumns(columns: KeywordColumnsMode): KeywordHubSortState {
+  if (columns === 'triage') return { key: 'opportunity', direction: 'desc' };
   return DEFAULT_SORT;
 }
 
@@ -108,6 +132,10 @@ type ParamValue = string | number | null | undefined;
 export interface UseKeywordsSurfaceStateReturn {
   lens: KeywordsSurfaceLens;
   setLens: (lens: KeywordsSurfaceLens) => void;
+  columns: KeywordColumnsMode;
+  setColumns: (columns: KeywordColumnsMode) => void;
+  groupBy: KeywordGroupBy;
+  setGroupBy: (groupBy: KeywordGroupBy) => void;
   filter: KeywordCommandCenterFilter;
   setFilter: (filter: KeywordCommandCenterFilter) => void;
   searchInput: string;
@@ -135,6 +163,8 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   const debouncedSearchInput = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
 
   const lens = lensFromParams(searchParams);
+  const columns = columnsFromParams(searchParams);
+  const groupBy = groupByFromParams(searchParams);
   const filter = filterFromParams(searchParams);
   const sort = sortFromParams(searchParams);
   const page = positiveInt(searchParams.get('page'), DEFAULT_PAGE);
@@ -176,14 +206,37 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   }, []);
 
   const setLens = useCallback((nextLens: KeywordsSurfaceLens) => {
-    const nextSort = defaultSortForLens(nextLens);
+    const nextSort = nextLens === 'rankings' ? defaultSortForColumns(columns) : DEFAULT_SORT;
     updateParams({
       [LENS_PARAM]: nextLens,
+      [COLUMNS_PARAM]: columns === 'triage' ? columns : null,
+      [GROUP_PARAM]: groupBy === 'none' ? null : groupBy,
       sort: nextSort.key,
       direction: nextSort.direction,
       page: DEFAULT_PAGE,
     });
-  }, [updateParams]);
+  }, [columns, groupBy, updateParams]);
+
+  const setColumns = useCallback((nextColumns: KeywordColumnsMode) => {
+    const nextSort = defaultSortForColumns(nextColumns);
+    updateParams({
+      [LENS_PARAM]: DEFAULT_LENS,
+      [COLUMNS_PARAM]: nextColumns === 'full' ? null : nextColumns,
+      [GROUP_PARAM]: groupBy === 'none' ? null : groupBy,
+      sort: nextSort.key,
+      direction: nextSort.direction,
+      page: DEFAULT_PAGE,
+    });
+  }, [groupBy, updateParams]);
+
+  const setGroupBy = useCallback((nextGroupBy: KeywordGroupBy) => {
+    updateParams({
+      [LENS_PARAM]: DEFAULT_LENS,
+      [COLUMNS_PARAM]: columns === 'full' ? null : columns,
+      [GROUP_PARAM]: nextGroupBy === 'none' ? null : nextGroupBy,
+      page: DEFAULT_PAGE,
+    });
+  }, [columns, updateParams]);
 
   const setFilter = useCallback((nextFilter: KeywordCommandCenterFilter) => {
     updateParams({ filter: nextFilter, page: DEFAULT_PAGE });
@@ -241,6 +294,10 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
   return {
     lens,
     setLens,
+    columns,
+    setColumns,
+    groupBy,
+    setGroupBy,
     filter,
     setFilter,
     searchInput,

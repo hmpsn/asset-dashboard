@@ -21,26 +21,31 @@ Primary route: `/ws/:workspaceId/seo-keywords`
 
 ## Required Interaction Model
 
-The prototype is a unified Keywords surface with five operator lenses:
+The Wave 2 admin UX diet retires three top-level lens choices while preserving
+their capabilities and deep links. The unified Keywords surface has two
+operator lenses:
 
-1. `Rankings` — keyword rows with rank, change/trend intent, volume, and ranking page context.
-2. `Opportunities` — upside-focused rows with score, estimated gain, and a recommended fix.
-3. `Pages` — keyword groups by ranking page, with cannibalization risk called out.
-4. `Clusters` — topic-cluster grouping.
-5. `Lifecycle` — stage board for discovered, targeted, published, ranking, and winning keywords.
+1. `Rankings` — the row workbench. `Columns: Full | Triage` selects the wide or upside-focused column set; `Group by: None | Page | Cluster` changes the presentation over the same current rows.
+2. `Lifecycle` — the stage board for discovered, targeted, published, ranking, and winning keywords.
 
 Prototype-critical behavior:
 
 - The page opens as `Rankings` by default.
-- Lens switching is the primary view switcher, not a replacement for lifecycle/status filters.
+- Lens switching chooses table versus lifecycle board; Columns and Group by control table presentation without creating more destinations.
 - Search and filter controls stay above the working set.
 - Row, grouped-card, and board-card selection opens a keyword detail drawer.
 - The drawer shows rank, opportunity, difficulty, page/cluster context, lifecycle action, SERP/editor handoff, and local-intent handoff.
-- Client keyword feedback lives on the Keywords page with requested/declined/approved direction and an `Add to strategy` action.
+- Client keyword feedback lives above the working table with requested/declined/approved direction and an `Add to strategy` action.
 
 ## Current Parity Grade
 
 Visual status: `owner-approved`.
+
+Admin UX campaign amendment, 2026-07-17: the approved five-lens visual
+baseline remains historical evidence, but the live navigation contract is now
+the two-lens model above. No capability was removed: the retired lens ids are
+compatibility receivers for table columns/grouping, and the screenshots below
+remain useful evidence for those equivalent presentations.
 
 Source-led correction result, 2026-07-10:
 
@@ -53,9 +58,9 @@ Source-led correction result, 2026-07-10:
 
 Why:
 
-- The rebuilt pilot already implements all five prototype lenses with `LensSwitcher`.
-- `Rankings` and `Opportunities` use distinct table shapes, so the opportunity workflow is not just a re-sorted rankings grid.
-- `Pages`, `Clusters`, and `Lifecycle` use grouped/board layouts and open the same detail drawer from cards.
+- The rebuilt pilot exposes only `Rankings` and `Lifecycle` through `LensSwitcher`.
+- Rankings retains distinct Full and Triage table shapes; opportunity triage is a column preset rather than a destination.
+- Page and Cluster grouping are presentation controls over the current Rankings rows; Lifecycle remains a board. Grouped rows and board cards open the same detail drawer.
 - The detail drawer preserves the prototype's per-keyword open state while carrying production evidence: source, outcome, local visibility, live SERP, protection, pinning, hard delete, and all server-provided next actions.
 - The route preserves the existing Hub contracts: `?lens=`, `?filter=`, `?search=`, `?page=`, `?pageSize=`, `?sort=`, `?direction=`, legacy `?tab=` segment links, and `?q=` drawer deep links.
 - Component tests already prove flag-on shell mount, URL/deep-link behavior, drawer behavior, grouped lenses, bulk actions, feedback action, live invalidation, loading/error/locked states, no fabricated money, and the rebuilt a11y floor.
@@ -72,9 +77,11 @@ Intentional divergence from prototype:
 Current route/state behavior:
 
 - `/ws/:workspaceId/seo-keywords` opens `Rankings`.
-- `?lens=rankings|opportunities|pages|clusters|lifecycle` opens the matching rebuilt lens.
+- `?lens=rankings|lifecycle` opens the matching rebuilt lens.
+- Legacy receivers remain permanent compatibility inputs: `?lens=opportunities` → `Rankings + Columns:Triage`; `?lens=pages` → `Rankings + Group by:Page`; `?lens=clusters` → `Rankings + Group by:Cluster`.
+- Canonical presentation state uses `?columns=triage` (Full is omitted) and `?group=page|cluster` (None is omitted).
 - `?tab=` remains the cross-surface Hub segment/filter receiver. Legacy segment values are treated as filters, not lenses.
-- Switching `?lens=` preserves an inbound `?tab=` filter.
+- Switching a lens or table presentation preserves an inbound `?tab=` filter.
 - `?q=<keyword>` opens the keyword detail drawer on mount.
 - Closing the Drawer removes only `?q=`, preserves the other validated query state, releases body scroll, and restores focus to the originating row when that row still exists.
 - `filter`, `search`, `page`, `pageSize`, `sort`, and `direction` remain validated URL-backed row-query state.
@@ -168,9 +175,9 @@ Current branch coverage proves:
 - Legacy `?tab=` segment links are preserved as filters and survive lens switching.
 - `local_candidates` uses the rows path rather than the combined initial view.
 - Rows render provenance, local posture, opportunity, display-only money, display cap, and metric-window disclosure.
-- `Opportunities` has its own `Est. gain` and `Fix` shape.
+- Triage columns retain the `Est. gain` and `Fix` shape.
 - Sort, pagination, add keyword, advanced filters, select-visible, and client feedback actions work.
-- All five lenses render and keep the rebuilt a11y floor.
+- Rankings, all three legacy compatibility receivers, Full/Triage columns, Page/Cluster grouping, and Lifecycle render and keep the rebuilt a11y floor.
 - Detail drawer opens from row click and `?q=`, carries value/provenance/outcome/local/SERP context, and avoids old internal empty labels.
 - Pointer-opened Close, Escape, and successful-delete paths preserve the remaining query state and return focus to the originating row; nested checkbox/button controls do not trigger the row-focus capture.
 - Client feedback, metric-window disclosure, SERP proof, and local evidence carry styleguide typography-role assertions.

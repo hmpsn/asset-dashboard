@@ -387,6 +387,7 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
             workspaceInitials={workspaceInitials}
             workQueue={workQueue}
             requests={cockpit.requests}
+            pendingReplies={cockpit.pendingReplies}
             ranks={cockpit.ranks}
             kpis={cockpit.kpis}
             onOpenRoute={openRoute}

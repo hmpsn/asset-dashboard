@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 710** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 711** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 711. Requests reply spine and Keywords lens diet 2026-07-17
+
+**What it does:** Makes unanswered client request threads a server-owned workspace badge summary, ordered by newest client message. The same summary drives the labeled Requests rail badge, its collapsed Client-Facing group count, the Cockpit “From client” count/list, and the Requests landing choice. Request broadcasts invalidate that authority. Keywords now exposes only Rankings and Lifecycle as destinations: Full/Triage selects the table columns, None/Page/Cluster groups the same row set, all retired lens URLs remain compatibility receivers, and client feedback appears before the working table.
+
+**Why it matters:** Operators can see and enter human-waiting work without opening every inbox, and the count cannot drift between navigation and Cockpit. Keyword work becomes one stable dataset with presentation controls instead of five destination-like choices, while existing bookmarks and handoffs keep working.
+
+**Tests:** Workspace badge route shape/last-author ordering, request-event invalidation, Requests default/deep-link behavior, sidebar badge survival, Cockpit source consistency, nav-registry census, two-lens visibility, all three legacy lens mappings, URL/filter preservation, grouped/table/lifecycle rendering, feedback reachability, and rebuilt accessibility coverage.
+
+**Files:** request summary/types and workspace-badges route; request invalidation, rebuilt Requests/sidebar/Cockpit consumers and focused tests; `keywords-rebuilt` state/lenses/table/surface and its component test; Keywords parity contract; roadmap records.
 
 ---
 

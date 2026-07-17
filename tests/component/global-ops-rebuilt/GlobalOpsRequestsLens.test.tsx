@@ -1,9 +1,20 @@
 // @ds-rebuilt
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RequestsLens } from '../../../src/components/global-ops-rebuilt/RequestsLens';
 import { expectNoA11yViolations } from '../a11y';
+
+let pendingReplies = 0;
+vi.mock('../../../src/hooks/admin/useWorkspaceBadges', () => ({
+  useWorkspaceBadges: () => ({
+    data: {
+      pendingRequests: 0,
+      hasContent: false,
+      pendingReplies: { count: pendingReplies, requestIds: [], newestAt: null },
+    },
+  }),
+}));
 
 vi.mock('../../../src/components/admin/ClientDeliverablesPane', () => ({
   ClientDeliverablesPane: () => <div data-testid="deliverables-pane">Deliverables capability</div>,
@@ -27,6 +38,10 @@ function renderRequests(initialEntry = '/ws/ws-1/requests') {
 }
 
 describe('Global Ops Requests visual composition', () => {
+  beforeEach(() => {
+    pendingReplies = 0;
+  });
+
   it('uses the prototype-measured canvas and truthful client-return header', async () => {
     const { container } = renderRequests();
 
@@ -68,5 +83,17 @@ describe('Global Ops Requests visual composition', () => {
     renderRequests('/ws/ws-1/requests?tab=unknown');
     expect(screen.getByTestId('requests-rebuilt')).toHaveAttribute('data-active-tab', 'deliverables');
     expect(screen.getByTestId('requests-invalid-tab-fallback')).toBeInTheDocument();
+  });
+
+  it('lands on the unanswered client section while an explicit deep link still wins', () => {
+    pendingReplies = 2;
+    const result = renderRequests();
+    expect(screen.getByTestId('requests-rebuilt')).toHaveAttribute('data-active-tab', 'requests');
+    expect(screen.getAllByTestId('requests-pane')).toHaveLength(1);
+    result.unmount();
+
+    renderRequests('/ws/ws-1/requests?tab=deliverables');
+    expect(screen.getByTestId('requests-rebuilt')).toHaveAttribute('data-active-tab', 'deliverables');
+    expect(screen.getAllByTestId('deliverables-pane')).toHaveLength(1);
   });
 });
