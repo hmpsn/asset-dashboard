@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 687** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 708** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -9986,3 +9986,15 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Tests:** Engine sender labels, sticky positioning, URL update, focus, and existing scroll receiver; Search row cap, truthful expander, contained expansion, and full-set filter; Outcomes readback-before-form DOM order plus existing manual-record attribution behavior.
 
 **Files:** rebuilt Engine/Search surfaces and component tests; Outcome dashboard and record-work component test; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 708. Admin UX W1.2 command verbs and Cockpit section handoffs 2026-07-17
+
+**Status:** Complete under the amended section/lens routing contract; typed per-item identity remains deferred to `cockpit-handoff-per-item-deeplink`.
+
+**What changed:** The Command Palette now distinguishes navigation-only shortcuts with honest Open labels and exposes the journeys judge's ten operator verbs. Workspace actions remain visible with clear disabled reasons when workspace or linked-site context is absent. Site Audit and strategy refresh use the background-job platform; Webflow publish requires confirmation and reuses the shared publish API; PageSpeed reuses the existing bulk execution path. The workspace model has no fixture flag, so the palette documents and applies the narrow audited name predicate for `cascade-debug*`, `dbg*`, `Trigger Check WS`, and `Check Set WS`.
+
+Cockpit work-queue rows now route every classifier source type to its most specific existing receiver: Requests sections, Pipeline Intake/Briefs/Planner, Keywords Rankings, Site Audit Content Health, bare Site Audit, and Workspace Settings Connections. No identity is parsed from display metadata and no unsupported receiver parameter is invented.
+
+**Tests:** Command handlers are asserted exactly once with workspace/site payloads, disabled states, confirmation, and fixture filtering. Cockpit component coverage clicks a real row for all nine source types. The deep-link contract statically pins both sender and receiver halves for every `?tab=`, `?lens=`, and `?sub=` handoff.
+
+**Files:** `src/components/CommandPalette.tsx`; rebuilt Cockpit surface/work queue; focused Command Palette and Cockpit component tests; `tests/contract/tab-deep-link-wiring.test.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.

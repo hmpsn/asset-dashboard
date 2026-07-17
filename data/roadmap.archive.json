@@ -82,6 +82,28 @@
           "createdAt": "2026-07-16",
           "owner": "outcomes",
           "notes": "Completed W1.1: OutcomeDashboard now renders the active outcome readback immediately after the TabBar and places Record published work below it, preserving the form while removing the readback/data-entry hierarchy inversion. Existing tab deep-link and EmptyState contracts were untouched."
+        },
+        {
+          "id": "cockpit-handoff-item-identity",
+          "title": "Cockpit queue hops carry item identity (?lens=/?item= deep links, two-halves contract)",
+          "source": "2026-07-16 UX-flow audit §6",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "cockpit",
+          "notes": "section/lens routing shipped; per-item deep-link deferred to cockpit-handoff-per-item-deeplink"
+        },
+        {
+          "id": "command-palette-verbs",
+          "title": "⌘K: honesty relabel (Open …) + top-10 action verbs + hide debug workspaces",
+          "source": "2026-07-16 UX-flow audit §6",
+          "est": "M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "platform",
+          "notes": "Shipped honest Open labels, the D4 top-10 verbs with real workspace-aware handlers and disabled states, background-job dispatch for audit/strategy, confirmed Webflow publish, PageSpeed bulk dispatch, and documented debug-workspace filtering."
         }
       ],
       "shippedAt": "2026-07-17"

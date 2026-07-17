@@ -397,6 +397,44 @@ describe('?tab= deep-link wiring contract', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Cockpit work-queue section/lens/sub handoffs (W1.2 amended contract)
+// ---------------------------------------------------------------------------
+
+describe('Cockpit work-queue section handoff two-halves contract', () => {
+  const senderFile = join(SRC_DIR, 'components/cockpit-rebuilt/CockpitSurface.tsx');
+  const senderSource = readFileSync(senderFile, 'utf8'); // readFile-ok — intentional static analysis
+  const cases = [
+    { sourceType: 'request', route: "'requests')}?tab=requests", receiver: 'components/global-ops-rebuilt/useGlobalOpsSurfaceState.ts', read: "params.get('tab')", value: 'requests' },
+    { sourceType: 'work_order', route: "'content-pipeline')}?tab=intake", receiver: 'components/content-pipeline-rebuilt/useContentPipelineSurfaceState.ts', read: 'searchParams.get(TAB_PARAM)', value: 'intake' },
+    { sourceType: 'content_request', route: "'content-pipeline')}?tab=briefs", receiver: 'components/content-pipeline-rebuilt/useContentPipelineSurfaceState.ts', read: 'searchParams.get(TAB_PARAM)', value: 'briefs' },
+    { sourceType: 'content_pipeline', route: "'content-pipeline')}?tab=planner", receiver: 'components/content-pipeline-rebuilt/useContentPipelineSurfaceState.ts', read: 'searchParams.get(TAB_PARAM)', value: 'planner' },
+    { sourceType: 'rank_drop', route: "'seo-keywords')}?lens=rankings", receiver: 'components/keywords-rebuilt/useKeywordsSurfaceState.ts', read: 'params.get(LENS_PARAM)', value: 'rankings' },
+    { sourceType: 'content_decay', route: "'seo-audit')}?sub=content-decay", receiver: 'components/site-audit-rebuilt/useSiteAuditSurfaceState.ts', read: 'searchParams.get(SUB_PARAM)', value: 'content-decay' },
+    { sourceType: 'audit_error', route: "'seo-audit')", receiver: 'components/site-audit-rebuilt/SiteAuditSurface.tsx', read: null, value: null },
+    { sourceType: 'setup_gap', route: "'workspace-settings')}?tab=connections", receiver: 'components/global-ops-rebuilt/useGlobalOpsSurfaceState.ts', read: "params.get('tab')", value: 'connections' },
+    { sourceType: 'churn_signal', route: "'requests')}?tab=signals", receiver: 'components/global-ops-rebuilt/useGlobalOpsSurfaceState.ts', read: "params.get('tab')", value: 'signals' },
+  ] as const;
+
+  it.each(cases)('$sourceType sender targets the declared receiver section without display-text identity', ({ sourceType, route }) => {
+    const start = senderSource.indexOf(`case '${sourceType}':`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const block = senderSource.slice(start, start + 500);
+    expect(block).toContain(route);
+    expect(block).not.toContain('.meta');
+  });
+
+  it.each(cases)('$sourceType receiver consumes and recognizes the declared URL state', ({ receiver, read, value }) => {
+    const receiverSource = readFileSync(join(SRC_DIR, receiver), 'utf8'); // readFile-ok — intentional static analysis
+    if (read === null || value === null) {
+      expect(receiverSource.length).toBeGreaterThan(0);
+      return;
+    }
+    expect(receiverSource).toContain(read);
+    expect(receiverSource).toContain(`'${value}'`);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // ?post= deep-link wiring: ContentCalendar → ContentManager
 // ---------------------------------------------------------------------------
 

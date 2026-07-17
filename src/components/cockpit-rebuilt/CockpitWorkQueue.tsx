@@ -189,7 +189,7 @@ export function CockpitWorkQueue({
                       key={`${item.stream}-${item.id}`}
                       item={item}
                       clientInitials={clientInitials}
-                      actionLabel={item.sourceType === 'work_order' ? 'Open panel' : item.stream === 'send' ? 'Review' : 'Open'}
+                      actionLabel={item.stream === 'send' ? 'Review' : 'Open'}
                       onAction={() => onOpenItem(item)}
                     />
                   ))}

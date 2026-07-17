@@ -23,7 +23,6 @@ import { WeeklyAccomplishments } from '../workspace-home';
 import { CockpitActivityDrawer } from './CockpitActivityDrawer';
 import { CockpitDecisionBand } from './CockpitDecisionBand';
 import { CockpitEvidenceRail } from './CockpitEvidenceRail';
-import { CockpitWorkOrderDrawer } from './CockpitWorkOrderDrawer';
 import { CockpitWorkQueue, STREAM_META, toSelectableWorkStream } from './CockpitWorkQueue';
 import { formatDate } from './cockpitFormatters';
 import { mutationErrorMessage } from './cockpitMutationFeedback';
@@ -57,7 +56,6 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
   const cockpit = useCockpitRebuilt(workspaceId);
   const [now, setNow] = useState(() => new Date());
   const [activityOpen, setActivityOpen] = useState(false);
-  const [workOrdersOpen, setWorkOrdersOpen] = useState(false);
   const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
   const [checklistVisible, setChecklistVisible] = useState(() => !localStorage.getItem(storageKey));
 
@@ -155,29 +153,31 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
   const handleOpenQueueItem = (item: WorkQueueItem) => {
     switch (item.sourceType) {
       case 'request':
-      case 'churn_signal':
-        navigate(routes.requests);
+        navigate(`${adminPath(workspaceId, 'requests')}?tab=requests`); // inbox-legacy-filter-literal-ok -- admin Requests page deep-link, not client inbox
         return;
       case 'work_order':
-        setWorkOrdersOpen(true);
+        navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=intake`);
         return;
       case 'content_decay':
-        navigate(routes.contentHealth);
+        navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`);
         return;
       case 'content_request':
-        navigate(routes.contentBriefs);
+        navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=briefs`);
         return;
       case 'content_pipeline':
-        navigate(routes.contentBriefs);
+        navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=planner`);
         return;
       case 'rank_drop':
-        navigate(routes.keywords);
+        navigate(`${adminPath(workspaceId, 'seo-keywords')}?lens=rankings`);
         return;
       case 'audit_error':
-        navigate(routes.siteAudit);
+        navigate(adminPath(workspaceId, 'seo-audit'));
         return;
       case 'setup_gap':
-        navigate(routes.settings);
+        navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`);
+        return;
+      case 'churn_signal':
+        navigate(`${adminPath(workspaceId, 'requests')}?tab=signals`);
         return;
     }
   };
@@ -405,11 +405,6 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
         activity={cockpit.activity}
-      />
-      <CockpitWorkOrderDrawer
-        open={workOrdersOpen}
-        workspaceId={workspaceId}
-        onClose={() => setWorkOrdersOpen(false)}
       />
       </div>
     </PageContainer>
