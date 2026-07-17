@@ -10,7 +10,7 @@ import { type Workspace } from './WorkspaceSelector';
 import { adminPath, GLOBAL_TABS } from '../routes';
 import {
   NAV_REGISTRY, type NavEntry, type NavGroupKey,
-  resolveNavLabel, isNavEntryHidden,
+  resolveNavLabel, resolveRebuiltNavZoneLabel, isNavEntryHidden,
 } from '../lib/navRegistry';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -37,11 +37,10 @@ export function isPaletteNavEntryAvailable(entry: Pick<NavEntry, 'id'>, selected
   return GLOBAL_TABS.has(entry.id) || selectedWorkspace !== null;
 }
 
-// Palette-local presentation: maps each registry group key to the sub-text
-// header shown under a palette item. Item identity (label / needsSite /
-// description) comes from the nav registry — never hard-coded here.
-// nav-registry-ok — group display labels are presentation, not item metadata.
-const PALETTE_GROUP_LABELS: Record<NavGroupKey, string> = {
+// Legacy palette presentation stays byte-identical while the rebuilt shell is
+// OFF. Flag-ON group labels resolve through REBUILT_NAV_ZONES in navRegistry.
+// nav-registry-ok — this map is flag-OFF compatibility copy only.
+const LEGACY_PALETTE_GROUP_LABELS: Record<NavGroupKey, string> = {
   home: '',
   monitoring: 'Monitoring',
   'site-health': 'Site Health',
@@ -141,7 +140,9 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
       if (isNavEntryHidden(entry, flagResolver)) continue;
       if (!isPaletteNavEntryAvailable(entry, selectedWorkspace)) continue;
       const label = resolveNavLabel(entry, flagResolver);
-      const groupLabel = PALETTE_GROUP_LABELS[entry.group];
+      const groupLabel = rebuildShellEnabled
+        ? resolveRebuiltNavZoneLabel(entry.id)
+        : LEGACY_PALETTE_GROUP_LABELS[entry.group];
       result.push({
         id: `nav:${entry.id}`,
         label,

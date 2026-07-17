@@ -1645,14 +1645,6 @@ const ACTIONLESS_EMPTY_STATE_ALLOWLIST: readonly EmptyStateActionAllowance[] = [
   { file: 'src/components/site-audit-rebuilt/SiteAuditSurface.tsx', marker: 'title="Connect a Webflow site first"', reason: 'TODO-W1.3: add the Workspace Settings action.' },
 ];
 
-const REBUILT_SIDEBAR_LABEL_ALLOWLIST = new Set([
-  'home\u0000Cockpit',
-  'seo-strategy\u0000Insights Engine',
-  'seo-keywords\u0000Keywords',
-  'content-pipeline\u0000Content Pipeline',
-  'media\u0000Asset Manager',
-]);
-
 function normalizedRepoPath(file: string): string {
   const normalized = file.replaceAll('\\', '/');
   const srcIndex = normalized.lastIndexOf('/src/');
@@ -1734,8 +1726,7 @@ export const CHECKS: Check[] = [
     pathFilter: 'src/components/layout/',
     displayScope: 'src/components/layout/RebuiltSidebar.tsx GROUP_PRESENTATION items',
     message:
-      'RebuiltSidebar item labels must come from navRegistry. Only the five audited overrides scheduled ' +
-      'for deletion in W0.3 are temporarily allowlisted; W0.3 must delete that allowlist with the overrides. ' +
+      'RebuiltSidebar item labels must come from navRegistry. All item label overrides are banned. ' +
       'Add // rebuilt-nav-label-ok: <reason> inline or immediately above only for an owner-approved exception.',
     severity: 'error',
     excludeLines: ['rebuilt-nav-label-ok'],
@@ -1756,12 +1747,9 @@ export const CHECKS: Check[] = [
         const groupSource = content.slice(groupStart, groupEnd >= 0 ? groupEnd + 3 : content.length);
         const fileLines = content.split('\n');
         for (const match of groupSource.matchAll(itemOverrideRe)) {
-          const id = match[2];
-          const label = match[4];
           const absoluteIndex = groupStart + (match.index ?? 0);
           const lineIndex = content.slice(0, absoluteIndex).split('\n').length - 1;
           if (hasHatch(fileLines, lineIndex, 'rebuilt-nav-label-ok')) continue;
-          if (REBUILT_SIDEBAR_LABEL_ALLOWLIST.has(`${id}\u0000${label}`)) continue;
           hits.push({ file, line: lineIndex + 1, text: fileLines[lineIndex]?.trim() ?? match[0].trim() });
         }
       }

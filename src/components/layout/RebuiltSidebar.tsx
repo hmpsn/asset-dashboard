@@ -8,7 +8,9 @@ import { featureFlags } from '../../api/misc';
 import { GLOBAL_TABS, adminPath, type Page } from '../../routes';
 import {
   NAV_REGISTRY,
+  REBUILT_NAV_ZONES,
   type NavEntry,
+  type RebuiltNavZoneKey,
   isNavEntryHidden,
   resolveNavDescription,
   resolveNavLabel,
@@ -37,24 +39,13 @@ interface RebuiltNavGroup {
   items: RebuiltNavItem[];
 }
 
-type RebuiltNavPresentationKey =
-  | 'top'
-  | 'strategy-content'
-  | 'search-site-health'
-  | 'optimization'
-  | 'client-facing'
-  | 'admin';
-
-interface RebuiltNavSpec {
-  id: Page;
-  label?: string;
-}
+type RebuiltNavPresentationKey = RebuiltNavZoneKey;
 
 interface RebuiltNavGroupPresentation {
   key: RebuiltNavPresentationKey;
   label: string;
   accent: string;
-  items: RebuiltNavSpec[];
+  items: readonly Page[];
 }
 
 export interface RebuiltSidebarProps {
@@ -89,81 +80,28 @@ const EXTRA_REBUILT_NAV_ENTRIES: Partial<Record<Page, NavEntry>> = {
   },
 };
 
-// nav-registry-ok — rebuilt sidebar grouping is prototype presentation only;
-// route identity and descriptions still come from NAV_REGISTRY where possible.
-const GROUP_PRESENTATION: RebuiltNavGroupPresentation[] = [
-  {
-    key: 'top',
-    label: '',
-    accent: 'var(--teal)',
-    items: [
-      { id: 'home', label: 'Cockpit' },
-      { id: 'seo-strategy', label: 'Insights Engine' },
-    ],
-  },
-  {
-    key: 'strategy-content',
-    label: 'STRATEGY & CONTENT',
-    accent: 'var(--blue)',
-    items: [
-      { id: 'seo-keywords', label: 'Keywords' },
-      { id: 'competitors' },
-      { id: 'content-pipeline', label: 'Content Pipeline' },
-      { id: 'local-seo' },
-    ],
-  },
-  {
-    key: 'search-site-health',
-    label: 'SEARCH & SITE HEALTH',
-    accent: 'var(--cyan)',
-    items: [
-      { id: 'analytics-hub' },
-      { id: 'page-intelligence' },
-      { id: 'seo-audit' },
-      { id: 'performance' },
-      { id: 'links' },
-      { id: 'media', label: 'Asset Manager' },
-    ],
-  },
-  {
-    key: 'optimization',
-    label: 'OPTIMIZATION',
-    accent: 'var(--teal)',
-    items: [
-      { id: 'seo-editor' },
-      { id: 'seo-schema' },
-      { id: 'rewrite' },
-      { id: 'brand' },
-    ],
-  },
-  {
-    key: 'client-facing',
-    label: 'CLIENT-FACING',
-    accent: 'var(--brand-yellow)',
-    items: [
-      { id: 'outcomes' },
-      { id: 'requests' },
-    ],
-  },
-  {
-    key: 'admin',
-    label: 'ADMIN',
-    accent: 'var(--brand-text)',
-    items: [
-      { id: 'outcomes-overview' },
-      { id: 'prospect' },
-      { id: 'ai-usage' },
-      { id: 'roadmap' },
-      { id: 'features' },
-      { id: 'diagnostics' },
-    ],
-  },
-];
+const REBUILT_ZONE_ACCENT: Record<RebuiltNavZoneKey, string> = {
+  top: 'var(--teal)',
+  'strategy-content': 'var(--blue)',
+  'search-site-health': 'var(--cyan)',
+  optimization: 'var(--teal)',
+  'client-facing': 'var(--brand-yellow)',
+  admin: 'var(--brand-text)',
+};
+
+// nav-registry-ok — rebuilt route identity, ordering, and zone labels come
+// from navRegistry; only visual accents and uppercase styling remain local.
+const GROUP_PRESENTATION: RebuiltNavGroupPresentation[] = REBUILT_NAV_ZONES.map((zone) => ({
+  key: zone.key,
+  label: zone.label.toUpperCase(),
+  accent: REBUILT_ZONE_ACCENT[zone.key],
+  items: zone.items,
+}));
 
 function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): RebuiltNavGroup[] {
-  const entryToNavItem = (entry: NavEntry, spec: RebuiltNavSpec): RebuiltNavItem => ({
+  const entryToNavItem = (entry: NavEntry): RebuiltNavItem => ({
     id: entry.id,
-    label: spec.label ?? resolveNavLabel(entry, isFlagEnabled),
+    label: resolveNavLabel(entry, isFlagEnabled),
     icon: entry.icon,
     desc: resolveNavDescription(entry, isFlagEnabled),
     needsSite: entry.needsSite,
@@ -174,9 +112,9 @@ function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): Rebui
     key: presentation.key,
     label: presentation.label,
     accent: presentation.accent,
-    items: presentation.items.flatMap((spec) => {
-      const entry = NAV_ENTRY_BY_ID.get(spec.id) ?? EXTRA_REBUILT_NAV_ENTRIES[spec.id];
-      return entry ? [entryToNavItem(entry, spec)] : [];
+    items: presentation.items.flatMap((id) => {
+      const entry = NAV_ENTRY_BY_ID.get(id) ?? EXTRA_REBUILT_NAV_ENTRIES[id];
+      return entry ? [entryToNavItem(entry)] : [];
     }),
   }));
 }

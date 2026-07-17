@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { RebuiltBreadcrumb } from '../../../src/components/layout/RebuiltBreadcrumb';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
+import { STUDIO_NAME } from '../../../src/constants';
 import { expectNoA11yViolations } from '../a11y';
 
 const mockNavigate = vi.fn();
@@ -18,7 +19,7 @@ vi.mock('../../../src/api/misc', async () => {
   return {
     ...actual,
     featureFlags: {
-      list: () => Promise.resolve({}),
+      list: () => Promise.resolve({ 'ui-rebuild-shell': true }),
     },
   };
 });
@@ -55,10 +56,10 @@ describe('RebuiltBreadcrumb', () => {
     expect(screen.getAllByTestId('rebuilt-breadcrumb-separator').length).toBeGreaterThan(0);
   });
 
-  it('renders a ?tab= sub-segment when the current URL carries one', () => {
+  it('renders a ?tab= sub-segment when the current URL carries one', async () => {
     renderBreadcrumb('content-pipeline', '/ws/ws-1/content-pipeline?tab=briefs');
 
-    expect(screen.getByText('Pipeline')).toBeInTheDocument();
+    expect(await screen.findByText('Content Pipeline')).toBeInTheDocument();
     expect(screen.getByText('Briefs')).toBeInTheDocument();
   });
 
@@ -73,7 +74,7 @@ describe('RebuiltBreadcrumb', () => {
     expect(screen.getByText('Client Dashboard')).toHaveAttribute('aria-current', 'page');
   });
 
-  it('only renders Keyword Hub sub-segments the receiver actually honors', () => {
+  it('only renders Keywords sub-segments the receiver actually honors', async () => {
     const { unmount } = renderBreadcrumb('seo-keywords', '/ws/ws-1/seo-keywords?tab=striking_distance');
 
     expect(screen.getByText('Striking Distance')).toHaveAttribute('aria-current', 'page');
@@ -82,7 +83,18 @@ describe('RebuiltBreadcrumb', () => {
     renderBreadcrumb('seo-keywords', '/ws/ws-1/seo-keywords?tab=local_candidates');
 
     expect(screen.queryByText('Local Candidates')).not.toBeInTheDocument();
-    expect(screen.getByText('Keyword Hub')).toHaveAttribute('aria-current', 'page');
+    expect(await screen.findByText('Keywords')).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('updates document.title from the active flag-aware registry label', async () => {
+    const { unmount } = renderBreadcrumb('seo-strategy', '/ws/ws-1/seo-strategy');
+
+    await waitFor(() => expect(document.title).toBe(`Insights Engine — ${STUDIO_NAME}`));
+
+    unmount();
+    renderBreadcrumb('seo-keywords', '/ws/ws-1/seo-keywords');
+
+    await waitFor(() => expect(document.title).toBe(`Keywords — ${STUDIO_NAME}`));
   });
 
   it('navigates to the command center when the root crumb is clicked', async () => {
