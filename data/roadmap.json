@@ -18,28 +18,6 @@
           "notes": "Keep verdict-first opening; move work block after value frame; pair POV editor + trust-spine preview; collapse evidence sections; Operations stays last (V5). Owner sign-off required before build."
         },
         {
-          "id": "keywords-lens-diet",
-          "title": "Keywords: 5 lenses → 2 + Columns preset + Group-by; surface client feedback above the table",
-          "source": "2026-07-16 UX-flow audit §7",
-          "est": "M",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "keywords",
-          "notes": "Opportunities is already a column swap (KeywordsTable.tsx:480); Pages/Clusters become Group-by. Aligns with DEF-kw read-model deferrals."
-        },
-        {
-          "id": "requests-inbox-spine",
-          "title": "Requests: recency-first landing + pending-replies nav badge + labeled nav home",
-          "source": "2026-07-16 UX-flow audit §6; rebuild audit B6",
-          "est": "M",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "client-comms",
-          "notes": "Nothing currently tells the operator a client replied without opening the surface."
-        },
-        {
           "id": "ai-visibility-flag-on-home",
           "title": "AI Visibility: give the LLM-mention panel a rebuilt flag-ON home",
           "source": "2026-07-16 rebuild audit §6 item (carried)",

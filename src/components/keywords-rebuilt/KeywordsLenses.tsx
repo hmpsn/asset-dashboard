@@ -7,7 +7,7 @@ import type {
   KeywordCommandCenterSummaryResponse,
 } from '../../../shared/types/keyword-command-center';
 import { KEYWORD_LIFECYCLE_STAGES } from '../../../shared/types/keyword-command-center';
-import { Badge, BoardCard, BoardColumn, Button, ClickableRow, GroupBlock, InlineBanner, IntentTag, Skeleton } from '../ui';
+import { Badge, BoardCard, BoardColumn, Button, ClickableRow, GroupBlock, InlineBanner, IntentTag, Segmented, Skeleton, Toolbar } from '../ui';
 import type { KeywordIntent } from '../ui';
 import { KeywordsTable, type KeywordRowsQueryResult } from './KeywordsTable';
 import { KEYWORDS_SAY_IT_ALOUD } from './keywordVocabulary';
@@ -264,7 +264,7 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
   const rowsResult = initialRowsResult ?? ownedRowsResult;
   const rows = rowsResult.data?.rows ?? [];
 
-  // Pages/Clusters/Lifecycle group the CURRENT PAGE of rows, not the whole workspace.
+  // Page/Cluster grouping and Lifecycle group the CURRENT PAGE of rows, not the whole workspace.
   // Be honest when that is a subset — never present a page-1 board as the full universe
   // (review PR #1480). Full server-side grouping over all keywords is a tracked follow-up.
   // Use the FILTER/SEARCH-scoped total (pageInfo.totalRows) so "N more hidden" is correct
@@ -275,7 +275,7 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
   const truncationBanner = hiddenFromGroups > 0 ? (
     <InlineBanner tone="warning" title={`Grouped from the first ${rows.length} keywords`}>
       {hiddenFromGroups} more keywords are not shown here — these lenses group the current
-      page, not the full set. Use the Rankings lens to page through every keyword.
+      page, not the full set. Return to ungrouped rows to page through every keyword.
     </InlineBanner>
   ) : null;
 
@@ -302,24 +302,6 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
     );
   }
 
-  if (state.lens === 'pages') {
-    return (
-      <div className="flex flex-col gap-3">
-        {truncationBanner}
-        <GroupedLens groups={groupRowsByPage(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />
-      </div>
-    );
-  }
-
-  if (state.lens === 'clusters') {
-    return (
-      <div className="flex flex-col gap-3">
-        {truncationBanner}
-        <GroupedLens groups={groupRowsByCluster(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />
-      </div>
-    );
-  }
-
   if (state.lens === 'lifecycle') {
     return (
       <div className="flex flex-col gap-3">
@@ -329,12 +311,61 @@ export function KeywordsLenses({ workspaceId, state, summary, initialRowsResult 
     );
   }
 
+  const presentationControls = (
+    <Toolbar label="Keyword table presentation" className="w-full" gap={8}>
+      <span className="t-caption font-medium text-[var(--brand-text-muted)]">Columns</span>
+      <Segmented
+        id="keyword-columns"
+        options={[
+          { value: 'full', label: 'Full' },
+          { value: 'triage', label: 'Triage' },
+        ]}
+        value={state.columns}
+        onChange={(value) => state.setColumns(value as typeof state.columns)}
+      />
+      <span className="ml-2 t-caption font-medium text-[var(--brand-text-muted)]">Group by</span>
+      <Segmented
+        id="keyword-group-by"
+        options={[
+          { value: 'none', label: 'None' },
+          { value: 'page', label: 'Page' },
+          { value: 'cluster', label: 'Cluster' },
+        ]}
+        value={state.groupBy}
+        onChange={(value) => state.setGroupBy(value as typeof state.groupBy)}
+      />
+    </Toolbar>
+  );
+
+  if (state.groupBy === 'page') {
+    return (
+      <div className="flex flex-col gap-3">
+        {presentationControls}
+        {truncationBanner}
+        <GroupedLens groups={groupRowsByPage(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />
+      </div>
+    );
+  }
+
+  if (state.groupBy === 'cluster') {
+    return (
+      <div className="flex flex-col gap-3">
+        {presentationControls}
+        {truncationBanner}
+        <GroupedLens groups={groupRowsByCluster(rows, summary)} onOpen={(row) => state.openKeyword(row.keyword)} />
+      </div>
+    );
+  }
+
   return (
-    <KeywordsTable
-      workspaceId={workspaceId}
-      state={state}
-      summary={summary}
-      rowsResult={rowsResult}
-    />
+    <div className="flex flex-col gap-3">
+      {presentationControls}
+      <KeywordsTable
+        workspaceId={workspaceId}
+        state={state}
+        summary={summary}
+        rowsResult={rowsResult}
+      />
+    </div>
   );
 }
