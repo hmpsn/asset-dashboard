@@ -1,7 +1,9 @@
 // @ds-rebuilt
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWorkspaces } from '../../hooks/admin';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
+import { adminPath } from '../../routes';
 import {
   useAnalyzeInternalLinks,
   useInternalLinksSnapshot,
@@ -76,6 +78,7 @@ function LinkOutcomeFooter() {
 }
 
 export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const state = useLinksSurfaceState();
   const workspaces = useWorkspaces();
@@ -258,6 +261,12 @@ export function LinksSurface({ workspaceId }: LinksSurfaceProps) {
           icon={SurfaceIcon}
           title="Connect a Webflow site first"
           description="Links reads the workspace Webflow site before it can scan redirects, internal links, dead links, or architecture."
+          action={(
+            <Button size="sm" variant="primary" onClick={() => navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`)}>
+              <Icon name="settings" size="sm" />
+              Open Workspace Settings
+            </Button>
+          )}
         />
       </div>
     );

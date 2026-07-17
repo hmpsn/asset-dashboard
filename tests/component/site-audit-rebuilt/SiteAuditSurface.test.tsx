@@ -552,6 +552,18 @@ describe('SiteAuditSurface rebuilt', () => {
     expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=content-health');
   });
 
+  it('opens Workspace Settings Connections from the no-site setup state', async () => {
+    const audit = makeAuditState();
+    mockUseSiteAuditRebuilt.mockReturnValue({ ...audit, siteId: '' });
+    renderSurface();
+
+    expect(await screen.findByText('Connect a Webflow site first')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/workspace-settings');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=connections');
+  });
+
   it('keeps internal rebuild and migration language out of the visible audit shell', async () => {
     const { container } = renderSurface('/ws/ws-1/seo-audit?sub=audit');
     expect(await screen.findByTestId('site-audit-rebuilt-audit')).toBeInTheDocument();

@@ -191,6 +191,16 @@ function AdminApp() {
   return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /></div>;
 }
 
+const LAST_VISITED_WORKSPACE_KEY = 'admin-last-visited-workspace';
+
+function readLastVisitedWorkspaceId(): string | null {
+  try {
+    return localStorage.getItem(LAST_VISITED_WORKSPACE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 // Exported for component tests that exercise the real admin routing logic.
 export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
   const location = useLocation();
@@ -219,6 +229,7 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const clearFixContext = useCallback(() => setFixContext(null), []);
   const [rewritePageUrl, setRewritePageUrl] = useState<string | null>(null);
   const [focusMode, setFocusMode] = useState(false);
+  const [lastVisitedWorkspaceId, setLastVisitedWorkspaceId] = useState<string | null>(readLastVisitedWorkspaceId);
   // Derived synchronously — prevents layout flash when navigating away (useEffect runs after paint)
   const effectiveFocusMode = focusMode && tab === 'rewrite';
   const rebuiltSurfaceActive = rebuildShellEnabled && REBUILT_SURFACES[tab] !== undefined;
@@ -277,11 +288,24 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (!urlWorkspaceId) return null;
     return workspaces.find(w => w.id === urlWorkspaceId) || null;
   }, [urlWorkspaceId, workspaces]);
+
+  useEffect(() => {
+    if (!selected || selected.id === lastVisitedWorkspaceId) return;
+    setLastVisitedWorkspaceId(selected.id);
+    try {
+      localStorage.setItem(LAST_VISITED_WORKSPACE_KEY, selected.id);
+    } catch {
+      /* localStorage unavailable — last-visited workspace stays in-memory only */
+    }
+  }, [lastVisitedWorkspaceId, selected]);
+
   const chromeWorkspace = useMemo(() => {
     if (selected) return selected;
-    if (GLOBAL_TABS.has(tab)) return workspaces[0] ?? null;
+    if (GLOBAL_TABS.has(tab) && lastVisitedWorkspaceId) {
+      return workspaces.find(workspace => workspace.id === lastVisitedWorkspaceId) ?? null;
+    }
     return null;
-  }, [selected, tab, workspaces]);
+  }, [lastVisitedWorkspaceId, selected, tab, workspaces]);
 
   // Rewrite tab is always a full-height two-pane layout (independent scroll per pane).
   // Focus mode additionally hides the sidebar, but height containment is needed in both modes.

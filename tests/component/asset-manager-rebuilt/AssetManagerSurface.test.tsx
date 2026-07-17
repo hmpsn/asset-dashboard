@@ -161,7 +161,12 @@ function renderSurface(initialEntry = '/ws/ws-1/media') {
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location-search" hidden>{location.search}</span>;
+  return (
+    <>
+      <span data-testid="location-pathname" hidden>{location.pathname}</span>
+      <span data-testid="location-search" hidden>{location.search}</span>
+    </>
+  );
 }
 
 function metricTile(label: string): HTMLElement {
@@ -533,6 +538,9 @@ describe('AssetManagerSurface', () => {
     renderSurface('/ws/ws-1/media');
 
     expect(await screen.findByText('Link a Webflow site')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/workspace-settings');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=connections');
   });
 
   it('passes the rebuilt a11y floor for the loaded browse view', async () => {
