@@ -1,7 +1,8 @@
 // @ds-rebuilt
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { cn } from '../../lib/utils';
 import { SEO_EDITOR_TARGET_TYPES } from '../../../shared/types/seo-editor-write-target';
+import { useToast } from '../Toast';
 import {
   Button,
   Checkbox,
@@ -184,10 +185,23 @@ export function SeoEditorWorksheet({
   onOpenPage,
   onClearFilters,
 }: SeoEditorWorksheetProps) {
+  const { toast } = useToast();
   const records = useMemo(() => sourceOrderedRecords(rows), [rows]);
   const staticSelectedCount = staticWorkflow.approvalSelected.size;
   const cmsSelectedCount = cmsWorkflow.approvalSelected.size;
   const selectedCount = staticSelectedCount + cmsSelectedCount;
+
+  useEffect(() => {
+    if (cmsWorkflow.approvalError) {
+      toast(cmsWorkflow.approvalError.message, 'error');
+    }
+  }, [cmsWorkflow.approvalError, toast]);
+
+  useEffect(() => {
+    if (cmsWorkflow.approvalSent) {
+      toast('CMS changes sent to client', 'success');
+    }
+  }, [cmsWorkflow.approvalSent, toast]);
 
   const visibleIds = useMemo(() => ({
     static: rows.flatMap((row) => (
