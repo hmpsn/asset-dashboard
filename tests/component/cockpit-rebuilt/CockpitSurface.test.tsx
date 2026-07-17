@@ -201,6 +201,11 @@ function makeCockpitState(overrides: Partial<UseCockpitRebuiltResult> = {}): Use
     requests: [
       { id: 'req-1', title: 'Can we review July posts?', status: 'open', category: 'content', createdAt: '2026-07-04T12:00:00.000Z' },
     ],
+    pendingReplies: {
+      count: 1,
+      requestIds: ['req-1'],
+      newestAt: '2026-07-04T12:00:00.000Z',
+    },
     activity: [
       { id: 'activity-1', type: 'content_published', title: 'Published July article', createdAt: '2026-07-06T12:00:00.000Z' },
     ],
@@ -468,6 +473,14 @@ describe('CockpitSurface rebuilt', () => {
     const weekly = screen.getByTestId('weekly-accomplishments');
 
     expect(coreGrid.compareDocumentPosition(weekly) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('uses the workspace-badges pending-reply authority for the From client rail count', async () => {
+    renderSurface();
+
+    expect(await screen.findByTestId('pending-replies-count')).toHaveTextContent('1');
+    const rail = screen.getByTestId('cockpit-evidence-rail');
+    expect(within(rail).getByText('Can we review July posts?')).toBeInTheDocument();
   });
 
   it.each<[WorkQueueSourceType, string]>([

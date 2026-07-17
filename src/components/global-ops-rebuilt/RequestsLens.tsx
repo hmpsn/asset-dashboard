@@ -13,6 +13,7 @@ import {
   useRovingTabindex,
 } from '../ui';
 import { REQUESTS_TABS, useRequestsTabState, type RequestsTab } from './useGlobalOpsSurfaceState';
+import { useWorkspaceBadges } from '../../hooks/admin/useWorkspaceBadges';
 
 interface RequestsLensProps {
   workspaceId?: string;
@@ -94,7 +95,9 @@ function RequestsModeTray({ value, onChange }: { value: RequestsTab; onChange: (
 }
 
 export function RequestsLens({ workspaceId }: RequestsLensProps) {
-  const state = useRequestsTabState();
+  const badgesQuery = useWorkspaceBadges(workspaceId);
+  const defaultTab: RequestsTab = (badgesQuery.data?.pendingReplies?.count ?? 0) > 0 ? 'requests' : 'deliverables';
+  const state = useRequestsTabState(defaultTab);
 
   if (!workspaceId) {
     return (
@@ -138,7 +141,7 @@ export function RequestsLens({ workspaceId }: RequestsLensProps) {
           <InlineBanner
             tone="warning"
             title="Unknown Requests tab"
-            message="The requested tab is not active, so Requests opened Deliverables."
+            message={`The requested tab is not active, so Requests opened ${TAB_LABELS[defaultTab]}.`}
             data-testid="requests-invalid-tab-fallback"
           />
         </div>

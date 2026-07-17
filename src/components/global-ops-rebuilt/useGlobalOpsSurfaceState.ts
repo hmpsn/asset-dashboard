@@ -67,14 +67,14 @@ export function useWorkspaceSettingsTabState() {
   };
 }
 
-export function useRequestsTabState() {
+export function useRequestsTabState(defaultTab: RequestsTab = 'deliverables') {
   const [params] = useSearchParams();
   const writeParam = useParamWriter();
   const tabParam = params.get('tab');
-  const tab = inList(tabParam, REQUESTS_TABS) ? tabParam : 'deliverables';
+  const tab = inList(tabParam, REQUESTS_TABS) ? tabParam : defaultTab;
   const setTab = useCallback((next: RequestsTab) => {
-    writeParam('tab', next === 'deliverables' ? null : next);
-  }, [writeParam]);
+    writeParam('tab', next === defaultTab ? null : next);
+  }, [defaultTab, writeParam]);
   return {
     tab,
     invalidTab: params.has('tab') && !inList(tabParam, REQUESTS_TABS),

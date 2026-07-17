@@ -17,6 +17,7 @@ import {
 } from '../../lib/navRegistry';
 import { queryKeys } from '../../lib/queryKeys';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
+import { useWorkspaceBadges } from '../../hooks/admin/useWorkspaceBadges';
 import { FEATURE_FLAGS, type FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { WorkspaceSelector, type Workspace } from '../WorkspaceSelector';
 import { NotificationBell } from '../NotificationBell';
@@ -150,6 +151,7 @@ export function RebuiltSidebar({
   onNavigate,
 }: RebuiltSidebarProps) {
   const navigate = useNavigate();
+  const badgesQuery = useWorkspaceBadges(selected?.id);
   const { data: flagValues } = useQuery({
     queryKey: queryKeys.shared.featureFlags(),
     queryFn: featureFlags.list,
@@ -158,6 +160,15 @@ export function RebuiltSidebar({
   });
   const isFlagEnabled = (flag: FeatureFlagKey) => flagValues?.[flag] ?? FEATURE_FLAGS[flag];
   const navGroups = useMemo(() => buildNavGroups(isFlagEnabled), [flagValues]);
+  const pendingReplies = badgesQuery.data?.pendingReplies?.count ?? 0;
+  const badgeForItem = (itemId: Page): number | undefined => {
+    const count = itemId === 'content-pipeline'
+      ? pendingContentRequests
+      : itemId === 'requests'
+        ? pendingReplies
+        : 0;
+    return count > 0 ? count : undefined;
+  };
 
   const [collapsedGroups, toggleGroup, setCollapsedGroups] = useToggleSet<string>(
     readCollapsedGroups,
@@ -335,11 +346,9 @@ export function RebuiltSidebar({
             rail={rail}
             collapsed={group.collapsed}
             onToggleCollapse={group.label ? () => toggleGroup(group.label) : undefined}
-            // When collapsed, the content-pipeline item (which carries the pending badge) is
-            // hidden, so surface the count on the group header instead — parity with legacy
-            // Sidebar's collapsed-group badge (review PR #1478). Expanded → the item shows it.
-            badge={group.collapsed && pendingContentRequests > 0 && group.items.some((item) => item.id === 'content-pipeline')
-              ? pendingContentRequests
+            // Preserve every hidden item count on its collapsed group header.
+            badge={group.collapsed
+              ? group.items.reduce((sum, item) => sum + (badgeForItem(item.id) ?? 0), 0) || undefined
               : undefined}
             style={{ marginTop: group.label ? 8 : 0 }}
           >
@@ -358,7 +367,7 @@ export function RebuiltSidebar({
                   collapsed={rail}
                   active={active}
                   disabled={disabled}
-                  badge={item.id === 'content-pipeline' && pendingContentRequests > 0 ? pendingContentRequests : undefined}
+                  badge={badgeForItem(item.id)}
                   accent={group.accent}
                   title={disabled ? disabledTitle : item.desc}
                   onClick={() => activateItem(item)}
