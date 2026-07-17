@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, relative } from 'path';
 import { describe, it, expect } from 'vitest';
+import { NAV_REGISTRY_BY_ID, resolveNavLabel } from '../../src/lib/navRegistry';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -453,6 +454,14 @@ describe('?post= deep-link wiring (ContentCalendar → ContentManager)', () => {
 
 describe('?tab=/?filter= deep-link wiring (rebuilt Asset Manager `media`)', () => {
   const stateHookFile = join(SRC_DIR, 'components/asset-manager-rebuilt/useAssetManagerSurfaceState.ts');
+
+  it('resolves the rebuilt deep-link destination label from navRegistry', () => {
+    const label = resolveNavLabel(
+      NAV_REGISTRY_BY_ID.media,
+      (flag) => flag === 'ui-rebuild-shell',
+    );
+    expect(label).toBe('Asset Manager');
+  });
 
   it('asset-manager surface state hook file exists', () => {
     expect(existsSync(stateHookFile)).toBe(true);

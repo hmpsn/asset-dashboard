@@ -10,6 +10,7 @@ import { KEYWORD_LIFECYCLE_STAGES } from '../../../shared/types/keyword-command-
 import { Badge, BoardCard, BoardColumn, Button, ClickableRow, GroupBlock, InlineBanner, IntentTag, Skeleton } from '../ui';
 import type { KeywordIntent } from '../ui';
 import { KeywordsTable, type KeywordRowsQueryResult } from './KeywordsTable';
+import { KEYWORDS_SAY_IT_ALOUD } from './keywordVocabulary';
 import type { UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
 
 interface KeywordsLensesProps {
@@ -138,7 +139,7 @@ function groupRowsByCluster(rows: KeywordCommandCenterRow[], summary?: KeywordCo
 
   const stillUncategorized = uncategorized.filter((row) => !row.assignment?.topicCluster);
   if (stillUncategorized.length > 0) {
-    groups.push({ id: 'uncategorized', title: 'Unclustered keywords', rows: stillUncategorized });
+    groups.push({ id: 'uncategorized', title: KEYWORDS_SAY_IT_ALOUD.unclustered, rows: stillUncategorized });
   }
 
   return groups;

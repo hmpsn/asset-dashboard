@@ -35,7 +35,7 @@ vi.mock('../../../src/components/AeoReview', () => ({
   default: () => <div data-testid="site-audit-aeo-view">AI Search Ready</div>,
 }));
 vi.mock('../../../src/components/ContentDecay', () => ({
-  default: () => <div data-testid="site-audit-content-decay-view">Content Health diagnostic</div>,
+  default: () => <div data-testid="site-audit-content-decay-view">Decaying pages diagnostic</div>,
 }));
 vi.mock('../../../src/components/audit/ActionItemsPanel', () => ({
   ActionItemsPanel: () => <div data-testid="site-audit-actions-panel" />,
@@ -291,7 +291,7 @@ describe('SiteAuditSurface rebuilt', () => {
 
   it.each([
     ['/ws/ws-1/seo-audit?sub=aeo-review', 'AI Search Ready', 'site-audit-aeo-view'],
-    ['/ws/ws-1/seo-audit?sub=content-decay', 'Content Health', 'site-audit-content-decay-view'],
+    ['/ws/ws-1/seo-audit?sub=content-decay', 'Decaying pages', 'site-audit-content-decay-view'],
     ['/ws/ws-1/seo-audit?sub=guide', 'Audit Guide', 'site-audit-guide-view'],
   ])('opens the in-flow %s receiver for compatibility deep link %s', async (entry, summary, testId) => {
     renderSurface(entry);
@@ -351,7 +351,7 @@ describe('SiteAuditSurface rebuilt', () => {
     expect(screen.getByTestId('location-search')).toHaveTextContent('');
     expect(auditModeSwitcher().getAllByRole('radio')).toHaveLength(2);
     expect(auditModeSwitcher().getByRole('radio', { name: /Site Audit/ })).toHaveAttribute('aria-checked', 'true');
-    expect(auditModeSwitcher().queryByRole('radio', { name: /AI Search Ready|Content Health|Guide/ })).not.toBeInTheDocument();
+    expect(auditModeSwitcher().queryByRole('radio', { name: /AI Search Ready|Decaying pages|Guide/ })).not.toBeInTheDocument();
 
     fireEvent.click(auditModeSwitcher().getByRole('radio', { name: /History/ }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('?sub=history');
@@ -540,6 +540,16 @@ describe('SiteAuditSurface rebuilt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review missing alt text' }));
     expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/media');
     expect(screen.getByTestId('location-search')).toHaveTextContent('?filter=missing-alt');
+  });
+
+  it('hands decaying pages to the canonical Content Health tab', async () => {
+    renderSurface('/ws/ws-1/seo-audit?sub=content-decay');
+
+    expect(await screen.findByText('Decaying pages')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View in Content Pipeline' }));
+
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/content-pipeline');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=content-health');
   });
 
   it('keeps internal rebuild and migration language out of the visible audit shell', async () => {

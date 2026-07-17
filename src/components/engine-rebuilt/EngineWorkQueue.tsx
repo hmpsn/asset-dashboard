@@ -54,17 +54,17 @@ const STREAM_META: Record<WorkQueueStream, {
     color: 'var(--teal)',
   },
   money: {
-    label: 'Money',
-    description: 'Value and pricing work with real provenance.',
-    groupTitle: 'Money queue',
+    label: 'Growth',
+    description: 'Upsell and value-proof work backed by measured results.',
+    groupTitle: 'Growth queue',
     icon: Trophy,
     iconName: 'trophy',
     color: 'var(--amber)',
   },
   unclassified: {
-    label: 'Risk',
-    description: 'Client signals and uncategorized attention.',
-    groupTitle: 'Risk and unclassified',
+    label: 'Needs triage',
+    description: 'Client signals and anything not yet sorted',
+    groupTitle: 'Needs triage',
     icon: Bell,
     iconName: 'bell',
     color: 'var(--brand-text-muted)',
@@ -170,7 +170,7 @@ export function EngineWorkQueue({
 
       <div className="flex flex-wrap items-center gap-2" aria-label="Engine queue filters">
         <FilterChip label="All" active={stream === 'all'} count={workQueue.items.length} onClick={() => onStreamChange('all')} />
-        <FilterChip label="Risk" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
+        <FilterChip label="Needs triage" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
         {sourceTypes.map((sourceType) => (
           <FilterChip
             key={sourceType}
@@ -190,7 +190,7 @@ export function EngineWorkQueue({
               <GroupBlock
                 key={streamId}
                 title={meta.groupTitle}
-                meta={`${rows.length} item${rows.length === 1 ? '' : 's'}`}
+                meta={meta.description}
                 icon={meta.icon}
                 iconColor={meta.color}
                 stats={[{ label: 'stream', value: workQueue.streams[streamId], color: meta.color }]}

@@ -29,6 +29,7 @@ import { actionVariant, localPriorityTone } from '../keyword-command-center/kccD
 import { LocalSeoVisibilityBadge } from '../local-seo/LocalSeoVisibilityPanel';
 import { serpBadges } from '../shared/serpFeatureBadges';
 import { mutationErrorMessage } from './keywordMutationFeedback';
+import { KeywordLifecycleBadge } from './keywordVocabulary';
 import {
   Badge,
   Button,
@@ -280,7 +281,7 @@ export function KeywordDrawer({ workspaceId, keyword, onClose }: KeywordDrawerPr
         ) : (
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={row.lifecycleStatus} domain="keyword-command-center" variant="soft" shape="pill" />
+              <KeywordLifecycleBadge status={row.lifecycleStatus} variant="soft" shape="pill" />
               {asIntent(row.metrics.intent) && <IntentTag intent={asIntent(row.metrics.intent)!} />}
               {row.isProtected && <Badge label="Protected" tone="amber" variant="soft" shape="pill" />}
               {row.isLostVisibility && <Badge label="Lost visibility" tone="amber" variant="outline" shape="pill" />}

@@ -17,7 +17,14 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, it, expect } from 'vitest';
-import { NAV_REGISTRY, NAV_REGISTRY_BY_ID, NON_REGISTRY_PAGES } from '../../src/lib/navRegistry';
+import {
+  NAV_REGISTRY,
+  NAV_REGISTRY_BY_ID,
+  NON_REGISTRY_PAGES,
+  REBUILT_NAV_ZONES,
+  resolveNavLabel,
+  resolveRebuiltNavZoneLabel,
+} from '../../src/lib/navRegistry';
 import type { Page } from '../../src/routes';
 
 const ROOT = join(__dirname, '../..');
@@ -104,6 +111,29 @@ describe('navRegistry completeness', () => {
       expect(entry.label.length).toBeGreaterThan(0);
       expect(entry.description.length).toBeGreaterThan(0);
     }
+  });
+
+  it('keeps legacy labels flag-OFF and resolves the D2 sidebar winners flag-ON', () => {
+    const expected = [
+      ['seo-strategy', 'Strategy', 'Insights Engine'],
+      ['seo-keywords', 'Keyword Hub', 'Keywords'],
+      ['media', 'Assets', 'Asset Manager'],
+      ['content-pipeline', 'Pipeline', 'Content Pipeline'],
+    ] as const;
+
+    for (const [id, legacyLabel, rebuiltLabel] of expected) {
+      const entry = NAV_REGISTRY_BY_ID[id];
+      expect(resolveNavLabel(entry, () => false)).toBe(legacyLabel);
+      expect(resolveNavLabel(entry, (flag) => flag === 'ui-rebuild-shell')).toBe(rebuiltLabel);
+    }
+  });
+
+  it('keeps rebuilt zone labels and destination membership in the registry', () => {
+    const zoneIds = REBUILT_NAV_ZONES.flatMap((zone) => zone.items);
+    expect(new Set(zoneIds).size).toBe(zoneIds.length);
+    expect(resolveRebuiltNavZoneLabel('seo-keywords')).toBe('Strategy & Content');
+    expect(resolveRebuiltNavZoneLabel('media')).toBe('Search & Site Health');
+    expect(resolveRebuiltNavZoneLabel('outcomes')).toBe('Client-Facing');
   });
 
   it('drift fixes: diagnostics is registered, workspace-scoped, and needs no site', () => {

@@ -663,6 +663,11 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
   it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toContain('Opportunity');
+    expect(headers).toContain('$/mo');
+    expect(headers).not.toContain('Opp');
+    expect(headers).not.toContain('$');
     expect(screen.getByText('cosmetic dentistry')).toBeInTheDocument();
     expect(screen.getByText('Commercial')).toBeInTheDocument();
     expect(screen.getByText('#6')).toBeInTheDocument();

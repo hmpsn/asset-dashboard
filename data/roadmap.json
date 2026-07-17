@@ -95,17 +95,6 @@
           "notes": "Copy the Competitors teach-with-CTA pattern; TrafficLens etc. name destinations without linking them."
         },
         {
-          "id": "nav-naming-closure",
-          "title": "One name per destination: owner picks per contested pair; move sidebar overrides into navRegistry",
-          "source": "2026-07-16 UX-flow audit §5 budget 6; rebuild audit B6",
-          "est": "S",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "platform",
-          "notes": "Insights Engine vs Strategy; Keywords vs Keyword Hub; Asset Manager vs Assets; palette groups follow registry."
-        },
-        {
           "id": "requests-inbox-spine",
           "title": "Requests: recency-first landing + pending-replies nav badge + labeled nav home",
           "source": "2026-07-16 UX-flow audit §6; rebuild audit B6",
@@ -148,17 +137,6 @@
           "createdAt": "2026-07-16",
           "owner": "platform",
           "notes": "Verb dispatch list in the audit verdicts JSON."
-        },
-        {
-          "id": "vocabulary-say-it-aloud-pass",
-          "title": "Dense-trio vocabulary pass (Backing moves live → Moves in progress, etc.) via ui-vocabulary + lexicon",
-          "source": "2026-07-16 UX-flow audit §5 budget 8",
-          "est": "S",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "platform",
-          "notes": "Replacement list in verdicts; register in the same commit per lexicon rule."
         },
         {
           "id": "ai-visibility-flag-on-home",

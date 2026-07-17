@@ -428,6 +428,108 @@ const CANONICAL: readonly LexiconEntry[] = [
     definition: 'Canonical registry of workspace-scoped WebSocket event name constants.',
     declarationSites: ['server/ws-events.ts'],
   },
+  {
+    term: '$/mo',
+    wordClass: 'canonical',
+    definition: 'Plain-language Keywords table heading for measured monthly dollar value.',
+    declarationSites: ['src/components/keywords-rebuilt/keywordVocabulary.tsx'],
+  },
+  {
+    term: 'Add to client update',
+    wordClass: 'canonical',
+    definition: 'Operator action that adds a recommendation to the next client update.',
+    declarationSites: ['docs/workflows/ui-vocabulary.md'],
+  },
+  {
+    term: 'Asset Manager',
+    wordClass: 'canonical',
+    definition: 'Rebuilt-shell destination for images, alt text, and media optimization.',
+    declarationSites: ['src/lib/navRegistry.tsx'],
+  },
+  {
+    term: 'Content Pipeline',
+    wordClass: 'canonical',
+    definition: 'Rebuilt-shell destination for content planning, production, and publishing.',
+    declarationSites: ['src/lib/navRegistry.tsx'],
+  },
+  {
+    term: 'Decaying pages',
+    wordClass: 'canonical',
+    definition: 'Plain-language Site Audit label for pages whose content performance is declining.',
+    declarationSites: ['docs/workflows/ui-vocabulary.md'],
+  },
+  {
+    term: 'Growth',
+    wordClass: 'canonical',
+    definition: 'Engine work stream for upsell and value-proof work backed by measured results.',
+    declarationSites: ['src/components/engine-rebuilt/EngineWorkQueue.tsx'],
+  },
+  {
+    term: 'Insights Engine',
+    wordClass: 'canonical',
+    definition: 'Rebuilt-shell destination for operator strategy, recommendations, and evidence.',
+    declarationSites: ['src/lib/navRegistry.tsx'],
+  },
+  {
+    term: 'Keywords',
+    wordClass: 'canonical',
+    definition: 'Rebuilt-shell destination for keyword lifecycle, rankings, and handoffs.',
+    declarationSites: ['src/lib/navRegistry.tsx'],
+  },
+  {
+    term: 'measuring',
+    wordClass: 'canonical',
+    definition: 'Badge label used while value proof has not yet been measured.',
+    declarationSites: ['src/components/engine-rebuilt/EngineSurface.tsx'],
+  },
+  {
+    term: 'Moves in progress',
+    wordClass: 'canonical',
+    definition: 'Plain-language label for recommendations currently backing a client update.',
+    declarationSites: ['src/components/engine-rebuilt/EngineSurface.tsx'],
+  },
+  {
+    term: 'Needs triage',
+    wordClass: 'canonical',
+    definition: 'Engine stream for client signals and work not yet sorted.',
+    declarationSites: ['src/components/engine-rebuilt/EngineWorkQueue.tsx'],
+  },
+  {
+    term: 'No moves added',
+    wordClass: 'canonical',
+    definition: 'Empty-state helper shown when a client update has no recommendations to send.',
+    declarationSites: ['src/components/engine-rebuilt/EngineSurface.tsx'],
+  },
+  {
+    term: 'Not in a topic yet',
+    wordClass: 'canonical',
+    definition: 'Plain-language Keywords group label for rows without a topic cluster.',
+    declarationSites: ['src/components/keywords-rebuilt/keywordVocabulary.tsx'],
+  },
+  {
+    term: 'Opportunity',
+    wordClass: 'canonical',
+    definition: 'Keywords table heading for the opportunity score.',
+    declarationSites: ['src/components/keywords-rebuilt/keywordVocabulary.tsx'],
+  },
+  {
+    term: 'Seen in search',
+    wordClass: 'canonical',
+    definition: 'Plain-language Keywords display label for the raw_evidence lifecycle status.',
+    declarationSites: ['src/components/keywords-rebuilt/keywordVocabulary.tsx'],
+  },
+  {
+    term: 'Send client update',
+    wordClass: 'canonical',
+    definition: 'Operator action that sends the recommendations currently added to a client update.',
+    declarationSites: ['src/components/engine-rebuilt/EngineSurface.tsx'],
+  },
+  {
+    term: 'to propose',
+    wordClass: 'canonical',
+    definition: 'Plain-language opportunity wording for work an operator may propose to a client.',
+    declarationSites: ['docs/workflows/ui-vocabulary.md'],
+  },
 ];
 
 // ── Externally-mirrored terms (spelling dictated by a third party) ───────────

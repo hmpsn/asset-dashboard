@@ -47,6 +47,38 @@ Use these exact labels when creating buttons, badges, tooltips, status text, and
 | Client inbox section — approvals/actions with note + requests | **"Conversations"** | Requests, Messages |
 | Win quality indicator | **"Win"** / **"Strong win"** | "success", "confirmed win" |
 
+### Admin rebuilt-shell names and say-it-aloud vocabulary (W0.3)
+
+When `ui-rebuild-shell` is ON, destination names resolve through
+`src/lib/navRegistry.tsx` `flagBehavior.labelWhenOn`. Flag-OFF labels remain legacy
+compatibility copy.
+
+| Context | Retired / legacy wording | Canonical rebuilt wording |
+|---------|---------------------------|---------------------------|
+| Strategy destination | Strategy | **Insights Engine** |
+| Keyword destination | Keyword Hub | **Keywords** |
+| Media destination | Assets | **Asset Manager** |
+| Pipeline destination | Pipeline | **Content Pipeline** |
+| Active recommendation count | Backing moves live | **Moves in progress** |
+| Add a recommendation to the next client communication | Stage for issue | **Add to client update** |
+| Send the current recommendation set | Send N staged | **Send client update (N)** |
+| Empty send helper | 0 staged — stage moves below to send | **No moves added — add moves below before sending** |
+| Unsorted Engine stream | Risk and unclassified | **Needs triage** |
+| Unsorted Engine stream description | Client signals and unclassified attention. | **Client signals and anything not yet sorted** |
+| Value-backed Engine stream | Money | **Growth** |
+| Value-backed Engine stream description | Value and pricing work with real provenance. | **Upsell and value-proof work backed by measured results.** |
+| Opportunity verb | to pitch | **to propose** |
+| Evidence lifecycle display | Raw Evidence | **Seen in search** |
+| Pending measurement badge | proof pending | **measuring** |
+| Keyword cluster fallback | Unclustered keywords | **Not in a topic yet** |
+| Keyword table score column | Opp | **Opportunity** |
+| Keyword table monthly-value column | $ | **$/mo** |
+| Site Audit content-health stream | Content Health | **Decaying pages** |
+
+Internal discriminators and persisted values (`money`, `unclassified`,
+`raw_evidence`, and related lifecycle enums) do not change; this table governs display
+copy only. `KD` remains the canonical dense-table abbreviation for keyword difficulty.
+
 ### Client-facing outcome/action labels (C2 / R12a)
 
 Every client surface that renders an outcome `ActionType` (win rows, scorecards, monthly

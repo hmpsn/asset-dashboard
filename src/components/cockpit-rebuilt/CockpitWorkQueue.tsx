@@ -55,19 +55,19 @@ export const STREAM_META: Record<WorkQueueStream, {
     color: 'var(--teal)',
   },
   money: {
-    label: 'Monetization',
-    unit: 'to pitch',
-    description: 'Grow the account',
-    groupTitle: 'Money queue',
+    label: 'Growth',
+    unit: 'to propose',
+    description: 'Upsell and value-proof work backed by measured results.',
+    groupTitle: 'Growth queue',
     icon: Trophy,
     iconName: 'trophy',
     color: 'var(--amber)',
   },
   unclassified: {
-    label: 'Risk',
+    label: 'Needs triage',
     unit: 'to triage',
-    description: 'Client signals and unclassified attention.',
-    groupTitle: 'Risk and unclassified',
+    description: 'Client signals and anything not yet sorted',
+    groupTitle: 'Needs triage',
     icon: Bell,
     iconName: 'bell',
     color: 'var(--brand-text-muted)',
@@ -134,7 +134,7 @@ export function CockpitWorkQueue({
   const filterControls = (
     <div className="flex min-w-max items-center gap-2" aria-label="Queue filters">
       <FilterChip label="All" active={stream === 'all'} count={workQueue.items.length} onClick={() => onStreamChange('all')} />
-      <FilterChip label="Risk" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
+      <FilterChip label="Needs triage" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
       {sourceTypes.map((sourceType) => (
         <FilterChip
           key={sourceType}

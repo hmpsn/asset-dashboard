@@ -32,13 +32,13 @@ import {
   InlineBanner,
   IntentTag,
   Meter,
-  StatusBadge,
   Toolbar,
   ToolbarSpacer,
 } from '../ui';
 import type { DataColumn } from '../ui';
 import type { UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
 import type { KeywordCommandCenterRowsResponse } from '../../../shared/types/keyword-command-center';
+import { KEYWORDS_SAY_IT_ALOUD, KeywordLifecycleBadge } from './keywordVocabulary';
 
 interface KeywordsTableProps {
   workspaceId: string;
@@ -323,7 +323,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
     {
       key: 'opportunity',
-      label: 'Opp',
+      label: KEYWORDS_SAY_IT_ALOUD.opportunity,
       width: '108px',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
@@ -345,7 +345,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
     {
       key: 'currentMonthly',
-      label: '$',
+      label: KEYWORDS_SAY_IT_ALOUD.currentMonthly,
       width: '64px',
       align: 'right',
       render: (_value, record) => {
@@ -361,12 +361,11 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         const row = (record as KeywordsTableRecord).source;
         return (
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <StatusBadge status={row.lifecycleStatus} domain="keyword-command-center" variant="soft" />
+            <KeywordLifecycleBadge status={row.lifecycleStatus} />
             {row.tracking.sourceGapKey && <Badge label="From gap" tone="blue" variant="soft" size="sm" />}
             {row.tracking.strategyOwned === true && <Badge label="Auto-managed" tone="teal" variant="soft" size="sm" />}
-            {/* No separate "Raw evidence" badge — the StatusBadge above already renders the
-                raw-evidence lifecycle status; a second badge duplicated the term (with
-                inconsistent casing) in the same cell. */}
+            {/* The lifecycle badge owns the plain-language status label; a second evidence
+                badge would duplicate the same state in this cell. */}
           </div>
         );
       },
@@ -441,7 +440,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
     {
       key: 'opportunity',
-      label: 'Opp',
+      label: KEYWORDS_SAY_IT_ALOUD.opportunity,
       width: 'minmax(135px, 1fr)',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;

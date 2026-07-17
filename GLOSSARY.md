@@ -127,6 +127,40 @@ Terms are grouped into four **word classes**:
 
 **`WS_EVENTS`** — The canonical registry of all workspace-scoped WebSocket event name constants, defined in `server/ws-events.ts`. Import from here instead of using string literals. Every new feature that emits real-time events must add its constants here.
 
+**`$/mo`** — The plain-language Keywords table heading for measured monthly dollar value. This is display vocabulary, not a stored field name.
+
+**Add to client update** — The operator action that adds a recommendation to the next client update. Replaces staging language in rebuilt display copy without renaming internal state.
+
+**Asset Manager** — The rebuilt-shell destination for images, alt text, and media optimization. Resolves from the `media` registry entry only while `ui-rebuild-shell` is ON.
+
+**Content Pipeline** — The rebuilt-shell destination for content planning, production, and publishing. Resolves from the `content-pipeline` registry entry only while `ui-rebuild-shell` is ON.
+
+**Decaying pages** — The plain-language Site Audit label for pages whose content performance is declining.
+
+**Growth** — The Engine work stream for upsell and value-proof work backed by measured results. The persisted/internal stream discriminator remains `money`.
+
+**Insights Engine** — The rebuilt-shell destination for operator strategy, recommendations, and evidence. Resolves from the `seo-strategy` registry entry only while `ui-rebuild-shell` is ON.
+
+**Keywords** — The rebuilt-shell destination for keyword lifecycle, rankings, and handoffs. Resolves from the `seo-keywords` registry entry only while `ui-rebuild-shell` is ON.
+
+**measuring** — The badge label used while value proof has not yet been measured. It replaces the less direct display phrase “proof pending.”
+
+**Moves in progress** — The plain-language label for recommendations currently backing a client update.
+
+**Needs triage** — The Engine stream for client signals and work not yet sorted. The persisted/internal stream discriminator remains `unclassified`.
+
+**No moves added** — The empty-state helper shown when a client update has no recommendations to send.
+
+**Not in a topic yet** — The plain-language Keywords group label for rows without a topic cluster.
+
+**Opportunity** — The Keywords table heading for the opportunity score. `KD` remains the approved abbreviation for keyword difficulty.
+
+**Seen in search** — The plain-language Keywords display label for the `raw_evidence` lifecycle status. The persisted status value remains unchanged.
+
+**Send client update** — The operator action that sends the recommendations currently added to a client update. Counted variants use “Send client update (N).”
+
+**to propose** — The plain-language opportunity wording for work an operator may propose to a client.
+
 ---
 
 ## externally-mirrored
