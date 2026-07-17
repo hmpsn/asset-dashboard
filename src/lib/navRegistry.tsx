@@ -29,12 +29,21 @@ import {
   Pencil, Target, Code2, Link2, MessageSquare,
   LayoutDashboard, Activity, Sparkles, Layers, FileSearch, Map, ListChecks,
   DollarSign, Trophy, BriefcaseBusiness, ChartSpline, Stethoscope, WandSparkles,
-  MapPinned, RadioTower,
+  MapPinned, RadioTower, LibraryBig,
 } from 'lucide-react';
-import type { Page } from '../routes';
+import { GLOBAL_TABS, adminPath, type Page } from '../routes';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
 
 type IconType = typeof Globe;
+
+/** Registry identity for the rebuilt, workspace-less portfolio home at `/`. */
+export const BOOK_ROOT_NAV_ID = 'book-root' as const;
+export type BookRootNavId = typeof BOOK_ROOT_NAV_ID;
+export type NavDestinationId = Page | BookRootNavId;
+export type NavDestinationScope = 'workspace' | 'global' | 'book';
+
+/** Non-Page destinations stay explicit so the Page/registry census cannot hide an orphan. */
+export const NON_PAGE_NAV_DESTINATIONS = [BOOK_ROOT_NAV_ID] as const;
 
 /**
  * Semantic group key for a nav entry. Surfaces map this to their own
@@ -74,8 +83,8 @@ export interface NavFlagBehavior {
   hideWhenOff?: boolean;
 }
 
-export interface NavEntry {
-  id: Page;
+export interface NavEntry<TId extends NavDestinationId = Page> {
+  id: TId;
   /** Default label (flag-OFF). Use resolveNavLabel() to apply flag behavior. */
   label: string;
   icon: IconType;
@@ -84,11 +93,16 @@ export interface NavEntry {
   description: string;
   /** When true, the surface is gated behind a linked Webflow site. */
   needsSite?: boolean;
+  /** Explicit only when the destination is not an ordinary workspace-scoped Page. */
+  scope?: NavDestinationScope;
   /** Optional flag-driven relabel/hide behavior. */
   flagBehavior?: NavFlagBehavior;
 }
 
+export type AnyNavEntry = NavEntry<NavDestinationId>;
+
 export type RebuiltNavZoneKey =
+  | 'book'
   | 'top'
   | 'strategy-content'
   | 'search-site-health'
@@ -100,7 +114,7 @@ export interface RebuiltNavZone {
   key: RebuiltNavZoneKey;
   /** Title-case shared label; visual consumers may transform casing. */
   label: string;
-  items: readonly Page[];
+  items: readonly NavDestinationId[];
 }
 
 /**
@@ -124,6 +138,7 @@ export const NON_REGISTRY_PAGES: Page[] = [
 
 /** Rebuilt-shell destination zones shared by the sidebar and Command Palette. */
 export const REBUILT_NAV_ZONES: readonly RebuiltNavZone[] = [
+  { key: 'book', label: 'All workspaces', items: [BOOK_ROOT_NAV_ID] },
   { key: 'top', label: '', items: ['home', 'seo-strategy'] },
   {
     key: 'strategy-content',
@@ -144,12 +159,12 @@ export const REBUILT_NAV_ZONES: readonly RebuiltNavZone[] = [
   },
 ];
 
-const REBUILT_NAV_ZONE_LABEL_BY_ID = new globalThis.Map<Page, string>(
+const REBUILT_NAV_ZONE_LABEL_BY_ID = new globalThis.Map<NavDestinationId, string>(
   REBUILT_NAV_ZONES.flatMap((zone) => zone.items.map((id) => [id, zone.label] as const)),
 );
 
 /** Resolve the rebuilt-shell zone label for a destination. */
-export function resolveRebuiltNavZoneLabel(id: Page): string | undefined {
+export function resolveRebuiltNavZoneLabel(id: NavDestinationId): string | undefined {
   return REBUILT_NAV_ZONE_LABEL_BY_ID.get(id);
 }
 
@@ -240,31 +255,63 @@ export const NAV_REGISTRY: NavEntry[] = [
     description: 'Revenue dashboard' },
 ];
 
-/** Lookup by Page id. */
-export const NAV_REGISTRY_BY_ID: Record<Page, NavEntry> = NAV_REGISTRY.reduce(
+/** Book-level registry entry kept outside the Page-only registry by design. */
+export const BOOK_ROOT_NAV_ENTRY: NavEntry<BookRootNavId> = {
+  id: BOOK_ROOT_NAV_ID,
+  label: 'Command Center',
+  icon: LibraryBig,
+  group: 'home',
+  scope: 'book',
+  description: 'All workspaces in your client book, ranked by attention',
+  flagBehavior: { flag: 'ui-rebuild-shell', hideWhenOff: true },
+};
+
+/** All destinations consumed by flag-aware palette/rebuilt-shell navigation. */
+export const NAV_DESTINATION_REGISTRY: AnyNavEntry[] = [BOOK_ROOT_NAV_ENTRY, ...NAV_REGISTRY];
+
+/** Lookup by Page or explicit non-Page destination id. */
+export const NAV_REGISTRY_BY_ID: Record<NavDestinationId, AnyNavEntry> = NAV_DESTINATION_REGISTRY.reduce(
   (acc, entry) => { acc[entry.id] = entry; return acc; },
-  {} as Record<Page, NavEntry>,
+  {} as Record<NavDestinationId, AnyNavEntry>,
 );
+
+/** Resolve inferred legacy scope plus explicit book/global scope into one routing model. */
+export function resolveNavScope(entry: AnyNavEntry): NavDestinationScope {
+  if (entry.scope) return entry.scope;
+  return GLOBAL_TABS.has(entry.id) ? 'global' : 'workspace';
+}
+
+/**
+ * Resolve a registry entry to its concrete route. Workspace-scoped destinations
+ * return null until a workspace is available; book/global destinations do not.
+ */
+export function resolveNavPath(entry: AnyNavEntry, workspaceId?: string | null): string | null {
+  const scope = resolveNavScope(entry);
+  if (scope === 'book') return '/';
+  if (entry.id === BOOK_ROOT_NAV_ID) return null;
+  if (scope === 'global') return adminPath('', entry.id);
+  return workspaceId ? adminPath(workspaceId, entry.id) : null;
+}
 
 /**
  * Resolve the effective label for an entry given the current flag state.
  * `isFlagEnabled` is the surface's flag resolver (e.g. useFeatureFlag).
  */
-export function resolveNavLabel(entry: NavEntry, isFlagEnabled: (flag: FeatureFlagKey) => boolean): string {
+export function resolveNavLabel(entry: AnyNavEntry, isFlagEnabled: (flag: FeatureFlagKey) => boolean): string {
   const fb = entry.flagBehavior;
   if (fb?.labelWhenOn && isFlagEnabled(fb.flag)) return fb.labelWhenOn;
   return entry.label;
 }
 
 /** Resolve the effective description for an entry given the current flag state. */
-export function resolveNavDescription(entry: NavEntry, isFlagEnabled: (flag: FeatureFlagKey) => boolean): string {
+export function resolveNavDescription(entry: AnyNavEntry, isFlagEnabled: (flag: FeatureFlagKey) => boolean): string {
   const fb = entry.flagBehavior;
   if (fb?.descriptionWhenOn && isFlagEnabled(fb.flag)) return fb.descriptionWhenOn;
   return entry.description;
 }
 
 /** Whether an entry is hidden under the current flag state. */
-export function isNavEntryHidden(entry: NavEntry, isFlagEnabled: (flag: FeatureFlagKey) => boolean): boolean {
+export function isNavEntryHidden(entry: AnyNavEntry, isFlagEnabled: (flag: FeatureFlagKey) => boolean): boolean {
   const fb = entry.flagBehavior;
   if (!fb) return false;
   const enabled = isFlagEnabled(fb.flag);
@@ -272,7 +319,7 @@ export function isNavEntryHidden(entry: NavEntry, isFlagEnabled: (flag: FeatureF
 }
 
 /** Resolve a Page id to its label, applying flag behavior. Falls back to the raw id. */
-export function resolveNavLabelById(id: Page, isFlagEnabled: (flag: FeatureFlagKey) => boolean): string {
+export function resolveNavLabelById(id: NavDestinationId, isFlagEnabled: (flag: FeatureFlagKey) => boolean): string {
   const entry = NAV_REGISTRY_BY_ID[id];
   return entry ? resolveNavLabel(entry, isFlagEnabled) : id;
 }

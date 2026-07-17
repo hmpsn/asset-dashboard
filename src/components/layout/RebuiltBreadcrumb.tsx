@@ -2,11 +2,11 @@
 import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MessageSquare } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { featureFlags } from '../../api/misc';
 import { adminPath, GLOBAL_TABS, type Page } from '../../routes';
 import { STUDIO_NAME } from '../../constants';
-import { resolveNavLabelById } from '../../lib/navRegistry';
+import { BOOK_ROOT_NAV_ID, resolveNavLabelById } from '../../lib/navRegistry';
 import { queryKeys } from '../../lib/queryKeys';
 import { FEATURE_FLAGS, type FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { KEYWORD_COMMAND_CENTER_FILTERS } from '../../../shared/types/keyword-command-center';
@@ -122,6 +122,7 @@ export function RebuiltBreadcrumb({
   pendingContentRequests,
 }: RebuiltBreadcrumbProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { data: flagValues } = useQuery({
     queryKey: queryKeys.shared.featureFlags(),
@@ -134,7 +135,8 @@ export function RebuiltBreadcrumb({
   const workspaceTitle = workspaces.length === 1 ? '1 workspace' : `${workspaces.length} workspaces`;
   const subTab = searchParams.get('tab');
   const subTabLabel = subTab ? SUB_TAB_LABELS_BY_PAGE[tab]?.[subTab] : undefined;
-  const activeTabLabel = fallbackTabLabel(tab, isFlagEnabled);
+  const bookRootLabel = resolveNavLabelById(BOOK_ROOT_NAV_ID, isFlagEnabled);
+  const activeTabLabel = location.pathname === '/' ? bookRootLabel : fallbackTabLabel(tab, isFlagEnabled);
 
   useEffect(() => {
     document.title = `${activeTabLabel} — ${STUDIO_NAME}`;
@@ -142,7 +144,7 @@ export function RebuiltBreadcrumb({
 
   const items = useMemo<BreadcrumbItem[]>(() => {
     const next: BreadcrumbItem[] = [
-      { label: 'Command Center', onClick: () => navigate('/') },
+      { label: bookRootLabel, onClick: () => navigate('/') },
     ];
     if (!GLOBAL_TABS.has(tab) && selected && workspaceLabel) {
       next.push({
@@ -158,7 +160,7 @@ export function RebuiltBreadcrumb({
     }
     if (next.length > 0) next[next.length - 1].current = true;
     return next;
-  }, [activeTabLabel, navigate, selected, subTabLabel, tab, workspaceLabel]);
+  }, [activeTabLabel, bookRootLabel, navigate, selected, subTabLabel, tab, workspaceLabel]);
 
   return (
     <nav

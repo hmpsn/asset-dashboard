@@ -76,6 +76,7 @@ describe('CommandPalette — real rebuilt-shell flag transition', () => {
     expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByText('Content Perf')).toBeInTheDocument();
     expect(screen.queryByText('Cockpit')).not.toBeInTheDocument();
+    expect(screen.queryByText('Command Center')).not.toBeInTheDocument();
 
     await act(async () => {
       resolveFlags({ ...FEATURE_FLAGS, 'ui-rebuild-shell': true });
@@ -85,6 +86,8 @@ describe('CommandPalette — real rebuilt-shell flag transition', () => {
     await waitFor(() => {
       expect(screen.getByText('Cockpit')).toBeInTheDocument();
     });
+    expect(screen.getByText('Command Center')).toBeInTheDocument();
+    expect(screen.getByText('All workspaces')).toBeInTheDocument();
     expect(screen.queryByText('Home')).not.toBeInTheDocument();
     expect(screen.queryByText('Content Perf')).not.toBeInTheDocument();
     expect(screen.getByText('Insights Engine')).toBeInTheDocument();

@@ -61,7 +61,7 @@ const defaultProps = {
   onLogout: vi.fn(),
 };
 
-function renderSidebar(overrides: Partial<typeof defaultProps> = {}) {
+function renderSidebar(overrides: Partial<typeof defaultProps> = {}, initialEntry = '/ws/ws-1') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // Pre-seed the feature-flag query so RebuiltSidebar's `useQuery` (staleTime: Infinity)
   // reads the flags SYNCHRONOUSLY from render 1 — no loading→loaded transition to race.
@@ -71,7 +71,7 @@ function renderSidebar(overrides: Partial<typeof defaultProps> = {}) {
   queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <RebuiltSidebar {...defaultProps} {...overrides} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -127,6 +127,20 @@ describe('RebuiltSidebar', () => {
     expect(screen.queryByRole('button', { name: 'Content Perf' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'MONITORING' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'CONTENT' })).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  }, 15_000);
+
+  it('renders the book Command Center as the active all-workspaces home at /', async () => {
+    const user = userEvent.setup();
+    const { container } = renderSidebar({ selected: null, tab: 'home' }, '/');
+
+    expect(screen.getByRole('button', { name: 'ALL WORKSPACES' })).toBeInTheDocument();
+    const commandCenter = screen.getByRole('button', { name: 'Command Center' });
+    expect(commandCenter).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Cockpit' })).not.toHaveAttribute('aria-current');
+
+    await user.click(commandCenter);
+    expect(mockNavigate).toHaveBeenCalledWith('/');
     await expectNoA11yViolations(container);
   }, 15_000);
 

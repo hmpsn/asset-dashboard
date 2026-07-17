@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 715** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 717** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 717. Book-level Command Center navigation and morning-triage closure 2026-07-17
+
+**What it does:** Makes the flag-ON book Command Center at `/` a first-class navigation destination. The nav registry module now models the workspace-less root explicitly as `book-root` with `scope: 'book'`, a shared `/` path resolver, and an “All workspaces” rebuilt zone. `NAV_REGISTRY` remains the byte-identical Page-only source for legacy navigation; `NAV_DESTINATION_REGISTRY` composes that list with the single book entry for the rebuilt sidebar and Command Palette, while the rebuilt breadcrumb resolves the same entry by ID. The sidebar keeps workspace Cockpit separate, marks Command Center current only at `/`, and the rebuilt breadcrumb also uses Command Center for the root document title.
+
+**Why it matters:** Morning triage now starts from a server-ranked client book instead of an arbitrary workspace. The highest-attention workspace is visible at landing with zero clicks, its Cockpit is one click away, and its top triage handoff is two clicks from landing. The prior path had no bounded cross-book click count: the operator had to inspect/switch workspaces linearly before paying J1's local row-opening cost.
+
+**Boundaries:** The registry-only destination exists only while `ui-rebuild-shell` is ON. Workspace `home` remains the existing `/ws/:workspaceId` Cockpit identity, flag-OFF `/` remains legacy `WorkspaceOverview`, the `Page` union and rebuilt direct-mount census are unchanged, and no migration or new deep-link parameter was needed.
+
+**Tests:** Registry/non-Page destination census and path resolution; Command Palette flag transition plus `/` navigation; rebuilt sidebar presence/current state and axe coverage; rebuilt breadcrumb root-current behavior, title, and axe coverage.
+
+**Files:** navigation registry and shared consumers; focused contract/component tests; J1 measurement note; roadmap, brand language, and this audit.
 
 ---
 

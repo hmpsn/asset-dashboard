@@ -287,6 +287,21 @@ describe('CommandPalette', () => {
       expect(screen.queryByText('Content Perf')).not.toBeInTheDocument();
     });
 
+    it('exposes the all-workspaces Command Center and navigates to the book root', () => {
+      useFeatureFlagMock.mockReturnValue(true);
+      render(<CommandPalette workspaces={[ws]} selectedWorkspace={null} onSelectWorkspace={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 'k', metaKey: true });
+
+      const input = screen.getByPlaceholderText('Search tools, workspaces, actions...');
+      fireEvent.change(input, { target: { value: 'Command Center' } });
+
+      expect(screen.getByText('All workspaces')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Command Center'));
+
+      expect(navigateMock).toHaveBeenCalledTimes(1);
+      expect(navigateMock).toHaveBeenCalledWith('/');
+    });
+
     it('preserves the legacy labels and Content Performance home when the shell flag is off', () => {
       open();
 
@@ -298,6 +313,7 @@ describe('CommandPalette', () => {
       expect(screen.getByText('Content Perf')).toBeInTheDocument();
       expect(screen.queryByText('AI Visibility')).not.toBeInTheDocument();
       expect(screen.queryByText('Cockpit')).not.toBeInTheDocument();
+      expect(screen.queryByText('Command Center')).not.toBeInTheDocument();
     });
   });
 

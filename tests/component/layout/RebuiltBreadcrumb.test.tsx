@@ -28,12 +28,16 @@ const WORKSPACES: Workspace[] = [
   { id: 'ws-1', name: 'Acme', webflowSiteId: 'site-1', webflowSiteName: 'acme.com', folder: 'acme', createdAt: '2026-01-01' },
 ];
 
-function renderBreadcrumb(tab: Parameters<typeof RebuiltBreadcrumb>[0]['tab'], initialEntry = '/ws/ws-1') {
+function renderBreadcrumb(
+  tab: Parameters<typeof RebuiltBreadcrumb>[0]['tab'],
+  initialEntry = '/ws/ws-1',
+  selected: Workspace | null = WORKSPACES[0],
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
-        <RebuiltBreadcrumb workspaces={WORKSPACES} selected={WORKSPACES[0]} tab={tab} pendingContentRequests={0} />
+        <RebuiltBreadcrumb workspaces={WORKSPACES} selected={selected} tab={tab} pendingContentRequests={0} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -47,6 +51,15 @@ describe('RebuiltBreadcrumb', () => {
     expect(screen.getByText('acme.com')).toBeInTheDocument();
     expect(screen.getByText('Site Audit')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByLabelText('Breadcrumb')).toHaveClass('t-ui');
+    await expectNoA11yViolations(container);
+  });
+
+  it('marks the registry-owned Command Center root current at /', async () => {
+    const { container } = renderBreadcrumb('home', '/', null);
+
+    expect(screen.getByText('Command Center')).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('button', { name: 'Command Center' })).not.toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe(`Command Center — ${STUDIO_NAME}`));
     await expectNoA11yViolations(container);
   });
 
