@@ -316,7 +316,7 @@ function LocationProbe() {
 
 function renderSchema(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const result = render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
         <ToastProvider>
@@ -324,9 +324,10 @@ function renderSchema(path: string) {
           <LocationProbe />
         </ToastProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { ...result, queryClient };
+  const result = render(tree());
+  return { ...result, queryClient, rerenderSchema: () => result.rerender(tree()) };
 }
 
 function FlaggedSchemaHarness() {
@@ -395,6 +396,31 @@ describe('SchemaSurface rebuilt admin surface', () => {
 
     const headers = within(pageList).getAllByRole('columnheader').map((header) => header.textContent);
     expect(headers).toEqual(['Page', 'Type', 'Validation', 'Publish']);
+  });
+
+  it('renders a retryable add-page fetch failure without opening the picker', () => {
+    const generation = generationMock();
+    let fetchPagesError: string | null = null;
+    const fetchPages = vi.fn(() => {
+      fetchPagesError = 'Webflow pages could not be loaded. Please try again.';
+      return Promise.resolve();
+    });
+    generationMock.mockImplementation(() => ({
+      ...generation,
+      fetchPagesError,
+      fetchPages,
+      showPagePicker: false,
+    }));
+    const view = renderSchema('/ws/ws-1/seo-schema?tab=generator');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a page' }));
+    view.rerenderSchema();
+
+    expect(screen.getByText('Webflow pages could not be loaded. Please try again.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /Add a page/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a page' }));
+    expect(fetchPages).toHaveBeenCalledTimes(2);
   });
 
   it('writes the validated tab state when switching lenses', () => {

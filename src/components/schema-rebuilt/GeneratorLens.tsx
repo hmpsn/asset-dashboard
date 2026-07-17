@@ -392,6 +392,11 @@ export function GeneratorLens({
                       Add a page
                     </Button>
                   </div>
+                  {generation.fetchPagesError && (
+                    <InlineBanner tone="error" size="sm" title="Pages could not be loaded">
+                      {generation.fetchPagesError}
+                    </InlineBanner>
+                  )}
                 </div>
               </div>
             </SectionCard>

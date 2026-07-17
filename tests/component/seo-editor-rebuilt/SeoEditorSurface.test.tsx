@@ -1,14 +1,16 @@
 // @ds-rebuilt
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useFeatureFlag } from '../../../src/hooks/useFeatureFlag';
 import { ToastProvider } from '../../../src/components/Toast';
 import { SeoEditorSurface } from '../../../src/components/seo-editor-rebuilt/SeoEditorSurface';
 import { SeoEditorPagePanel } from '../../../src/components/seo-editor-rebuilt/SeoEditorPagePanel';
+import { SeoEditorWorksheet } from '../../../src/components/seo-editor-rebuilt/SeoEditorWorksheet';
 import { useSeoEditorSurfaceState } from '../../../src/components/seo-editor-rebuilt/useSeoEditorSurfaceState';
+import { useCmsEditorApprovalWorkflow } from '../../../src/components/cms-editor/useCmsEditorApprovalWorkflow';
 import { SEO_EDITOR_TARGET_TYPES } from '../../../shared/types/seo-editor-write-target';
 import type {
   CmsSeoWorkflowState,
@@ -26,6 +28,15 @@ const publishCmsCollectionMock = vi.fn();
 const sendStaticPageMock = vi.fn();
 const cmsSendForApprovalMock = vi.fn();
 const featureFlagsListMock = vi.fn();
+const apiPostMock = vi.fn();
+
+vi.mock('../../../src/api/client', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/api/client')>('../../../src/api/client');
+  return {
+    ...actual,
+    post: (...args: Parameters<typeof actual.post>) => apiPostMock(...args),
+  };
+});
 
 const workspace = {
   id: 'ws-1',
@@ -228,6 +239,35 @@ function cmsWorkflow(overrides: Partial<CmsSeoWorkflowState> = {}): CmsSeoWorkfl
   };
 }
 
+function CmsToolbarSendHarness({ changed = false }: { changed?: boolean }) {
+  const [edits] = useState(() => ({
+    'item-1': {
+      name: 'CMS Post',
+      slug: 'cms-post',
+      'seo-title': changed ? 'CMS SEO revised' : 'CMS SEO',
+      'seo-description': 'CMS description.',
+    },
+  }));
+  const approval = useCmsEditorApprovalWorkflow({
+    workspaceId: 'ws-1',
+    siteId: 'site-1',
+    edits,
+    collections: [cmsRow.cmsCollection!],
+    refreshStates: vi.fn(),
+  });
+
+  return (
+    <SeoEditorWorksheet
+      rows={[{ ...cmsRow, cmsEdit: edits['item-1'] }]}
+      staticWorkflow={staticWorkflow()}
+      staticBulkWorkflow={staticBulkWorkflow()}
+      cmsWorkflow={cmsWorkflow({ ...approval, edits })}
+      onOpenPage={vi.fn()}
+      onClearFilters={vi.fn()}
+    />
+  );
+}
+
 const workflows = {
   hasUnsaved: true,
   approvalRefreshKey: 0,
@@ -324,6 +364,7 @@ function expectTextWithClass(text: string | RegExp, className: string) {
 describe('SeoEditorSurface rebuilt', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    apiPostMock.mockResolvedValue({ success: true });
     workflows.staticWorkflow = staticWorkflow();
     workflows.bulkWorkflow = staticBulkWorkflow();
     workflows.cmsWorkflow = cmsWorkflow();
@@ -556,6 +597,39 @@ describe('SeoEditorSurface rebuilt', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Titles' }));
     expect(workflows.cmsWorkflow.bulkAiRewrite).toHaveBeenCalledWith('title');
     expect(screen.queryByRole('button', { name: /Request changes|Approve/ })).not.toBeInTheDocument();
+  });
+
+  it('toasts the CMS no-changes validation error beside the toolbar send action', async () => {
+    renderWithProviders(<CmsToolbarSendHarness />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select CMS Post' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Send CMS to client' }));
+
+    expect(await screen.findByText(/No changes detected on selected items/i)).toBeInTheDocument();
+    expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
+  it('toasts the CMS approval request failure beside the toolbar send action', async () => {
+    apiPostMock.mockRejectedValueOnce(new Error('Approval service unavailable'));
+    renderWithProviders(<CmsToolbarSendHarness changed />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select CMS Post' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Send CMS to client' }));
+
+    expect(await screen.findByText(/Failed to send for approval/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send CMS to client' })).toBeEnabled();
+  });
+
+  it('toasts CMS approval success and preserves selection clearing', async () => {
+    renderWithProviders(<CmsToolbarSendHarness changed />);
+
+    const rowSelection = screen.getByRole('checkbox', { name: 'Select CMS Post' });
+    fireEvent.click(rowSelection);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send CMS to client' }));
+
+    expect(await screen.findByText(/sent/i)).toBeInTheDocument();
+    await waitFor(() => expect(rowSelection).not.toBeChecked());
+    expect(screen.queryByRole('button', { name: 'Send CMS to client' })).not.toBeInTheDocument();
   });
 
   it('keeps the research alias on the workbench and shows truthful no-recommendation drawer copy', () => {
