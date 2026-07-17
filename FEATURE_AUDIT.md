@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 708** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 710** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 710. Admin bounded-workbench canyon containment 2026-07-17
+
+**What it does:** Adds `WorkbenchFrame`, the canonical viewport-bounded collection layout with one flex-none decision region and exactly one internally scrolling collection. Site Audit pins a compact health verdict, working category filters, utilities, and bulk actions above its issue queue. Schema pins readiness, workflow, summary, and publish/send controls; its generated-page table adds title/path/type search, status filters, a 100-row default cap, truthful expansion, and read-only row type labels while type editing remains in the detail Drawer. Asset Manager pins the existing Browse toolbar, mounts assets in 100-item batches, reports the exact remaining count, and trims grid cards to open/select plus the contextual missing-alt action while preserving Drawer and bulk repair actions.
+
+**Why it matters:** Operators can keep scope, filters, and high-trust actions visible while triaging hundreds of audit issues, schema pages, or media assets. Known items are findable without 27–47 folds of page scrolling, and the Media library avoids mounting the audit's 1,583-button interaction surface at once.
+
+**Safety and performance:** Site Audit drawer/deep-link/bulk behavior, Schema generate/review/publish/send flows, and Asset Manager Repair/Upload/detail overlay precedence are unchanged. The Media 250-asset component fixture now mounts 100 cards and 208 buttons initially, then loads at most 100 more per action with truthful remaining counts.
+
+**Tests:** `WorkbenchFrame` structure and axe coverage; loaded Site Audit pinned/collection containment; 125-page Schema search/cap/expansion and Drawer preservation; 250-asset Media batch, control-count ratchet, overlay/deep-link behavior, and rebuilt a11y coverage.
+
+**Files:** `src/components/ui/layout/WorkbenchFrame.tsx` and UI barrels/styleguide; rebuilt Site Audit, Schema, and Asset Manager surfaces and their focused component tests; `BRAND_DESIGN_LANGUAGE.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
 
 ---
 

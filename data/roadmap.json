@@ -18,39 +18,6 @@
           "notes": "Keep verdict-first opening; move work block after value frame; pair POV editor + trust-spine preview; collapse evidence sections; Operations stays last (V5). Owner sign-off required before build."
         },
         {
-          "id": "canyon-containment-site-audit",
-          "title": "Site Audit: bounded-workbench containment (47.2 folds → pinned hero + contained issues list)",
-          "source": "2026-07-16 UX-flow audit §4",
-          "est": "M",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "site-health",
-          "notes": "Page Intelligence caliber: pinned AuditHero+categories+bulk band; issues become the contained region."
-        },
-        {
-          "id": "canyon-containment-schema",
-          "title": "Schema: containment + in-region search/filter + row cap (38.2 folds, 541 buttons)",
-          "source": "2026-07-16 UX-flow audit §4",
-          "est": "M",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "site-health",
-          "notes": "Heaviest caliber; also resolves the drawer-per-page scale finding from the rebuild audit."
-        },
-        {
-          "id": "canyon-containment-media",
-          "title": "Media: contained grid + load-more batching (27.4 folds, 1,583-button DOM)",
-          "source": "2026-07-16 UX-flow audit §4",
-          "est": "M",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "site-health",
-          "notes": "Also a real perf win (DOM diet). Optional shared WorkbenchFrame primitive if 3+ surfaces adopt the skeleton."
-        },
-        {
           "id": "keywords-lens-diet",
           "title": "Keywords: 5 lenses → 2 + Columns preset + Group-by; surface client feedback above the table",
           "source": "2026-07-16 UX-flow audit §7",
