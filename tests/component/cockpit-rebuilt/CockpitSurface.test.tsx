@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   featureFlagsList: vi.fn(),
   cockpitState: null as UseCockpitRebuiltResult | null,
   navigate: vi.fn(),
+  anomalies: [] as Array<{ id: string }>,
+  anomalyAlerts: vi.fn(),
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -66,6 +68,10 @@ vi.mock('../../../src/hooks/admin/useCockpitRebuilt', () => {
     ),
   };
 });
+
+vi.mock('../../../src/hooks/admin', () => ({
+  useAnomalyAlerts: (...args: unknown[]) => mocks.anomalyAlerts(...args),
+}));
 
 vi.mock('../../../src/components/workspace-home', () => ({
   ActivityFeed: ({ activity }: { activity: Array<{ title: string }> }) => (
@@ -266,6 +272,12 @@ describe('CockpitSurface rebuilt', () => {
     window.localStorage.setItem(`onboarding_checklist_dismissed_${workspaceId}`, '1');
     mocks.featureFlagsList.mockResolvedValue({ 'ui-rebuild-shell': true });
     mocks.cockpitState = makeCockpitState();
+    mocks.anomalies = [
+      { id: 'anomaly-1' },
+      { id: 'anomaly-2' },
+      { id: 'anomaly-3' },
+    ];
+    mocks.anomalyAlerts.mockReturnValue({ data: mocks.anomalies, isLoading: false });
   });
 
   it('mounts after the real feature-flag hook transitions from loading fallback to ON', async () => {
@@ -320,6 +332,18 @@ describe('CockpitSurface rebuilt', () => {
     expect(screen.getByRole('radio', { name: /Optimizations/ })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: /To send/ })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: /Growth/ })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('shows the shared Search & Traffic anomaly source count and links to its focused section', async () => {
+    renderSurface();
+
+    const pointer = await screen.findByRole('button', { name: 'Review 3 anomalies in Search & Traffic' });
+    expect(pointer).toHaveTextContent(`${mocks.anomalies.length} anomalies`);
+    expect(mocks.anomalyAlerts).toHaveBeenCalledWith(workspaceId, true);
+
+    fireEvent.click(pointer);
+
+    expect(mocks.navigate).toHaveBeenCalledWith(`/ws/${workspaceId}/analytics-hub?section=anomalies`);
   });
 
   it('uses the canonical Growth and Needs triage vocabulary across the stream tiles and queue', async () => {

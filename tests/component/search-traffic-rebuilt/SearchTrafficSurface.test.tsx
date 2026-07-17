@@ -66,6 +66,21 @@ const ga4Overview = {
   dateRange: { start: '2026-06-01', end: '2026-06-28' },
 };
 let currentGa4Overview: typeof ga4Overview | null = ga4Overview;
+let currentAnomalies: Array<{
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  type: 'traffic_drop';
+  severity: 'critical' | 'warning' | 'positive';
+  title: string;
+  description: string;
+  metric: string;
+  currentValue: number;
+  previousValue: number;
+  changePct: number;
+  detectedAt: string;
+  source: 'gsc';
+}> = [];
 const featureFlagResponse: Partial<Record<FeatureFlagKey, boolean>> = {
   'ui-rebuild-shell': true,
 };
@@ -87,7 +102,7 @@ vi.mock('../../../src/hooks/admin', () => ({
     refetch: vi.fn(),
   }),
   useAnomalyAlerts: () => ({
-    data: [],
+    data: currentAnomalies,
     isLoading: false,
   }),
 }));
@@ -192,7 +207,7 @@ vi.mock('../../../src/hooks/admin/useInsightFeed', () => ({
 }));
 
 vi.mock('../../../src/hooks/admin/useAnomalyAlerts', () => ({
-  useAnomalyAlerts: () => ({ data: [], isLoading: false }),
+  useAnomalyAlerts: () => ({ data: currentAnomalies, isLoading: false }),
 }));
 
 vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
@@ -295,6 +310,7 @@ beforeEach(() => {
   currentSearchOverview = searchOverview;
   currentSearchError = null;
   currentGa4Overview = ga4Overview;
+  currentAnomalies = [];
   adminSearchCallMock.mockClear();
   adminGa4CallMock.mockClear();
   getMock.mockResolvedValue([
@@ -446,6 +462,31 @@ describe('SearchTrafficSurface', () => {
     expect(screen.getByText('Showing 1 of 1 rows')).toHaveClass('t-caption-sm');
     expect(screen.getByText('Open Keyword Hub')).toHaveClass('t-ui');
     expect(screen.getByText('/cosmetic-dentistry')).toBeInTheDocument();
+  });
+
+  it('reads the anomalies section deep link, opens monitoring, and focuses the existing alert section', async () => {
+    currentAnomalies = [{
+      id: 'anomaly-1',
+      workspaceId: 'ws-1',
+      workspaceName: 'Acme Dental',
+      type: 'traffic_drop',
+      severity: 'critical',
+      title: 'Organic traffic dropped',
+      description: 'Clicks fell outside the expected range.',
+      metric: 'clicks',
+      currentValue: 75,
+      previousValue: 100,
+      changePct: -25,
+      detectedAt: '2026-07-16T12:00:00.000Z',
+      source: 'gsc',
+    }];
+
+    renderSurface('/ws/ws-1/analytics-hub?section=anomalies');
+
+    const anomalySection = await screen.findByRole('button', { name: /Anomaly Alerts/i });
+    await waitFor(() => expect(anomalySection).toHaveFocus());
+    expect(anomalySection.closest('details')).toHaveAttribute('open');
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/analytics-hub?section=anomalies');
   });
 
   it('caps Search detail at 25 rows and expands or filters against the truthful row count', async () => {
