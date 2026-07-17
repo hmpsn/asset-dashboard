@@ -73,17 +73,6 @@
           "notes": "Also a real perf win (DOM diet). Optional shared WorkbenchFrame primitive if 3+ surfaces adopt the skeleton."
         },
         {
-          "id": "usability-budgets-ratification",
-          "title": "Ratify 8 usability budgets + wire enforcement homes (pr-check/contract-test/checklist)",
-          "source": "2026-07-16 UX-flow audit §5",
-          "est": "M",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "platform",
-          "notes": "Primary-action ≤1 fold; contained collections; one idiom per pattern; teaching empty states; windowed aggregates; one name per destination; truthful actions; say-it-aloud vocabulary."
-        },
-        {
           "id": "keywords-lens-diet",
           "title": "Keywords: 5 lenses → 2 + Columns preset + Group-by; surface client feedback above the table",
           "source": "2026-07-16 UX-flow audit §7",

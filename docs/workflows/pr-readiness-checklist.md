@@ -61,7 +61,21 @@ Run this before opening a PR or marking a phase complete. This checklist is inte
 - [ ] `BRAND_DESIGN_LANGUAGE.md` is updated if UI patterns/colors changed
 - [ ] `data/features.json` is updated if the feature is client-impactful or sales-relevant
 
-## 8. Verification commands
+## 8. Admin usability budgets (D3-ratified)
+
+For every new or materially reworked admin surface, apply the full contract in
+`docs/rules/usability-budgets.md`:
+
+- [ ] Budget 1 — At 1440×900 with representative data, the standard browser probe places the first enabled primary action within one fold (`y < 900`), or the surface contract explicitly declares it verdict-only
+- [ ] Budget 2 — The measured page is at most four folds deep, and every collection over 50 rows paginates, virtualizes, or uses a contained master/detail region
+- [ ] Budget 3 — A lens represents a distinct mental model, no more than two control rows sit above a collection, and Guide uses the shared Drawer idiom
+- [ ] Budget 4 — Every `EmptyState` has an action or an audited terminal/parent-owned exception; its copy names the population condition or exact recovery rather than apologizing
+- [ ] Budget 5 — Every aggregate/rate states its time window and source/basis, and the displayed numerator, denominator, rate, and total all come from the same windowed source
+- [ ] Budget 6 — Sidebar, breadcrumb, command palette, document title, and in-surface title use the same registry-resolved destination name
+- [ ] Budget 7 — New operator-facing terms are registered in `GLOSSARY.md` + `shared/types/lexicon.ts`, follow `ui-vocabulary.md`, and action labels truthfully say what they do
+- [ ] Budget 8 — Verdict/readback content appears above data-entry forms; occasional entry lives below it or behind a secondary action and Drawer
+
+## 9. Verification commands
 
 Run the standard gates:
 
@@ -79,7 +93,7 @@ rg "createTestContext\\(" tests/
 rg "violet\\|indigo" src/components/
 ```
 
-## 9. PR closeout prompts
+## 10. PR closeout prompts
 
 Answer these before you hit "ready for review":
 
