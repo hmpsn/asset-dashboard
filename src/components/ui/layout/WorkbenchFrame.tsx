@@ -2,6 +2,8 @@
 import type { ReactElement, ReactNode } from 'react';
 import { cn } from '../../../lib/utils';
 
+const WORKBENCH_VIEWPORT_HEIGHT = 'calc(100vh - var(--shell-topbar) - var(--page-pad-y) - var(--page-pad-bottom))';
+
 export interface WorkbenchFrameProps {
   /** Compact decision context and collection controls that stay visible. */
   pinned: ReactNode;
@@ -33,15 +35,28 @@ export function WorkbenchFrame({
       id={id}
       className={cn('flex min-h-0 flex-col overflow-hidden', className)}
       style={{
-        height: 'calc(100vh - var(--shell-topbar) - var(--page-pad-y) - var(--page-pad-bottom))',
+        // AppShell scrolls a content-sized <main>, so parent percentage heights are not a
+        // usable constraint here. Own a definite viewport-derived block size instead.
+        display: 'flex',
+        flex: '0 0 auto',
+        flexDirection: 'column',
+        minHeight: 0,
+        height: WORKBENCH_VIEWPORT_HEIGHT,
+        maxHeight: WORKBENCH_VIEWPORT_HEIGHT,
+        overflow: 'hidden',
       }}
       data-testid="workbench-frame"
     >
-      <div className={cn('flex-none', pinnedClassName)} data-testid="workbench-pinned">
+      <div
+        className={cn('flex min-h-0 flex-none flex-col', pinnedClassName)}
+        style={{ display: 'flex', flex: '0 0 auto', flexDirection: 'column', minHeight: 0 }}
+        data-testid="workbench-pinned"
+      >
         {pinned}
       </div>
       <div
         className={cn('min-h-0 flex-1 overflow-auto', collectionClassName)}
+        style={{ flex: '1 1 0%', minHeight: 0, overflow: 'auto' }}
         role={collectionLabel ? 'region' : undefined}
         aria-label={collectionLabel}
         data-workbench-collection

@@ -401,7 +401,10 @@ describe('SiteAuditSurface rebuilt', () => {
     await screen.findByTestId('site-audit-rebuilt-audit');
     const frame = screen.getByTestId('workbench-frame');
     expect(frame).toHaveStyle({
+      display: 'flex',
+      flex: '0 0 auto',
       height: 'calc(100vh - var(--shell-topbar) - var(--page-pad-y) - var(--page-pad-bottom))',
+      maxHeight: 'calc(100vh - var(--shell-topbar) - var(--page-pad-y) - var(--page-pad-bottom))',
     });
 
     const pinned = screen.getByTestId('workbench-pinned');
@@ -412,6 +415,7 @@ describe('SiteAuditSurface rebuilt', () => {
     const collections = frame.querySelectorAll('[data-workbench-collection]');
     expect(collections).toHaveLength(1);
     expect(collections[0]).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
+    expect(collections[0]).toHaveStyle({ flex: '1 1 0%', minHeight: 0, overflow: 'auto' });
     expect(within(collections[0] as HTMLElement).getByTestId('site-audit-issues')).toBeInTheDocument();
   });
 
