@@ -51,6 +51,13 @@ function sameKeyword(a: string, b: string): boolean {
 function collectQueryParamValues(rawValue: unknown): string[] {
   if (typeof rawValue === 'string') return [rawValue];
   if (Array.isArray(rawValue)) return rawValue.flatMap(collectQueryParamValues);
+  // Express's `qs` parser converts a repeated param with MORE than its arrayLimit
+  // (default 20) values into an OBJECT keyed by numeric strings ({0:'a',1:'b',...})
+  // instead of an array. Without this branch, a full keyword page (up to
+  // MAX_ROW_HISTORY_QUERIES = 100 rows) silently parses to zero queries and 400s.
+  if (rawValue && typeof rawValue === 'object') {
+    return Object.values(rawValue as Record<string, unknown>).flatMap(collectQueryParamValues);
+  }
   return [];
 }
 
