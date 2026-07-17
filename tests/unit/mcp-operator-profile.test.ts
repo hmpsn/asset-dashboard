@@ -247,7 +247,7 @@ describe('MCP compact operator profile contract', () => {
     const explicitFull = executorFactory(registry, MCP_SERVER_PROFILES.FULL);
     const operator = executorFactory(registry, MCP_SERVER_PROFILES.OPERATOR);
     const baseRequest = {
-      auth: { scope: 'all' as const, label: 'master' },
+      auth: { scope: 'all' as const },
       requestId: 'operator-profile-unit-test',
     };
 
@@ -259,6 +259,19 @@ describe('MCP compact operator profile contract', () => {
       .resolves.toEqual({
         content: [{ type: 'text', text: JSON.stringify({ name: 'get_workspace_overview' }) }],
       });
+    expect(handler).toHaveBeenCalledTimes(2);
+
+    const sentinelCollision = await full({
+      auth: { scope: 'all', keyId: 'key-sentinel-collision', label: 'Workspace named all' },
+      requestId: baseRequest.requestId,
+      name: 'get_workspace_overview',
+      args: { workspaceId: 'ws-other' },
+    });
+    expect(parseJsonV1(sentinelCollision)).toEqual({
+      code: 'forbidden',
+      message: 'This API key cannot operate on the requested workspace.',
+      retryable: false,
+    });
     expect(handler).toHaveBeenCalledTimes(2);
 
     const notFoundEnvelope = {

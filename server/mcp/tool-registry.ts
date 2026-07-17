@@ -9,7 +9,7 @@ import {
   MCP_TOOL_ERROR_CODES,
 } from '../../shared/types/mcp-runtime.js';
 import { createLogger } from '../logger.js';
-import type { McpAuthContext } from './auth.js';
+import { isMcpMasterKeyAuth, type McpAuthContext } from './auth.js';
 import {
   MCP_TOOL_ERROR_CONTRACTS,
   type McpToolErrorContract,
@@ -567,6 +567,15 @@ function operatorDefinition(definition: Tool): Tool {
   });
 }
 
+const OPERATOR_TOOL_DEFINITIONS = Object.freeze(
+  [...MCP_TOOL_REGISTRY.values()]
+    .filter(entry => isMcpToolAllowedInProfile(
+      MCP_SERVER_PROFILES.OPERATOR,
+      entry.definition.name,
+    ))
+    .map(entry => operatorDefinition(entry.definition as Tool)),
+) as Tool[];
+
 /**
  * Return the immutable discovery surface for one server profile.
  *
@@ -579,11 +588,7 @@ export function listMcpToolDefinitionsForProfile(
 ): Tool[] {
   if (profile === MCP_SERVER_PROFILES.FULL) return listMcpToolDefinitions();
 
-  return Object.freeze(
-    [...MCP_TOOL_REGISTRY.values()]
-      .filter(entry => isMcpToolAllowedInProfile(profile, entry.definition.name))
-      .map(entry => operatorDefinition(entry.definition as Tool)),
-  ) as Tool[];
+  return OPERATOR_TOOL_DEFINITIONS;
 }
 
 export function getDeclaredWorkspaceField(
@@ -673,6 +678,7 @@ async function executeRegisteredMcpTool(
   const entry = registry.get(name);
   const contract = registeredContract(entry);
   const toolLogFields = safeToolLogFields(entry);
+  const isMasterKey = isMcpMasterKeyAuth(auth);
   const camelWorkspaceId = readNonEmptyString(args.workspaceId);
   const snakeWorkspaceId = readNonEmptyString(args.workspace_id);
 
@@ -692,7 +698,7 @@ async function executeRegisteredMcpTool(
     ? readNonEmptyString(args[entry.workspaceField])
     : undefined;
 
-  if (auth.scope !== 'all') {
+  if (!isMasterKey) {
     if (
       typeof auth.keyId !== 'string'
       || auth.keyId.length === 0
@@ -745,7 +751,7 @@ async function executeRegisteredMcpTool(
     });
   }
 
-  const context: McpToolExecutionContext = auth.scope === 'all'
+  const context: McpToolExecutionContext = isMasterKey
     ? {
         requestId,
         toolName: name,

@@ -228,22 +228,32 @@ describe('mcp server transport routing', () => {
     expect(h.serverInstances).toHaveLength(0);
   });
 
-  it('fails closed when the operator profile receives workspace-scoped auth', async () => {
-    const res = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-    };
-    await handleMcpRequest({
-      body: {},
-      mcpAuth: {
+  it('fails closed when the operator profile receives any workspace-key identity', async () => {
+    for (const mcpAuth of [
+      {
         scope: 'ws-operator-denied',
         keyId: 'key-operator-denied',
         label: 'Workspace key',
       },
-    } as never, res as never, MCP_SERVER_PROFILES.OPERATOR);
+      {
+        scope: 'all',
+        keyId: 'key-sentinel-collision',
+        label: 'Workspace named all',
+      },
+    ]) {
+      const res = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn().mockReturnThis(),
+      };
+      await handleMcpRequest(
+        { body: {}, mcpAuth } as never,
+        res as never,
+        MCP_SERVER_PROFILES.OPERATOR,
+      );
 
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    }
     expect(h.serverInstances).toHaveLength(0);
     expect(h.transportInstances).toHaveLength(0);
   });

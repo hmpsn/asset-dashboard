@@ -63,8 +63,10 @@ automatic approval, client-send, or publication path.
 ### Workspace scope and parameter casing (gotcha)
 
 Most tools operate on **one** client workspace. Six tools are explicitly global and therefore
-master-key only: `list_workspaces` and `create_workspace`. `get_pending_work` has a declared,
-optional `workspaceId`; omitting it requests a cross-workspace summary and is also master-key only.
+master-key only: `list_workspaces`, `create_workspace`, `list_library_templates`,
+`get_library_template`, `promote_template_to_library`, and `instantiate_library_template`.
+`get_pending_work` has a declared, optional `workspaceId`; omitting it requests a cross-workspace
+summary and is also master-key only.
 
 For workspace-scoped tools, the parameter name is **not** uniform:
 
@@ -95,13 +97,14 @@ Send the key as a Bearer token: `Authorization: Bearer <key>`.
 | **Per-workspace key** | `mcp_api_keys` table (sha256-hashed) | exactly **one** workspace | Plaintext shown **once** at creation (`mcp_` prefix, 32 bytes base64url). Only the hash is stored. Revocable via `revoked_at` (idempotent) — this is how rotation works. `last_used_at` is touched on each authenticated call. |
 
 The P1 `/mcp/operator` boundary adds `mcpMasterKeyOnlyMiddleware` after normal authentication.
-It accepts only the already-resolved `scope: 'all'` identity and returns the same generic 401 for
-workspace keys; it never re-reads or re-compares bearer material. Capability-scoped operator
-credentials are intentionally deferred to P5. `/mcp` retains both key types unchanged.
+It accepts only the canonical master identity (`scope: 'all'` with no workspace-key ID or label)
+and returns the same generic 401 for workspace keys; it never re-reads or re-compares bearer
+material. Capability-scoped operator credentials are intentionally deferred to P5. `/mcp` retains
+both key types unchanged.
 
 ### Scope enforcement (security-critical)
 
-For a per-workspace key (`auth.scope !== 'all'`), `executeMcpTool` checks the workspace field
+For a per-workspace key (`!isMcpMasterKeyAuth(auth)`), `executeMcpTool` checks the workspace field
 declared by the registered tool **after** parsing, because the workspace id lives in the JSON body,
 not a header/URL. Fail-closed:
 
@@ -113,7 +116,9 @@ not a header/URL. Fail-closed:
   workspace key must not enumerate across all workspaces.
 - **Conflicting `workspaceId` / `workspace_id` aliases** → rejected for every caller.
 
-The master key (`scope: 'all'`) bypasses both checks.
+Only the canonical master identity bypasses both checks. A workspace-key row whose durable
+workspace ID happens to equal the reserved `all` sentinel remains workspace-scoped because its
+key ID and label distinguish it from the environment master key.
 
 > The `mcp_api_keys` table is created by migration `163-mcp-api-keys.sql`. The store API
 > (`createMcpApiKey`, `listMcpApiKeys`, `findActiveKeyByHash`, `revokeMcpApiKey`, `touchLastUsed`,

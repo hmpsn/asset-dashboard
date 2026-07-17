@@ -78,6 +78,7 @@ describe('MCP operator master-key boundary', () => {
     for (const req of [
       {},
       { mcpAuth: { scope: 'ws-operator-denied', keyId: 'key-1', label: 'Workspace' } },
+      { mcpAuth: { scope: 'all', keyId: 'key-all', label: 'Workspace named all' } },
     ]) {
       const res = createRes();
       const next = vi.fn();

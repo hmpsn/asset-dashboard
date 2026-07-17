@@ -12,7 +12,7 @@ import { createLogger } from '../logger.js';
 import { isServerRequestId } from '../request-correlation.js';
 import { MCP_SERVER_INSTRUCTIONS } from './instructions.js';
 import { MCP_OPERATOR_PROFILE_INSTRUCTIONS } from './profiles.js';
-import type { McpAuthContext } from './auth.js';
+import { isMcpMasterKeyAuth, type McpAuthContext } from './auth.js';
 import {
   executeMcpTool,
   executeOperatorMcpTool,
@@ -89,7 +89,7 @@ export async function handleMcpRequest(
     !auth
     || (
       profile === MCP_SERVER_PROFILES.OPERATOR
-      && auth.scope !== 'all'
+      && !isMcpMasterKeyAuth(auth)
     )
   ) {
     res.status(401).json({ error: 'Unauthorized' });
