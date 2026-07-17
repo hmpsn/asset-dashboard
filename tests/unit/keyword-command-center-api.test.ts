@@ -50,4 +50,17 @@ describe('keywordCommandCenter.rows — request params', () => {
     expect(url).toContain('page=2');
     expect(url).toContain('pageSize=50');
   });
+
+  it('builds an unpaginated grouped-view URL with its complete grouping scope', () => {
+    keywordCommandCenter.grouped('ws-1', {
+      groupBy: 'cluster',
+      filter: 'tracked',
+      search: 'seo guide',
+      sort: 'clicks',
+      direction: 'desc',
+    });
+    expect(getMock.mock.calls[0][0] as string).toBe(
+      '/api/webflow/keyword-command-center/ws-1/grouped?groupBy=cluster&filter=tracked&search=seo+guide&sort=clicks&direction=desc',
+    );
+  });
 });

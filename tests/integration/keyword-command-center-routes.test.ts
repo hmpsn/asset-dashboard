@@ -11,6 +11,7 @@ import { upsertPageKeyword } from '../../server/page-keywords.js';
 import { TRACKED_KEYWORD_SOURCE, TRACKED_KEYWORD_STATUS, type TrackedKeyword } from '../../shared/types/rank-tracking.js';
 import type {
   KeywordCommandCenterInitialViewResponse,
+  KeywordCommandCenterGroupedViewResponse,
   KeywordCommandCenterRow,
   KeywordCommandCenterRowsResponse,
   KeywordCommandCenterSummaryResponse,
@@ -113,6 +114,25 @@ describe('Keyword Command Center routes', () => {
     await expect(res.json()).resolves.toEqual({
       error: 'Initial Keyword Hub read does not support local_candidates',
     });
+  });
+
+  it('GET grouped returns complete server-owned groups and rejects an invalid grouping', async () => {
+    const grouped = await api(
+      `/api/webflow/keyword-command-center/${workspaceId}/grouped?groupBy=page&search=${encodeURIComponent('emergency dentist near me')}`,
+    );
+    expect(grouped.status).toBe(200);
+    const body = await grouped.json() as KeywordCommandCenterGroupedViewResponse;
+    expect(body).toMatchObject({
+      groupBy: 'page',
+      totalRows: 1,
+      groups: [expect.objectContaining({
+        id: '/emergency-dentist',
+        rollup: expect.objectContaining({ keywordCount: 1 }),
+      })],
+    });
+
+    const invalid = await api(`/api/webflow/keyword-command-center/${workspaceId}/grouped?groupBy=invalid`);
+    expect(invalid.status).toBe(400);
   });
 
   it('POST track activates a keyword and protected lifecycle actions require explicit confirmation', async () => {

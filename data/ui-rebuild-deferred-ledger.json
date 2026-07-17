@@ -158,17 +158,18 @@
     {
       "id": "DEF-kw-002",
       "surface": "keywords",
-      "item": "Avg-position and period-over-period delta KPI variants are deferred; the pilot renders existing count and traffic-value tiles only.",
-      "decision": "Do not compute new summary rollups or deltas in the client. The KPI variants need a server-owned rollup/snapshot-diff contract before they can be trusted.",
+      "item": "Average-position and period-over-period position delta KPIs use a server-owned rank-snapshot rollup.",
+      "decision": "Resolved in W4.2b. The KCC summary selects the latest snapshot in adjacent 28-day current/prior observation windows, serves an impression-weighted average position plus positive-is-improvement delta, and returns null rather than fabricated zeroes when current or prior evidence is missing. The rebuilt surface renders the served metrics in blue MetricTiles.",
       "class": "data",
-      "upgradeTrigger": "Server summary exposes average-position and comparison-period deltas with tests that define the date window and empty-state semantics.",
+      "upgradeTrigger": "Complete: server summary rollups, pinned equal-length windows, empty-state tests, and rebuilt KPI tiles are live.",
       "owner": "josh",
-      "status": "open",
+      "status": "done",
       "roadmapItemId": null,
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
       "links": {
-        "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation"
+        "source": "docs/ui-rebuild/pilot/keywords-data-source-ledger.md#3-platform-build-backlog--build-vs-defer-recommendation",
+        "roadmapArchiveId": "admin-ux-w42b-keyword-summary-rollups-grouped-views"
       }
     },
     {
@@ -206,17 +207,18 @@
     {
       "id": "DEF-kw-003",
       "surface": "keywords",
-      "item": "The Pages/Clusters/Lifecycle grouped lenses group only the CURRENT PAGE of rows (pageSize <= 100), not the full workspace keyword set \u2014 so BoardColumn counts and group stats reflect page 1 while the lens tab shows the true total. Review PR #1480 made this HONEST (a truncation banner + removed the fabricated client-side averageRank) but full coverage needs server-side grouping.",
-      "decision": "Ship the grouped lenses over the current page WITH an explicit truncation banner (never present a page-1 board as the full universe) rather than fetch-all-client-side (unbounded) or block the pilot on a server grouping contract. averageRank removed per DEF-kw-002 (no client rollups).",
+      "item": "Pages, Clusters, and Lifecycle lenses use the complete server-side grouped keyword read model rather than grouping the current list page.",
+      "decision": "Resolved in W4.2b. The KCC grouped endpoint projects all filter/search-scoped rows from one skinny source snapshot and groups them by page, cluster, or lifecycleStage with server-owned keyword, click, impression, and average-position rollups. The rebuilt lenses render those groups directly; the #1480 current-page truncation banner and client grouping helpers are retired.",
       "class": "data",
-      "upgradeTrigger": "A server-side grouped-view read model (group by page/cluster/lifecycleStage across ALL keywords with server-computed counts + rollups) \u2014 then the grouped lenses render complete groups without the page cap.",
+      "upgradeTrigger": "Complete: the server grouped-view read model and complete rebuilt grouped lenses are live without a page cap.",
       "owner": "josh",
-      "status": "open",
+      "status": "done",
       "roadmapItemId": null,
       "createdAt": "2026-07-06",
       "reviewBy": "2026-10-31",
       "links": {
-        "pr": "#1480"
+        "pr": "#1480",
+        "roadmapArchiveId": "admin-ux-w42b-keyword-summary-rollups-grouped-views"
       }
     },
     {

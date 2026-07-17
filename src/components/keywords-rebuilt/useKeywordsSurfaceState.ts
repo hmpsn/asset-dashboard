@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   KEYWORD_COMMAND_CENTER_FILTERS,
+  KEYWORD_COMMAND_CENTER_GROUP_BY,
   type KeywordCommandCenterFilter,
+  type KeywordCommandCenterGroupedViewQuery,
   type KeywordCommandCenterRowsQuery,
 } from '../../../shared/types/keyword-command-center';
 import {
@@ -151,6 +153,7 @@ export interface UseKeywordsSurfaceStateReturn {
   openKeyword: (keyword: string) => void;
   closeKeyword: () => void;
   rowsQuery: KeywordCommandCenterRowsQuery;
+  groupedQuery: KeywordCommandCenterGroupedViewQuery | null;
 }
 
 export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
@@ -290,6 +293,23 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
     page,
     pageSize,
   }), [filter, page, pageSize, search, sort.direction, sort.key]);
+  const groupedQuery = useMemo<KeywordCommandCenterGroupedViewQuery | null>(() => {
+    const serverGroupBy = lens === 'lifecycle'
+      ? KEYWORD_COMMAND_CENTER_GROUP_BY.LIFECYCLE_STAGE
+      : groupBy === 'page'
+        ? KEYWORD_COMMAND_CENTER_GROUP_BY.PAGE
+        : groupBy === 'cluster'
+          ? KEYWORD_COMMAND_CENTER_GROUP_BY.CLUSTER
+          : null;
+    if (!serverGroupBy) return null;
+    return {
+      groupBy: serverGroupBy,
+      filter,
+      search: search || undefined,
+      sort: hubSortToKccSort(sort.key),
+      direction: sort.direction,
+    };
+  }, [filter, groupBy, lens, search, sort.direction, sort.key]);
 
   return {
     lens,
@@ -313,5 +333,6 @@ export function useKeywordsSurfaceState(): UseKeywordsSurfaceStateReturn {
     openKeyword,
     closeKeyword,
     rowsQuery,
+    groupedQuery,
   };
 }

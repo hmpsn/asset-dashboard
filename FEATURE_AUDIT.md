@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 713** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 714** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 714. Server-owned keyword summary rollups and complete grouped lenses 2026-07-17
+
+**What it does:** Closes `DEF-kw-002` and `DEF-kw-003` with two KCC-owned skinny read models over existing data. The summary now serves an impression-weighted average position and positive-is-improvement comparison delta from adjacent 28-day snapshot-observation windows anchored to the latest rank snapshot. The new grouped endpoint projects every filter/search-scoped keyword from one KCC source snapshot, then groups by page, topic cluster, or lifecycle stage with server-owned keyword counts, clicks, impressions, average position, coverage copy, and cannibalization flags. The rebuilt Keywords surface adds blue Avg. position and Position change `MetricTile`s and renders complete server groups directly; it no longer groups the current page or shows the temporary truncation warning.
+
+**Why it matters:** Operators can trust that a lifecycle column or page group represents the whole selected keyword set, not whichever 50–100 rows happened to be on screen. Rank KPIs make comparison evidence scannable without presenting missing history as zero or stable performance.
+
+**Boundaries:** Both paths stay inside the SEO-health/KCC skinny projection. They do not call the retired full keyword-universe model, mutate rank data, change W4.2a's row-history contract, or require a database migration. Missing current rank evidence yields unavailable average and deltas; missing prior evidence preserves the current average while comparison deltas remain unavailable.
+
+**Tests:** Adjacent-window boundary selection, impression weighting, zero-impression mean fallback, missing-current and missing-prior semantics; 105-row full-set grouping beyond the list cap; page/cluster/lifecycle membership and server rollups; grouped API serialization and route validation; component KPI, empty-state, complete-group, no-truncation, and accessibility coverage.
+
+**Files:** `shared/types/keyword-command-center.ts`; KCC summary/source/grouped/rows services and facade/route; KCC API, query keys, hook, state, and rebuilt Keywords lenses/surface; focused unit/integration/component tests; deferred ledger, roadmap, brand language, and this audit.
 
 ---
 
@@ -866,7 +880,7 @@ A comprehensive value assessment of every feature in the platform — **feature 
 
 **Why it matters to clients:** Indirect but meaningful — operators keep the full keyword workflow and trust signals while getting a denser, more consistent surface for deciding which keywords to track, promote, retire, or turn into content. No client-facing money is fabricated; money remains display-only from server data.
 
-**Deferred decisions:** `DEF-kw-001` originally tracked inline row sparklines/7-day deltas and was resolved by feature 713's batched history read model; `DEF-kw-002` still tracks avg-position and period-over-period KPI variants pending server-owned rollup/delta semantics.
+**Deferred decisions:** `DEF-kw-001` was resolved by feature 713's batched history read model. `DEF-kw-002` and the later `DEF-kw-003` current-page grouping follow-up are resolved by feature 714's server-owned summary and grouped read models.
 
 **Tests:** Contract/unit coverage for opportunity score, traffic value, lifecycle stage, deep-link/a11y coverage, query invalidation, and bundle budget; component tests for flag mount, lenses, table, drawer, states, WS invalidation, mutations, and a11y; Playwright Component Testing visual baselines for 5 states × 2 themes. Pre-commit changed-test run passed 2,003 files / 28,264 tests.
 

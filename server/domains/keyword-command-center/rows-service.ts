@@ -2,6 +2,7 @@ import { keywordComparisonKey } from '../../../shared/keyword-normalization.js';
 import {
   KEYWORD_COMMAND_CENTER_FILTERS,
   type KeywordCommandCenterFilter,
+  type KeywordCommandCenterRow,
   type KeywordCommandCenterRowsQuery,
   type KeywordCommandCenterRowsResponse,
 } from '../../../shared/types/keyword-command-center.js';
@@ -19,6 +20,7 @@ import {
   restrictPageToKeys,
 } from './bundle-filters.js';
 import {
+  allRowCandidateKeysForQuery,
   filterBundleToKeys,
   LOCAL_CANDIDATE_ROW_LIMIT,
   rowCandidateKeysForQuery,
@@ -337,4 +339,73 @@ export async function buildKeywordCommandCenterRows(
     return buildKeywordCommandCenterLocalCandidateRows(workspaceId, query, options);
   }
   return buildKeywordCommandCenterRowsSkinny(workspaceId, query, options);
+}
+
+/**
+ * Complete skinny-row projection for the server-owned grouped read model.
+ * Unlike `/rows`, this deliberately does not paginate; it still reads only the
+ * KCC source snapshot and list-row projection, never the retired full universe.
+ */
+export async function buildKeywordCommandCenterRowsForGrouping(
+  workspaceId: string,
+  query: KeywordCommandCenterRowsQuery = {},
+  options: { includeLocalSeo?: boolean; sourceSnapshot?: KeywordCommandCenterSourceSnapshot } = {},
+): Promise<KeywordCommandCenterRow[] | null> {
+  const filter = query.filter ?? KEYWORD_COMMAND_CENTER_FILTERS.ALL;
+  if (filterNeedsLocalCandidates(filter)) {
+    const response = await buildKeywordCommandCenterLocalCandidateRows(workspaceId, {
+      ...query,
+      page: 1,
+      pageSize: LOCAL_CANDIDATE_ROW_LIMIT,
+    }, options);
+    return response?.rows ?? null;
+  }
+
+  const snapshot = options.sourceSnapshot ?? buildKeywordCommandCenterSourceSnapshot(workspaceId, {
+    includeLocalSeo: options.includeLocalSeo,
+    includeScoring: true,
+  });
+  if (!snapshot) return null;
+  const valueScoring = snapshot.scoringContext
+    ? { on: true, ctx: snapshot.scoringContext }
+    : buildValueScoringConfig(snapshot.workspace);
+  const localVisibilityByKeyword = localVisibilityByFilter(
+    snapshot.workspace.id,
+    filter,
+    options.includeLocalSeo,
+    snapshot.localVisibilityByKeyword,
+  );
+  const bundle = buildFilteredBundle({ snapshot, filter, localVisibility: localVisibilityByKeyword });
+  const candidateBundle = filterUsesLocalVisibilityRows(filter)
+    ? {
+      ...bundle,
+      strategy: null,
+      pageMap: [],
+      contentGaps: [],
+      keywordGaps: [],
+      trackedKeywords: [],
+      latestRanks: [],
+      feedback: new Map<string, FeedbackRow>(),
+    }
+    : bundle;
+  const allKeys = allRowCandidateKeysForQuery(candidateBundle, localVisibilityByKeyword, query, valueScoring);
+  const completeBundle = filterBundleToKeys(bundle, allKeys);
+  const completeLocalVisibility = filterMapByKeys(localVisibilityByKeyword, allKeys);
+  const lostVisibilityKeys = new Set(snapshot.lostVisibilityRows.map(row => keywordComparisonKey(row.query)).filter(Boolean));
+  const rows = new Map<string, DraftRow>();
+  await populateDraftRows(rows, completeBundle);
+  ensureLocalVisibilityRows(rows, completeLocalVisibility);
+  const finalized = finalizeDraftRows(rows, {
+    workspaceId: snapshot.workspace.id,
+    localVisibilityByKeyword: completeLocalVisibility,
+    activeLocalMarketCount: options.includeLocalSeo ? snapshot.activeLocalMarketCount ?? 0 : 0,
+    lostVisibilityKeys,
+    valueScoring,
+    publishedPagePaths: listPublishedPostPagePaths(snapshot.workspace.id),
+  });
+  return finalized.rows
+    .filter(row => matchesFilter(row, filter))
+    .filter(row => matchesSearch(row, query.search))
+    .sort(sortRowsForQuery(query.sort, query.direction))
+    .map(stripRowForList);
 }
