@@ -52,7 +52,7 @@ import { LocalSeoMarketSetupDrawer } from '../local-seo/LocalSeoMarketSetupDrawe
 import { EngineWorkQueue } from './EngineWorkQueue';
 import { EngineMoveDrawer } from './EngineMoveDrawer';
 import { EngineOperations } from './EngineOperations';
-import { type EngineLens, useEngineSurfaceState } from './useEngineSurfaceState';
+import { ENGINE_LENSES, type EngineLens, useEngineSurfaceState } from './useEngineSurfaceState';
 import { formatDate, formatMoney, provenanceBasis } from './engineFormatters';
 import { mutationErrorMessage } from './engineMutationFeedback';
 
@@ -591,7 +591,11 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
         )}
 
         <div data-testid="engine-opening-cluster" className="flex flex-col gap-0">
-          <Toolbar label="Insights Engine controls" className="w-full" align="center">
+          <Toolbar
+            label="Insights Engine controls"
+            className="sticky top-0 z-[var(--z-sticky)] w-full bg-[var(--surface-1)] py-2"
+            align="center"
+          >
             <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-3">
               <h1 className="t-label m-0 flex-none text-[var(--teal)]">
                 Insights Engine · {workspaceName}
@@ -604,6 +608,23 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                   : 'Freshness unavailable'}
               </p>
             </div>
+            <nav
+              aria-label="Engine sections"
+              className="flex w-full gap-1 overflow-x-auto border-t border-[var(--brand-border)] pt-2"
+            >
+              {ENGINE_LENSES.filter((lens) => lens.id !== 'spine').map((lens) => (
+                <Button
+                  key={lens.id}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => state.setLens(lens.id)}
+                  aria-current={state.lens === lens.id ? 'location' : undefined}
+                  className="flex-none"
+                >
+                  {lens.label}
+                </Button>
+              ))}
+            </nav>
           </Toolbar>
 
           <section

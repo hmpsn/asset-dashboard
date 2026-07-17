@@ -1,11 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import OutcomeDashboard from '../../src/components/admin/outcomes/OutcomeDashboard';
 import RecordPublishedWorkCard from '../../src/components/admin/outcomes/RecordPublishedWorkCard';
 
 const mutate = vi.fn();
 vi.mock('../../src/hooks/admin/useOutcomes', () => ({
   useRecordOutcomeAction: () => ({ mutate, isPending: false, isError: false }),
 }));
+
+vi.mock('../../src/components/admin/outcomes/OutcomeTopWins', () => ({
+  default: () => <div data-testid="outcome-wins-readback">Top wins readback</div>,
+}));
+vi.mock('../../src/components/admin/outcomes/OutcomeScorecard', () => ({ default: () => <div>Scorecard readback</div> }));
+vi.mock('../../src/components/admin/outcomes/OutcomeActionFeed', () => ({ default: () => <div>Action readback</div> }));
+vi.mock('../../src/components/admin/outcomes/OutcomeLearningsPanel', () => ({ default: () => <div>Learnings readback</div> }));
+vi.mock('../../src/components/admin/outcomes/OutcomePlaybooks', () => ({ default: () => <div>Playbooks readback</div> }));
+vi.mock('../../src/components/admin/outcomes/OutcomeCoverageFunnel', () => ({ default: () => <div>Coverage readback</div> }));
 
 afterEach(() => {
   cleanup();
@@ -18,6 +28,18 @@ function fill(url: string, title: string) {
 }
 
 describe('RecordPublishedWorkCard', () => {
+  it('keeps the active outcome readback above the occasional record-work form', async () => {
+    render(<OutcomeDashboard workspaceId="ws-1" />);
+
+    const tabs = screen.getByRole('tablist');
+    const readback = await screen.findByTestId('outcome-wins-readback');
+    const recordForm = screen.getByRole('button', { name: 'Record' }).closest('form');
+
+    expect(recordForm).not.toBeNull();
+    expect(tabs.compareDocumentPosition(readback) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(readback.compareDocumentPosition(recordForm!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('records agency-published work as platform_executed with a source snapshot', () => {
     render(<RecordPublishedWorkCard workspaceId="ws-1" />);
     fill('https://rinse.example/blog/whitening', 'Teeth Whitening 101');

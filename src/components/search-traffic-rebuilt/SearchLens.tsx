@@ -22,6 +22,7 @@ import {
   EmptyState,
   Icon,
   InlineBanner,
+  SearchField,
   Segmented,
   Skeleton,
 } from '../ui';
@@ -56,6 +57,8 @@ const SEARCH_LINES: TrendLine[] = [
   { key: 'position', color: SERIES.position, yAxisId: 'right', label: 'Position' },
   { key: 'clicksPrior', color: SERIES.previous, yAxisId: 'left', label: 'Prior clicks' },
 ];
+
+const DETAIL_ROW_LIMIT = 25;
 
 function badgeFor(insight: FeedInsight) {
   if (insight.type === 'ctr_opportunity') return { label: 'Low CTR', tone: 'red' as const };
@@ -182,6 +185,8 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
   const strategyKeywords = useMemo(() => new Set((strategySet.data?.keywords ?? []).map((item) => item.keyword.toLowerCase())), [strategySet.data?.keywords]);
   const badgeMap = useMemo(() => buildBadgeMap(feed), [feed]);
   const [showAllInsights, setShowAllInsights] = useState(false);
+  const [tableFilter, setTableFilter] = useState('');
+  const [showAllRows, setShowAllRows] = useState(false);
   const contextBand = (
     <SearchContextBand
       workspaceId={workspaceId}
@@ -264,6 +269,14 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
     ? data.overview.topQueries.map((row: SearchQuery) => ({ ...row }))
     : data.overview.topPages.map((row: SearchPage) => ({ ...row }));
   const rowCount = tableMode === 'queries' ? data.overview.topQueries.length : data.overview.topPages.length;
+  const normalizedTableFilter = tableFilter.trim().toLowerCase();
+  const filteredRows = normalizedTableFilter
+    ? rows.filter((row) => String('query' in row ? row.query : row.page).toLowerCase().includes(normalizedTableFilter))
+    : rows;
+  const visibleRows = showAllRows ? filteredRows : filteredRows.slice(0, DETAIL_ROW_LIMIT);
+  const rowCountLabel = normalizedTableFilter
+    ? `Showing ${visibleRows.length} of ${filteredRows.length} matching rows (${rowCount} total)`
+    : `Showing ${visibleRows.length} of ${rowCount} rows`;
 
   return (
     <div className="flex flex-col gap-4">
@@ -374,7 +387,7 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
         action={(
           <div className="flex flex-wrap items-center justify-end gap-3">
             <span className="t-caption-sm text-[var(--brand-text-muted)]">
-              {rowCount} {rowCount === 1 ? 'row' : 'rows'}
+              {rowCountLabel}
             </span>
             <Segmented
               options={[
@@ -382,17 +395,44 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
                 { value: 'pages', label: 'Pages' },
               ]}
               value={tableMode}
-              onChange={(value) => onTableModeChange(value as SearchTrafficTableMode)}
+              onChange={(value) => {
+                setTableFilter('');
+                setShowAllRows(false);
+                onTableModeChange(value as SearchTrafficTableMode);
+              }}
             />
           </div>
         )}
       >
-        <DataTable
-          columns={tableMode === 'queries' ? queryColumns(strategyKeywords, badgeMap) : pageColumns(badgeMap)}
-          rows={rows as unknown as Record<string, unknown>[]}
-          getRowKey={(row, index) => `${tableMode}-${String(row.query ?? row.page)}-${index}`}
-          empty={<EmptyState icon={Search} title={tableMode === 'queries' ? 'No queries' : 'No pages'} description="No row-level Search Console data returned for this window." />}
-        />
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <SearchField
+            value={tableFilter}
+            onChange={setTableFilter}
+            placeholder={tableMode === 'queries' ? 'Search queries…' : 'Search pages…'}
+            className="min-w-0 flex-1"
+          />
+          {filteredRows.length > DETAIL_ROW_LIMIT && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAllRows((current) => !current)}
+              className="flex-none"
+            >
+              {showAllRows ? `Show first ${DETAIL_ROW_LIMIT}` : `Show all ${filteredRows.length}`}
+            </Button>
+          )}
+        </div>
+        <div
+          data-testid="search-detail-table-region"
+          className={showAllRows ? 'max-h-[60vh] overflow-auto' : undefined}
+        >
+          <DataTable
+            columns={tableMode === 'queries' ? queryColumns(strategyKeywords, badgeMap) : pageColumns(badgeMap)}
+            rows={visibleRows as unknown as Record<string, unknown>[]}
+            getRowKey={(row, index) => `${tableMode}-${String(row.query ?? row.page)}-${index}`}
+            empty={<EmptyState icon={Search} title={tableMode === 'queries' ? 'No queries' : 'No pages'} description="No row-level Search Console data returned for this window." />}
+          />
+        </div>
       </ChartCard>
 
       {contextBand}

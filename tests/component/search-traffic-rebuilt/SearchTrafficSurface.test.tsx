@@ -443,9 +443,57 @@ describe('SearchTrafficSurface', () => {
 
     expect(await screen.findByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true');
     await waitFor(() => expect(getMock).toHaveBeenCalled());
-    expect(screen.getByText('1 row')).toHaveClass('t-caption-sm');
+    expect(screen.getByText('Showing 1 of 1 rows')).toHaveClass('t-caption-sm');
     expect(screen.getByText('Open Keyword Hub')).toHaveClass('t-ui');
     expect(screen.getByText('/cosmetic-dentistry')).toBeInTheDocument();
+  });
+
+  it('caps Search detail at 25 rows and expands or filters against the truthful row count', async () => {
+    currentSearchOverview = {
+      ...searchOverview,
+      topQueries: Array.from({ length: 32 }, (_, index) => ({
+        query: `detail query ${String(index + 1).padStart(2, '0')}`,
+        clicks: 320 - index,
+        impressions: 3_200 - index,
+        ctr: 10 - (index / 10),
+        position: 1 + index,
+      })),
+      topPages: Array.from({ length: 28 }, (_, index) => ({
+        page: `https://acme.com/detail-page-${String(index + 1).padStart(2, '0')}`,
+        clicks: 280 - index,
+        impressions: 2_800 - index,
+        ctr: 9 - (index / 10),
+        position: 2 + index,
+      })),
+    };
+    renderSurface('/ws/ws-1/analytics-hub?lens=search');
+
+    const grid = await screen.findByRole('grid');
+    expect(within(grid).getAllByRole('row')).toHaveLength(26);
+    expect(screen.getByText('detail query 25')).toBeInTheDocument();
+    expect(screen.queryByText('detail query 26')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 25 of 32 rows')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 32' }));
+
+    expect(await screen.findByText('detail query 32')).toBeInTheDocument();
+    expect(screen.getByTestId('search-detail-table-region')).toHaveClass('max-h-[60vh]', 'overflow-auto');
+    expect(screen.getByText('Showing 32 of 32 rows')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search queries…'), {
+      target: { value: 'query 30' },
+    });
+
+    expect(await screen.findByText('detail query 30')).toBeInTheDocument();
+    expect(screen.queryByText('detail query 29')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 1 of 1 matching rows (32 total)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Pages' }));
+
+    expect(await screen.findByText('/detail-page-25')).toBeInTheDocument();
+    expect(screen.queryByText('/detail-page-26')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 25 of 28 rows')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show all 28' })).toBeInTheDocument();
   });
 
   it('returns to Search with canonical URL state while preserving days and view', async () => {

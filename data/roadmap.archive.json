@@ -49,6 +49,39 @@
           "createdAt": "2026-07-16",
           "owner": "platform",
           "notes": "W0.3 complete across the conventions judge's replacement sites: Engine, Cockpit, Keywords, the shared lifecycle badge, and Site Audit use the registered say-it-aloud labels; Site Audit hands Decaying pages to Content Pipeline's canonical Content Health tab. Persisted discriminators money, unclassified, and raw_evidence remain unchanged, and legacy flag-OFF display paths retain compatibility copy."
+        },
+        {
+          "id": "engine-jump-nav-senders",
+          "title": "Engine: render ENGINE_LENSES jump-nav senders in a sticky toolbar row",
+          "source": "2026-07-16 UX-flow audit §3 (quick win)",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "strategy",
+          "notes": "Completed W1.1: the opening Engine toolbar now renders sticky Changes, Signals, POV, Moves, and Operations ghost-button senders from ENGINE_LENSES. Each sender delegates to setLens so the existing URL, scroll, and focus receiver remains authoritative; the top --z-sticky row stays separate from the fixed-bottom CurationBulkActionBar. Navigation aid only — budget 1 remains owned by W2.A."
+        },
+        {
+          "id": "canyon-cap-search-traffic",
+          "title": "Search & Traffic: Detail table cap (~25) + in-table filter + truthful expander (35.7 folds)",
+          "source": "2026-07-16 UX-flow audit §4; rebuild audit #27",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "analytics",
+          "notes": "Completed W1.1: the Search Detail card renders 25 rows initially, filters the complete query/page row set in-table, reports visible/filtered/source totals truthfully, and expands all matching rows inside a 60vh scroll region so the lower Search band remains reachable. No CT story baselines changed."
+        },
+        {
+          "id": "outcomes-record-form-demotion",
+          "title": "Outcomes: move Record-published-work below the tabs or behind a Drawer",
+          "source": "2026-07-16 UX-flow audit §6; rebuild audit inversion",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "outcomes",
+          "notes": "Completed W1.1: OutcomeDashboard now renders the active outcome readback immediately after the TabBar and places Record published work below it, preserving the form while removing the readback/data-entry hierarchy inversion. Existing tab deep-link and EmptyState contracts were untouched."
         }
       ],
       "shippedAt": "2026-07-17"

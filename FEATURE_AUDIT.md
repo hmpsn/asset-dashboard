@@ -9974,3 +9974,15 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Compatibility:** Internal work-stream and lifecycle discriminators (`money`, `unclassified`, `raw_evidence`) are unchanged. Legacy flag-OFF Keyword Hub and Site Audit copy remains untouched under D8.
 
 **Files:** rebuilt Cockpit work queue and tests; rebuilt Site Audit surface and tests; shared status badge registry and test; roadmap completion note.
+
+### 707. Admin UX W1.1 flow quick wins 2026-07-17
+
+**Status:** Complete. Three rebuilt admin surfaces now remove avoidable navigation, collection-depth, and readback-order friction without changing their data or mutation contracts.
+
+**What changed:** Insights Engine renders Changes, Signals, POV, Moves, and Operations as a sticky jump row in its opening toolbar. The senders use the existing `ENGINE_LENSES` vocabulary and `setLens` receiver, including its URL persistence, focus, and smooth-scroll behavior. Search & Traffic caps the Detail table at 25 rows, adds a mode-aware in-table text search, states visible/filtered/source counts, and contains the expanded full set in a 60vh scroll region. Outcomes keeps the selected readback immediately below its TabBar and moves the occasional Record published work form beneath that readback.
+
+**Constraints preserved:** Engine navigation remains a navigation aid rather than a budget-1 fold fix; the fixed-bottom curation bulk bar and top sticky navigation do not overlap. Search & Traffic keeps its narrative report scroll and no component-test visual baseline was regenerated. Outcomes retains its existing tab state and form behavior; no EmptyState allowlist or deep-link contract changed.
+
+**Tests:** Engine sender labels, sticky positioning, URL update, focus, and existing scroll receiver; Search row cap, truthful expander, contained expansion, and full-set filter; Outcomes readback-before-form DOM order plus existing manual-record attribution behavior.
+
+**Files:** rebuilt Engine/Search surfaces and component tests; Outcome dashboard and record-work component test; `data/roadmap.json`; `FEATURE_AUDIT.md`.

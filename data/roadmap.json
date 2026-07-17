@@ -7,17 +7,6 @@
       "rationale": "Instrumented UX-flow audit (docs/superpowers/audits/2026-07-16-admin-ux-flow-audit.md) + carried-over items from the rebuild audit. Advisory findings ratified into work items; owner prioritizes.",
       "items": [
         {
-          "id": "engine-jump-nav-senders",
-          "title": "Engine: render ENGINE_LENSES jump-nav senders in a sticky toolbar row",
-          "source": "2026-07-16 UX-flow audit §3 (quick win)",
-          "est": "S",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "strategy",
-          "notes": "Receiver + URL state already built (EngineSurface.tsx:500-513); render Changes/Signals/POV/Moves/Operations anchors via Segmented/ghost buttons."
-        },
-        {
           "id": "engine-actions-forward-reorder",
           "title": "Engine: actions-forward spine reorder (Option A) — owner circle-back",
           "source": "2026-07-16 UX-flow audit §3; engine-contract.md:135 trigger fired",
@@ -49,17 +38,6 @@
           "createdAt": "2026-07-16",
           "owner": "site-health",
           "notes": "Heaviest caliber; also resolves the drawer-per-page scale finding from the rebuild audit."
-        },
-        {
-          "id": "canyon-cap-search-traffic",
-          "title": "Search & Traffic: Detail table cap (~25) + in-table filter + truthful expander (35.7 folds)",
-          "source": "2026-07-16 UX-flow audit §4; rebuild audit #27",
-          "est": "S",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "analytics",
-          "notes": "Report caliber — keep narrative page scroll; cap only the Detail ChartCard."
         },
         {
           "id": "canyon-containment-media",
@@ -115,17 +93,6 @@
           "createdAt": "2026-07-16",
           "owner": "cockpit",
           "notes": "Stops the re-find tax when landing on large surfaces."
-        },
-        {
-          "id": "outcomes-record-form-demotion",
-          "title": "Outcomes: move Record-published-work below the tabs or behind a Drawer",
-          "source": "2026-07-16 UX-flow audit §6; rebuild audit inversion",
-          "est": "S",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "outcomes",
-          "notes": "Readback first; data entry secondary."
         },
         {
           "id": "command-palette-verbs",
