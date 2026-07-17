@@ -112,7 +112,7 @@ describe('RebuiltSidebar', () => {
     expectBefore(optimization, clientFacing);
     expectBefore(clientFacing, admin);
 
-    for (const label of ['Keywords', 'Competitors', 'Content Pipeline', 'Local Presence', 'Asset Manager', 'Action Results', 'Requests']) {
+    for (const label of ['Keywords', 'Competitors', 'Content Pipeline', 'Local Presence', 'Asset Manager', 'AI Visibility', 'Action Results', 'Requests']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     }
     const flagOn = (flag: FeatureFlagKey) => flag === 'ui-rebuild-shell';

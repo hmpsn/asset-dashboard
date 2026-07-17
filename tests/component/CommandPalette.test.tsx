@@ -276,7 +276,7 @@ describe('CommandPalette', () => {
       open();
 
       expect(useFeatureFlagMock).toHaveBeenCalledWith('ui-rebuild-shell');
-      for (const label of ['Cockpit', 'Insights Engine', 'Keywords', 'Asset Manager', 'Content Pipeline']) {
+      for (const label of ['Cockpit', 'Insights Engine', 'Keywords', 'Asset Manager', 'AI Visibility', 'Content Pipeline']) {
         expect(screen.getByText(label)).toBeInTheDocument();
       }
       for (const legacyLabel of ['Home', 'Strategy', 'Keyword Hub', 'Assets', 'Pipeline']) {
@@ -296,6 +296,7 @@ describe('CommandPalette', () => {
       expect(screen.getByText('Assets')).toBeInTheDocument();
       expect(screen.getByText('Pipeline')).toBeInTheDocument();
       expect(screen.getByText('Content Perf')).toBeInTheDocument();
+      expect(screen.queryByText('AI Visibility')).not.toBeInTheDocument();
       expect(screen.queryByText('Cockpit')).not.toBeInTheDocument();
     });
   });

@@ -22,6 +22,7 @@ import {
   NAV_REGISTRY_BY_ID,
   NON_REGISTRY_PAGES,
   REBUILT_NAV_ZONES,
+  isNavEntryHidden,
   resolveNavLabel,
   resolveRebuiltNavZoneLabel,
 } from '../../src/lib/navRegistry';
@@ -48,6 +49,14 @@ describe('navRegistry completeness', () => {
   it('keeps Requests as a labeled Client-Facing rail home', () => {
     expect(NAV_REGISTRY_BY_ID.requests.label).toBe('Requests');
     expect(resolveRebuiltNavZoneLabel('requests')).toBe('Client-Facing');
+  });
+
+  it('keeps AI Visibility in Search & Site Health and visible only with the rebuilt shell ON', () => {
+    const entry = NAV_REGISTRY_BY_ID['ai-visibility'];
+    expect(entry.label).toBe('AI Visibility');
+    expect(resolveRebuiltNavZoneLabel('ai-visibility')).toBe('Search & Site Health');
+    expect(isNavEntryHidden(entry, () => false)).toBe(true);
+    expect(isNavEntryHidden(entry, (flag) => flag === 'ui-rebuild-shell')).toBe(false);
   });
 
   it('parses a non-empty Page union from routes.ts', () => {

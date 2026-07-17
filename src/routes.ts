@@ -6,6 +6,7 @@ export type Page =
   | 'seo-strategy' | 'seo-keywords' | 'page-intelligence' | 'local-seo' | 'seo-schema' | 'seo-briefs' | 'competitors'
   | 'content' | 'calendar' | 'brand' | 'subscriptions' | 'content-pipeline'
   | 'analytics-hub'
+  | 'ai-visibility'
   | 'performance'
   | 'content-perf'
   | 'rewrite'

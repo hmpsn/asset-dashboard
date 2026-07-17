@@ -2,7 +2,7 @@
 
 Source of truth for mounted rebuilt surfaces: `src/components/layout/rebuiltSurfaces.ts`.
 
-This inventory began as behavior-first triage. Joshua explicitly approved the original final 24-route batch with every documented exception and retained Page Rewriter Focus rail on 2026-07-10, bringing the original 26 mounts to `owner-approved`. He later approved the Page Intelligence / Content Performance receiving-home bundle: Page Intelligence is the 27th owner-approved direct mount, while Content Performance is an owner-approved folded receiver rather than another registry entry.
+This inventory began as behavior-first triage. Joshua explicitly approved the original final 24-route batch with every documented exception and retained Page Rewriter Focus rail on 2026-07-10, bringing the original 26 mounts to `owner-approved`. He later approved the Page Intelligence / Content Performance receiving-home bundle: Page Intelligence is the 27th owner-approved direct mount, while Content Performance is an owner-approved folded receiver rather than another registry entry. W3.1 adds AI Visibility as the 28th direct mount under an embedded dedicated-home default that is still awaiting owner review.
 
 Accepted directions and their circle-back triggers for the behavior mismatch and capability risk buckets are recorded in `docs/ui-rebuild/parity/owner-decision-packet.md`.
 
@@ -35,7 +35,13 @@ Route coverage note: this inventory grades mounted rebuilt route families, not e
 
 | Surface | Reason | Required contract focus |
 |---|---|---|
-| `content-perf` → `content-pipeline?tab=published` / Content Performance | Status: `owner-approved`. Pipeline Published owns the flag-on four-stat/result-card composition, stable item identity, paired trend Drawer, typed unavailable states, bounded read refetch, and public-safe projection. Flag-off keeps the legacy page/nav, so this is not a 28th direct rebuilt mount. Joshua approved the receiving-home bundle on 2026-07-11. | Complete for the visual receiving-home decision. Preserve the compatibility route until a separately authorized staging retirement proves the shipping flag state and route-removal checklist. `AUD-D4` separately asks whether impressions/sessions should also appear in the first summary band. |
+| `content-perf` → `content-pipeline?tab=published` / Content Performance | Status: `owner-approved`. Pipeline Published owns the flag-on four-stat/result-card composition, stable item identity, paired trend Drawer, typed unavailable states, bounded read refetch, and public-safe projection. Flag-off keeps the legacy page/nav, so this remains a folded receiver rather than a direct rebuilt mount. Joshua approved the receiving-home bundle on 2026-07-11. | Complete for the visual receiving-home decision. Preserve the compatibility route until a separately authorized staging retirement proves the shipping flag state and route-removal checklist. `AUD-D4` separately asks whether impressions/sessions should also appear in the first summary band. |
+
+## Awaiting Owner Approval
+
+| Surface | Reason | Required contract focus |
+|---|---|---|
+| `ai-visibility` / AI Visibility | Status: `awaiting owner approval`. W3.1 implements the campaign's embedded default: a dedicated lightweight Search & Site Health home that composes the established aggregate panel and refresh job exactly once. | Owner may veto the dedicated home at PR review. Until then, preserve the exact-once capability packet and byte-identical flag-OFF Keyword Hub mount. |
 
 ## Owner-Approved Capability Exceptions
 
@@ -46,7 +52,7 @@ Route coverage note: this inventory grades mounted rebuilt route families, not e
 
 ## Contract Coverage
 
-All 17 currently mounted rebuilt admin surface families have a parity contract; `page-intelligence-contract.md` closes the contract gap introduced by the 27th registry mount. Continue adding packets before any future rebuilt route is mounted in `REBUILT_SURFACES`.
+All 18 currently mounted rebuilt admin surface families have a parity contract; `ai-visibility-contract.md` covers the 28th direct mount before owner review. Continue adding packets before any future rebuilt route is mounted in `REBUILT_SURFACES`.
 
 ## Earlier Owner-Approved Calibration Surfaces
 
