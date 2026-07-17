@@ -36,8 +36,11 @@ vi.mock('../../server/abort-helpers.js', async importOriginal => ({
 }));
 
 import {
+  MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES,
+  MatrixGenerationProviderInputEnvelopeError,
   matrixGenerationInputReservationCeiling,
   matrixGenerationProviderReservation,
+  matrixGenerationRenderedInputUtf8Bytes,
 } from '../../server/domains/content/matrix-generation/budget.js';
 import {
   auditMatrixGenerationCandidate,
@@ -47,7 +50,14 @@ import {
 import {
   estimateMatrixGenerationBatchBudget,
   estimateMatrixGenerationCellBudget,
+  estimateMatrixGenerationSetAuditInputReservation,
 } from '../../server/domains/content/matrix-generation/preview.js';
+import {
+  MATRIX_GENERATION_SET_AUDIT_MAX_ITEM_ID_UTF8_BYTES,
+  MATRIX_GENERATION_SET_AUDIT_MAX_PAGE_TEXT_CHARS,
+  projectMatrixGenerationSetAuditPage,
+  renderMatrixGenerationSetAuditProviderInput,
+} from '../../server/domains/content/matrix-generation/set-audit-input.js';
 import {
   auditMatrixGenerationSet,
 } from '../../server/domains/content/matrix-generation/set-audit.js';
@@ -304,6 +314,44 @@ describe('content matrix preview budget', () => {
     expect(matrixGenerationInputReservationCeiling(1)).toBe(513);
   });
 
+  it('enforces the shared envelope on exact rendered UTF-8 input at the dispatch boundary', () => {
+    const dispatchFor = (content: string): BoundedProviderDispatch => ({
+      provider: 'openai',
+      fallback: false,
+      renderedInput: {
+        provider: 'openai',
+        system: undefined,
+        messages: [{ role: 'user', content }],
+      },
+      maxOutputTokens: 500,
+    });
+    const empty = dispatchFor('');
+    const wrapperBytes = matrixGenerationRenderedInputUtf8Bytes(empty);
+    const exactAscii = dispatchFor('a'.repeat(
+      MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES - wrapperBytes,
+    ));
+    const overAscii = dispatchFor(`${exactAscii.renderedInput.messages[0]!.content}a`);
+
+    expect(matrixGenerationRenderedInputUtf8Bytes(exactAscii))
+      .toBe(MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES);
+    expect(() => matrixGenerationProviderReservation(exactAscii)).not.toThrow();
+    expect(() => matrixGenerationProviderReservation(overAscii))
+      .toThrow(MatrixGenerationProviderInputEnvelopeError);
+
+    const emoji = '🧭';
+    const emojiBytes = Buffer.byteLength(emoji, 'utf8');
+    const availableBytes = MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES - wrapperBytes;
+    const emojiCount = Math.floor(availableBytes / emojiBytes);
+    const remainingAscii = availableBytes - (emojiCount * emojiBytes);
+    const exactUnicode = dispatchFor(`${emoji.repeat(emojiCount)}${'x'.repeat(remainingAscii)}`);
+    expect(matrixGenerationRenderedInputUtf8Bytes(exactUnicode))
+      .toBe(MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES);
+    expect(() => matrixGenerationProviderReservation(exactUnicode)).not.toThrow();
+    expect(() => matrixGenerationProviderReservation(dispatchFor(
+      `${exactUnicode.renderedInput.messages[0]!.content}${emoji}`,
+    ))).toThrow(MatrixGenerationProviderInputEnvelopeError);
+  });
+
   it('keeps a six-page, fifteen-section service batch inside the accepted hard ceilings', () => {
     const context = generationContext();
     context.authority.systemVoiceBlock = 'Finalized voice authority. '.repeat(1_200);
@@ -329,6 +377,108 @@ describe('content matrix preview budget', () => {
     expect(estimate.providerCalls).toBeLessThanOrEqual(
       MATRIX_GENERATION_BATCH_LIMITS.maxProviderCalls,
     );
+  });
+
+  it('rejects an aggregate selection whose estimate cannot be accepted by start hard limits', () => {
+    const context = generationContext();
+    const target = expandedServiceTarget(15, 0);
+    target.estimatedPaidBudget = estimateMatrixGenerationCellBudget(target, context, []);
+
+    expect(() => estimateMatrixGenerationBatchBudget(
+      Array.from({ length: MATRIX_GENERATION_BATCH_LIMITS.maxItems }, () => target),
+    )).toThrow(/batch estimate exceeds its accepted hard limit/i);
+  });
+
+  it('reserves at least the exact 25-cell Unicode set-audit input with long durable IDs', () => {
+    const maxItemId = (index: number) => {
+      const suffix = index.toString().padStart(4, '0');
+      return `${'🧭'.repeat(49)}${suffix}`;
+    };
+    expect(Buffer.byteLength(maxItemId(0), 'utf8'))
+      .toBe(MATRIX_GENERATION_SET_AUDIT_MAX_ITEM_ID_UTF8_BYTES);
+
+    const targets = Array.from({ length: 25 }, (_, targetIndex) => {
+      const target = expandedServiceTarget(40, targetIndex);
+      target.blockManifest.blocks = target.blockManifest.blocks.map((block, blockIndex) => ({
+        ...block,
+        id: `${targetIndex}-${blockIndex}-${'界'.repeat(60)}`,
+      }));
+      return target;
+    });
+    const maximumUnicodeText = '🧭'.repeat(MATRIX_GENERATION_SET_AUDIT_MAX_PAGE_TEXT_CHARS);
+    const runtimePages = targets.map((target, index) => projectMatrixGenerationSetAuditPage({
+      itemId: maxItemId(index),
+      target,
+      text: maximumUnicodeText,
+    }));
+    const { renderedInput } = renderMatrixGenerationSetAuditProviderInput(runtimePages);
+    const exactRuntimeBytes = matrixGenerationRenderedInputUtf8Bytes({
+      provider: 'openai',
+      fallback: false,
+      renderedInput,
+      maxOutputTokens: 5_000,
+    });
+    const exactRuntimeReservation = matrixGenerationInputReservationCeiling(exactRuntimeBytes);
+    const previewReservation = estimateMatrixGenerationSetAuditInputReservation(targets);
+
+    expect(exactRuntimeBytes).toBeGreaterThan(
+      MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES * 0.75,
+    );
+    expect(exactRuntimeBytes)
+      .toBeLessThanOrEqual(MATRIX_GENERATION_PROVIDER_INPUT_ENVELOPE_UTF8_BYTES);
+    expect(previewReservation).toBeGreaterThanOrEqual(exactRuntimeReservation);
+  });
+
+  it('sanitizes C0-heavy runtime page text before reserving set-audit input', async () => {
+    const controls = String.fromCharCode(
+      ...Array.from({ length: 9 }, (_, index) => index),
+      11,
+      12,
+      ...Array.from({ length: 18 }, (_, index) => index + 14),
+      127,
+    );
+    const targets = [expandedServiceTarget(4, 0), expandedServiceTarget(4, 1)];
+    const candidates = targets.map((target, index) => ({
+      item: {
+        id: `item-control-${index + 1}`,
+        previewTarget: target,
+      } as MatrixGenerationItem,
+      post: {
+        introduction: `<p>Safe copy ${controls.repeat(500)}</p>`,
+        sections: [],
+        conclusion: '<p>Safe conclusion.</p>',
+      } as PersistedGeneratedPost,
+    }));
+    const dispatches: BoundedProviderDispatch[] = [];
+    let serializedPages = '';
+    const callAI = vi.fn(async (options: AICallOptions) => {
+      serializedPages = options.messages?.[0]?.content ?? '';
+      return aiResult(options, JSON.stringify({ findings: [] }));
+    });
+
+    await auditMatrixGenerationSet({
+      workspaceId: WORKSPACE_ID,
+      candidates,
+      expectedCandidateCount: candidates.length,
+      passCount: 1,
+      beforeBoundedProviderDispatch: dispatch => dispatches.push(dispatch),
+      dependencies: { callAI },
+    });
+
+    const payload = JSON.parse(serializedPages) as { pages: Array<{ text: string }> };
+    expect(payload.pages).toHaveLength(2);
+    for (const page of payload.pages) {
+      expect(page.text).toContain('Safe copy');
+      expect(page.text).not.toMatch(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/);
+      expect(page.text.length).toBeLessThanOrEqual(
+        MATRIX_GENERATION_SET_AUDIT_MAX_PAGE_TEXT_CHARS,
+      );
+    }
+
+    const exactRuntimeBytes = matrixGenerationRenderedInputUtf8Bytes(dispatches[0]!);
+    const exactRuntimeReservation = matrixGenerationInputReservationCeiling(exactRuntimeBytes);
+    const previewReservation = estimateMatrixGenerationSetAuditInputReservation(targets);
+    expect(previewReservation).toBeGreaterThanOrEqual(exactRuntimeReservation);
   });
 
   it('does not reject its exact preview ceiling across every mocked provider stage', async () => {

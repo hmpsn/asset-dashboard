@@ -1,6 +1,25 @@
 {
   "sprints": [
     {
+      "id": "sprint-mcp-open-work-2026-07-17",
+      "name": "MCP — Open Work",
+      "hours": "P0 first — unblock the first paid matrix generation before follow-on MCP work",
+      "rationale": "A real Rinse matrix cell reached zero blockers for the first time on 2026-07-17, then preview_content_matrix_generation entered its previously unexercised ready-path tail and returned a generic internal_error. This blocks every paid content-matrix generation run and is the top platform blocker until the ready preview succeeds for the durable single-cell and multi-cell reproductions.",
+      "items": [
+        {
+          "id": "mcp-matrix-ready-preview-internal-error",
+          "title": "Fix fully-unblocked matrix preview internal_error",
+          "source": "2026-07-17 IE MCP Rinse reproduction; server/domains/content/matrix-generation/preview.ts ready tail",
+          "est": "S-M",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-07-17",
+          "owner": "content-pipeline",
+          "notes": "TOP BLOCKER; complete before every lower-priority MCP item. The implementation adds matrix-only bounded context handling, all six safe stage boundaries, typed/redacted MCP errors, and production-shaped single/two-cell determinism plus no-side-effect coverage. A fully isolated synthetic staging canary passed on 2026-07-17: blocked behavior remained intact; one-cell and two-cell previews returned ready with stable fingerprints and finite budgets; no paid generation ran; and the temporary key/workspace were deleted. The item remains pending until the exact durable Rinse cells return ready after production deployment; do not invoke paid start automatically. Preserve every deliberate gate: evidence/voice/identity requirements stay blocking, exact revisions/fingerprints/budget ceilings remain mandatory, human review is not bypassed, and no generation/publish call is started automatically."
+        }
+      ]
+    },
+    {
       "id": "sprint-productized-content-templates-2026-07-16",
       "name": "Productized Content Templates — overrides, optional sections, and library reuse",
       "hours": "TBD — four small staging-first PRs after MCP legibility",

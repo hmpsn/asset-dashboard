@@ -72,7 +72,10 @@ import {
   MatrixGenerationEvidenceError,
   resolveContentMatrixEvidence,
 } from '../../domains/content/matrix-generation/evidence.js';
-import { previewMatrixGeneration } from '../../domains/content/matrix-generation/preview.js';
+import {
+  MatrixGenerationPreviewStageError,
+  previewMatrixGeneration,
+} from '../../domains/content/matrix-generation/preview.js';
 import {
   getMatrixGeneration,
   MatrixGenerationBatchNotFoundError,
@@ -439,6 +442,12 @@ export interface ContentMatrixActionDependencies {
   broadcastToWorkspace: typeof broadcastToWorkspace;
   invalidateContentPipelineIntelligence: typeof invalidateContentPipelineIntelligence;
   recordPaidCallOnce: typeof recordPaidCallOnce;
+  logPreviewFailure: (fields: {
+    requestId: string;
+    tool: string;
+    stage: MatrixGenerationPreviewStageError['stage'];
+    classification: string;
+  }) => void;
 }
 
 const defaultDependencies: ContentMatrixActionDependencies = {
@@ -469,6 +478,9 @@ const defaultDependencies: ContentMatrixActionDependencies = {
   broadcastToWorkspace,
   invalidateContentPipelineIntelligence,
   recordPaidCallOnce,
+  logPreviewFailure: fields => {
+    log.error(fields, 'Matrix generation preview stage failed');
+  },
 };
 
 function snakeCaseKey(key: string): string {
@@ -1394,7 +1406,15 @@ export function createContentMatrixActionHandler(
           matrixId: parsed.data.matrix_id,
           selections: [first, ...selections.slice(1)],
         });
-        return mcpSuccess(toMcpPayload(projectPreviewResult(result)));
+        try {
+          return mcpSuccess(toMcpPayload(projectPreviewResult(result)));
+        } catch (error) {
+          throw MatrixGenerationPreviewStageError.from(
+            'mcp_projection',
+            first.cellId,
+            error,
+          );
+        }
       }
 
       if (name === 'resolve_content_matrix_evidence') {
@@ -1685,6 +1705,32 @@ export function createContentMatrixActionHandler(
       if (error instanceof MatrixReadServiceError) return readServiceError(error);
       if (error instanceof PseoMatrixBridgeError) return pseoBridgeError(error);
       if (error instanceof TemplateGenerationUpgradeError) return upgradeServiceError(error);
+      if (error instanceof MatrixGenerationPreviewStageError) {
+        dependencies.logPreviewFailure({
+          requestId: context.requestId,
+          tool: name,
+          stage: error.stage,
+          classification: error.classification,
+        });
+        if (error.code === 'precondition_failed' && error.fieldPath && error.constraint) {
+          return mcpJsonV1Error({
+            code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
+            message: 'The matrix generation preview exceeds a safe generation limit.',
+            retryable: false,
+            details: {
+              field_path: error.fieldPath,
+              constraint: error.constraint,
+              stage: error.stage,
+              cell_id: error.cellId,
+            },
+          });
+        }
+        return mcpJsonV1Error({
+          code: MCP_TOOL_ERROR_CODES.INTERNAL_ERROR,
+          message: 'The tool could not complete because of an internal error.',
+          retryable: false,
+        });
+      }
       if (error instanceof MatrixGenerationEvidenceError) {
         return mcpJsonV1Error({
           code: error.code === 'not_found'

@@ -169,10 +169,27 @@ export const CONTENT_GENERATION_CONTEXT_V2_BUDGETS = {
 } as const satisfies Record<ContentGenerationContextV2Stage, number>;
 
 export class ContentGenerationContextBudgetError extends Error {
-  constructor(stage: ContentGenerationContextV2Stage, budget: number) {
+  readonly stage: ContentGenerationContextV2Stage;
+  readonly budget: number;
+  readonly estimatedTokens: number | null;
+
+  constructor(
+    stage: ContentGenerationContextV2Stage,
+    budget: number,
+    estimatedTokens: number | null = null,
+  ) {
     super(`Required ${stage} generation context exceeds its ${budget}-token budget`);
     this.name = 'ContentGenerationContextBudgetError';
+    this.stage = stage;
+    this.budget = budget;
+    this.estimatedTokens = estimatedTokens;
   }
+}
+
+export interface ContentGenerationContextV2BuilderOptions
+  extends ContentGenerationContextV2Options {
+  /** Matrix-only override for UTF-8-consistent provider reservation estimates. */
+  projectionTokenEstimator?: (value: string) => number;
 }
 
 function estimateContextTokens(value: string): number {
@@ -193,6 +210,7 @@ function buildBudgetedProjection(
   authority: ContentGenerationPromptAuthority,
   requiredBlocks: readonly string[],
   optionalBlocks: readonly string[],
+  tokenEstimator: (value: string) => number = estimateContextTokens,
 ): { prompt: string; tokens: number } {
   const systemAuthority = [
     authority.systemVoiceBlock,
@@ -200,14 +218,14 @@ function buildBudgetedProjection(
   ].filter(block => block.trim()).join('\n\n');
   const selected = requiredBlocks.map(block => block.trim()).filter(Boolean);
   let prompt = selected.join('\n\n');
-  let tokens = estimateContextTokens(systemAuthority) + estimateContextTokens(prompt);
-  if (tokens > budget) throw new ContentGenerationContextBudgetError(stage, budget);
+  let tokens = tokenEstimator(systemAuthority) + tokenEstimator(prompt);
+  if (tokens > budget) throw new ContentGenerationContextBudgetError(stage, budget, tokens);
 
   for (const rawBlock of optionalBlocks) {
     const block = rawBlock.trim();
     if (!block) continue;
     const candidate = prompt ? `${prompt}\n\n${block}` : block;
-    const candidateTokens = estimateContextTokens(systemAuthority) + estimateContextTokens(candidate);
+    const candidateTokens = tokenEstimator(systemAuthority) + tokenEstimator(candidate);
     if (candidateTokens <= budget) {
       prompt = candidate;
       tokens = candidateTokens;
@@ -341,7 +359,7 @@ function capturedAuthority(
 
 export async function buildContentGenerationContextV2(
   workspaceId: string,
-  opts: ContentGenerationContextV2Options,
+  opts: ContentGenerationContextV2BuilderOptions,
 ): Promise<ContentGenerationContextV2Result> {
   const baseSlices: readonly IntelligenceSlice[] = ['seoContext', 'brand', 'insights', 'learnings', 'eeatAssets'];
   const slices = await withActiveLocalSeoSlice(workspaceId, baseSlices, opts.includeLocalSeo ?? true);
@@ -403,16 +421,16 @@ export async function buildContentGenerationContextV2(
     targetPageBlock,
     briefEvidence.prompt,
     evidenceStatus.prompt,
-  ], [seoBlocks.keywordBlock, seoBlocks.personasBlock, seoBlocks.knowledgeBlock, supplementaryContext]);
+  ], [seoBlocks.keywordBlock, seoBlocks.personasBlock, seoBlocks.knowledgeBlock, supplementaryContext], opts.projectionTokenEstimator);
   const draft = buildBudgetedProjection('draft', budgets.draft, authority, [
     authority.userVoiceBlock,
     authority.identityPromptBlock,
     draftEvidence.prompt,
     evidenceStatus.prompt,
-  ], []);
+  ], [], opts.projectionTokenEstimator);
   const voiceReview = buildBudgetedProjection('voiceReview', budgets.voiceReview, authority, [
     authority.userVoiceBlock,
-  ], []);
+  ], [], opts.projectionTokenEstimator);
 
   const sourceObservedAt = Array.from(new Set([
     opts.sourceEvidence?.capturedAt,
