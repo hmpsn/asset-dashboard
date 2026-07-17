@@ -58,6 +58,7 @@ export * from './analytics-contract.ts';
 export type * from './platform-observability.ts';
 export type * from './workspace-overview.ts';
 export type * from './work-queue.ts';
+export type * from './cockpit-portfolio.ts';
 export type * from './keyword-strategy-ux.ts';
 export type * from './usage.ts';
 export * from './seo-audit.ts';
