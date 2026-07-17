@@ -2,6 +2,7 @@
 import { Suspense, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
+import { resolvePagePath } from '../../lib/pathUtils';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { adminPath } from '../../routes';
 import {
@@ -416,6 +417,7 @@ function IssueDetailDrawer({
   const firstPageInstance = group?.instances.find((instance) => instance.page) ?? null;
   const firstPage = firstPageInstance?.page ?? null;
   const firstIssue = firstPageInstance?.issue ?? null;
+  const firstPagePath = firstPage ? resolvePagePath(firstPage) : null;
   const taskKey = firstPage && firstIssue ? `${firstPage.pageId}-${firstIssue.check}-${firstIssue.message.slice(0, 30)}` : '';
   const fixKey = firstPage && firstIssue ? `${firstPage.pageId}-${firstIssue.check}` : '';
   const editedSuggestion = firstIssue?.suggestedFix
@@ -479,7 +481,10 @@ function IssueDetailDrawer({
           </div>
 
           {firstPage && firstIssue && (
-            <div className="space-y-3">
+            <div className="space-y-3" data-testid="site-audit-issue-actions">
+              <div className="t-caption text-[var(--brand-text-muted)]">
+                Applies to {firstPagePath} only
+              </div>
               <div className="flex items-center justify-between gap-2">
                 <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Send to client</div>
                 {flaggedIssues.has(taskKey) && <Badge label="Sent" tone="emerald" variant="soft" />}
@@ -555,9 +560,12 @@ function IssueDetailDrawer({
               ))}
               {group.instances.length > 12 && (
                 <div className="t-caption text-[var(--brand-text-muted)]">
-                  {group.instances.length - 12} more affected pages are included in batch actions.
+                  {group.instances.length - 12} more affected pages are not shown above.
                 </div>
               )}
+              <div className="t-caption text-[var(--brand-text-muted)]">
+                Add visible tasks uses the current table filters. Add error tasks, Add all tasks, and Accept all use the full audit.
+              </div>
             </div>
           </div>
 

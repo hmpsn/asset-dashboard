@@ -429,6 +429,43 @@ describe('SiteAuditSurface rebuilt', () => {
     expectTextWithClass('Home', 't-ui');
   });
 
+  it('states the first-page action scope and the filter-selective batch semantics in the issue drawer', async () => {
+    const audit = makeAuditState();
+    const titleGroup = issueGroups[0];
+    const additionalPages = [
+      { ...sampleAudit.pages[0], pageId: 'page-about', page: 'About', slug: 'about', url: '/about' },
+      { ...sampleAudit.pages[0], pageId: 'page-contact', page: 'Contact', slug: 'contact', url: '/contact' },
+    ];
+    const threePageGroup: AuditIssueGroup = {
+      ...titleGroup,
+      affectedPages: 3,
+      instances: [
+        titleGroup.instances[0],
+        ...additionalPages.map((page) => ({
+          id: `${page.pageId}-title-Missing title`,
+          page,
+          issue: page.issues[0],
+        })),
+      ],
+    };
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      issueGroups: [threePageGroup, issueGroups[1]],
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+    fireEvent.click(await screen.findByText('Missing title'));
+
+    const drawer = screen.getByRole('dialog', { name: 'title' });
+    const actions = within(drawer).getByTestId('site-audit-issue-actions');
+    expect(within(actions).getByText('Applies to /home only')).toBeVisible();
+    expect(within(actions).getByRole('button', { name: 'Accept suggestion' })).toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: 'Send to client' })).toBeInTheDocument();
+    expect(within(drawer).getByText(
+      'Add visible tasks uses the current table filters. Add error tasks, Add all tasks, and Accept all use the full audit.',
+    )).toBeVisible();
+  });
+
   it('uses styleguide roles for the audit decision console', async () => {
     renderSurface('/ws/ws-1/seo-audit');
 
