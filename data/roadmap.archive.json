@@ -1,6 +1,26 @@
 {
   "sprints": [
     {
+      "id": "admin-ux-flow-2026-07-terminal-history",
+      "name": "✅ SHIPPED — Admin UX flow & ease-of-use (from 2026-07-16 audits)",
+      "hours": "~60",
+      "rationale": "Terminal item history split from admin-ux-flow-2026-07. Instrumented UX-flow audit (docs/superpowers/audits/2026-07-16-admin-ux-flow-audit.md) + carried-over items from the rebuild audit. Advisory findings ratified into work items; owner prioritizes.",
+      "items": [
+        {
+          "id": "loaded-demo-workspace",
+          "title": "seed:demo: one loaded demo workspace (50+ board cards, 10+ queue items, scan artifacts)",
+          "source": "2026-07-16 UX-flow audit §8",
+          "est": "M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "platform",
+          "notes": "Added idempotent ws_demo_loaded with 50+ pipeline cards, 10+ Cockpit items, persisted scan fixtures, 520 page keywords, unanswered client replies, and recorded wins for under-load smoke testing."
+        }
+      ],
+      "shippedAt": "2026-07-17"
+    },
+    {
       "id": "sprint-productized-content-templates-2026-07-16-terminal-history",
       "name": "✅ SHIPPED — Productized Content Templates — overrides, optional sections, and library reuse",
       "hours": "TBD — four small staging-first PRs after MCP legibility",
