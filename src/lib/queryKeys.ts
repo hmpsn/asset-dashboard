@@ -144,6 +144,8 @@ export const queryKeys = {
     rankTrackingHistory: (wsId: string) => ['admin-rank-tracking-history', wsId] as const,
     rankTrackingHistoryQueries: (wsId: string, queries: string[]) =>
       ['admin-rank-tracking-history', wsId, 'queries', ...[...queries].sort()] as const,
+    rankTrackingRowHistory: (wsId: string, queries: string[]) =>
+      ['admin-rank-tracking-history', wsId, 'rows', ...[...queries].sort()] as const,
     internalLinksSnapshot: (siteId: string, wsId?: string) =>
       wsId ? ['admin-internal-links-snapshot', siteId, wsId] as const : ['admin-internal-links-snapshot', siteId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,

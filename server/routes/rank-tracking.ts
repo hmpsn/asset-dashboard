@@ -13,6 +13,7 @@ import {
   togglePinKeyword,
   storeRankSnapshot,
   getRankHistory,
+  getRankHistoryRows,
   getLatestRanks,
 } from '../rank-tracking.js';
 import { getSearchOverview } from '../search-console.js';
@@ -30,6 +31,7 @@ import { createLogger } from '../logger.js';
 
 const router = Router();
 const log = createLogger('rank-tracking-routes');
+const MAX_ROW_HISTORY_QUERIES = 100;
 
 function parseHistoryLimit(rawLimit: unknown): number | null {
   if (rawLimit == null) return 90;
@@ -49,6 +51,13 @@ function sameKeyword(a: string, b: string): boolean {
 function collectQueryParamValues(rawValue: unknown): string[] {
   if (typeof rawValue === 'string') return [rawValue];
   if (Array.isArray(rawValue)) return rawValue.flatMap(collectQueryParamValues);
+  // Express's `qs` parser converts a repeated param with MORE than its arrayLimit
+  // (default 20) values into an OBJECT keyed by numeric strings ({0:'a',1:'b',...})
+  // instead of an array. Without this branch, a full keyword page (up to
+  // MAX_ROW_HISTORY_QUERIES = 100 rows) silently parses to zero queries and 400s.
+  if (rawValue && typeof rawValue === 'object') {
+    return Object.values(rawValue as Record<string, unknown>).flatMap(collectQueryParamValues);
+  }
   return [];
 }
 
@@ -205,6 +214,18 @@ router.get('/api/rank-tracking/:workspaceId/ai-visibility', requireWorkspaceAcce
     competitors: latest?.competitors ?? [],
     sourceDomains: latest?.sourceDomains ?? [],
   });
+});
+
+// Batched skinny read for the visible rebuilt Keywords table page. This stays
+// separate from the date-centric history endpoint so the drawer's response and
+// cache contract remain unchanged.
+router.get('/api/rank-tracking/:workspaceId/history/rows', requireWorkspaceAccess('workspaceId'), (req, res) => {
+  const queries = parseHistoryQueryFilters(req.query) ?? [];
+  if (queries.length === 0) return res.status(400).json({ error: 'at least one query is required' });
+  if (queries.length > MAX_ROW_HISTORY_QUERIES) {
+    return res.status(400).json({ error: `query supports at most ${MAX_ROW_HISTORY_QUERIES} values` });
+  }
+  res.json(getRankHistoryRows(req.params.workspaceId, queries));
 });
 
 // Get rank history (for charting)

@@ -2,7 +2,7 @@
   "version": 1,
   "updatedAt": "2026-07-16T05:27:59.000Z",
   "tolerance": 0.05,
-  "total": 1831418,
+  "total": 1832274,
   "entries": {
     "css:assets/index.css": 37315,
     "css:vendor/fontawesome/fontawesome-sharp-regular-subset.min.css": 1203,
@@ -202,7 +202,7 @@
     "js:src/components/global-ops-rebuilt/index.ts": 22581,
     "js:src/components/KeywordHub.tsx": 14273,
     "js:src/components/keywords-rebuilt/KeywordDrawer.tsx": 4413,
-    "js:src/components/keywords-rebuilt/KeywordsSurface.tsx": 10258,
+    "js:src/components/keywords-rebuilt/KeywordsSurface.tsx": 11114,
     "js:src/components/KeywordStrategy.tsx": 8637,
     "js:src/components/LandingPage.tsx": 5667,
     "js:src/components/LinkChecker.tsx": 2781,

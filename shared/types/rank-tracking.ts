@@ -87,6 +87,28 @@ export interface RankHistoryEntry {
   positions: Record<string, number>;
 }
 
+export interface RankHistoryPoint {
+  date: string;
+  position: number;
+}
+
+/**
+ * One visible keyword's real rank snapshots. Positive delta means the rank
+ * improved (for example, position 12 to 7 is +5). The delta is omitted unless
+ * at least two real points exist inside the server's seven-day window.
+ */
+export interface RankHistorySeries {
+  query: string;
+  points: RankHistoryPoint[];
+  delta7d?: number;
+}
+
+/** Page-batched read model for the rebuilt Keywords table. */
+export interface RankHistoryRowsResponse {
+  windowDays: number;
+  series: RankHistorySeries[];
+}
+
 export interface LatestRank {
   query: string;
   position: number;

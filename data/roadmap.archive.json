@@ -227,6 +227,18 @@
           "createdAt": "2026-07-16",
           "owner": "site-health",
           "notes": "SHIPPED (#1581). Restored legacy AuditIssueRow depth: per-page action rows firing with each page's pageId, informed Apply-to-all preview with per-page outcomes, #1566 filter-truthful scope copy preserved."
+        },
+        {
+          "id": "admin-ux-w42a-keyword-rank-history-readmodel",
+          "title": "W4.2a — batched visible-row keyword rank history and 7-day trend",
+          "source": "Admin UX campaign Wave 4 backend read models; deferred ledger DEF-kw-001",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-17",
+          "completedAt": "2026-07-17",
+          "owner": "seo-health",
+          "notes": "Completed 2026-07-17. Added a one-statement skinny read over existing rank snapshots for up to 100 visible keyword queries, typed per-keyword series, and a server-owned 7-day position delta that is omitted when fewer than two real points exist in the window. The rebuilt full Rankings DataTable now makes one React Query keyed by the canonical visible set and renders the shared Sparkline plus honest loading/error/establishing states. The existing drawer endpoint and behavior remain unchanged; no full keyword-universe builder, client-side delta fabrication, or database migration was introduced."
         }
       ],
       "shippedAt": "2026-07-17"

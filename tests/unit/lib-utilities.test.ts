@@ -341,6 +341,13 @@ describe('queryKeys — admin rank tracking keys', () => {
     expect(queryKeys.admin.rankTrackingHistory(WS)).toEqual(['admin-rank-tracking-history', WS]);
   });
 
+  it('rankTrackingRowHistory sorts visible queries for a stable page-set key', () => {
+    const first = queryKeys.admin.rankTrackingRowHistory(WS, ['z', 'a', 'm']);
+    const second = queryKeys.admin.rankTrackingRowHistory(WS, ['m', 'z', 'a']);
+    expect(first).toEqual(second);
+    expect(first).toEqual(['admin-rank-tracking-history', WS, 'rows', 'a', 'm', 'z']);
+  });
+
   it('localSeo key shape', () => {
     expect(queryKeys.admin.localSeo(WS)).toEqual(['admin-local-seo', WS]);
   });

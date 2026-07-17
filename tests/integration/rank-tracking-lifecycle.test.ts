@@ -82,6 +82,7 @@ import { storeRankSnapshot } from '../../server/rank-tracking.js';
 import { WS_EVENTS } from '../../server/ws-events.js';
 import db from '../../server/db/index.js';
 import { withPublicTestAuth } from './public-auth-test-helpers.js';
+import type { RankHistoryRowsResponse } from '../../shared/types/rank-tracking.js';
 
 // ─── Server lifecycle ─────────────────────────────────────────────────────────
 
@@ -484,6 +485,40 @@ describe('GET /api/rank-tracking/:workspaceId/history — edge cases', () => {
     ]);
     expect(body[0].positions).not.toHaveProperty('dentist');
     expect(body[0].positions).not.toHaveProperty('chicago');
+  });
+
+  it('batches visible row series and server-computed deltas', async () => {
+    storeRankSnapshot(wsId, '2026-07-01', [
+      { query: 'batched alpha', position: 12, clicks: 2, impressions: 30, ctr: 6.7 },
+      { query: 'batched beta', position: 20, clicks: 1, impressions: 20, ctr: 5 },
+    ]);
+    storeRankSnapshot(wsId, '2026-07-08', [
+      { query: 'batched alpha', position: 8, clicks: 3, impressions: 40, ctr: 7.5 },
+    ]);
+
+    const params = new URLSearchParams();
+    params.append('query', 'batched alpha');
+    params.append('query', 'batched beta');
+    const res = await api(`/api/rank-tracking/${wsId}/history/rows?${params.toString()}`);
+
+    expect(res.status).toBe(200);
+    expect(await res.json() as RankHistoryRowsResponse).toEqual({
+      windowDays: 7,
+      series: [
+        {
+          query: 'batched alpha',
+          points: [
+            { date: '2026-07-01', position: 12 },
+            { date: '2026-07-08', position: 8 },
+          ],
+          delta7d: 4,
+        },
+        {
+          query: 'batched beta',
+          points: [{ date: '2026-07-01', position: 20 }],
+        },
+      ],
+    });
   });
 });
 
