@@ -1,14 +1,20 @@
 // @ds-rebuilt
+import { useMemo, useState } from 'react';
 import { AlertTriangle, FileJson } from 'lucide-react';
+import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import type { SchemaPageSuggestion } from '../schema/schemaSuggesterTypes';
 import { SCHEMA_PAGE_TYPE_OPTIONS } from '../schema/schemaPageTypeOptions';
 import {
   Badge,
+  Button,
   DataTable,
   EmptyState,
-  FormSelect,
+  FilterChip,
   Icon,
   InlineBanner,
+  SearchField,
+  Toolbar,
+  ToolbarSpacer,
   type DataColumn,
 } from '../ui';
 import {
@@ -31,7 +37,21 @@ interface SchemaPageTableProps {
   retractedPages: Set<string>;
   validationStatusByPageId: Map<string, SchemaValidationRecord['status']>;
   onOpenPage: (pageId: string) => void;
-  onPageTypeChange: (pageId: string, pageType: string) => void;
+}
+
+const SCHEMA_PAGE_ROW_LIMIT = 100;
+
+type SchemaPageStatusFilter = 'needs-fixes' | 'published' | 'stale' | 'retracted';
+
+const STATUS_FILTERS: Array<{ id: SchemaPageStatusFilter; label: string }> = [
+  { id: 'needs-fixes', label: 'Needs fixes' },
+  { id: 'published', label: 'Published' },
+  { id: 'stale', label: 'Stale' },
+  { id: 'retracted', label: 'Retracted' },
+];
+
+function pageTypeLabel(value: string): string {
+  return SCHEMA_PAGE_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
 function EmptyIcon({ className }: { className?: string }) {
@@ -46,9 +66,11 @@ export function SchemaPageTable({
   retractedPages,
   validationStatusByPageId,
   onOpenPage,
-  onPageTypeChange,
 }: SchemaPageTableProps) {
-  const rows = pages.map((page) => {
+  const [search, setSearch] = useState('');
+  const [showAllRows, setShowAllRows] = useState(false);
+  const [statusFilters, toggleStatus] = useToggleSet<SchemaPageStatusFilter>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
+  const rows = useMemo(() => pages.map((page) => {
     const validationStatus = validationStatusForPage(page, validationStatusByPageId);
     return {
       id: page.pageId,
@@ -62,7 +84,29 @@ export function SchemaPageTable({
       pageType: pageTypes[page.pageId] || 'auto',
       pageTypeError: pageTypeErrors[page.pageId],
     };
+  }), [pageTypeErrors, pageTypes, pages, published, retractedPages, validationStatusByPageId]);
+
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredRows = rows.filter((row) => {
+    const matchesSearch = !normalizedSearch || [row.title, row.path, pageTypeLabel(row.pageType)]
+      .some((value) => value.toLowerCase().includes(normalizedSearch));
+    if (!matchesSearch) return false;
+    if (statusFilters.size === 0) return true;
+    return Array.from(statusFilters).some((filter) => {
+      if (filter === 'needs-fixes') return row.validationStatus === 'errors' || row.validationStatus === 'warnings';
+      if (filter === 'published') return !row.retracted && (row.published || Boolean(row.page.lastPublishedAt));
+      if (filter === 'stale') return row.staleDays !== null;
+      return row.retracted;
+    });
   });
+  const visibleRows = showAllRows ? filteredRows : filteredRows.slice(0, SCHEMA_PAGE_ROW_LIMIT);
+
+  const filterCount = (filter: SchemaPageStatusFilter): number => rows.filter((row) => {
+    if (filter === 'needs-fixes') return row.validationStatus === 'errors' || row.validationStatus === 'warnings';
+    if (filter === 'published') return !row.retracted && (row.published || Boolean(row.page.lastPublishedAt));
+    if (filter === 'stale') return row.staleDays !== null;
+    return row.retracted;
+  }).length;
 
   const columns: DataColumn[] = [
     {
@@ -85,16 +129,9 @@ export function SchemaPageTable({
       label: 'Type',
       width: '180px',
       render: (_value, row) => {
-        const page = row.page as SchemaPageSuggestion;
         return (
-          <div className="w-full" onClick={(event) => event.stopPropagation()}>
-            <FormSelect
-              value={row.pageType as string}
-              onChange={(value) => onPageTypeChange(page.pageId, value)}
-              options={SCHEMA_PAGE_TYPE_OPTIONS}
-              aria-label={`Page type for ${titleForPage(page)}`}
-              className="t-mono w-full px-[10px] py-[6px]"
-            />
+          <div className="w-full">
+            <Badge label={pageTypeLabel(row.pageType as string)} tone="zinc" variant="outline" size="sm" />
             {Boolean(row.pageTypeError) && (
               <div className="mt-1 flex items-center gap-1 t-caption-sm text-[var(--amber)]">
                 <Icon as={AlertTriangle} size="xs" />
@@ -129,10 +166,42 @@ export function SchemaPageTable({
 
   return (
     <div className="flex flex-col gap-2" data-testid="schema-page-list">
+      <Toolbar label="Generated schema page filters" className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-2)] p-2">
+        <SearchField
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setShowAllRows(false);
+          }}
+          placeholder="Search generated pages…"
+          className="min-w-[220px] flex-1"
+        />
+        {STATUS_FILTERS.map((filter) => (
+          <FilterChip
+            key={filter.id}
+            label={filter.label}
+            count={filterCount(filter.id)}
+            active={statusFilters.has(filter.id)}
+            onClick={() => {
+              toggleStatus(filter.id);
+              setShowAllRows(false);
+            }}
+          />
+        ))}
+        <ToolbarSpacer />
+        <span className="t-caption-sm text-[var(--brand-text-muted)]">
+          Showing {visibleRows.length} of {filteredRows.length} {filteredRows.length === 1 ? 'page' : 'pages'}
+        </span>
+        {filteredRows.length > SCHEMA_PAGE_ROW_LIMIT && (
+          <Button variant="ghost" size="sm" onClick={() => setShowAllRows((current) => !current)}>
+            {showAllRows ? `Show first ${SCHEMA_PAGE_ROW_LIMIT}` : `Show all ${filteredRows.length}`}
+          </Button>
+        )}
+      </Toolbar>
       <DataTable
         id="schema-generated-pages"
         columns={columns}
-        rows={rows}
+        rows={visibleRows}
         getRowKey={(row) => row.id as string}
         onRowClick={(row) => onOpenPage(row.id as string)}
         className="[&>[role=row]:first-child]:h-px [&>[role=row]:first-child]:overflow-hidden [&>[role=row]:first-child]:border-0 [&>[role=row]:first-child]:p-0 [&>[role=row]:first-child]:opacity-0 [&>[role=row]:not(:first-child)]:min-h-[68px] [&>[role=row]:not(:first-child)]:py-[11px]"

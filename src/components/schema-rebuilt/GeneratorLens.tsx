@@ -29,6 +29,7 @@ import {
   SearchField,
   SectionCard,
   Skeleton,
+  WorkbenchFrame,
   type DataColumn,
 } from '../ui';
 import { SCHEMA_PAGE_TYPE_OPTIONS } from '../schema/schemaPageTypeOptions';
@@ -367,22 +368,31 @@ export function GeneratorLens({
       )}
 
       {pages.length > 0 && (
-        <>
+        <WorkbenchFrame
+          collectionLabel="Generated schema pages"
+          pinnedClassName="pb-3"
+          pinned={(
+            <div className="flex flex-col gap-2.5">
           <div data-testid="schema-generator-hero">
             <SectionCard noPadding className="overflow-hidden">
-              <div className="grid min-h-[188px] items-center gap-5 px-[26px] py-[22px] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-6">
-                <div className="mx-auto flex h-[120px] w-[120px] flex-col items-center justify-center rounded-[var(--radius-pill)] border-[9px] border-[var(--surface-3)] bg-[var(--surface-1)] shadow-[var(--shadow-sm)]">
-                  <Icon name="file" size="2xl" className="text-[var(--teal)]" />
-                  <span className="mt-2 t-micro text-[var(--brand-text-muted)]">Ready for review</span>
+              <div className="grid min-h-[82px] items-center gap-4 px-4 py-3 sm:grid-cols-[58px_minmax(0,1fr)_auto]">
+                <div className="mx-auto flex h-[52px] w-[52px] items-center justify-center rounded-[var(--radius-pill)] border-[5px] border-[var(--surface-3)] bg-[var(--surface-1)] shadow-[var(--shadow-sm)]">
+                  <Icon name="file" size="lg" className="text-[var(--teal)]" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="t-h2 max-w-[34ch] font-bold text-[var(--brand-text-bright)]">
+                  <h2 className="t-page font-bold text-[var(--brand-text-bright)]">
                     {readinessTitle}
                   </h2>
-                  <p className="mt-2 max-w-[62ch] t-ui leading-[1.55] text-[var(--brand-text)]">
+                  <p className="mt-1 max-w-[76ch] t-caption-sm text-[var(--brand-text)]">
                     {readinessDetail}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  {generation.fetchPagesError && (
+                    <InlineBanner tone="error" size="sm" title="Pages could not be loaded">
+                      {generation.fetchPagesError}
+                    </InlineBanner>
+                  )}
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
                     <Button size="sm" variant="primary" onClick={handleRunScan} disabled={generation.loading}>
                       <Icon name="sparkle" size="sm" />
                       Re-generate all
@@ -391,12 +401,6 @@ export function GeneratorLens({
                       {!generation.loadingPages && <Icon name="plus" size="sm" />}
                       Add a page
                     </Button>
-                  </div>
-                  {generation.fetchPagesError && (
-                    <InlineBanner tone="error" size="sm" title="Pages could not be loaded">
-                      {generation.fetchPagesError}
-                    </InlineBanner>
-                  )}
                 </div>
               </div>
             </SectionCard>
@@ -433,16 +437,16 @@ export function GeneratorLens({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="schema-summary-strip">
             <div className="flex" data-testid="schema-summary-tile">
-              <MetricTile label="Generated pages" value={stats.pages} sub="Current schema snapshot" accent="var(--blue)" icon={FileJson} className="min-h-[108px]" />
+              <MetricTile label="Generated pages" value={stats.pages} sub="Current schema snapshot" accent="var(--blue)" icon={FileJson} className="min-h-[76px]" />
             </div>
             <div className="flex" data-testid="schema-summary-tile">
-              <MetricTile label="@graph types" value={stats.totalGraphTypes} sub="Across generated pages" accent="var(--teal)" icon={FileJson} className="min-h-[108px]" />
+              <MetricTile label="@graph types" value={stats.totalGraphTypes} sub="Across generated pages" accent="var(--teal)" icon={FileJson} className="min-h-[76px]" />
             </div>
             <div className="flex" data-testid="schema-summary-tile">
-              <MetricTile label="Existing schema" value={stats.pagesWithExisting} sub="Pages already carrying JSON-LD" accent="var(--emerald)" icon={CheckCircle} className="min-h-[108px]" />
+              <MetricTile label="Existing schema" value={stats.pagesWithExisting} sub="Pages already carrying JSON-LD" accent="var(--emerald)" icon={CheckCircle} className="min-h-[76px]" />
             </div>
             <div className="flex" data-testid="schema-summary-tile">
-              <MetricTile label="Pages with errors" value={stats.pagesWithErrors} sub={stats.pagesWithWarnings > 0 ? `${formatInteger(stats.pagesWithWarnings)} with warnings` : 'No additional warnings'} accent={stats.pagesWithErrors > 0 ? 'var(--amber)' : 'var(--emerald)'} icon={ShieldCheck} className="min-h-[108px]" />
+              <MetricTile label="Pages with errors" value={stats.pagesWithErrors} sub={stats.pagesWithWarnings > 0 ? `${formatInteger(stats.pagesWithWarnings)} with warnings` : 'No additional warnings'} accent={stats.pagesWithErrors > 0 ? 'var(--amber)' : 'var(--emerald)'} icon={ShieldCheck} className="min-h-[76px]" />
             </div>
           </div>
 
@@ -515,19 +519,20 @@ export function GeneratorLens({
               {generation.singlePageError}
             </InlineBanner>
           )}
-
-          <SchemaPageTable
-            pages={pages}
-            pageTypes={generation.pageTypes}
-            pageTypeErrors={pageTypeErrors}
-            published={publishing.published}
-            retractedPages={publishing.retractedPages}
-            validationStatusByPageId={validationStatusByPageId}
-            onOpenPage={setSelectedPageId}
-            onPageTypeChange={handlePageTypeChange}
-          />
-
-          <div className="flex flex-col gap-3" data-testid="schema-production-support">
+            </div>
+          )}
+        >
+          <div className="flex flex-col gap-3 pr-1">
+          <div data-testid="schema-production-support">
+            <GroupBlock
+              icon={ShieldCheck}
+              iconColor="var(--blue)"
+              title="Production setup and evidence"
+              meta="Site plan, CMS mapping, approval, coverage, and measured impact"
+              collapsible
+              defaultOpen={false}
+            >
+            <div className="flex flex-col gap-3">
             <SchemaSitePlanBridge siteId={siteId} workspaceId={workspaceId} />
             <SchemaBusinessProfilePanel
               businessProfile={businessProfile}
@@ -576,8 +581,21 @@ export function GeneratorLens({
             <SchemaCompletenessPanel pages={pages} workspaceId={workspaceId} />
             <SchemaImpactPanel data={impactQuery.data} loading={impactQuery.isLoading} />
             <SchemaHowToFooter />
+            </div>
+            </GroupBlock>
           </div>
-        </>
+
+          <SchemaPageTable
+            pages={pages}
+            pageTypes={generation.pageTypes}
+            pageTypeErrors={pageTypeErrors}
+            published={publishing.published}
+            retractedPages={publishing.retractedPages}
+            validationStatusByPageId={validationStatusByPageId}
+            onOpenPage={setSelectedPageId}
+          />
+          </div>
+        </WorkbenchFrame>
       )}
 
       <SchemaPagePickerDrawer
