@@ -126,6 +126,17 @@
           "createdAt": "2026-07-16",
           "owner": "platform",
           "notes": "Completed W1.3: global tabs retain a validated, localStorage-backed last-visited workspace for shell context. With no valid visit history, chrome stays unbound, global breadcrumbs omit the workspace segment, and AdminChat does not mount."
+        },
+        {
+          "id": "engine-actions-forward-reorder",
+          "title": "Engine: actions-forward spine reorder (Option A) — owner circle-back",
+          "source": "2026-07-16 UX-flow audit §3; engine-contract.md:135 trigger fired",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "strategy",
+          "notes": "D1 Option A implemented: protected verdict-first opening preserved; curation/attention/backing moves/projections now follow the value frame; POV editor + trust-spine preview share one Compose the issue band; stance/signals/lost-query recovery share a default-collapsed Evidence behind this issue disclosure that auto-opens for ?lens=signals; Operations remains last (V5). Engine component suite: 52 tests green, including actions-forward order, exact-once send/POV/preview, signals disclosure deep link, and W1.1 jump-nav regression. Contract circle-back recorded for owner-veto review."
         }
       ],
       "shippedAt": "2026-07-17"
