@@ -1,19 +1,24 @@
 // @ds-rebuilt
 import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DollarSign, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sun, Users } from 'lucide-react';
 import { auth } from '../../api';
 import { featureFlags } from '../../api/misc';
 import { GLOBAL_TABS, adminPath, type Page } from '../../routes';
 import {
-  NAV_REGISTRY,
+  NAV_DESTINATION_REGISTRY,
   REBUILT_NAV_ZONES,
-  type NavEntry,
+  BOOK_ROOT_NAV_ID,
+  type AnyNavEntry,
+  type NavDestinationId,
+  type NavDestinationScope,
   type RebuiltNavZoneKey,
   isNavEntryHidden,
   resolveNavDescription,
   resolveNavLabel,
+  resolveNavPath,
+  resolveNavScope,
 } from '../../lib/navRegistry';
 import { queryKeys } from '../../lib/queryKeys';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
@@ -25,10 +30,11 @@ import { ClickableRow, IconButton, NavGroup, NavItem } from '../ui';
 import { useRovingTabindex } from '../ui/useRovingTabindex';
 
 interface RebuiltNavItem {
-  id: Page;
+  id: NavDestinationId;
   label: string;
-  icon: NavEntry['icon'];
+  icon: AnyNavEntry['icon'];
   desc: string;
+  scope: NavDestinationScope;
   needsSite?: boolean;
   hidden: boolean;
 }
@@ -46,7 +52,7 @@ interface RebuiltNavGroupPresentation {
   key: RebuiltNavPresentationKey;
   label: string;
   accent: string;
-  items: readonly Page[];
+  items: readonly NavDestinationId[];
 }
 
 export interface RebuiltSidebarProps {
@@ -68,9 +74,9 @@ export interface RebuiltSidebarProps {
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'admin-sidebar-collapsed';
-const NAV_ENTRY_BY_ID = new Map<Page, NavEntry>(NAV_REGISTRY.map((entry) => [entry.id, entry]));
+const NAV_ENTRY_BY_ID = new Map<NavDestinationId, AnyNavEntry>(NAV_DESTINATION_REGISTRY.map((entry) => [entry.id, entry]));
 
-const EXTRA_REBUILT_NAV_ENTRIES: Partial<Record<Page, NavEntry>> = {
+const EXTRA_REBUILT_NAV_ENTRIES: Partial<Record<NavDestinationId, AnyNavEntry>> = {
   competitors: {
     id: 'competitors',
     label: 'Competitors',
@@ -82,6 +88,7 @@ const EXTRA_REBUILT_NAV_ENTRIES: Partial<Record<Page, NavEntry>> = {
 };
 
 const REBUILT_ZONE_ACCENT: Record<RebuiltNavZoneKey, string> = {
+  book: 'var(--teal)',
   top: 'var(--teal)',
   'strategy-content': 'var(--blue)',
   'search-site-health': 'var(--cyan)',
@@ -100,11 +107,12 @@ const GROUP_PRESENTATION: RebuiltNavGroupPresentation[] = REBUILT_NAV_ZONES.map(
 }));
 
 function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): RebuiltNavGroup[] {
-  const entryToNavItem = (entry: NavEntry): RebuiltNavItem => ({
+  const entryToNavItem = (entry: AnyNavEntry): RebuiltNavItem => ({
     id: entry.id,
     label: resolveNavLabel(entry, isFlagEnabled),
     icon: entry.icon,
     desc: resolveNavDescription(entry, isFlagEnabled),
+    scope: resolveNavScope(entry),
     needsSite: entry.needsSite,
     hidden: isNavEntryHidden(entry, isFlagEnabled),
   });
@@ -121,8 +129,9 @@ function buildNavGroups(isFlagEnabled: (flag: FeatureFlagKey) => boolean): Rebui
 }
 
 function isNavItemDisabled(item: RebuiltNavItem, selected: Workspace | null): boolean {
-  if (GLOBAL_TABS.has(item.id)) return false;
-  return !selected || (!!item.needsSite && !selected.webflowSiteId);
+  const entry = NAV_ENTRY_BY_ID.get(item.id);
+  if (!entry || resolveNavPath(entry, selected?.id) === null) return true;
+  return item.scope === 'workspace' && !!item.needsSite && !selected?.webflowSiteId;
 }
 
 function readCollapsedGroups(): Set<string> {
@@ -151,6 +160,7 @@ export function RebuiltSidebar({
   onNavigate,
 }: RebuiltSidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const badgesQuery = useWorkspaceBadges(selected?.id);
   const { data: flagValues } = useQuery({
     queryKey: queryKeys.shared.featureFlags(),
@@ -160,8 +170,9 @@ export function RebuiltSidebar({
   });
   const isFlagEnabled = (flag: FeatureFlagKey) => flagValues?.[flag] ?? FEATURE_FLAGS[flag];
   const navGroups = useMemo(() => buildNavGroups(isFlagEnabled), [flagValues]);
+  const activeDestinationId: NavDestinationId = location.pathname === '/' ? BOOK_ROOT_NAV_ID : tab;
   const pendingReplies = badgesQuery.data?.pendingReplies?.count ?? 0;
-  const badgeForItem = (itemId: Page): number | undefined => {
+  const badgeForItem = (itemId: NavDestinationId): number | undefined => {
     const count = itemId === 'content-pipeline'
       ? pendingContentRequests
       : itemId === 'requests'
@@ -185,7 +196,7 @@ export function RebuiltSidebar({
 
   // effect-layout-ok — intentional post-render active-group expansion mirrors legacy Sidebar
   useEffect(() => {
-    const activeGroup = navGroups.find((group) => group.label && group.items.some((item) => item.id === tab));
+    const activeGroup = navGroups.find((group) => group.label && group.items.some((item) => item.id === activeDestinationId));
     if (activeGroup && collapsedGroups.has(activeGroup.label)) {
       setCollapsedGroups((prev) => {
         const next = new Set(prev);
@@ -193,8 +204,8 @@ export function RebuiltSidebar({
         return next;
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- ONLY a tab change reopens the active group (legacy Sidebar parity, deps [tab]). `navGroups` is intentionally omitted: it gets a fresh identity when the flag query resolves, and including it would re-run this effect and re-expand a group the user just manually collapsed (review PR #1478). navGroups is read as a live closure — correct because a stale read only matters across a tab change, which retriggers the effect anyway.
-  }, [tab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ONLY an active destination change reopens the active group (legacy Sidebar parity). `navGroups` is intentionally omitted: it gets a fresh identity when the flag query resolves, and including it would re-run this effect and re-expand a group the user just manually collapsed (review PR #1478). navGroups is read as a live closure — correct because a stale read only matters across a destination change, which retriggers the effect anyway.
+  }, [activeDestinationId]);
 
   const visibleGroups = useMemo(() => navGroups.map((group) => {
     // In the icon rail there are no group headers to toggle, so every group is
@@ -214,16 +225,14 @@ export function RebuiltSidebar({
   ), [selected, visibleGroups]);
 
   const activateItem = (item: RebuiltNavItem) => {
-    const isGlobal = GLOBAL_TABS.has(item.id);
     const disabled = isNavItemDisabled(item, selected);
     if (disabled) return;
-    if (isGlobal) {
-      navigate('/' + item.id);
-      onNavigate?.();
-    } else if (selected) {
-      navigate(adminPath(selected.id, item.id));
-      onNavigate?.();
-    }
+    const entry = NAV_ENTRY_BY_ID.get(item.id);
+    if (!entry) return;
+    const path = resolveNavPath(entry, selected?.id);
+    if (!path) return;
+    navigate(path);
+    onNavigate?.();
   };
 
   const roving = useRovingTabindex(enabledVisibleItems.length, {
@@ -354,7 +363,7 @@ export function RebuiltSidebar({
           >
             {group.visibleItems.map((item) => {
               const index = navIndex;
-              const active = tab === item.id;
+              const active = activeDestinationId === item.id;
               const disabled = isNavItemDisabled(item, selected);
               const rovingProps = disabled ? null : roving.getItemProps(index);
               if (!disabled) navIndex += 1;

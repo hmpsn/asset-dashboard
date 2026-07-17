@@ -81,17 +81,6 @@
       "rationale": "Instrumented UX-flow audit (docs/superpowers/audits/2026-07-16-admin-ux-flow-audit.md) + carried-over items from the rebuild audit. Advisory findings ratified into work items; owner prioritizes.",
       "items": [
         {
-          "id": "book-level-cockpit",
-          "title": "Book-level Cockpit at / — cross-workspace verdict/stream rollup (Command Center rebuild)",
-          "source": "2026-07-16 rebuild audit §6 item 11 (carried)",
-          "est": "L",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "cockpit",
-          "notes": "W4.1a complete 2026-07-17: GET /api/cockpit/portfolio now serves attention-ranked per-workspace work-queue classifications + cockpit verdicts, reconciled queue/verdict counts, and explicit unreconciled money totals. W4.1b complete 2026-07-17: the ui-rebuild-shell flag-ON root now mounts a book-level Command Center that preserves server order, shows live/snapshot presence, renders every reconciled count family, and keeps both money totals explicitly not yet reconcilable; flag-OFF root remains the legacy WorkspaceOverview. No migration was needed. Parent remains pending for W4.1c nav/journey integration."
-        },
-        {
           "id": "cockpit-handoff-per-item-deeplink",
           "title": "Cockpit handoffs: typed per-item identity on aggregate rows + ?issue=/?item= receivers (Site Audit, Requests, Content Pipeline)",
           "source": "2026-07-17 W1.2 NEEDS_CONTEXT — deferred from cockpit-handoff-item-identity; pairs with site-audit-per-page-repair-rows (W3.3)",

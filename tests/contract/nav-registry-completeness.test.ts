@@ -18,11 +18,15 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, it, expect } from 'vitest';
 import {
+  BOOK_ROOT_NAV_ID,
+  NAV_DESTINATION_REGISTRY,
   NAV_REGISTRY,
   NAV_REGISTRY_BY_ID,
+  NON_PAGE_NAV_DESTINATIONS,
   NON_REGISTRY_PAGES,
   REBUILT_NAV_ZONES,
   isNavEntryHidden,
+  resolveNavPath,
   resolveNavLabel,
   resolveRebuiltNavZoneLabel,
 } from '../../src/lib/navRegistry';
@@ -45,6 +49,17 @@ function parsePageUnion(): string[] {
 
 describe('navRegistry completeness', () => {
   const pageUnion = parsePageUnion();
+
+  it('models the rebuilt book root as an explicit flag-ON, workspace-less destination', () => {
+    const entry = NAV_REGISTRY_BY_ID[BOOK_ROOT_NAV_ID];
+
+    expect(entry.label).toBe('Command Center');
+    expect(entry.scope).toBe('book');
+    expect(resolveRebuiltNavZoneLabel(BOOK_ROOT_NAV_ID)).toBe('All workspaces');
+    expect(resolveNavPath(entry, null)).toBe('/');
+    expect(isNavEntryHidden(entry, () => false)).toBe(true);
+    expect(isNavEntryHidden(entry, (flag) => flag === 'ui-rebuild-shell')).toBe(false);
+  });
 
   it('keeps Requests as a labeled Client-Facing rail home', () => {
     expect(NAV_REGISTRY_BY_ID.requests.label).toBe('Requests');
@@ -72,10 +87,18 @@ describe('navRegistry completeness', () => {
     expect(missing).toEqual([]);
   });
 
-  it('has no orphan registry entries (every entry is a real Page value)', () => {
+  it('has no orphan registry entries beyond explicit non-Page destinations', () => {
     const unionSet = new Set(pageUnion);
-    const orphans = NAV_REGISTRY.filter((e) => !unionSet.has(e.id));
+    const allowedNonPages = new Set<string>(NON_PAGE_NAV_DESTINATIONS);
+    const orphans = NAV_DESTINATION_REGISTRY.filter((e) => !unionSet.has(e.id) && !allowedNonPages.has(e.id));
     expect(orphans.map((e) => e.id)).toEqual([]);
+  });
+
+  it('keeps every non-Page destination explicit and registered', () => {
+    const unionSet = new Set(pageUnion);
+    const actualNonPages = NAV_DESTINATION_REGISTRY.filter((entry) => !unionSet.has(entry.id)).map((entry) => entry.id);
+
+    expect(actualNonPages).toEqual(NON_PAGE_NAV_DESTINATIONS);
   });
 
   it('excluded (redirect/legacy) Page values are not also registered', () => {
@@ -98,14 +121,14 @@ describe('navRegistry completeness', () => {
   });
 
   it('registry ids are unique', () => {
-    const ids = NAV_REGISTRY.map((e) => e.id);
+    const ids = NAV_DESTINATION_REGISTRY.map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('registry icons are unique enough for sidebar scanning', () => {
     const seen = new Map<unknown, string>();
     const duplicates: string[] = [];
-    for (const entry of NAV_REGISTRY) {
+    for (const entry of NAV_DESTINATION_REGISTRY) {
       const prior = seen.get(entry.icon);
       if (prior) duplicates.push(`${prior}/${entry.id}`);
       else seen.set(entry.icon, entry.id);
@@ -115,13 +138,13 @@ describe('navRegistry completeness', () => {
   });
 
   it('NAV_REGISTRY_BY_ID resolves every entry', () => {
-    for (const entry of NAV_REGISTRY) {
+    for (const entry of NAV_DESTINATION_REGISTRY) {
       expect(NAV_REGISTRY_BY_ID[entry.id]).toBe(entry);
     }
   });
 
   it('every entry has a non-empty label and description', () => {
-    for (const entry of NAV_REGISTRY) {
+    for (const entry of NAV_DESTINATION_REGISTRY) {
       expect(entry.label.length).toBeGreaterThan(0);
       expect(entry.description.length).toBeGreaterThan(0);
     }

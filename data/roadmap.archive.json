@@ -262,6 +262,17 @@
           "completedAt": "2026-07-17",
           "owner": "outcomes",
           "notes": "Completed 2026-07-17. Added a server-owned rolling 90-day portfolio read model for measured monthly value, positive click gains, and deduplicated wins across every workspace. The read reuses the canonical windowed outcome-win query, excludes not_acted_on independently, and separates platform-executed agency work from externally-executed client-side work. The rebuilt Outcomes Book consumes the route for both summary tiles and row metrics, replaces mixed all-time/28-day columns, and renders explicit no-evidence states. No migration or flag change."
+        },
+        {
+          "id": "book-level-cockpit",
+          "title": "Book-level Cockpit at / — cross-workspace verdict/stream rollup (Command Center rebuild)",
+          "source": "2026-07-16 rebuild audit §6 item 11 (carried)",
+          "est": "L",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "cockpit",
+          "notes": "W4.1a complete 2026-07-17: GET /api/cockpit/portfolio now serves attention-ranked per-workspace work-queue classifications + cockpit verdicts, reconciled queue/verdict counts, and explicit unreconciled money totals. W4.1b complete 2026-07-17: the ui-rebuild-shell flag-ON root now mounts a book-level Command Center that preserves server order, shows live/snapshot presence, renders every reconciled count family, and keeps both money totals explicitly not yet reconcilable; flag-OFF root remains the legacy WorkspaceOverview. W4.1c complete 2026-07-17: the nav registry module now carries an explicit flag-ON book-root destination used by the Command Palette, rebuilt sidebar, and breadcrumb root; / is current in sidebar/breadcrumb, and J1 is re-measured as 0 clicks to identify, 1 to enter the highest-attention Cockpit, and 2 to open its top triage handoff. No migration was needed."
         }
       ],
       "shippedAt": "2026-07-17"

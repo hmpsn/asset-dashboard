@@ -8,10 +8,10 @@ import {
   MessageSquare, Trophy, Upload, RefreshCw, Gauge,
 } from 'lucide-react';
 import { type Workspace } from './WorkspaceSelector';
-import { adminPath, GLOBAL_TABS } from '../routes';
+import { adminPath } from '../routes';
 import {
-  NAV_REGISTRY, type NavEntry, type NavGroupKey,
-  resolveNavLabel, resolveRebuiltNavZoneLabel, isNavEntryHidden,
+  NAV_DESTINATION_REGISTRY, type AnyNavEntry, type NavGroupKey,
+  resolveNavLabel, resolveNavPath, resolveRebuiltNavZoneLabel, isNavEntryHidden,
 } from '../lib/navRegistry';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
 import { useBackgroundTasks } from '../hooks/useBackgroundTasks';
@@ -36,8 +36,8 @@ interface CommandPaletteProps {
   onSelectWorkspace: (ws: Workspace) => void;
 }
 
-export function isPaletteNavEntryAvailable(entry: Pick<NavEntry, 'id'>, selectedWorkspace: Workspace | null): boolean {
-  return GLOBAL_TABS.has(entry.id) || selectedWorkspace !== null;
+export function isPaletteNavEntryAvailable(entry: AnyNavEntry, selectedWorkspace: Workspace | null): boolean {
+  return resolveNavPath(entry, selectedWorkspace?.id) !== null;
 }
 
 /**
@@ -153,9 +153,11 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
     const flagResolver = (flag: FeatureFlagKey) => (
       flag === 'ui-rebuild-shell' ? rebuildShellEnabled : false
     );
-    for (const entry of NAV_REGISTRY) {
+    for (const entry of NAV_DESTINATION_REGISTRY) {
       if (isNavEntryHidden(entry, flagResolver)) continue;
       if (!isPaletteNavEntryAvailable(entry, selectedWorkspace)) continue;
+      const path = resolveNavPath(entry, selectedWorkspace?.id);
+      if (!path) continue;
       const label = resolveNavLabel(entry, flagResolver);
       const groupLabel = rebuildShellEnabled
         ? resolveRebuiltNavZoneLabel(entry.id)
@@ -166,7 +168,7 @@ export function CommandPalette({ workspaces, selectedWorkspace, onSelectWorkspac
         sub: groupLabel || undefined,
         icon: entry.icon,
         type: 'nav',
-        action: () => { navigate(adminPath(selectedWorkspace?.id || '', entry.id)); addRecent(`nav:${entry.id}`); },
+        action: () => { navigate(path); addRecent(`nav:${entry.id}`); },
       });
     }
 
