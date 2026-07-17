@@ -46,6 +46,7 @@ vi.mock('../../../src/hooks/admin/useCockpitPortfolio', () => ({
 }));
 
 import { CommandCenterSurface } from '../../../src/components/command-center-rebuilt/CommandCenterSurface';
+import { expectNoA11yViolations } from '../a11y';
 import { useRebuildShellEnabled } from '../../../src/components/layout/RebuiltAppChrome';
 import { BOOK_REBUILT_SURFACE } from '../../../src/components/layout/rebuiltSurfaces';
 
@@ -152,6 +153,12 @@ describe('book-level Command Center rebuilt surface', () => {
         lastSeen: '2026-07-17T12:00:00.000Z',
       }],
     };
+  });
+
+  it('carries the @ds-rebuilt accessibility floor', async () => {
+    const { container } = renderSurface();
+    await screen.findAllByTestId('portfolio-workspace-card');
+    await expectNoA11yViolations(container);
   });
 
   it('preserves the server attention order and opens the matching workspace Cockpit', () => {
