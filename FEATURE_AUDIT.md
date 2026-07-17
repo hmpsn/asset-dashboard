@@ -10098,3 +10098,17 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Unit coverage pins deterministic attention ranking and exact-only aggregation, including proof that money evidence is ignored. Integration coverage invokes the real Express route over real workspace-backed inputs and verifies per-workspace classifier/verdict parity plus the honest totals contract.
 
 **Files:** shared Cockpit portfolio types; Cockpit portfolio domain and route; app route registration; focused unit/integration tests; roadmap and feature audit.
+
+### 715. Admin UX W4.2c GO-004 Outcomes Book portfolio rollup 2026-07-17
+
+**Status:** Complete. The rebuilt Outcomes Book now has one truthful server-owned portfolio window instead of a permanent unavailable banner and mixed all-time/28-day row metrics.
+
+**What changed:** Added `GET /api/outcomes/portfolio-rollup`, backed by a typed rolling 90-day read model over existing tracked actions and measured outcomes. It deduplicates multiple winning checkpoints to the highest checkpoint per action, sums measured monthly value and positive click gains, and returns both portfolio totals and per-workspace rows. The rebuilt page consumes those totals through a dedicated admin React Query hook, renders blue value/click tiles, an attribution-separated measured-win tile, and em dashes or an explicit no-wins message when the window has no proof.
+
+**Attribution honesty:** This read path reuses the canonical windowed win query that excludes `not_acted_on` and client-hidden outcome actions, then independently guards against `not_acted_on` again before aggregation. Overall measured totals may include `externally_executed`, but the response and UI keep those client-side wins separate from `platform_executed`; only the latter is labeled agency-executed.
+
+**Window rationale:** Rolling 90 days matches the Outcome engine's longest standard measurement checkpoint and provides enough portfolio evidence for slower-measuring work while keeping value, click gains, and wins on the same explicit ISO interval.
+
+**Tests:** Added route coverage for the 90-day interval, multi-checkpoint deduplication, out-of-window exclusion, `not_acted_on` exclusion, attribution buckets, and zero-evidence workspaces. Updated the rebuilt Outcomes Book component suite for server totals, unified headings, attribution copy, loading, and empty-window states. No migration or feature-flag change.
+
+**Files:** outcome portfolio shared types; canonical windowed outcome reader; portfolio service and route; outcomes API/query key/hook; rebuilt Outcomes Book lens/table; focused integration and component tests; GO-004 parity/owner docs; deferred ledger and roadmap.

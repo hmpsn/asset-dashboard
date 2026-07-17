@@ -250,6 +250,18 @@
           "createdAt": "2026-07-17",
           "owner": "seo-health",
           "notes": "Completed locally on 2026-07-17: KCC summary now serves impression-weighted average position plus explicit current/prior adjacent 28-day snapshot windows and server deltas with honest missing-current/missing-prior semantics. Added a skinny, unpaginated grouped endpoint for page/cluster/lifecycleStage with complete row membership and server-owned count/click/impression/average-position rollups. Rebuilt Keywords consumes both contracts, adds blue Avg. position/Position change MetricTiles, and removes current-page grouping plus its truncation banner. No migration and no W4.2a rank-history changes."
+        },
+        {
+          "id": "admin-ux-w42c-outcomes-book-rollup",
+          "title": "W4.2c — GO-004 server-owned Outcomes Book portfolio rollup",
+          "source": "Admin UX campaign Wave 4; GO-004 attribution-honest outcome read model",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-17",
+          "completedAt": "2026-07-17",
+          "owner": "outcomes",
+          "notes": "Completed 2026-07-17. Added a server-owned rolling 90-day portfolio read model for measured monthly value, positive click gains, and deduplicated wins across every workspace. The read reuses the canonical windowed outcome-win query, excludes not_acted_on independently, and separates platform-executed agency work from externally-executed client-side work. The rebuilt Outcomes Book consumes the route for both summary tiles and row metrics, replaces mixed all-time/28-day columns, and renders explicit no-evidence states. No migration or flag change."
         }
       ],
       "shippedAt": "2026-07-17"

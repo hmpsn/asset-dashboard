@@ -1015,6 +1015,29 @@ export function getWinsWithValueByWorkspace(workspaceId: string, limit = 100): O
   return rows.map(rowToOutcomeValueWin);
 }
 
+/**
+ * Windowed form of the canonical attribution- and visibility-honest win reader.
+ * It intentionally reuses the same SQL path as monthly-digest ROI highlights:
+ * `not_acted_on` and client-hidden actions are excluded before aggregation, and
+ * multiple winning checkpoints collapse to the highest checkpoint per action.
+ */
+export function getWinsWithValueByWorkspaceInWindow(
+  workspaceId: string,
+  window: ROIHighlightWindow,
+  limit = -1,
+): OutcomeValueWin[] {
+  const rows = stmts().getWinsWithValueByWorkspaceInWindow.all(
+    workspaceId,
+    ...CLIENT_HIDDEN_OUTCOME_ACTION_TYPES,
+    window.start,
+    window.endExclusive,
+    window.start,
+    window.endExclusive,
+    limit,
+  ) as WinWithValueRow[];
+  return rows.map(rowToOutcomeValueWin);
+}
+
 export function getWorkspaceOutcomeValueRollup(workspaceId: string, limit = 100): WorkspaceOverviewOutcomeValue {
   const wins = getWinsWithValueByWorkspace(workspaceId, limit);
   return wins.reduce<WorkspaceOverviewOutcomeValue>(

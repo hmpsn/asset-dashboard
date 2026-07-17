@@ -248,6 +248,7 @@ export const queryKeys = {
     outcomePlaybooks: (wsId: string) => ['admin-outcome-playbooks', wsId] as const,
     outcomeTopWins: (wsId: string) => ['admin-outcome-top-wins', wsId] as const,
     outcomeOverview: () => ['admin-outcome-overview'] as const,
+    outcomePortfolioRollup: () => ['admin-outcome-portfolio-rollup'] as const,
 
     // Intelligence
     intelligence: (wsId: string, slices?: readonly string[], pagePath?: string, learningsDomain?: string) =>
