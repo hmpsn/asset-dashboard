@@ -11,6 +11,7 @@ import { SeoEditorPagePanel } from '../../../src/components/seo-editor-rebuilt/S
 import { SeoEditorWorksheet } from '../../../src/components/seo-editor-rebuilt/SeoEditorWorksheet';
 import { useSeoEditorSurfaceState } from '../../../src/components/seo-editor-rebuilt/useSeoEditorSurfaceState';
 import { useCmsEditorApprovalWorkflow } from '../../../src/components/cms-editor/useCmsEditorApprovalWorkflow';
+import { useCmsEditorAiWorkflow } from '../../../src/components/cms-editor/useCmsEditorAiWorkflow';
 import { SEO_EDITOR_TARGET_TYPES } from '../../../shared/types/seo-editor-write-target';
 import type {
   CmsSeoWorkflowState,
@@ -105,12 +106,13 @@ const cmsRow: SeoEditorSurfaceRow = {
       { id: 'slug', slug: 'slug', displayName: 'Slug', type: 'PlainText' },
       { id: 'seo-title', slug: 'seo-title', displayName: 'SEO Title', type: 'PlainText' },
       { id: 'seo-description', slug: 'seo-description', displayName: 'SEO Description', type: 'PlainText' },
+      { id: 'og-title', slug: 'og-title', displayName: 'Open Graph Title', type: 'PlainText' },
     ],
-    items: [{ id: 'item-1', fieldData: { name: 'CMS Post', slug: 'cms-post', 'seo-title': 'CMS SEO', 'seo-description': 'CMS description.' } }],
+    items: [{ id: 'item-1', fieldData: { name: 'CMS Post', slug: 'cms-post', 'seo-title': 'CMS SEO', 'seo-description': 'CMS description.', 'og-title': 'CMS social title' } }],
     total: 1,
   },
-  cmsItem: { id: 'item-1', fieldData: { name: 'CMS Post', slug: 'cms-post', 'seo-title': 'CMS SEO', 'seo-description': 'CMS description.' } },
-  cmsEdit: { name: 'CMS Post', slug: 'cms-post', 'seo-title': 'CMS SEO', 'seo-description': 'CMS description.' },
+  cmsItem: { id: 'item-1', fieldData: { name: 'CMS Post', slug: 'cms-post', 'seo-title': 'CMS SEO', 'seo-description': 'CMS description.', 'og-title': 'CMS social title' } },
+  cmsEdit: { name: 'CMS Post', slug: 'cms-post', 'seo-title': 'CMS SEO', 'seo-description': 'CMS description.', 'og-title': 'CMS social title' },
   pageState: { status: 'in-review' },
   recommendations: [],
   metrics: { lastEditedAt: '2026-07-02T00:00:00.000Z' },
@@ -246,6 +248,7 @@ function CmsToolbarSendHarness({ changed = false }: { changed?: boolean }) {
       slug: 'cms-post',
       'seo-title': changed ? 'CMS SEO revised' : 'CMS SEO',
       'seo-description': 'CMS description.',
+      'og-title': 'CMS social title',
     },
   }));
   const approval = useCmsEditorApprovalWorkflow({
@@ -264,6 +267,35 @@ function CmsToolbarSendHarness({ changed = false }: { changed?: boolean }) {
       cmsWorkflow={cmsWorkflow({ ...approval, edits })}
       onOpenPage={vi.fn()}
       onClearFilters={vi.fn()}
+    />
+  );
+}
+
+function CmsFieldRewriteHarness() {
+  const [edits, setEdits] = useState(() => ({
+    'item-1': { ...cmsRow.cmsEdit! },
+  }));
+  const updateField = (itemId: string, fieldSlug: string, value: string) => {
+    setEdits((previous) => ({
+      ...previous,
+      [itemId]: { ...previous[itemId], [fieldSlug]: value },
+    }));
+  };
+  const aiWorkflow = useCmsEditorAiWorkflow({
+    siteId: 'site-1',
+    workspaceId: 'ws-1',
+    collections: [cmsRow.cmsCollection!],
+    edits,
+    updateField,
+  });
+
+  return (
+    <SeoEditorPagePanel
+      workspaceId="ws-1"
+      row={{ ...cmsRow, cmsEdit: edits['item-1'] }}
+      staticWorkflow={staticWorkflow()}
+      cmsWorkflow={cmsWorkflow({ ...aiWorkflow, edits, updateField })}
+      onClose={vi.fn()}
     />
   );
 }
@@ -554,9 +586,19 @@ describe('SeoEditorSurface rebuilt', () => {
     expect(screen.getAllByRole('button', { name: /Static bulk actions/i })).toHaveLength(1);
   });
 
-  it('shows the source missing-metadata banner only for editable rows and wires each fix action once', () => {
+  it('keeps the missing-metadata banner count equal to the static set its fix actions operate on', () => {
     workflows.staticWorkflow = staticWorkflow({
       edits: { 'page-1': { seoTitle: '', seoDescription: '', dirty: true } },
+    });
+    workflows.bulkWorkflow = staticBulkWorkflow({ missingTitles: 1, missingDescs: 1 });
+    workflows.cmsWorkflow = cmsWorkflow({
+      edits: {
+        'item-1': {
+          ...cmsRow.cmsEdit!,
+          'seo-title': '',
+          'seo-description': '',
+        },
+      },
     });
     renderWithProviders(<SeoEditorSurface workspaceId="ws-1" />);
     fireEvent.click(screen.getByRole('button', { name: /Production tools/i }));
@@ -569,12 +611,12 @@ describe('SeoEditorSurface rebuilt', () => {
     expect(workflows.bulkWorkflow.handleBulkFix).toHaveBeenNthCalledWith(1, 'title');
     expect(workflows.bulkWorkflow.handleBulkFix).toHaveBeenNthCalledWith(2, 'description');
 
-    // The manual fixture is missing both tags, so the count remaining at one
-    // proves read-only rows do not inflate actionable work.
+    // Both the CMS and manual fixtures are missing both tags. The count staying
+    // at one proves the banner describes only the static set these buttons fix.
     expect(screen.queryByText(/2 missing titles|2 missing descriptions/i)).not.toBeInTheDocument();
   });
 
-  it('shows only supported selected-row actions in one compact strip', async () => {
+  it('submits each selected target type once from one unified send control', async () => {
     workflows.staticWorkflow = staticWorkflow({
       approvalSelected: new Set(['page-1']),
       edits: { 'page-1': { seoTitle: '', seoDescription: '', dirty: true } },
@@ -588,8 +630,15 @@ describe('SeoEditorSurface rebuilt', () => {
     expect(screen.queryByText('Missing metadata')).not.toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Select all Static pages' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Select all CMS collection items' })).toBeChecked();
-    expect(screen.getAllByRole('button', { name: 'Send static to client' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Send CMS to client' })).toHaveLength(1);
+    expect(selectedToolbar).toHaveTextContent('1 static · 1 CMS');
+    fireEvent.click(screen.getByRole('button', { name: 'Send 2 to client' }));
+    await waitFor(() => {
+      expect(workflows.staticWorkflow.sendForApproval).toHaveBeenCalledTimes(1);
+      expect(workflows.cmsWorkflow.sendForApproval).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.queryByRole('button', { name: 'Send static to client' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send CMS to client' })).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Rewrite static' }));
     expect(workflows.bulkWorkflow.bulkAiRewrite).toHaveBeenCalledWith('both');
 
@@ -599,11 +648,118 @@ describe('SeoEditorSurface rebuilt', () => {
     expect(screen.queryByRole('button', { name: /Request changes|Approve/ })).not.toBeInTheDocument();
   });
 
+  it('routes static title and description rewrites through the single-field workflow', () => {
+    const workflow = staticWorkflow();
+    renderWithProviders(
+      <SeoEditorPagePanel
+        workspaceId="ws-1"
+        row={staticRow}
+        staticWorkflow={workflow}
+        cmsWorkflow={cmsWorkflow()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite SEO title with AI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite meta description with AI' }));
+
+    expect(workflow.aiRewrite).toHaveBeenNthCalledWith(1, 'page-1', 'title');
+    expect(workflow.aiRewrite).toHaveBeenNthCalledWith(2, 'page-1', 'description');
+  });
+
+  it('calls the single-field endpoint for an individual CMS SEO field rewrite', async () => {
+    apiPostMock.mockResolvedValueOnce({ text: 'A stronger social title' });
+    renderWithProviders(<CmsFieldRewriteHarness />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite Open Graph Title with AI' }));
+
+    await waitFor(() => expect(apiPostMock).toHaveBeenCalledWith(
+      '/api/webflow/seo-rewrite',
+      expect.objectContaining({ field: 'title', workspaceId: 'ws-1' }),
+    ));
+  });
+
+  it('edits the CMS slug through the existing CMS field update workflow', () => {
+    const workflow = cmsWorkflow();
+    renderWithProviders(
+      <SeoEditorPagePanel
+        workspaceId="ws-1"
+        row={cmsRow}
+        staticWorkflow={staticWorkflow()}
+        cmsWorkflow={workflow}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Slug' }), {
+      target: { value: 'cms-post-revised' },
+    });
+    expect(workflow.updateField).toHaveBeenCalledWith('item-1', 'slug', 'cms-post-revised');
+  });
+
+  it('surfaces the current item approval history with values and prior changes', () => {
+    const rowWithHistory: SeoEditorSurfaceRow = {
+      ...cmsRow,
+      approvalHistory: [
+        {
+          id: 'approval-latest',
+          pageId: 'item-1',
+          pageTitle: 'CMS Post',
+          pageSlug: 'cms-post',
+          field: 'seo-title',
+          collectionId: 'collection-1',
+          currentValue: 'Old CMS title',
+          proposedValue: 'Proposed CMS title',
+          clientValue: 'Client-edited CMS title',
+          status: 'rejected',
+          createdAt: '2026-07-15T10:00:00.000Z',
+          updatedAt: '2026-07-16T10:00:00.000Z',
+          batchName: 'CMS SEO Changes — Jul 16, 2026',
+          batchId: 'batch-latest',
+        },
+        {
+          id: 'approval-older',
+          pageId: 'item-1',
+          pageTitle: 'CMS Post',
+          pageSlug: 'cms-post',
+          field: 'seo-description',
+          collectionId: 'collection-1',
+          currentValue: 'Old description',
+          proposedValue: 'Approved description',
+          status: 'approved',
+          createdAt: '2026-07-10T10:00:00.000Z',
+          updatedAt: '2026-07-11T10:00:00.000Z',
+          batchName: 'CMS SEO Changes — Jul 11, 2026',
+          batchId: 'batch-older',
+        },
+      ],
+    };
+
+    renderWithProviders(
+      <SeoEditorPagePanel
+        workspaceId="ws-1"
+        row={rowWithHistory}
+        staticWorkflow={staticWorkflow()}
+        cmsWorkflow={cmsWorkflow()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Approval history')).toBeInTheDocument();
+    expect(screen.getByText('Old CMS title')).toBeInTheDocument();
+    expect(screen.getByText('Client-edited CMS title')).toBeInTheDocument();
+    expect(screen.queryByText('Old description')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show 1 earlier change' }));
+    expect(screen.getByText('Old description')).toBeInTheDocument();
+    expect(screen.getByText('Approved description')).toBeInTheDocument();
+  });
+
   it('toasts the CMS no-changes validation error beside the toolbar send action', async () => {
     renderWithProviders(<CmsToolbarSendHarness />);
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select CMS Post' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Send CMS to client' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Send 1 to client' }));
 
     expect(await screen.findByText(/No changes detected on selected items/i)).toBeInTheDocument();
     expect(apiPostMock).not.toHaveBeenCalled();
@@ -614,10 +770,10 @@ describe('SeoEditorSurface rebuilt', () => {
     renderWithProviders(<CmsToolbarSendHarness changed />);
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select CMS Post' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Send CMS to client' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Send 1 to client' }));
 
     expect(await screen.findByText(/Failed to send for approval/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send CMS to client' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Send 1 to client' })).toBeEnabled();
   });
 
   it('toasts CMS approval success and preserves selection clearing', async () => {
@@ -625,11 +781,11 @@ describe('SeoEditorSurface rebuilt', () => {
 
     const rowSelection = screen.getByRole('checkbox', { name: 'Select CMS Post' });
     fireEvent.click(rowSelection);
-    fireEvent.click(await screen.findByRole('button', { name: 'Send CMS to client' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Send 1 to client' }));
 
     expect(await screen.findByText(/sent/i)).toBeInTheDocument();
     await waitFor(() => expect(rowSelection).not.toBeChecked());
-    expect(screen.queryByRole('button', { name: 'Send CMS to client' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send 1 to client' })).not.toBeInTheDocument();
   });
 
   it('keeps the research alias on the workbench and shows truthful no-recommendation drawer copy', () => {
