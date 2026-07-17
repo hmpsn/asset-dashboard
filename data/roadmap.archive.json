@@ -194,6 +194,39 @@
           "createdAt": "2026-07-16",
           "owner": "strategy",
           "notes": "D1 Option A implemented: protected verdict-first opening preserved; curation/attention/backing moves/projections now follow the value frame; POV editor + trust-spine preview share one Compose the issue band; stance/signals/lost-query recovery share a default-collapsed Evidence behind this issue disclosure that auto-opens for ?lens=signals; Operations remains last (V5). Engine component suite: 52 tests green, including actions-forward order, exact-once send/POV/preview, signals disclosure deep link, and W1.1 jump-nav regression. Contract circle-back recorded for owner-veto review."
+        },
+        {
+          "id": "ai-visibility-flag-on-home",
+          "title": "AI Visibility: give the LLM-mention panel a rebuilt flag-ON home",
+          "source": "2026-07-16 rebuild audit §6 item (carried)",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "analytics",
+          "notes": "SHIPPED (#1582). Dedicated lightweight /ai-visibility rebuilt-shell home in Search & Site Health; thin wrapper over the existing AiVisibilityPanel + refresh job; legacy KeywordHub mount stays byte-identical flag-OFF (D8). Owner approved the dedicated-surface default at PR review."
+        },
+        {
+          "id": "anomaly-stream-flag-on-home",
+          "title": "Anomaly alerts: flag-ON home + Cockpit risk-stream pointer (provable mapping from legacy 21-alert strip)",
+          "source": "2026-07-16 rebuild audit B4 (carried)",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "analytics",
+          "notes": "SHIPPED (#1583). S&T anomaly parity was already met (both rebuilt lenses mount the legacy AnomalyAlerts) so scope narrowed to: Cockpit 'N anomalies' pointer sharing the useAnomalyAlerts source count + two-halves ?section=anomalies deep-link, and work-queue.ts positive-severity-in-Risk fix."
+        },
+        {
+          "id": "site-audit-per-page-repair-rows",
+          "title": "Site Audit drawer: per-instance action rows or apply-to-all-N with preview + per-page results",
+          "source": "2026-07-16 rebuild audit #14 (carried); journeys J2",
+          "est": "L",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "site-health",
+          "notes": "SHIPPED (#1581). Restored legacy AuditIssueRow depth: per-page action rows firing with each page's pageId, informed Apply-to-all preview with per-page outcomes, #1566 filter-truthful scope copy preserved."
         }
       ],
       "shippedAt": "2026-07-17"
