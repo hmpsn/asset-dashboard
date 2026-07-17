@@ -16,6 +16,7 @@ export type {
   UseCockpitRebuiltResult,
 } from './useCockpitRebuilt';
 export { useWorkspaceOverviewData } from './useWorkspaceOverview';
+export { useCockpitPortfolio, usePortfolioPresence } from './useCockpitPortfolio';
 export { useWorkspaceBadges } from './useWorkspaceBadges';
 export { useAuditTrafficMap, useAuditSuppressions, useAuditSchedule, useSchemaSnapshot, useWebflowPages } from './useAdminSeo';
 export { useSeoAuditWorkflow } from './useSeoAuditWorkflow';

@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 714** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 715** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 716. Book-level rebuilt Command Center surface 2026-07-17
+
+**What it does:** Replaces the `ui-rebuild-shell` flag-ON root redirect/legacy seam with a real book-level Command Center inside the rebuilt shell. It reads W4.1a's `GET /api/cockpit/portfolio` rollup through a dedicated React Query hook, renders workspace verdict and work-stream cards in the server's attention order, adds snapshot plus live WebSocket presence indicators, and exposes every reconciled count family across workspaces, queue streams, and verdicts. The two money summaries preserve the server's explicit “Not yet reconcilable” status and reason without rendering a dollar aggregate.
+
+**Why it matters:** An operator can begin morning triage at `/` and see which client needs attention first without being bounced into one workspace or opening the legacy overview. The surface keeps ranking and money claims server-authoritative, so the portfolio view cannot drift into browser-calculated priority or misleading agency-wide value.
+
+**Boundaries:** This is a read-only cockpit surface over existing W4.1a and presence endpoints. It introduces no migration, mutation, money reconciliation, nav destination, command-palette action, or flag change. `/ws/:workspaceId` keeps the existing per-workspace Cockpit, and the flag-OFF `/` branch remains the legacy `WorkspaceOverview` path.
+
+**Tests:** Real feature-flag loading-to-ON mount, flag-ON root chrome wiring, flag-OFF legacy root preservation, server order, reconciled count families, unreconciled money/no-currency behavior, presence, and rebuilt registry census.
+
+**Files:** book-level Command Center component; portfolio/presence API and admin hooks; query keys; rebuilt root registry and `App.tsx` flag-ON seam; parity packet; component and contract tests; roadmap, brand language, and this audit.
 
 ---
 

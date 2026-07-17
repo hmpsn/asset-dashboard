@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { get, getSafe, getOptional } from '../../api/client';
 import { queryKeys } from '../../lib/queryKeys';
 import type { WorkspaceOverviewItem } from '../../../shared/types/workspace-overview';
+import type { PresenceMap } from '../../api/presence';
 
 interface ActivityEntry {
   id: string;
@@ -21,8 +22,6 @@ interface AnomalySummary {
   acknowledgedAt?: string;
   dismissedAt?: string;
 }
-
-type PresenceMap = Record<string, Array<{ userId: string; email: string; name?: string; role: string; connectedAt: string; lastSeen: string }>>;
 
 export interface WorkspaceOverviewData {
   workspaces: WorkspaceOverviewItem[];

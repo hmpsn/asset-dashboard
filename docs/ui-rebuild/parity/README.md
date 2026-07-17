@@ -83,7 +83,7 @@ Current coverage finding:
 
 - `src/routes.ts` has 33 admin `Page` values.
 - `NAV_REGISTRY` has 27 global nav destinations, and `NON_REGISTRY_PAGES` explicitly accounts for the other 6 redirects, folded routes, standalone workspace receivers, and rebuilt-sidebar-only entries.
-- `REBUILT_SURFACES` has 28 directly mounted rebuilt routes. Page Intelligence is the 27th owner-approved direct mount; AI Visibility is the 28th and is awaiting owner review under W3.1's embedded dedicated-home default.
+- `REBUILT_SURFACES` has 28 directly mounted workspace/global `Page` routes. Page Intelligence is the 27th owner-approved direct mount; AI Visibility is the 28th and is awaiting owner review under W3.1's embedded dedicated-home default. W4.1b adds the separately registered `BOOK_REBUILT_SURFACE` at `/`; its `command-center-contract.md` packet is implementation-complete and awaiting owner visual review without changing the 28-route `Page` census.
 - `content-perf` is deliberately not a direct mount: with `ui-rebuild-shell` on, its compatibility route resolves to `content-pipeline?tab=published`; with the flag off, the legacy Content Performance route and nav remain intact.
 - `competitors` is still globally `NON_REGISTRY_PAGES`, but the rebuilt sidebar now surfaces it in the prototype `Strategy & Content` zone because the rebuilt shell is flag-gated. `workspace-settings` remains a per-workspace settings receiver, not a main sidebar item.
 

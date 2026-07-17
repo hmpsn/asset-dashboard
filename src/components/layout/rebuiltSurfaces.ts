@@ -16,6 +16,11 @@ import { lazyWithRetry } from '../../lib/lazyWithRetry';
  */
 export type RebuiltSurfaceProps = { workspaceId: string };
 
+/** Book-level root mount; separate from the workspace-scoped `home` Page identity. */
+export const BOOK_REBUILT_SURFACE = lazyWithRetry(() =>
+  import('../command-center-rebuilt/CommandCenterSurface').then(m => ({ default: m.CommandCenterSurface })),
+);
+
 export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurfaceProps>>> = {
   'seo-keywords': lazyWithRetry(() =>
     import('../keywords-rebuilt/KeywordsSurface').then(m => ({ default: m.KeywordsSurface })),

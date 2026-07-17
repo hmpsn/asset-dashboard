@@ -15,7 +15,7 @@
           "status": "pending",
           "createdAt": "2026-07-16",
           "owner": "cockpit",
-          "notes": "W4.1a complete 2026-07-17: GET /api/cockpit/portfolio now serves attention-ranked per-workspace work-queue classifications + cockpit verdicts, reconciled queue/verdict counts, and explicit unreconciled money totals. No migration, intelligence slice, or WS event was needed because this is a read-only composition over existing sources. Parent remains pending for W4.1b surface + W4.1c nav/journey integration."
+          "notes": "W4.1a complete 2026-07-17: GET /api/cockpit/portfolio now serves attention-ranked per-workspace work-queue classifications + cockpit verdicts, reconciled queue/verdict counts, and explicit unreconciled money totals. W4.1b complete 2026-07-17: the ui-rebuild-shell flag-ON root now mounts a book-level Command Center that preserves server order, shows live/snapshot presence, renders every reconciled count family, and keeps both money totals explicitly not yet reconcilable; flag-OFF root remains the legacy WorkspaceOverview. No migration was needed. Parent remains pending for W4.1c nav/journey integration."
         },
         {
           "id": "cockpit-handoff-per-item-deeplink",

@@ -20,7 +20,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { RebuiltAppChrome, useRebuildShellEnabled } from './components/layout/RebuiltAppChrome';
-import { REBUILT_SURFACES } from './components/layout/rebuiltSurfaces';
+import { BOOK_REBUILT_SURFACE, REBUILT_SURFACES } from './components/layout/rebuiltSurfaces';
 import { Icon } from './components/ui/Icon';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { TabBar } from './components/ui/TabBar';
@@ -232,7 +232,8 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const [lastVisitedWorkspaceId, setLastVisitedWorkspaceId] = useState<string | null>(readLastVisitedWorkspaceId);
   // Derived synchronously — prevents layout flash when navigating away (useEffect runs after paint)
   const effectiveFocusMode = focusMode && tab === 'rewrite';
-  const rebuiltSurfaceActive = rebuildShellEnabled && REBUILT_SURFACES[tab] !== undefined;
+  const bookRootActive = rebuildShellEnabled && location.pathname === '/';
+  const rebuiltSurfaceActive = bookRootActive || (rebuildShellEnabled && REBUILT_SURFACES[tab] !== undefined);
 
   // Reset backing state when navigating away so returning to rewrite starts fresh
   useEffect(() => {
@@ -510,9 +511,9 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
 
-  const canMountRebuiltSurface = chromeWorkspace !== null || GLOBAL_TABS.has(tab);
+  const canMountRebuiltSurface = bookRootActive || chromeWorkspace !== null || GLOBAL_TABS.has(tab);
   const RebuiltSurface = rebuildShellEnabled && canMountRebuiltSurface ? REBUILT_SURFACES[tab] : undefined;
-  if (RebuiltSurface && canMountRebuiltSurface) {
+  if ((bookRootActive || RebuiltSurface) && canMountRebuiltSurface) {
     const rebuiltWorkspaceId = selected?.id ?? chromeWorkspace?.id ?? '';
     return (
       <>
@@ -537,9 +538,11 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
           focusMode={effectiveFocusMode}
           onFocusModeChange={setFocusMode}
         >
-          <ErrorBoundary label={tab}>
+          <ErrorBoundary label={bookRootActive ? 'command-center' : tab}>
             <Suspense fallback={<ChunkFallback />}>
-              <RebuiltSurface key={`${tab}:${rebuiltWorkspaceId}`} workspaceId={rebuiltWorkspaceId} />
+              {bookRootActive
+                ? <BOOK_REBUILT_SURFACE key="command-center:book" />
+                : RebuiltSurface && <RebuiltSurface key={`${tab}:${rebuiltWorkspaceId}`} workspaceId={rebuiltWorkspaceId} />}
             </Suspense>
           </ErrorBoundary>
         </RebuiltAppChrome>
