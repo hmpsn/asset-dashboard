@@ -50,7 +50,17 @@
  * behavior change to import-time semantics outside this ticket's "additive,
  * no data changes" scope, so they are registered with `stopHook: false` and
  * an explicit `exemptReason` instead of being force-fit into the lifecycle
- * API. The MCP TTL sweeper (server/mcp/handles.ts) is similar — its
+ * API.
+ *
+ * All three are `.unref()`'d. Starting at import is the exemption; being REF'd
+ * was a bug — a ref'd sweeper keeps the event loop alive forever, so any CLI
+ * that transitively imports the AI/server stack never exits (2026-07-16:
+ * `npm run seed:demo` hung 18+ min via content-brief → ai-deduplication).
+ * unref() preserves the import-time semantics this exemption depends on (a real
+ * server's HTTP listener keeps the loop alive, so the sweepers still tick) while
+ * ensuring an import alone can never block exit. Guarded by
+ * tests/unit/module-load-timers.test.ts; server/mcp/handles.ts is the reference
+ * pattern. The MCP TTL sweeper (server/mcp/handles.ts) is similar — its
  * `NODE_ENV=test` guard exists specifically so an always-on timer doesn't
  * break test teardown — but it already skips itself under test, so it is
  * registered the same way: metadata-only, `stopHook: false`, documented
@@ -382,9 +392,9 @@ export const CRON_METADATA: Record<CronId, CronMetadataEntry> = {
     stop: noop,
     exemptReason:
       'Module-level setInterval that fires unconditionally on import of server/middleware.ts (every ' +
-      'createApp() consumer, including most integration tests, relies on it running immediately). Not ' +
-      'unref\'d, no existing stop export. Security-relevant in-process cache sweeper; restructuring its ' +
-      'import-time start semantics is out of scope for this additive registry PR.',
+      'createApp() consumer, including most integration tests, relies on it running immediately). Unref\'d ' +
+      '(so an import alone never blocks process exit), no existing stop export. Security-relevant in-process ' +
+      'cache sweeper; restructuring its import-time start semantics is out of scope for this additive registry PR.',
   },
   'middleware-login-lockout-cleanup': {
     label: 'Login Lockout Cleanup',
@@ -396,7 +406,7 @@ export const CRON_METADATA: Record<CronId, CronMetadataEntry> = {
     stop: noop,
     exemptReason:
       'Same posture as middleware-rate-limit-cleanup: module-level setInterval firing unconditionally on ' +
-      'import, not unref\'d, no existing stop export, security-relevant (login lockout state). Excluded from ' +
+      'import, unref\'d, no existing stop export, security-relevant (login lockout state). Excluded from ' +
       'this additive registry PR\'s lifecycle for the same reason.',
   },
   'ai-deduplication-cache-cleanup': {
@@ -408,10 +418,12 @@ export const CRON_METADATA: Record<CronId, CronMetadataEntry> = {
     start: noop,
     stop: noop,
     exemptReason:
-      'Module-level setInterval firing unconditionally on import of server/ai-deduplication.ts, not unref\'d, ' +
+      'Module-level setInterval firing unconditionally on import of server/ai-deduplication.ts; unref\'d, ' +
       'no existing stop export. Same register-or-exempt decision as the middleware.ts sweepers — deferred ' +
       'restructuring, not silently dropped (this entry is what makes the gap visible and enforced by the ' +
-      'census contract test).',
+      'census contract test). The unref() is load-bearing: while it was ref\'d, importing this module kept ' +
+      'the event loop alive forever and every CLI that reached the AI stack hung (2026-07-16 seed:demo). ' +
+      'Guarded by tests/unit/module-load-timers.test.ts.',
   },
 };
 

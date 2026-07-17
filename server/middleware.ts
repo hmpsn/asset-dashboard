@@ -44,13 +44,16 @@ export function rateLimit(windowMs: number, maxRequests: number, keyMode: 'per-p
   };
 }
 
-// Clean up stale rate limit entries every 5 minutes
-setInterval(() => {
+// Clean up stale rate limit entries every 5 minutes. .unref()'d so this in-process
+// sweeper never keeps a process alive on its own — importing this module must not
+// stop a CLI from exiting. See tests/unit/module-load-timers.test.ts.
+const rateLimitCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, bucket] of rateLimitBuckets) {
     if (now > bucket.resetAt) rateLimitBuckets.delete(key);
   }
 }, 5 * 60 * 1000);
+rateLimitCleanupTimer.unref();
 
 // Pre-built rate limiters
 //
@@ -125,14 +128,16 @@ export function clearLoginFailures(email: string): void {
   loginAttemptsByEmail.delete(email.toLowerCase().trim());
 }
 
-// Clean up expired login lockouts every 10 minutes
-setInterval(() => {
+// Clean up expired login lockouts every 10 minutes. .unref()'d for the same reason
+// as the rate-limit sweeper above.
+const loginLockoutCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, attempt] of loginAttemptsByEmail) {
     if (attempt.lockedUntil > 0 && attempt.lockedUntil <= now) loginAttemptsByEmail.delete(key);
     else if (now - attempt.lastFailure > LOGIN_COOLDOWN_MS) loginAttemptsByEmail.delete(key);
   }
 }, 10 * 60 * 1000);
+loginLockoutCleanupTimer.unref();
 
 // ── Session Signing ──
 

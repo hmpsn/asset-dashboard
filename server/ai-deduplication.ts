@@ -265,10 +265,16 @@ class AIRequestDeduplicator {
 // Global instance
 export const aiDeduplicator = new AIRequestDeduplicator();
 
-// Cleanup expired entries every minute
-setInterval(() => {
+// Cleanup expired entries every minute. Registered in server/cron-registry.ts as a
+// `stopHook: false` exemption: it starts at import time because every createApp()
+// consumer relies on it sweeping immediately. .unref()'d so that this housekeeping
+// timer can never be the only thing holding the event loop open — without it, any
+// CLI that transitively imports the AI stack never exits (2026-07-16: `npm run
+// seed:demo` hung 18+ min via content-brief → here).
+const cleanupTimer = setInterval(() => {
   aiDeduplicator.cleanup();
 }, 60 * 1000);
+cleanupTimer.unref();
 
 // Export for testing
 export { AIRequestDeduplicator };
