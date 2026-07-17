@@ -1,25 +1,6 @@
 {
   "sprints": [
     {
-      "id": "sprint-mcp-open-work-2026-07-17",
-      "name": "MCP — Open Work",
-      "hours": "P0 first — unblock the first paid matrix generation before follow-on MCP work",
-      "rationale": "A real Rinse matrix cell reached zero blockers for the first time on 2026-07-17, then preview_content_matrix_generation entered its previously unexercised ready-path tail and returned a generic internal_error. This blocks every paid content-matrix generation run and is the top platform blocker until the ready preview succeeds for the durable single-cell and multi-cell reproductions.",
-      "items": [
-        {
-          "id": "mcp-matrix-ready-preview-internal-error",
-          "title": "Fix fully-unblocked matrix preview internal_error",
-          "source": "2026-07-17 IE MCP Rinse reproduction; server/domains/content/matrix-generation/preview.ts ready tail",
-          "est": "S-M",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-07-17",
-          "owner": "content-pipeline",
-          "notes": "TOP BLOCKER; complete before every lower-priority MCP item. The implementation adds matrix-only bounded context handling, all six safe stage boundaries, typed/redacted MCP errors, and production-shaped single/two-cell determinism plus no-side-effect coverage. A fully isolated synthetic staging canary passed on 2026-07-17: blocked behavior remained intact; one-cell and two-cell previews returned ready with stable fingerprints and finite budgets; no paid generation ran; and the temporary key/workspace were deleted. The item remains pending until the exact durable Rinse cells return ready after production deployment; do not invoke paid start automatically. Preserve every deliberate gate: evidence/voice/identity requirements stay blocking, exact revisions/fingerprints/budget ceilings remain mandatory, human review is not bypassed, and no generation/publish call is started automatically."
-        }
-      ]
-    },
-    {
       "id": "sprint-productized-content-templates-2026-07-16",
       "name": "Productized Content Templates — overrides, optional sections, and library reuse",
       "hours": "TBD — four small staging-first PRs after MCP legibility",
@@ -2145,6 +2126,26 @@
           "notes": "Completed in codex/ui-visual-parity and explicitly owner-approved by Joshua as part of the Page Intelligence plus Content Performance receiving-home bundle. Pipeline Published owns the prototype-led four-stat/result-card composition and server-authoritative readback summary. The nonexistent refresh mutation was removed, matrix/request items have stable identities, trends return typed availability and load only after intentional Drawer open to avoid N live GSC calls, public items omit admin outcome internals, and ?tab=published&item= deep links initialize and clear truthfully. Flag-on /content-perf bookmarks redirect with item identity and the rebuilt sidebar removes the duplicate; flag-off keeps the legacy route/nav. Browser evidence at both fixed viewports is under /tmp/asset-dashboard-codex-visual-parity/content-performance/; the owner workspace is truthfully empty while populated composition is component-fixture protected. Status: owner-approved; rendered review and automated PASS are supporting evidence only, while Joshua's explicit approval is the acceptance source."
         }
       ]
+    },
+    {
+      "id": "sprint-mcp-open-work-2026-07-17",
+      "name": "✅ SHIPPED — MCP — Open Work",
+      "hours": "P0 first — unblock the first paid matrix generation before follow-on MCP work",
+      "rationale": "A real Rinse matrix cell reached zero blockers for the first time on 2026-07-17, then preview_content_matrix_generation entered its previously unexercised ready-path tail and returned a generic internal_error. This blocks every paid content-matrix generation run and is the top platform blocker until the ready preview succeeds for the durable single-cell and multi-cell reproductions.",
+      "items": [
+        {
+          "id": "mcp-matrix-ready-preview-internal-error",
+          "title": "Fix fully-unblocked matrix preview internal_error",
+          "source": "2026-07-17 IE MCP Rinse reproduction; server/domains/content/matrix-generation/preview.ts ready tail",
+          "est": "S-M",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-17",
+          "owner": "content-pipeline",
+          "notes": "Completed 2026-07-17. A production-shaped fixture confirmed ContentGenerationContextBudgetError when full finalized voice plus approved identity exceeded the global context defaults. The repair adds matrix-only bounded context handling, all six safe stage boundaries, typed/redacted MCP errors, and deterministic single/two-cell coverage without changing shared defaults or weakening evidence, voice, identity, revision, fingerprint, human-review, paid-work, send, approval, or publication gates. An isolated staging canary preserved the blocked path and returned ready for one and two cells with stable fingerprints and finite budgets; its temporary key and workspace were deleted. After production deployment of main merge 973bb2a1d90934a300770d7bb0f200c9734422ad, the exact durable Rinse workspace, matrix, and two cells passed read-only production acceptance: single-cell ready, two-cell ready, deterministic retry, and finite batch budget. No paid generation was invoked; start_content_matrix_generation remains owner-authorized."
+        }
+      ],
+      "shippedAt": "2026-07-17"
     },
     {
       "id": "sprint-mcp-matrix-brand-generation-2026-07-13",
