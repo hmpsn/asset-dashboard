@@ -1512,6 +1512,24 @@
       "createdAt": "2026-07-07",
       "reviewBy": "2026-12-10",
       "links": {}
+    },
+    {
+      "id": "DEF-global-ops-010",
+      "surface": "global-ops",
+      "item": "GO-004 Outcomes Book portfolio totals require one server-owned, attribution-honest measurement window.",
+      "decision": "Resolved in W4.2c. A rolling 90-day server read model now owns portfolio and per-workspace measured value, positive click gains, and deduplicated wins. It independently excludes not_acted_on, separates agency-executed from client-side work, and replaces the mixed all-time/28-day React presentation with honest empty states.",
+      "class": "data",
+      "upgradeTrigger": "Complete: the typed portfolio route, admin hook, rebuilt totals and rows, attribution tests, and empty-window states are live.",
+      "owner": "Joshua",
+      "status": "done",
+      "roadmapItemId": null,
+      "createdAt": "2026-07-17",
+      "reviewBy": "2026-12-10",
+      "links": {
+        "decision": "docs/ui-rebuild/parity/global-ops-contract.md#accepted-deferrals-and-decisions",
+        "ownerPacket": "docs/ui-rebuild/parity/owner-decision-packet.md#global-ops-sub-decisions-accepted-2026-07-09",
+        "roadmapArchiveId": "admin-ux-w42c-outcomes-book-rollup"
+      }
     }
   ]
 }

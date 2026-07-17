@@ -12,6 +12,7 @@ import { expectNoA11yViolations } from '../a11y';
 const mocks = vi.hoisted(() => ({
   workspaceOverview: vi.fn(),
   outcomeOverview: vi.fn(),
+  portfolioRollup: vi.fn(),
 }));
 
 vi.mock('../../../src/hooks/admin/useWorkspaceOverview', () => ({
@@ -20,6 +21,7 @@ vi.mock('../../../src/hooks/admin/useWorkspaceOverview', () => ({
 
 vi.mock('../../../src/hooks/admin/useOutcomes', () => ({
   useOutcomeOverview: () => mocks.outcomeOverview(),
+  useOutcomePortfolioRollup: () => mocks.portfolioRollup(),
 }));
 
 vi.mock('../../../src/components/admin/outcomes/OutcomeDashboard', () => ({
@@ -129,30 +131,57 @@ function renderBook() {
 beforeEach(() => {
   mocks.workspaceOverview.mockReset();
   mocks.outcomeOverview.mockReset();
+  mocks.portfolioRollup.mockReset();
   mocks.workspaceOverview.mockReturnValue({
     data: { workspaces: [workspace()] },
     isLoading: false,
     isError: false,
   });
   mocks.outcomeOverview.mockReturnValue({ data: [outcome], isLoading: false, isError: false });
+  mocks.portfolioRollup.mockReturnValue({
+    data: {
+      window: { days: 90, label: 'Last 90 days', start: '2026-04-18T00:00:00.000Z', endExclusive: '2026-07-17T00:00:00.000Z' },
+      totals: { wins: 4, valuePerMonth: 1_200, clicksGained: 240, withValue: 1 },
+      attribution: {
+        platformExecuted: { wins: 3, valuePerMonth: 900, clicksGained: 180 },
+        externallyExecuted: { wins: 1, valuePerMonth: 300, clicksGained: 60 },
+      },
+      workspaces: [{
+        workspaceId: 'ws-acme',
+        workspaceName: 'Acme Dental',
+        hasMeasuredWins: true,
+        totals: { wins: 4, valuePerMonth: 1_200, clicksGained: 240, withValue: 1 },
+        attribution: {
+          platformExecuted: { wins: 3, valuePerMonth: 900, clicksGained: 180 },
+          externallyExecuted: { wins: 1, valuePerMonth: 300, clicksGained: 60 },
+        },
+        notActedOnExcluded: true,
+      }],
+    },
+    isLoading: false,
+    isError: false,
+  });
 });
 
 describe('Global Ops Outcomes visual composition', () => {
   it('matches the book-level hierarchy while preserving additive production evidence in disclosure', () => {
     renderBook();
 
-    expect(screen.getByRole('heading', { name: 'What your work has delivered.' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What the work has delivered.' })).toBeInTheDocument();
     expect(screen.getByText('Action results · across your book')).toBeInTheDocument();
-    expect(screen.getByText('Book totals are not yet available')).toBeInTheDocument();
+    expect(screen.getAllByText('Measured value / mo').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Clicks gained').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Measured wins').length).toBeGreaterThan(0);
+    expect(screen.getByText('3 agency-executed · 1 client-side')).toBeInTheDocument();
     expect(screen.getByText('By workspace')).toBeInTheDocument();
-    expect(screen.getByText('$1,200')).toBeInTheDocument();
+    expect(screen.getAllByText('$1,200').length).toBeGreaterThan(0);
     expect(screen.getByText('Improving')).toBeInTheDocument();
     expect(screen.getByRole('grid', { name: 'Outcomes by workspace' })).toHaveClass('overflow-auto', 'md:max-h-[390px]');
     expect(screen.getByRole('columnheader', { name: 'Workspace' }).parentElement).toHaveClass('sticky', 'top-0');
 
     fireEvent.click(screen.getByRole('button', { name: 'View Acme Dental outcome evidence' }));
 
-    expect(screen.getByText('3 platform · 1 client-side')).toBeInTheDocument();
+    expect(screen.getAllByText('3 agency-executed · 1 client-side').length).toBeGreaterThan(0);
     expect(screen.getByText('5.2')).toBeInTheDocument();
     expect(screen.getByText('3 / 5')).toBeInTheDocument();
     expect(screen.getByText('Broken links: 2')).toBeInTheDocument();
@@ -163,9 +192,11 @@ describe('Global Ops Outcomes visual composition', () => {
     renderBook();
 
     expect(screen.queryByText(/rolling 90/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Value delivered / mo (all-time)' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Clicks (28d)' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Wins (all-time)' })).toBeInTheDocument();
+    expect(screen.getAllByText('Last 90 days').length).toBeGreaterThan(0);
+    expect(screen.getByRole('columnheader', { name: 'Measured value / mo' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Clicks gained' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Measured wins' })).toBeInTheDocument();
+    expect(screen.queryByText(/all-time value|28-day clicks/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'View Acme Dental outcome evidence' }));
     expect(screen.getByText('Win rate (all-time)')).toBeInTheDocument();
@@ -192,6 +223,7 @@ describe('Global Ops Outcomes visual composition', () => {
   it('keeps loading and empty states inside the same comparison spine', () => {
     mocks.workspaceOverview.mockReturnValue({ data: undefined, isLoading: true, isError: false });
     mocks.outcomeOverview.mockReturnValue({ data: undefined, isLoading: true, isError: false });
+    mocks.portfolioRollup.mockReturnValue({ data: undefined, isLoading: true, isError: false });
     const result = renderBook();
 
     expect(screen.getByRole('grid', { name: 'Outcomes by workspace' })).toBeInTheDocument();
@@ -201,7 +233,21 @@ describe('Global Ops Outcomes visual composition', () => {
 
     mocks.workspaceOverview.mockReturnValue({ data: { workspaces: [] }, isLoading: false, isError: false });
     mocks.outcomeOverview.mockReturnValue({ data: [], isLoading: false, isError: false });
+    mocks.portfolioRollup.mockReturnValue({
+      data: {
+        window: { days: 90, label: 'Last 90 days', start: '2026-04-18T00:00:00.000Z', endExclusive: '2026-07-17T00:00:00.000Z' },
+        totals: { wins: 0, valuePerMonth: 0, clicksGained: 0, withValue: 0 },
+        attribution: {
+          platformExecuted: { wins: 0, valuePerMonth: 0, clicksGained: 0 },
+          externallyExecuted: { wins: 0, valuePerMonth: 0, clicksGained: 0 },
+        },
+        workspaces: [],
+      },
+      isLoading: false,
+      isError: false,
+    });
     renderBook();
+    expect(screen.getByText('No measured wins in this window')).toBeInTheDocument();
     expect(screen.getByText('No workspace outcome evidence yet')).toBeInTheDocument();
     expect(screen.getByText('No graduated wins yet')).toBeInTheDocument();
   });

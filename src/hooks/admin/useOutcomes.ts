@@ -88,6 +88,13 @@ export function useOutcomeOverview() {
   });
 }
 
+export function useOutcomePortfolioRollup() {
+  return useQuery({
+    queryKey: queryKeys.admin.outcomePortfolioRollup(),
+    queryFn: ({ signal }) => outcomesApi.getPortfolioRollup(signal),
+  });
+}
+
 // ── Playbooks ──────────────────────────────────────────────────────────────
 
 export function useOutcomePlaybooks(wsId: string) {

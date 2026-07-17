@@ -10086,3 +10086,17 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Verification:** Production-shaped finalized voice plus approved `differentiators` and `objection_handling` reproduce the prior global-budget failure, then pass under the bounded matrix contract. Single-cell and two-cell previews are stable across retries, remain under batch ceilings, preserve the blocked path, and leave run/job/brief/post counts unchanged. MCP contracts cover ready projection, serialization-stage classification, typed overflow, request correlation, and secret redaction. A temporary isolated staging canary independently passed blocked, single-ready, two-ready, deterministic-retry, and finite-budget checks, then revoked its key and deleted its workspace. Production deployment `dep-d9d8qm58nd3s73dou9d0` reached `live` at main merge `973bb2a1d90934a300770d7bb0f200c9734422ad`; the exact durable Rinse workspace/matrix/cells then passed the same read-only ready, determinism, and finite-budget acceptance. No paid generation was started.
 
 **Files:** matrix-generation preview and context-budget diagnostics; MCP content-matrix adapter; focused unit/contract tests; MCP generation rule; roadmap and audit.
+
+### 711. Admin UX W4.2c GO-004 Outcomes Book portfolio rollup 2026-07-17
+
+**Status:** Complete. The rebuilt Outcomes Book now has one truthful server-owned portfolio window instead of a permanent unavailable banner and mixed all-time/28-day row metrics.
+
+**What changed:** Added `GET /api/outcomes/portfolio-rollup`, backed by a typed rolling 90-day read model over existing tracked actions and measured outcomes. It deduplicates multiple winning checkpoints to the highest checkpoint per action, sums measured monthly value and positive click gains, and returns both portfolio totals and per-workspace rows. The rebuilt page consumes those totals through a dedicated admin React Query hook, renders blue value/click tiles, an attribution-separated measured-win tile, and em dashes or an explicit no-wins message when the window has no proof.
+
+**Attribution honesty:** This read path reuses the canonical windowed win query that excludes `not_acted_on` and client-hidden outcome actions, then independently guards against `not_acted_on` again before aggregation. Overall measured totals may include `externally_executed`, but the response and UI keep those client-side wins separate from `platform_executed`; only the latter is labeled agency-executed.
+
+**Window rationale:** Rolling 90 days matches the Outcome engine's longest standard measurement checkpoint and provides enough portfolio evidence for slower-measuring work while keeping value, click gains, and wins on the same explicit ISO interval.
+
+**Tests:** Added route coverage for the 90-day interval, multi-checkpoint deduplication, out-of-window exclusion, `not_acted_on` exclusion, attribution buckets, and zero-evidence workspaces. Updated the rebuilt Outcomes Book component suite for server totals, unified headings, attribution copy, loading, and empty-window states. No migration or feature-flag change.
+
+**Files:** outcome portfolio shared types; canonical windowed outcome reader; portfolio service and route; outcomes API/query key/hook; rebuilt Outcomes Book lens/table; focused integration and component tests; GO-004 parity/owner docs; deferred ledger and roadmap.

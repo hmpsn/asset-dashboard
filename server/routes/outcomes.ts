@@ -53,6 +53,7 @@ import type {
 import type { RecommendationSet } from '../../shared/types/recommendations.js';
 import { actionTypeEnum, attributionEnum, outcomeScoreEnum, trackedActionSourceSnapshotSchema } from '../schemas/outcome-schemas.js';
 import { invalidateIntelligenceCache } from '../intelligence/cache-invalidation.js';
+import { buildOutcomePortfolioRollup } from '../outcome-portfolio-rollup.js';
 
 const log = createLogger('outcomes');
 
@@ -183,6 +184,17 @@ function computeScorecard(
 // ══════════════════════════════════════════════════════
 // ADMIN ROUTES (requireWorkspaceAccess)
 // ══════════════════════════════════════════════════════
+
+// GET /api/outcomes/portfolio-rollup — GO-004 cross-workspace, windowed proof totals.
+// LITERAL route — must come BEFORE param routes to avoid shadowing.
+router.get('/api/outcomes/portfolio-rollup', (_req, res) => {
+  try {
+    res.json(buildOutcomePortfolioRollup());
+  } catch (err) {
+    log.error({ err }, 'Failed to get outcomes portfolio rollup');
+    res.status(500).json({ error: 'Failed to get outcomes portfolio rollup' });
+  }
+});
 
 // GET /api/outcomes/overview — Multi-workspace overview
 // LITERAL route — must come BEFORE param routes to avoid shadowing

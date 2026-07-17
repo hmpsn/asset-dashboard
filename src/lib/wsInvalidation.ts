@@ -321,6 +321,7 @@ function adminInvalidationKeys(
       return [
         queryKeys.admin.outcomeActions(workspaceId),
         queryKeys.admin.outcomeScorecard(workspaceId),
+        queryKeys.admin.outcomePortfolioRollup(),
         queryKeys.admin.outcomeTimeline(workspaceId),
         queryKeys.admin.outcomeTopWins(workspaceId),
         // R9 (B15): a scored outcome writes/updates a provenance-bearing row — the funnel
@@ -343,6 +344,7 @@ function adminInvalidationKeys(
     case WS_EVENTS.OUTCOME_EXTERNAL_DETECTED:
       return [
         queryKeys.admin.outcomeActions(workspaceId),
+        queryKeys.admin.outcomePortfolioRollup(),
         queryKeys.client.outcomeWins(workspaceId),
         queryKeys.client.monthlyDigest(workspaceId),
       ] as const;
