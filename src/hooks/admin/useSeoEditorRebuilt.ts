@@ -27,7 +27,10 @@ import { useCmsEditorAiWorkflow } from '../../components/cms-editor/useCmsEditor
 import { useCmsEditorPublishBulkWorkflow } from '../../components/cms-editor/useCmsEditorPublishBulkWorkflow';
 import type { FixContext } from '../../types/fix-context';
 import type { SeoEditorPage } from '../../components/editor/seoEditorTypes';
-import type { CmsCollection } from '../../components/cms-editor/cmsEditorModel';
+import {
+  buildItemApprovalMap,
+  type CmsCollection,
+} from '../../components/cms-editor/cmsEditorModel';
 import type {
   CmsSeoWorkflowState,
   SeoEditorKeywordAssignment,
@@ -91,6 +94,10 @@ export function useSeoEditorSurfaceData({ workspaceId }: UseSeoEditorSurfaceData
   const recommendationRows = useMemo(
     () => recommendations.data?.recommendations ?? [],
     [recommendations.data?.recommendations],
+  );
+  const approvalHistoryByItemId = useMemo(
+    () => buildItemApprovalMap(cmsQuery.data?.approvalBatches ?? []),
+    [cmsQuery.data?.approvalBatches],
   );
 
   const resolvedTargets = useMemo(
@@ -163,6 +170,7 @@ export function useSeoEditorSurfaceData({ workspaceId }: UseSeoEditorSurfaceData
           target,
           cmsCollection: collection,
           cmsItem: item,
+          approvalHistory: approvalHistoryByItemId.get(target.itemId) ?? [],
           pageState: state,
           recommendations: [],
           metrics: { lastEditedAt: state?.updatedAt ?? null },
@@ -186,7 +194,7 @@ export function useSeoEditorSurfaceData({ workspaceId }: UseSeoEditorSurfaceData
     }
 
     return result;
-  }, [cmsQuery.data?.collections, joinedById, keywordByPageId, pageStates, pagesQuery.data, recommendationRows, recommendations.isSuccess, resolvedTargets.targets]);
+  }, [approvalHistoryByItemId, cmsQuery.data?.collections, joinedById, keywordByPageId, pageStates, pagesQuery.data, recommendationRows, recommendations.isSuccess, resolvedTargets.targets]);
 
   const refetchAll = useCallback(async () => {
     await Promise.all([
