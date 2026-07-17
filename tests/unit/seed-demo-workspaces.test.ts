@@ -3,7 +3,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import db from '../../server/db/index.js';
-import { listBriefs } from '../../server/content-brief.js';
+import { listBriefs } from '../../server/content-brief-read-model.js';
 import { listContentRequests } from '../../server/content-requests.js';
 import { listPosts } from '../../server/content-posts-db.js';
 import { listChurnSignals } from '../../server/churn-signals.js';
@@ -77,6 +77,11 @@ function readSeedScriptSource(): string {
   return readFileSync(filePath, 'utf-8');
 }
 
+function readLoadedFixtureSource(): string {
+  const filePath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/loaded-demo-workspace.ts');
+  return readFileSync(filePath, 'utf-8');
+}
+
 describe('seed demo workspaces — client_actions.source_type is in-union', () => {
   it('the seeded client_actions INSERT never uses an out-of-union source_type literal', () => {
     const source = readSeedScriptSource();
@@ -105,6 +110,10 @@ describe('seed demo workspaces — client_actions.source_type is in-union', () =
 });
 
 describe('seed demo workspaces — loaded workspace contract', () => {
+  it('keeps fixture persistence free of server-lifetime AI cleanup handles', () => {
+    expect(readLoadedFixtureSource()).not.toMatch(/from ['"]\.\.\/\.\.\/server\/content-brief\.js['"]/);
+  });
+
   it('seeds realistic high-volume data through every W0.1 read path and remains idempotent', () => {
     runDemoSeed();
 

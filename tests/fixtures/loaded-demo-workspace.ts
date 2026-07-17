@@ -1,5 +1,4 @@
 import db from '../../server/db/index.js';
-import { upsertBrief } from '../../server/content-brief.js';
 import { createContentRequest } from '../../server/content-requests.js';
 import { createPost } from '../../server/content-posts-db.js';
 import { recordAction, recordOutcome } from '../../server/outcome-tracking.js';
@@ -54,7 +53,38 @@ function seedContentPipeline(workspaceId: string): void {
     };
   });
 
-  for (const brief of briefs) upsertBrief(workspaceId, brief);
+  // The canonical writer lives in content-brief.ts, whose generation imports load
+  // ai-deduplication.ts and start its ref'ed 60-second cleanup interval at module
+  // evaluation. A one-shot seed must not start that server-lifetime resource, so
+  // this deterministic fixture persists only the fields it owns directly.
+  const insertBrief = db.prepare(`
+    INSERT INTO content_briefs (
+      id, workspace_id, target_keyword, secondary_keywords, suggested_title,
+      suggested_meta_desc, outline, word_count_target, intent, audience,
+      competitor_insights, internal_link_suggestions, created_at, page_type,
+      keyword_locked, keyword_source
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const brief of briefs) {
+    insertBrief.run(
+      brief.id,
+      workspaceId,
+      brief.targetKeyword,
+      JSON.stringify(brief.secondaryKeywords),
+      brief.suggestedTitle,
+      brief.suggestedMetaDesc,
+      JSON.stringify(brief.outline),
+      brief.wordCountTarget,
+      brief.intent,
+      brief.audience,
+      brief.competitorInsights,
+      JSON.stringify(brief.internalLinkSuggestions),
+      brief.createdAt,
+      brief.pageType ?? null,
+      brief.keywordLocked ? 1 : 0,
+      brief.keywordSource ?? null,
+    );
+  }
 
   const postBriefs = briefs.slice(BOARD_BRIEF_COUNT);
   for (const [index, brief] of postBriefs.entries()) {
