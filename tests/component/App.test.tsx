@@ -52,6 +52,10 @@ vi.mock('../../src/components/page-rewriter-rebuilt/PageRewriterSurface', () => 
   },
 }));
 
+vi.mock('../../src/components/command-center-rebuilt/CommandCenterSurface', () => ({
+  CommandCenterSurface: () => <div data-testid="command-center-rebuilt-surface" />,
+}));
+
 vi.mock('../../src/components/content-pipeline-rebuilt/ContentPipelineSurface', async () => {
   const { useLocation } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {
@@ -888,6 +892,25 @@ describe('Dashboard content rendering', () => {
   it('renders WorkspaceOverview when no workspace selected', async () => {
     await renderDashboardAtPath('/');
     await waitFor(() => expect(screen.getByTestId('workspace-overview')).toBeInTheDocument());
+  });
+
+  it('mounts the rebuilt book Command Center at flag-ON root without selecting a workspace', async () => {
+    rebuildShellMock.enabled = true;
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('command-center-rebuilt-surface')).toBeInTheDocument());
+    expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'none');
+    expect(screen.queryByTestId('workspace-overview')).not.toBeInTheDocument();
   });
 
   it('renders WorkspaceHome at /ws/:id', async () => {

@@ -6,7 +6,7 @@ This inventory began as behavior-first triage. Joshua explicitly approved the or
 
 Accepted directions and their circle-back triggers for the behavior mismatch and capability risk buckets are recorded in `docs/ui-rebuild/parity/owner-decision-packet.md`.
 
-Route coverage note: this inventory grades mounted rebuilt route families, not every admin `Page` value. `docs/ui-rebuild/parity/coverage-audit.md` is the current route/nav census. `page-intelligence` is now in `REBUILT_SURFACES`; `content-perf` retains its standalone route/nav identity but folds into Pipeline Published only when the rebuilt flag is on. `seo-briefs`, `content`, and `calendar` are folded or redirect-only; `subscriptions` remains a standalone legacy receiver while its Content Pipeline query alias folds into publish/capacity state; `workspace-settings` remains a per-workspace settings receiver, not a main sidebar item. `competitors` is still globally `NON_REGISTRY_PAGES`, but the rebuilt sidebar surfaces it in the prototype `Strategy & Content` zone because the rebuilt shell is flag-gated.
+Route coverage note: this inventory grades mounted rebuilt route families, not every admin `Page` value. `docs/ui-rebuild/parity/coverage-audit.md` is the current route/nav census. `page-intelligence` is now in `REBUILT_SURFACES`; the W4.1b book root is a separate `BOOK_REBUILT_SURFACE` because it has no workspace-scoped `Page` identity; `content-perf` retains its standalone route/nav identity but folds into Pipeline Published only when the rebuilt flag is on. `seo-briefs`, `content`, and `calendar` are folded or redirect-only; `subscriptions` remains a standalone legacy receiver while its Content Pipeline query alias folds into publish/capacity state; `workspace-settings` remains a per-workspace settings receiver, not a main sidebar item. `competitors` is still globally `NON_REGISTRY_PAGES`, but the rebuilt sidebar surfaces it in the prototype `Strategy & Content` zone because the rebuilt shell is flag-gated.
 
 ## Owner-Approved Former Review Queue
 
@@ -52,7 +52,7 @@ Route coverage note: this inventory grades mounted rebuilt route families, not e
 
 ## Contract Coverage
 
-All 18 currently mounted rebuilt admin surface families have a parity contract; `ai-visibility-contract.md` covers the 28th direct mount before owner review. Continue adding packets before any future rebuilt route is mounted in `REBUILT_SURFACES`.
+All 19 currently mounted rebuilt admin surface families have a parity contract; `ai-visibility-contract.md` covers the 28th direct `Page` mount and `command-center-contract.md` covers the separately registered book root before owner review. Continue adding packets before any future rebuilt surface is mounted.
 
 ## Earlier Owner-Approved Calibration Surfaces
 

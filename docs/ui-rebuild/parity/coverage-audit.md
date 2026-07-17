@@ -1,6 +1,6 @@
 # Admin Rebuilt Route Coverage Audit
 
-Audit state: route, nav, interior-state, and layout accounting complete; 27 direct rebuilt mounts plus the folded Content Performance receiving home are owner-approved, and the 28th direct mount (AI Visibility) awaits owner review under W3.1's embedded default
+Audit state: route, nav, interior-state, and layout accounting complete; 27 direct rebuilt mounts plus the folded Content Performance receiving home are owner-approved, the 28th direct mount (AI Visibility) awaits owner review, and the separately registered book root awaits W4.1b owner visual review
 Last updated: 2026-07-17
 Source of truth files: `src/routes.ts`, `src/lib/navRegistry.tsx`, `src/components/layout/rebuiltSurfaces.ts`, and `hmpsn studio Design System/mockup/nav.js`
 
@@ -19,13 +19,15 @@ This audit answers four questions that the per-surface contracts do not answer b
 | `NAV_REGISTRY` entries | 27 | Standalone nav/palette/breadcrumb destinations. |
 | `NON_REGISTRY_PAGES` | 6 | Redirect-only, folded, or non-global-nav route ids. |
 | `REBUILT_SURFACES` entries | 28 | Routes that mount directly inside `RebuiltAppChrome` when `ui-rebuild-shell` is on. |
-| Parity contract files | 18 | One contract per directly mounted surface family; Global Ops covers multiple route ids. |
+| Parity contract files | 19 | One contract per mounted surface family; Global Ops covers multiple route ids and the book root is separate from `Page`. |
+| Book root mounts | 1 | `BOOK_REBUILT_SURFACE` mounts at `/` only while `ui-rebuild-shell` is ON. |
 
 Current census result:
 
 - Every `Page` value is either registered in `NAV_REGISTRY` or intentionally listed in `NON_REGISTRY_PAGES`.
 - Every `NAV_REGISTRY` entry maps to a real `Page` value.
 - Every currently mounted rebuilt route family has an initial behavior-first parity contract.
+- The book-level `/` surface is registered and counted separately so the workspace-scoped `home` identity remains unchanged.
 - Not every admin page is currently rebuilt.
 
 ## Rebuilt Versus Non-Rebuilt
@@ -42,7 +44,7 @@ Current census result:
 | `calendar` | `NON_REGISTRY_PAGES` | Not rebuilt | Redirects to `content-pipeline?tab=calendar`. |
 | `subscriptions` | `NON_REGISTRY_PAGES` | Not rebuilt | Preserved standalone legacy `ContentSubscriptions` receiver. Separately, `content-pipeline?tab=subscriptions` aliases to the rebuilt pipeline's publish/capacity state. |
 
-Practical answer: 28 routes mount directly through the rebuilt registry. The first 27 are owner-approved; AI Visibility is the 28th and awaits review of the embedded dedicated-home decision. Content Performance remains a main-nav compatibility route without a direct entry, by deliberate compatibility design: it folds into the already-mounted Pipeline Published receiver only while the rebuilt flag is on. SEO Briefs, Content, and Calendar remain redirect/fold aliases, and Subscriptions remains a flag-off legacy receiver with a Pipeline query alias.
+Practical answer: 28 `Page` routes mount directly through `REBUILT_SURFACES`, plus one separately registered book-level root mounts through `BOOK_REBUILT_SURFACE`. The first 27 route mounts are owner-approved; AI Visibility is the 28th and awaits review of the embedded dedicated-home decision; the book root awaits W4.1b owner visual review. Content Performance remains a main-nav compatibility route without a direct entry, by deliberate compatibility design: it folds into the already-mounted Pipeline Published receiver only while the rebuilt flag is on. SEO Briefs, Content, and Calendar remain redirect/fold aliases, and Subscriptions remains a flag-off legacy receiver with a Pipeline query alias.
 
 ## Nav Bar Audit
 
