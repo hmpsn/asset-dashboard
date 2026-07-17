@@ -68,6 +68,7 @@ import revenueRoutes from './routes/revenue.js';
 import brandDocsRoutes from './routes/brand-docs.js';
 import backlinksRoutes from './routes/backlinks.js';
 import workspaceHomeRoutes from './routes/workspace-home.js';
+import cockpitPortfolioRoutes from './routes/cockpit-portfolio.js';
 import workspaceBadgesRoutes from './routes/workspace-badges.js';
 import rewriteChatRoutes from './routes/rewrite-chat.js';
 import siteArchitectureRoutes from './routes/site-architecture.js';
@@ -371,6 +372,7 @@ export function createApp(): express.Express {
   app.use(brandDocsRoutes);
   app.use(backlinksRoutes);
   app.use(workspaceHomeRoutes);
+  app.use(cockpitPortfolioRoutes);
   app.use(workspaceBadgesRoutes);
   app.use(rewriteChatRoutes);
   app.use(siteArchitectureRoutes);

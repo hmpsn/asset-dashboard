@@ -10086,3 +10086,15 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Verification:** Production-shaped finalized voice plus approved `differentiators` and `objection_handling` reproduce the prior global-budget failure, then pass under the bounded matrix contract. Single-cell and two-cell previews are stable across retries, remain under batch ceilings, preserve the blocked path, and leave run/job/brief/post counts unchanged. MCP contracts cover ready projection, serialization-stage classification, typed overflow, request correlation, and secret redaction. A temporary isolated staging canary independently passed blocked, single-ready, two-ready, deterministic-retry, and finite-budget checks, then revoked its key and deleted its workspace. Production deployment `dep-d9d8qm58nd3s73dou9d0` reached `live` at main merge `973bb2a1d90934a300770d7bb0f200c9734422ad`; the exact durable Rinse workspace/matrix/cells then passed the same read-only ready, determinism, and finite-budget acceptance. No paid generation was started.
 
 **Files:** matrix-generation preview and context-budget diagnostics; MCP content-matrix adapter; focused unit/contract tests; MCP generation rule; roadmap and audit.
+
+### 711. Admin UX W4.1a book-level Cockpit server rollup 2026-07-17
+
+**Status:** Complete for the server-rollup phase. W4.1b surface and W4.1c navigation/journey integration remain pending.
+
+**What changed:** Adds `GET /api/cockpit/portfolio`, a read-only cross-workspace Command Center model. For every visible active workspace, the server reads the same inputs used by Workspace Home, calls the canonical `classifyWorkQueue()` and `buildCockpitVerdict()` domain functions, and returns the complete classification/verdict pair in a summary row. Rows are ranked without an opaque score: cockpit verdict priority (`at_risk`, `watch`, `establishing`, `on_track`), then negative queue items, unclassified items, total queue items, workspace name, and workspace ID.
+
+**Honesty and scope:** Workspace, attention, queue-stream, queue-item, and verdict counts are exactly reconcilable from the returned rows and carry an explicit `reconciled` status. `valueAtStake` and `recoveredSoFar` remain `not_yet_reconcilable` with `null` values because workspace money frames may use different attribution bases and measurement windows; the rollup never sums verdict evidence or fabricates a book number. The route respects JWT workspace visibility, excludes archived workspaces through the canonical list read, and performs no writes, broadcasts, or cache mutation. No migration, new intelligence source/slice, or WS event was needed.
+
+**Tests:** Unit coverage pins deterministic attention ranking and exact-only aggregation, including proof that money evidence is ignored. Integration coverage invokes the real Express route over real workspace-backed inputs and verifies per-workspace classifier/verdict parity plus the honest totals contract.
+
+**Files:** shared Cockpit portfolio types; Cockpit portfolio domain and route; app route registration; focused unit/integration tests; roadmap and feature audit.

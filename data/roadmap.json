@@ -15,7 +15,7 @@
           "status": "pending",
           "createdAt": "2026-07-16",
           "owner": "cockpit",
-          "notes": "Server-side per-workspace classification already exists; closes the dual-shell seam; restores presence + Needs-attention triage."
+          "notes": "W4.1a complete 2026-07-17: GET /api/cockpit/portfolio now serves attention-ranked per-workspace work-queue classifications + cockpit verdicts, reconciled queue/verdict counts, and explicit unreconciled money totals. No migration, intelligence slice, or WS event was needed because this is a read-only composition over existing sources. Parent remains pending for W4.1b surface + W4.1c nav/journey integration."
         },
         {
           "id": "cockpit-handoff-per-item-deeplink",
