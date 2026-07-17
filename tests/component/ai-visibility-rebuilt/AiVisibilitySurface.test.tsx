@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { rankTracking, type AiVisibilityReadResponse } from '../../../src/api/seo';
 import { AiVisibilitySurface } from '../../../src/components/ai-visibility-rebuilt/AiVisibilitySurface';
+import { expectNoA11yViolations } from '../a11y';
 
 const VISIBILITY_DATA: AiVisibilityReadResponse = {
   latest: {
@@ -72,5 +73,13 @@ describe('AI Visibility rebuilt surface', () => {
       expect(rankTracking.refreshAiVisibility).toHaveBeenCalledTimes(1);
       expect(rankTracking.refreshAiVisibility).toHaveBeenCalledWith('ws-1');
     });
+  });
+
+  it('carries the @ds-rebuilt accessibility floor', async () => {
+    const { container } = renderSurface();
+
+    // Wait for the populated state to render before scanning (the panel loads async).
+    await screen.findByText('44%');
+    await expectNoA11yViolations(container);
   });
 });
