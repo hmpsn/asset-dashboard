@@ -16,6 +16,17 @@
           "createdAt": "2026-07-16",
           "owner": "platform",
           "notes": "Added idempotent ws_demo_loaded with 50+ pipeline cards, 10+ Cockpit items, persisted scan fixtures, 520 page keywords, unanswered client replies, and recorded wins for under-load smoke testing."
+        },
+        {
+          "id": "usability-budgets-ratification",
+          "title": "Ratify 8 usability budgets + wire enforcement homes (pr-check/contract-test/checklist)",
+          "source": "2026-07-16 UX-flow audit §5",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "platform",
+          "notes": "D3-ratified all 8 budgets in docs/rules/usability-budgets.md; added the 1440×900 fold/action probe and PR-readiness gates; added green ratchet rules for actionless rebuilt EmptyStates (54 audited exceptions, including 6 TODO-W1.3 repairs) and new RebuiltSidebar label overrides (5 temporary W0.3 exceptions), with full pr-check self-test/governance coverage."
         }
       ],
       "shippedAt": "2026-07-17"
