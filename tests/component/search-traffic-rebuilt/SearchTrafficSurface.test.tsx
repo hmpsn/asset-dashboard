@@ -601,6 +601,26 @@ describe('SearchTrafficSurface', () => {
     expect(screen.getAllByRole('button', { name: 'Add annotation' })).toHaveLength(1);
   });
 
+  it('opens Workspace Settings Connections from the Search Console setup state', async () => {
+    currentWorkspace = { ...workspace, gscPropertyUrl: undefined };
+    renderSurface();
+
+    expect(await screen.findByText('Search Console not configured')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/workspace-settings?tab=connections');
+  });
+
+  it('opens Workspace Settings Connections from the GA4 setup state', async () => {
+    currentWorkspace = { ...workspace, ga4PropertyId: undefined };
+    renderSurface('/ws/ws-1/analytics-hub?lens=traffic');
+
+    expect(await screen.findByText('GA4 not configured')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/workspace-settings?tab=connections');
+  });
+
   it('keeps the lower Search home mounted once when GSC returns no overview', async () => {
     currentSearchOverview = null;
     currentSearchError = 'Search Console returned no overview rows';

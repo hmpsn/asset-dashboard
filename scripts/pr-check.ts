@@ -1589,7 +1589,6 @@ type EmptyStateActionAllowance = {
  * different EmptyState. W1.3 TODOs must be deleted as that sweep adds actions.
  */
 const ACTIONLESS_EMPTY_STATE_ALLOWLIST: readonly EmptyStateActionAllowance[] = [
-  { file: 'src/components/asset-manager-rebuilt/AssetManagerSurface.tsx', marker: 'title="Link a Webflow site"', reason: 'TODO-W1.3: add the Workspace Settings action.' },
   { file: 'src/components/asset-manager-rebuilt/AuditLens.tsx', marker: "title={activeFilter || search ? 'No matching issues' : 'All clear'}", reason: 'Terminal all-clear state; filtered branch names its clear-filter recovery.' },
   { file: 'src/components/competitors-rebuilt/BacklinkProfileCard.tsx', marker: 'title="No backlink data returned"', reason: 'Terminal provider result that explains the population condition.' },
   { file: 'src/components/competitors-rebuilt/CompetitorAlerts.tsx', marker: "title={competitorCount > 0 ? 'No competitor movement detected' : 'No competitor set configured'}", reason: 'Terminal monitoring result; the parent surface owns competitor setup.' },
@@ -1608,12 +1607,10 @@ const ACTIONLESS_EMPTY_STATE_ALLOWLIST: readonly EmptyStateActionAllowance[] = [
   { file: 'src/components/global-ops-rebuilt/wave-b/diagnostics/DiagnosticsReportView.tsx', marker: 'title="Diagnostic failed"', reason: 'Terminal failed report whose description names retry at the source insight.' },
   { file: 'src/components/global-ops-rebuilt/wave-c/outcomes/OutcomeRecentWins.tsx', marker: 'title="No graduated wins yet"', reason: 'Terminal readback that names the scored-checkpoint population condition.' },
   { file: 'src/components/global-ops-rebuilt/wave-c/outcomes/OutcomesBookTable.tsx', marker: 'title="No workspace outcome evidence yet"', reason: 'Terminal readback that names the measurement-checkpoint population condition.' },
-  { file: 'src/components/links-rebuilt/LinksSurface.tsx', marker: 'title="Connect a Webflow site first"', reason: 'TODO-W1.3: add the Workspace Settings action.' },
   { file: 'src/components/local-presence-rebuilt/LocalPresenceReviewsPipeline.tsx', marker: "title={!connected ? 'Connect Google Business Profile first' : 'Map a GBP location first'}", reason: 'Setup prerequisite; adjacent settings controls own connection and mapping.' },
   { file: 'src/components/local-presence-rebuilt/LocalPresenceReviewsPipeline.tsx', marker: 'title="Connect Google Business Profile first"', reason: 'Setup prerequisite; adjacent settings controls own connection.' },
   { file: 'src/components/local-presence-rebuilt/LocalPresenceReviewsPipeline.tsx', marker: 'title="No review responses match this desk"', reason: 'Filter-empty state whose description names sync, draft, and clear-filter recovery.' },
   { file: 'src/components/local-presence-rebuilt/LocalPresenceVisibility.tsx', marker: 'title="No repeat competitors match this view"', reason: 'Terminal readback that names the two-snapshot population condition.' },
-  { file: 'src/components/page-intelligence-rebuilt/PageIntelligenceSurface.tsx', marker: 'title="Connect a Webflow site"', reason: 'TODO-W1.3: add the Workspace Settings action.' },
   { file: 'src/components/page-intelligence-rebuilt/PageIntelligenceSurface.tsx', marker: 'title="No matching pages"', reason: 'Search-empty state whose description names valid search dimensions.' },
   { file: 'src/components/performance-rebuilt/PageSpeedLens.tsx', marker: 'title="No PageSpeed pages returned"', reason: 'Nested table terminal result; the parent lens owns run/retry controls.' },
   { file: 'src/components/performance-rebuilt/PageWeightLens.tsx', marker: 'title="No assets on this page"', reason: 'Nested table terminal result for the selected page.' },
@@ -1630,11 +1627,9 @@ const ACTIONLESS_EMPTY_STATE_ALLOWLIST: readonly EmptyStateActionAllowance[] = [
   { file: 'src/components/search-traffic-rebuilt/OverviewLens.tsx', marker: 'title="No analytics connected"', reason: 'Setup prerequisite naming the exact fix location; sibling lenses own direct setup actions.' },
   { file: 'src/components/search-traffic-rebuilt/OverviewLens.tsx', marker: 'title="No trend points yet"', reason: 'Terminal provider result for the selected window.' },
   { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: "title={positive ? 'No recorded ranking gains' : 'No ranking risks need attention'}", reason: 'Healthy terminal insight result that names its population condition.' },
-  { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: 'title="Search Console not configured"', reason: 'TODO-W1.3: add the Workspace Settings action.' },
   { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: "title={data.error ? 'Search data unavailable' : 'No search data'}", reason: 'Terminal provider result; wording quality remains a manual budget-4 check.' },
   { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: 'title="No daily trend rows"', reason: 'Terminal provider result for the selected window.' },
   { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: "title={tableMode === 'queries' ? 'No queries' : 'No pages'}", reason: 'Nested table terminal result for the selected window and mode.' },
-  { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="GA4 not configured"', reason: 'TODO-W1.3: add the Workspace Settings action.' },
   { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No GA4 data"', reason: 'Terminal provider result; wording quality remains a manual budget-4 check.' },
   { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No daily traffic rows"', reason: 'Terminal provider result for the selected window.' },
   { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No sources"', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
@@ -1642,7 +1637,6 @@ const ACTIONLESS_EMPTY_STATE_ALLOWLIST: readonly EmptyStateActionAllowance[] = [
   { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No landing pages"', reason: 'Nested provider-result table for the selected window.' },
   { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No conversions"', reason: 'Nested provider-result table for the selected window.' },
   { file: 'src/components/site-audit-rebuilt/SiteAuditSurface.tsx', marker: 'title="No issues match the current filters"', reason: 'Existing filter-empty state whose description names clear/re-run recovery.' },
-  { file: 'src/components/site-audit-rebuilt/SiteAuditSurface.tsx', marker: 'title="Connect a Webflow site first"', reason: 'TODO-W1.3: add the Workspace Settings action.' },
 ];
 
 function normalizedRepoPath(file: string): string {

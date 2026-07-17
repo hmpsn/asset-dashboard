@@ -1,7 +1,7 @@
 // @ds-rebuilt
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getStrategyKeywordSet } from '../../api/keyword-strategy';
 import { useInsightFeed } from '../../hooks/admin/useInsightFeed';
 import { useAnalyticsAnnotations, useCreateAnnotation } from '../../hooks/admin/useAnalyticsAnnotations';
@@ -173,6 +173,7 @@ function MovementList({ items, positive }: { items: FeedInsight[]; positive: boo
 }
 
 export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, onOpenBreakdowns, configured }: SearchLensProps) {
+  const navigate = useNavigate();
   const [activeLines, toggleLine] = useToggleSet(['clicks', 'impressions']);
   const { feed, summary, isLoading: feedLoading } = useInsightFeed(workspaceId);
   const { data: annotations = [] } = useAnalyticsAnnotations(workspaceId);
@@ -211,6 +212,12 @@ export function SearchLens({ workspaceId, data, tableMode, onTableModeChange, on
           icon={Search}
           title="Search Console not configured"
           description="Select a Search Console property in Workspace Settings to view search performance."
+          action={(
+            <Button size="sm" variant="primary" onClick={() => navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`)}>
+              <Icon name="settings" size="sm" />
+              Open Workspace Settings
+            </Button>
+          )}
         />
         {contextBand}
       </div>

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { UnifiedPage } from '../../../shared/types/page-join';
 import { expectNoA11yViolations } from '../a11y';
 
@@ -99,6 +99,11 @@ function ClearRouterState() {
   return <button type="button" onClick={() => navigate('/ws/ws-1/page-intelligence', { replace: true, state: {} })}>Clear router state</button>;
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
+}
+
 function surfaceTree(withFixContext = false, initialEntry?: string) {
   return (
     <MemoryRouter
@@ -109,6 +114,7 @@ function surfaceTree(withFixContext = false, initialEntry?: string) {
           }
         : '/ws/ws-1/page-intelligence')]}
     >
+      <LocationProbe />
       <Routes>
         <Route
           path="/ws/:workspaceId/page-intelligence"
@@ -206,6 +212,15 @@ describe('PageIntelligenceSurface module contract', () => {
     view.rerender(surfaceTree(false, initialEntry));
 
     await waitFor(() => expect(screen.getByTestId('page-intelligence-detail')).toHaveAttribute('data-page-id', 'page-1'));
+  });
+
+  it('opens Workspace Settings Connections from the no-site setup state', () => {
+    mocks.workspaces.data = [{ id: 'ws-1', name: 'Acme', webflowSiteId: '' }];
+    render(surfaceTree());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/workspace-settings?tab=connections');
   });
 
   it('meets the rebuilt accessibility floor', async () => {

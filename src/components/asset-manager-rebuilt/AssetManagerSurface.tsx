@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Database, FolderOpen, Grid3X3, Image, List, Minimize2, RefreshCw, Sparkles, Upload, Wand2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ApiError, del, get, patch, post } from '../../api/client';
 import { bulkGenerateAltText, type BulkAltTextNdjsonEvent } from '../../api/seo';
 import { workspaces } from '../../api/workspaces';
@@ -10,6 +11,7 @@ import { useQueue } from '../../hooks/admin/useQueue';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { queryKeys } from '../../lib/queryKeys';
+import { adminPath } from '../../routes';
 import { useToast } from '../Toast';
 import { buildDefaultSelectedFields, CmsFieldSelector } from '../assets/CmsFieldSelector';
 import type { CmsImageScanResult } from '../../../shared/types/cms-images';
@@ -164,6 +166,7 @@ function LockedIcon({ className }: { className?: string }) {
 }
 
 export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const state = useAssetManagerSurfaceState();
@@ -782,6 +785,12 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
           icon={LockedIcon}
           title="Link a Webflow site"
           description="Asset Manager needs a connected Webflow site before it can list, audit, or upload media."
+          action={(
+            <Button size="sm" variant="primary" onClick={() => navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`)}>
+              <Icon name="settings" size="sm" />
+              Open Workspace Settings
+            </Button>
+          )}
         />
       </div>
     );

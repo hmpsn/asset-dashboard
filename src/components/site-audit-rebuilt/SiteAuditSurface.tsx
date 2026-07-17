@@ -1165,6 +1165,7 @@ function LensBody({
 }
 
 export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
+  const navigate = useNavigate();
   const state = useSiteAuditSurfaceState();
   const audit = useSiteAuditRebuilt(workspaceId);
 
@@ -1223,6 +1224,12 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
           icon={SurfaceIcon}
           title="Connect a Webflow site first"
           description="Site Audit reads the workspace Webflow site before it can scan technical health and content readiness."
+          action={(
+            <Button size="sm" variant="primary" onClick={() => navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`)}>
+              <Icon name="settings" size="sm" />
+              Open Workspace Settings
+            </Button>
+          )}
         />
       </div>
     );

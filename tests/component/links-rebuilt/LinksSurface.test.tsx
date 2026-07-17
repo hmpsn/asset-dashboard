@@ -354,7 +354,12 @@ function renderSurface(initialEntry = '/ws/ws-1/links', client = createClient())
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location-search">{location.search}</span>;
+  return (
+    <>
+      <span data-testid="location-pathname">{location.pathname}</span>
+      <span data-testid="location-search">{location.search}</span>
+    </>
+  );
 }
 
 function expectTextToHaveClass(text: RegExp | string, className: string) {
@@ -606,6 +611,20 @@ describe('LinksSurface rebuilt admin surface', () => {
 
     expect(await screen.findByText('Schema priority queue')).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/deferred|v1|signed write target|receiver|mounted below|legacy alias|rebuild|migration|URL state|route tab/i);
+  });
+
+  it('opens Workspace Settings Connections from the no-site setup state', async () => {
+    workspacesMock.mockReturnValue({
+      ...defaultWorkspaces(),
+      data: [{ ...workspace, webflowSiteId: undefined }],
+    });
+    renderSurface();
+
+    expect(await screen.findByText('Connect a Webflow site first')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/workspace-settings');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=connections');
   });
 
   it('meets the a11y floor after skeletons settle', async () => {
