@@ -481,10 +481,31 @@ function setupKeywordHooks() {
   addKeywordMutateMock.mockImplementation((_keyword: string, options?: { onSuccess?: () => void }) => {
     options?.onSuccess?.();
   });
-  apiGetMock.mockResolvedValue([
-    { date: '2026-07-01', positions: { 'cosmetic dentistry': 8, 'emergency dentist': 16 } },
-    { date: '2026-07-02', positions: { 'cosmetic dentistry': 6, 'emergency dentist': 14 } },
-  ]);
+  apiGetMock.mockImplementation((path: string) => {
+    if (path.includes('/history/rows?')) {
+      return Promise.resolve({
+        windowDays: 7,
+        series: [
+          {
+            query: 'cosmetic dentistry',
+            points: [
+              { date: '2026-07-01', position: 8 },
+              { date: '2026-07-08', position: 6 },
+            ],
+            delta7d: 2,
+          },
+          {
+            query: 'emergency dentist',
+            points: [{ date: '2026-07-08', position: 14 }],
+          },
+        ],
+      });
+    }
+    return Promise.resolve([
+      { date: '2026-07-01', positions: { 'cosmetic dentistry': 8, 'emergency dentist': 16 } },
+      { date: '2026-07-02', positions: { 'cosmetic dentistry': 6, 'emergency dentist': 14 } },
+    ]);
+  });
 }
 
 function LocationProbe() {
@@ -696,6 +717,21 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.queryByText('$0')).not.toBeInTheDocument();
     expect(screen.queryByText('No CPC')).not.toBeInTheDocument();
     expect(screen.getByRole('status', { name: /45 more keywords hidden/i })).toBeInTheDocument();
+  });
+
+  it('loads one visible-set rank-history batch and renders honest row trend states', async () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toContain('7d trend');
+    expect(await screen.findByRole('img', { name: 'cosmetic dentistry rank trend' })).toBeInTheDocument();
+    expect(screen.getByText('+2 · 7d')).toBeInTheDocument();
+    expect(screen.getByText('Not enough snapshots yet')).toBeInTheDocument();
+    expect(screen.queryByText('0 · 7d')).not.toBeInTheDocument();
+
+    const rowHistoryCalls = apiGetMock.mock.calls.filter(([path]) => String(path).includes('/history/rows?'));
+    expect(rowHistoryCalls).toEqual([[
+      '/api/rank-tracking/ws-1/history/rows?query=cosmetic+dentistry&query=emergency+dentist',
+    ]]);
   });
 
   it('maps the legacy Opportunities lens to Rankings with Triage columns', () => {

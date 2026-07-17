@@ -232,6 +232,13 @@ describe('src/api/seo — rankTracking', () => {
     );
   });
 
+  it('rankTracking.rowHistory batches visible keywords with repeated query params', async () => {
+    await rankTracking.rowHistory('ws-1', ['dentist, chicago', '100% growth', '  ']);
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/api/rank-tracking/ws-1/history/rows?query=dentist%2C+chicago&query=100%25+growth',
+    );
+  });
+
   it('rankTracking.removeKeyword URL-encodes the keyword', async () => {
     await rankTracking.removeKeyword('ws-1', 'best coffee shops');
     const [url] = mockedDel.mock.calls[0];

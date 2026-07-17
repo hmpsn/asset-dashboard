@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 712** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 713** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 713. Batched visible-row keyword rank trends 2026-07-17
+
+**What it does:** Closes `DEF-kw-001` with an admin-only, page-batched rank-history read model over the existing `rank_snapshots` source. One SQL read projects up to 100 requested visible keywords into typed per-keyword point series and computes a positive-is-improvement seven-day delta only when two real points exist in that window. The rebuilt full Rankings DataTable makes one React Query keyed by the canonical visible keyword set, renders the existing `Sparkline` primitive and delta pill per row, and shows contextual loading, unavailable, or “Not enough snapshots yet” states without inventing a zero trend. The existing drawer endpoint and behavior are unchanged.
+
+**Why it matters:** Operators can scan momentum alongside current rank without opening every drawer or paying an N+1 request cost. Sparse tracking remains visibly sparse, so a newly tracked keyword cannot look stable merely because the platform lacks evidence.
+
+**Boundaries:** This is a skinny SEO-health read from existing snapshots. It does not call the retired full keyword-universe builder, mutate rank history or metadata, expose a new public endpoint, or require a database migration.
+
+**Tests:** One-statement service batching, requested-order/case matching, real seven-day delta and sparse-window omission, admin route response, repeated-query API serialization, stable visible-set query keys, and component coverage for one batch request, Sparkline rendering, delta display, and the establishing state.
+
+**Files:** `shared/types/rank-tracking.ts`; `server/rank-tracking.ts`; `server/routes/rank-tracking.ts`; `src/api/seo.ts`; `src/lib/queryKeys.ts`; `src/components/keywords-rebuilt/KeywordsTable.tsx`; focused unit, integration, and component tests; deferred ledger, roadmap, brand language, and this audit.
 
 ---
 
@@ -852,7 +866,7 @@ A comprehensive value assessment of every feature in the platform — **feature 
 
 **Why it matters to clients:** Indirect but meaningful — operators keep the full keyword workflow and trust signals while getting a denser, more consistent surface for deciding which keywords to track, promote, retire, or turn into content. No client-facing money is fabricated; money remains display-only from server data.
 
-**Deferred decisions:** `DEF-kw-001` tracks inline row sparklines/7-day deltas pending a batched history read model; `DEF-kw-002` tracks avg-position and period-over-period KPI variants pending server-owned rollup/delta semantics.
+**Deferred decisions:** `DEF-kw-001` originally tracked inline row sparklines/7-day deltas and was resolved by feature 713's batched history read model; `DEF-kw-002` still tracks avg-position and period-over-period KPI variants pending server-owned rollup/delta semantics.
 
 **Tests:** Contract/unit coverage for opportunity score, traffic value, lifecycle stage, deep-link/a11y coverage, query invalidation, and bundle budget; component tests for flag mount, lenses, table, drawer, states, WS invalidation, mutations, and a11y; Playwright Component Testing visual baselines for 5 states × 2 themes. Pre-commit changed-test run passed 2,003 files / 28,264 tests.
 
