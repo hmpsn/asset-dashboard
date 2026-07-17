@@ -634,6 +634,32 @@ describe('KeywordsSurface rebuilt pilot scaffold', () => {
     expect(screen.getByText(/Ranks observed/)).toBeInTheDocument();
   });
 
+  it('renders monthly value as unavailable instead of $0 without provider evidence', () => {
+    summaryHookMock.mockReturnValue({
+      data: { ...summaryPayload, trafficValueMonthly: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    const summary = screen.getByTestId('keywords-summary');
+    const monthlyValueCell = within(summary).getByText('Monthly value').closest('[data-testid="keywords-summary-cell"]');
+    expect(monthlyValueCell).not.toBeNull();
+    expect(within(monthlyValueCell as HTMLElement).getByText('—')).toBeInTheDocument();
+    expect(within(monthlyValueCell as HTMLElement).getByText('Unavailable')).toBeInTheDocument();
+    expect(within(summary).queryByText('$0')).not.toBeInTheDocument();
+  });
+
+  it('formats measured monthly value as currency', () => {
+    renderSurface('/ws/ws-1/seo-keywords');
+
+    const summary = screen.getByTestId('keywords-summary');
+    expect(within(summary).getByText('$1,234')).toBeInTheDocument();
+  });
+
   it('renders keyword rows, provenance, opportunity, and money empty states without fabricating dollars', () => {
     renderSurface('/ws/ws-1/seo-keywords');
 

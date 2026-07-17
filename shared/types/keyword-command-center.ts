@@ -343,11 +343,8 @@ export interface KeywordCommandCenterSummaryResponse {
   generatedAt?: string | null;
   summarizedAt: string;
   geoLabel?: string;
-  /**
-   * Monthly organic traffic value from the ROI page-keyword read path.
-   * Display-only; null when no page-keyword or legacy page-map source exists.
-   */
-  trafficValueMonthly?: number | null;
+  /** null = no provider value evidence for this workspace — render as unavailable, never as $0 */
+  trafficValueMonthly: number | null;
   /** Topic cluster rows from the normalized topic_clusters table for rebuilt grouping lenses. */
   topicClusters?: TopicCluster[];
   /** Cannibalization rows from the normalized cannibalization_issues table for rebuilt grouping flags. */

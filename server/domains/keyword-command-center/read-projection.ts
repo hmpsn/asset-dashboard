@@ -26,7 +26,7 @@ export interface KeywordCommandCenterReadProjection {
 }
 
 function trafficValueFromPages(pages: PageKeywordMap[]): number | null {
-  if (pages.length === 0) return null;
+  if (!pages.some(page => page.cpc != null)) return null;
   const total = pages.reduce((sum, page) => sum + keywordDollarValue({
     clicks: page.clicks ?? 0,
     cpc: page.cpc ?? 0,
