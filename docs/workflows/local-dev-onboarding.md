@@ -42,6 +42,9 @@ The SQLite DB is `$DATA_DIR/dashboard.db`; in dev with `DATA_DIR` unset it defau
 - `ws_demo_premium` (tier: premium, scenario: content/schema/inbox history)
 - `ws_demo_broken_integrations` (tier: growth, scenario: missing/broken integrations)
 - `ws_demo_rich_cms` (tier: premium, scenario: rich CMS/Webflow workflow state)
+- `ws_demo_loaded` (tier: premium, scenario: high-volume admin UX and under-load smoke testing)
+
+Use `ws_demo_loaded` when validating collection containment, fold depth, queue density, and other admin UX behavior under realistic volume. It includes 50+ active Content Pipeline board cards across brief/draft/review stages, 10+ Cockpit queue items across risk/send/money/audit producers, persisted audit and redirect scans, 500+ page-keyword rows with zero and positive CPC values, client requests with unanswered replies, and recorded wins.
 
 Client password for all demo workspaces: `demo-client`
 
@@ -54,6 +57,7 @@ Admin URLs:
 - `/ws/ws_demo_broken_integrations`
 - `/ws/ws_demo_rich_cms`
 - `/ws/ws_demo_provider_rich` (provider-backed populated visual fixture; requires `LOCAL_FAKE_PROVIDERS=true`)
+- `/ws/ws_demo_loaded` (high-volume admin UX fixture; no live crawl required)
 
 Client URLs:
 
@@ -64,6 +68,7 @@ Client URLs:
 - `/client/ws_demo_broken_integrations`
 - `/client/ws_demo_rich_cms`
 - `/client/ws_demo_provider_rich`
+- `/client/ws_demo_loaded`
 
 ## Provider environment profiles
 

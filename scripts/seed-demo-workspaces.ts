@@ -10,13 +10,19 @@ import {
   createLocalSiteSpeedFixture,
   LOCAL_PROVIDER_FIXTURE,
 } from '../server/providers/local-provider-fixtures.js';
+import {
+  LOADED_DEMO_SITE_ID,
+  LOADED_DEMO_WORKSPACE_ID,
+  resetLoadedDemoWorkspaceData,
+  seedLoadedDemoWorkspaceData,
+} from '../tests/fixtures/loaded-demo-workspace.js';
 
 interface DemoWorkspaceSeed {
   id: string;
   name: string;
   folder: string;
   tier: 'free' | 'growth' | 'premium';
-  scenario: DemoScenario | 'provider-rich';
+  scenario: DemoScenario | 'provider-rich' | 'loaded';
   domain: string;
   webflowSiteId: string | null;
   webflowSiteName: string | null;
@@ -69,7 +75,27 @@ export const PROVIDER_RICH_DEMO_WORKSPACE: DemoWorkspaceSeed = {
   seoDataProvider: 'dataforseo',
 };
 
-const ALL_DEMO_WORKSPACES = [...DEMO_WORKSPACES, PROVIDER_RICH_DEMO_WORKSPACE];
+export const LOADED_DEMO_WORKSPACE: DemoWorkspaceSeed = {
+  id: LOADED_DEMO_WORKSPACE_ID,
+  name: 'Loaded Demo Workspace',
+  folder: 'loaded-demo',
+  tier: 'premium',
+  scenario: 'loaded',
+  domain: 'loaded-demo.example.com',
+  webflowSiteId: LOADED_DEMO_SITE_ID,
+  webflowSiteName: 'Loaded Demo Site',
+  webflowToken: 'demo-webflow-token-loaded',
+  clientPassword: DEMO_PASSWORD,
+  gscPropertyUrl: 'sc-domain:loaded-demo.example.com',
+  ga4PropertyId: 'properties/987654321',
+  seoDataProvider: 'dataforseo',
+};
+
+const ALL_DEMO_WORKSPACES = [
+  ...DEMO_WORKSPACES,
+  PROVIDER_RICH_DEMO_WORKSPACE,
+  LOADED_DEMO_WORKSPACE,
+];
 
 function upsertDemoWorkspace(seed: DemoWorkspaceSeed): 'created' | 'updated' {
   const existing = db.prepare('SELECT id FROM workspaces WHERE id = ?').get(seed.id) as { id: string } | undefined;
@@ -772,14 +798,20 @@ function seedScenarioData(seed: DemoWorkspaceSeed): void {
 
   if (seed.scenario === 'provider-rich') {
     seedProviderRichWorkspace(seed);
+    return;
+  }
+
+  if (seed.scenario === 'loaded') {
+    seedLoadedDemoWorkspaceData(seed.id, seed.webflowSiteId ?? LOADED_DEMO_SITE_ID, seed.webflowSiteName ?? seed.name);
   }
 }
 
-function runSeed(): Array<{ seed: DemoWorkspaceSeed; status: 'created' | 'updated' }> {
+export function runDemoSeed(): Array<{ seed: DemoWorkspaceSeed; status: 'created' | 'updated' }> {
   const tx = db.transaction(() => {
     const results = ALL_DEMO_WORKSPACES.map(seed => ({ seed, status: upsertDemoWorkspace(seed) }));
     for (const seed of ALL_DEMO_WORKSPACES) resetWorkspaceDemoData(seed.id);
     resetProviderRichData(PROVIDER_RICH_DEMO_WORKSPACE.id);
+    resetLoadedDemoWorkspaceData(LOADED_DEMO_WORKSPACE.id, LOADED_DEMO_SITE_ID);
     for (const seed of ALL_DEMO_WORKSPACES) seedScenarioData(seed);
     return results;
   });
@@ -789,7 +821,7 @@ function runSeed(): Array<{ seed: DemoWorkspaceSeed; status: 'created' | 'update
 
 function main(): void {
   assertDemoSeedEnvironmentSafe();
-  const results = runSeed();
+  const results = runDemoSeed();
 
   console.log('\nDemo workspace seeding complete:\n');
   for (const { seed, status } of results) {
