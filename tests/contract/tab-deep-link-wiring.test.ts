@@ -17,6 +17,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, relative } from 'path';
 import { describe, it, expect } from 'vitest';
 import { NAV_REGISTRY_BY_ID, resolveNavLabel } from '../../src/lib/navRegistry';
+import { adminPath } from '../../src/routes';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -283,6 +284,10 @@ const senders = findTabSenders();
 // ---------------------------------------------------------------------------
 
 describe('?tab= deep-link wiring contract', () => {
+  it('builds the dedicated AI Visibility workspace route without a synthetic tab parameter', () => {
+    expect(adminPath('ws-1', 'ai-visibility')).toBe('/ws/ws-1/ai-visibility');
+  });
+
   it('route map is populated (sanity check)', () => {
     // App.tsx should map at least 15 page slugs to component files
     expect(routeMap.size).toBeGreaterThan(15);

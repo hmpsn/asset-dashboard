@@ -29,7 +29,7 @@ import {
   Pencil, Target, Code2, Link2, MessageSquare,
   LayoutDashboard, Activity, Sparkles, Layers, FileSearch, Map, ListChecks,
   DollarSign, Trophy, BriefcaseBusiness, ChartSpline, Stethoscope, WandSparkles,
-  MapPinned,
+  MapPinned, RadioTower,
 } from 'lucide-react';
 import type { Page } from '../routes';
 import type { FeatureFlagKey } from '../../shared/types/feature-flags';
@@ -70,6 +70,8 @@ export interface NavFlagBehavior {
   descriptionWhenOn?: string;
   /** When true, the entry is hidden from nav surfaces while the flag is ON. */
   hideWhenOn?: boolean;
+  /** When true, the entry is exposed only while the named flag is ON. */
+  hideWhenOff?: boolean;
 }
 
 export interface NavEntry {
@@ -131,7 +133,7 @@ export const REBUILT_NAV_ZONES: readonly RebuiltNavZone[] = [
   {
     key: 'search-site-health',
     label: 'Search & Site Health',
-    items: ['analytics-hub', 'page-intelligence', 'seo-audit', 'performance', 'links', 'media'],
+    items: ['analytics-hub', 'page-intelligence', 'seo-audit', 'performance', 'links', 'media', 'ai-visibility'],
   },
   { key: 'optimization', label: 'Optimization', items: ['seo-editor', 'seo-schema', 'rewrite', 'brand'] },
   { key: 'client-facing', label: 'Client-Facing', items: ['outcomes', 'requests'] },
@@ -164,6 +166,9 @@ export const NAV_REGISTRY: NavEntry[] = [
   // ── Monitoring ──
   { id: 'analytics-hub', label: 'Search & Traffic', icon: BarChart3, group: 'monitoring', needsSite: true,
     description: 'Unified analytics: search performance, traffic, insights, and annotations' },
+  { id: 'ai-visibility', label: 'AI Visibility', icon: RadioTower, group: 'site-health', needsSite: true,
+    description: 'AI answer share of voice, mention trend, and cited source domains',
+    flagBehavior: { flag: 'ui-rebuild-shell', hideWhenOff: true } },
   { id: 'outcomes', label: 'Action Results', icon: Trophy, group: 'monitoring',
     description: "Track what's working across all your SEO actions" },
 
@@ -261,7 +266,9 @@ export function resolveNavDescription(entry: NavEntry, isFlagEnabled: (flag: Fea
 /** Whether an entry is hidden under the current flag state. */
 export function isNavEntryHidden(entry: NavEntry, isFlagEnabled: (flag: FeatureFlagKey) => boolean): boolean {
   const fb = entry.flagBehavior;
-  return !!(fb?.hideWhenOn && isFlagEnabled(fb.flag));
+  if (!fb) return false;
+  const enabled = isFlagEnabled(fb.flag);
+  return !!((fb.hideWhenOn && enabled) || (fb.hideWhenOff && !enabled));
 }
 
 /** Resolve a Page id to its label, applying flag behavior. Falls back to the raw id. */

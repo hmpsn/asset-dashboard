@@ -50,6 +50,7 @@ const DIRECT_REBUILT_MOUNTS = [
   'brand',
   'content-pipeline',
   'analytics-hub',
+  'ai-visibility',
   'performance',
   'rewrite',
   'workspace-settings',
