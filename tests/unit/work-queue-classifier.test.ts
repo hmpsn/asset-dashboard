@@ -52,6 +52,10 @@ describe('classifyWorkQueue', () => {
       money: 1,
       unclassified: 2,
     });
+    expect(result.items.find(item => item.id === 'monetization-content')).toEqual(expect.objectContaining({
+      stream: 'money',
+      title: '1 growth play to propose',
+    }));
 
     for (const stream of WORK_QUEUE_STREAMS) {
       expect(result.streams[stream]).toBe(result.items.filter(item => item.stream === stream).length);
