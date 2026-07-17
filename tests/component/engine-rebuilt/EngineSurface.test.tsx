@@ -310,12 +310,12 @@ const workspaceId = 'ws-engine';
 const SPINE_SECTION_TEST_IDS = [
   'engine-section-orientation',
   'engine-section-value-frame',
-  'engine-section-pov',
-  'engine-section-stance',
-  'engine-section-strategy-evidence',
   'engine-section-backing-moves',
   'engine-section-projections',
+  'engine-section-pov',
   'engine-trust-spine-preview',
+  'engine-section-strategy-evidence',
+  'engine-section-stance',
   'engine-section-operations',
 ] as const;
 
@@ -697,7 +697,7 @@ describe('EngineSurface rebuilt', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('renders one ordered strategy spine with a compact Engine jump navigation', async () => {
+  it('renders the owner-approved actions-forward section order with a compact Engine jump navigation', async () => {
     renderSurface();
 
     await screen.findByTestId('engine-section-operations');
@@ -713,6 +713,33 @@ describe('EngineSurface rebuilt', () => {
     expect(within(jumpNav).queryByRole('button', { name: 'Spine' })).not.toBeInTheDocument();
     expect(screen.getByText('Average position')).toBeInTheDocument();
     expect(screen.getByText('#9.2')).toBeInTheDocument();
+  });
+
+  it('pairs the POV and client preview in one compose band with exact-once send ownership', async () => {
+    renderSurface();
+
+    const composeBand = await screen.findByTestId('engine-compose-issue');
+    expect(composeBand).toHaveClass('lg:grid-cols-2');
+    expect(within(composeBand).getAllByTestId('drafted-pov-editor')).toHaveLength(1);
+    expect(within(composeBand).getAllByTestId('engine-trust-spine-preview')).toHaveLength(1);
+    expect(screen.getAllByTestId('drafted-pov-editor')).toHaveLength(1);
+    expect(screen.getAllByTestId('engine-trust-spine-preview')).toHaveLength(1);
+    expect(screen.getAllByTestId('engine-topbar-send-btn')).toHaveLength(1);
+  });
+
+  it('keeps issue evidence collapsed by default and auto-opens it for the signals lens', async () => {
+    const defaultView = renderSurface();
+
+    const defaultEvidence = await screen.findByTestId('engine-section-strategy-evidence');
+    expect(within(defaultEvidence).getByText('Evidence behind this issue')).toBeInTheDocument();
+    expect(defaultEvidence.querySelector('details')).not.toHaveAttribute('open');
+
+    defaultView.unmount();
+    renderSurface('/ws/ws-engine/seo-strategy?lens=signals');
+
+    const linkedEvidence = await screen.findByTestId('engine-section-strategy-evidence');
+    expect(linkedEvidence.querySelector('details')).toHaveAttribute('open');
+    await waitFor(() => expect(linkedEvidence).toHaveFocus());
   });
 
   it('keeps jump navigation sticky at the top and sends clicks through the existing focus receiver', async () => {

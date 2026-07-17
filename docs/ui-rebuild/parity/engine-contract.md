@@ -16,45 +16,46 @@ Primary route: `/ws/:workspaceId/seo-strategy`
 
 ## Required Interaction Model
 
-The prototype is a single strategy spine, not a tabbed workspace. The operator should move down the page in this order:
+The Engine remains a single strategy spine, not a tabbed workspace. Owner decision D1
+ratifies this actions-forward composition while preserving the prototype's verdict-first
+opening:
 
-1. Orientation and verdict
+1. Protected opening cluster: orientation and verdict
    - Client-scoped eyebrow: `Insights Engine · {client}`.
-   - One verdict headline and short explanation.
    - Staleness and "what changed" nudges above the verdict when needed.
+   - One verdict headline and short explanation.
+   - The eyebrow Toolbar → `StrategyDiff` → nudges → verdict sequence remains byte-identical.
 
 2. Value frame
    - Pipeline value at stake.
    - Recovered so far.
-   - Backing moves live.
+   - Moves in progress.
    - Average position or equivalent strategy momentum.
 
-3. Client-facing point of view
-   - The editable POV the client will see.
-   - Send action remains attached to the staged set, not separated from the queue.
-
-4. Stance allocation
-   - Work allocation across demand, protect, technical, and local.
-
-5. Strategy evidence
-   - Intelligence signals.
-   - Lost visibility / recovery content.
-
-6. Backing moves
+3. Actions-forward work block
+   - Compact Curation and Needs Attention support state.
    - Grouped recommendations staged into the issue.
    - Stage/cut/edit lifecycle controls remain on the move rows.
    - Move details open a drawer from the row.
-
-7. Projection lenses
-   - The only prototype lens switcher is inside "What each staged move becomes".
+   - The only visible lens switcher remains inside "What each staged move becomes".
    - It switches between Keyword targets and Content work orders.
    - Rows deep-link to Keyword Hub or Content Pipeline.
 
-8. Client trust-spine preview
-   - Shows what the client will see before send.
+4. Compose the issue
+   - The compact editable POV and `ClientTrustSpinePreview` sit adjacent at desktop widths.
+   - Draft narrative and exact client preview therefore form one send-loop band instead of
+     repeating the verdict/value story as a separate downstream section.
+   - The single topbar send action remains attached to the staged set.
 
-9. Operational disclosures
+5. Evidence behind this issue
+   - Stance allocation, Intelligence Signals, and Lost visibility / recovery content share
+     one collapsed Disclosure.
+   - `?lens=signals` auto-opens the Disclosure using the same key-remount contract as
+     Operations; the default route keeps it closed.
+
+6. Operational disclosures
    - Setup/config/trust/readiness tools are reachable, but should not become the primary page structure.
+   - Operations remains the final section under the owner-approved V5 exception.
 
 ## Implemented Correction And Review Status
 
@@ -69,6 +70,9 @@ The behavior mismatch is corrected:
 - The canonical `BackingMovesQueue` owns recommendation detail entry; duplicate Fix-now and move-index queues were removed from the backing-moves section.
 - Add Recommendation, move detail, local-market setup, lifecycle actions, and staged-set send behavior remain reachable exactly once.
 - Cross-surface work and setup panels remain available under the canonical `Disclosure`; `?lens=operations` opens it automatically.
+- The owner-approved D1 work block follows the value frame, the POV and client preview share
+  one `Compose the issue` band, and stance/signals/recovery share one default-collapsed
+  `Evidence behind this issue` Disclosure; `?lens=signals` opens that Disclosure automatically.
 - The opening is constrained to the prototype's 1180px spine. A compact client-scoped eyebrow replaces the duplicate page header, and refresh/freshness controls remain in that top control cluster instead of interrupting the verdict-to-POV story.
 - `?lens=changes` opens `StrategyDiff`, while move detail is read-only evidence so Stage/Fix/Park retain one lifecycle-control home in the backing queue.
 - Cannibalization detail is also read-only. Its send, resolve, editor-fix, and keeper-write controls retain one writable home under Operations.
@@ -91,6 +95,7 @@ Current route/state behavior:
 - `/ws/:workspaceId/seo-strategy` opens the `spine` lens.
 - `?lens=spine|changes|signals|pov|moves|operations` keeps the full spine rendered and focuses the corresponding section.
 - `?lens=changes` expands the change-history disclosure; `?lens=operations` expands operational tools.
+- `?lens=signals` expands the single evidence disclosure while preserving the full spine.
 - Invalid `?lens=` falls back to spine and shows a warning.
 - Legacy `?tab=overview` redirects to `?lens=spine`.
 - Legacy `?tab=content` redirects to `content-pipeline?tab=content-health`.
@@ -133,6 +138,16 @@ Keep these capabilities reachable exactly once:
 
 - `ODP-001 A` was accepted: collapse the top-level lenses and preserve `?lens=` as section focus/open state.
 - Circle-back trigger: revisit if the single spine makes a required review/action materially harder to find, or if the integrated page still reads as stacked production panels rather than the prototype strategy story.
+- Trigger fired 2026-07-16: the instrumented `1440×900` audit measured a 3.4-fold
+  Engine with only 1 of 19 actions above the fold, the first enabled primary action at
+  `y=1750`, and Operations at approximately `y=2940`. This is the exact action-findability
+  condition anticipated by the ODP-001 circle-back.
+- Owner decision `D1` ratifies Option A: preserve the opening cluster byte-identically;
+  place Curation, Needs Attention, Backing Moves, and projections directly after the value
+  frame; pair the compact POV with the client preview; collapse stance/signals/recovery into
+  `Evidence behind this issue`; and keep Operations last. This owner-approved composition is
+  recorded in the same PR and remains subject to the campaign's explicit owner-veto gate at
+  PR review.
 - Triggered 2026-07-09: Joshua found the first implementation visually too far from the prototype. Integration stopped before Wave 2, the first pass was graded `revise`, and the prototype-led composition corrections above were applied.
 - Sol review round 2 also returned `revise`; it is resolved by the four-group stance, locally light horizontal trust preview, prop-responsive Changes disclosure, and reproducible browser artifacts listed below.
 - Sol review round 4 also returned `revise`; it is resolved by moving cannibalization send/resolve/editor-fix and keeper selection out of the evidence Drawer and into Operations without dropping the capability.
@@ -333,7 +348,11 @@ Current correction coverage additionally proves:
 - The trust preview proves locally light portal framing and a three-column proof row.
 - A cold strategy fixture proves Operations remains reachable and opens from its deep link.
 - Missing comparison history proves a requested Changes receiver renders honest feedback instead of blank space.
-- Prototype opening order, hero stat hierarchy, section labels, calmer signal/move density, and exact-once recommendation drawer entry are pinned.
+- The protected prototype opening order and hero stat hierarchy remain pinned, followed by
+  the owner-approved D1 order: work block → projections → Compose the issue → collapsed
+  evidence → Operations.
+- The compose band mounts the compact POV and client preview exactly once, the topbar send
+  remains exact-once, and `?lens=signals` opens the otherwise-collapsed evidence Disclosure.
 - Projection content mounts exactly once inside the only visible lens control.
 - Projection rows are filtered by the staged-and-sendable recommendation set; unavailable rows cannot expose Stage, and mixed bulk Stage submits only the sendable subset.
 - Keeper writes optimistically update the workspace query, roll back on failure, invalidate both source reads without delaying success callbacks, and render without a local shadow layer.

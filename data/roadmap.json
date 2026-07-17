@@ -7,17 +7,6 @@
       "rationale": "Instrumented UX-flow audit (docs/superpowers/audits/2026-07-16-admin-ux-flow-audit.md) + carried-over items from the rebuild audit. Advisory findings ratified into work items; owner prioritizes.",
       "items": [
         {
-          "id": "engine-actions-forward-reorder",
-          "title": "Engine: actions-forward spine reorder (Option A) — owner circle-back",
-          "source": "2026-07-16 UX-flow audit §3; engine-contract.md:135 trigger fired",
-          "est": "M",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "strategy",
-          "notes": "Keep verdict-first opening; move work block after value frame; pair POV editor + trust-spine preview; collapse evidence sections; Operations stays last (V5). Owner sign-off required before build."
-        },
-        {
           "id": "ai-visibility-flag-on-home",
           "title": "AI Visibility: give the LLM-mention panel a rebuilt flag-ON home",
           "source": "2026-07-16 rebuild audit §6 item (carried)",
