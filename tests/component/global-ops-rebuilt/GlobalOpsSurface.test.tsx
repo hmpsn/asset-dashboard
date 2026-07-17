@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   archiveMutate: vi.fn(),
   workspaceOverview: vi.fn(),
   outcomeOverview: vi.fn(),
+  portfolioRollup: vi.fn(),
 }));
 
 vi.mock('../../../src/hooks/admin/useWorkspaceOverview', () => ({
@@ -37,6 +38,7 @@ vi.mock('../../../src/hooks/admin/useWorkspaceOverview', () => ({
 
 vi.mock('../../../src/hooks/admin/useOutcomes', () => ({
   useOutcomeOverview: () => mocks.outcomeOverview(),
+  useOutcomePortfolioRollup: () => mocks.portfolioRollup(),
 }));
 
 vi.mock('../../../src/api/misc', async () => {
@@ -154,6 +156,7 @@ beforeEach(() => {
   mocks.archiveMutate.mockReset();
   mocks.workspaceOverview.mockReset();
   mocks.outcomeOverview.mockReset();
+  mocks.portfolioRollup.mockReset();
   mocks.workspaceOverview.mockReturnValue({
     data: {
       workspaces: [{
@@ -186,6 +189,11 @@ beforeEach(() => {
     }],
     isLoading: false,
   });
+  // W4.2c: OutcomesBookLens now reads the server-owned portfolio rollup. This test
+  // guards that the surface uses server evidence and invents no React rollup — an
+  // empty rollup keeps it on the honest "window unavailable" path while the table
+  // still renders workspace evidence from the overview mocks above.
+  mocks.portfolioRollup.mockReturnValue({ data: undefined, isLoading: false, isError: false });
   mocks.roadmapGet.mockResolvedValue({
     sprints: [
       {
