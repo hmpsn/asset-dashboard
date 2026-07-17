@@ -464,6 +464,82 @@ describe('LinksSurface rebuilt admin surface', () => {
     });
   });
 
+  it('latches a successful internal-link send to Sent until a new analysis snapshot arrives', async () => {
+    renderSurface('/ws/ws-1/links?tab=internal');
+
+    expect(await screen.findByText(/cosmetic dentistry/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Send recommendations to client'));
+    const sendButton = screen.getByRole('button', { name: 'Send to client' });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => expect(clientActionCreateMock).toHaveBeenCalledTimes(1));
+    expect(sendButton).toBeDisabled();
+    expect(sendButton).toHaveTextContent('Sent');
+
+    internalAnalyzeMock.mockResolvedValueOnce({
+      ...internalResult,
+      analyzedAt: '2026-07-08T14:00:00.000Z',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Re-analyze' }));
+
+    await waitFor(() => expect(sendButton).toBeEnabled());
+    expect(sendButton).toHaveTextContent('Send to client');
+  });
+
+  it('keeps the internal-link send enabled after a failed request', async () => {
+    clientActionCreateMock.mockRejectedValueOnce(new Error('Client action unavailable'));
+    renderSurface('/ws/ws-1/links?tab=internal');
+
+    expect(await screen.findByText(/cosmetic dentistry/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Send recommendations to client'));
+    const sendButton = screen.getByRole('button', { name: 'Send to client' });
+    fireEvent.click(sendButton);
+
+    expect(await screen.findByText('Client action unavailable')).toBeInTheDocument();
+    expect(sendButton).toBeEnabled();
+    expect(sendButton).toHaveTextContent('Send to client');
+  });
+
+  it('latches a successful redirect send to Sent until a new scan snapshot arrives', async () => {
+    renderSurface('/ws/ws-1/links?tab=redirects');
+
+    expect(await screen.findByText('Suggested 301 redirects')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    fireEvent.click(screen.getByText('Accepted redirect batch'));
+    const sendButton = screen.getByRole('button', { name: 'Send to client' });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => expect(clientActionCreateMock).toHaveBeenCalledTimes(1));
+    expect(sendButton).toBeDisabled();
+    expect(sendButton).toHaveTextContent('Sent');
+
+    redirectScanMock.mockResolvedValueOnce({
+      ...redirectResult,
+      scannedAt: '2026-07-08T15:00:00.000Z',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Re-scan' }));
+    await waitFor(() => expect(redirectScanMock).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept' }));
+    fireEvent.click(screen.getByText('Accepted redirect batch'));
+
+    expect(screen.getByRole('button', { name: 'Send to client' })).toBeEnabled();
+  });
+
+  it('keeps the redirect send enabled after a failed request', async () => {
+    clientActionCreateMock.mockRejectedValueOnce(new Error('Client action unavailable'));
+    renderSurface('/ws/ws-1/links?tab=redirects');
+
+    expect(await screen.findByText('Suggested 301 redirects')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    fireEvent.click(screen.getByText('Accepted redirect batch'));
+    const sendButton = screen.getByRole('button', { name: 'Send to client' });
+    fireEvent.click(sendButton);
+
+    expect(await screen.findByText('Client action unavailable')).toBeInTheDocument();
+    expect(sendButton).toBeEnabled();
+    expect(sendButton).toHaveTextContent('Send to client');
+  });
+
   it('frames link repairs as measured outcomes instead of claiming wins inside the workshop', async () => {
     renderSurface('/ws/ws-1/links?tab=internal');
 

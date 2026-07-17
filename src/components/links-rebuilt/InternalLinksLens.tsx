@@ -89,6 +89,16 @@ function htmlForSuggestion(suggestion: LinkSuggestion): string {
   return `<a href="${suggestion.toPage}">${suggestion.anchorText}</a>`;
 }
 
+export function useSnapshotSendLatch(snapshotId: string | null) {
+  const [sentSnapshotId, setSentSnapshotId] = useState<string | null>(null);
+  return {
+    sent: snapshotId != null && sentSnapshotId === snapshotId,
+    markSent: useCallback(() => {
+      if (snapshotId != null) setSentSnapshotId(snapshotId);
+    }, [snapshotId]),
+  };
+}
+
 function SuggestionDrawer({
   suggestion,
   onClose,
@@ -297,6 +307,7 @@ export function InternalLinksLens({
   const { toast } = useToast();
   const data = analyze.data ?? snapshot.data ?? null;
   const sendToClient = useSendInternalLinks(workspaceId);
+  const sendLatch = useSnapshotSendLatch(data?.analyzedAt ?? null);
   const [note, setNote] = useState('');
   const [selectedSuggestion, setSelectedSuggestion] = useState<LinkSuggestion | null>(null);
   const filtered = useMemo(() => filterSuggestions(data?.suggestions ?? [], priority, search), [data?.suggestions, priority, search]);
@@ -337,7 +348,10 @@ export function InternalLinksLens({
         },
       },
     }, {
-      onSuccess: () => toast('Internal-link recommendations sent to client', 'success'),
+      onSuccess: () => {
+        sendLatch.markSent();
+        toast('Internal-link recommendations sent to client', 'success');
+      },
       onError: (error) => toast(mutationErrorMessage(error, 'Internal-link send failed'), 'error'),
     });
   };
@@ -560,9 +574,9 @@ export function InternalLinksLens({
               placeholder="Add a note for your client (optional)"
               disabled={sendToClient.isPending}
             />
-            <Button size="sm" variant="primary" disabled={sendToClient.isPending || filtered.length === 0} onClick={sendSuggestions}>
-              <Icon name="send" size="sm" />
-              Send to client
+            <Button size="sm" variant="primary" disabled={sendToClient.isPending || filtered.length === 0 || sendLatch.sent} onClick={sendSuggestions}>
+              <Icon name={sendLatch.sent ? 'check' : 'send'} size="sm" />
+              {sendLatch.sent ? 'Sent' : 'Send to client'}
             </Button>
           </div>
         </GroupBlock>
