@@ -37,7 +37,6 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
         title="Outcomes"
         subtitle="Track what's working across all your SEO actions"
       />
-      <RecordPublishedWorkCard workspaceId={workspaceId} />
       {/* tab-deeplink-ok — outcomes tabs are not navigated to via ?tab= from other components */}
       <TabBar tabs={tabs} active={activeTab} onChange={(t) => setActiveTab(t as OutcomeTab)} />
       <ErrorBoundary>
@@ -50,6 +49,7 @@ export default function OutcomeDashboard({ workspaceId }: OutcomeDashboardProps)
           {activeTab === 'coverage' && <OutcomeCoverageFunnel workspaceId={workspaceId} />}
         </Suspense>
       </ErrorBoundary>
+      <RecordPublishedWorkCard workspaceId={workspaceId} />
     </div>
   );
 }
