@@ -64,7 +64,7 @@ function parseErrorText(result: Awaited<ReturnType<ReturnType<typeof createMcpTo
   return first?.type === 'text' ? first.text : '';
 }
 
-const masterAuth = { scope: 'all' as const, label: 'master' };
+const masterAuth = { scope: 'all' as const };
 
 describe('canonical MCP tool registry', () => {
   it('is the sole 18-family, 102-tool discovery source with exact global tools', () => {

@@ -85,6 +85,7 @@ vi.mock('../../server/mcp/tool-registry.js', () => ({
 import { handleMcpRequest } from '../../server/mcp/server.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types';
 import { MCP_SERVER_INSTRUCTIONS } from '../../server/mcp/instructions.js';
+import { MCP_SERVER_PROFILES } from '../../shared/types/mcp-runtime.js';
 
 describe('mcp server transport routing', () => {
   beforeEach(() => {
@@ -225,6 +226,36 @@ describe('mcp server transport routing', () => {
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
     expect(h.serverInstances).toHaveLength(0);
+  });
+
+  it('fails closed when the operator profile receives any workspace-key identity', async () => {
+    for (const mcpAuth of [
+      {
+        scope: 'ws-operator-denied',
+        keyId: 'key-operator-denied',
+        label: 'Workspace key',
+      },
+      {
+        scope: 'all',
+        keyId: 'key-sentinel-collision',
+        label: 'Workspace named all',
+      },
+    ]) {
+      const res = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn().mockReturnThis(),
+      };
+      await handleMcpRequest(
+        { body: {}, mcpAuth } as never,
+        res as never,
+        MCP_SERVER_PROFILES.OPERATOR,
+      );
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+    }
+    expect(h.serverInstances).toHaveLength(0);
+    expect(h.transportInstances).toHaveLength(0);
   });
 
   it('creates stateless transport and closes server after handling request', async () => {

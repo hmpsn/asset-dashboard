@@ -1,6 +1,80 @@
 {
   "sprints": [
     {
+      "id": "sprint-mcp-operator-control-plane-2026-07-17",
+      "name": "MCP Operator Control Plane",
+      "hours": "Seven staging-first backend phases; one PR at a time",
+      "rationale": "Make desktop administration compact, deterministic, and safer while the Insights Engine remains the authoritative database and client-view layer. Preserve the full MCP surface for advanced work and avoid the active UI rebuild.",
+      "items": [
+        {
+          "id": "mcp-operator-briefs",
+          "title": "P2 — Deterministic decision and client views",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-17",
+          "owner": "analytics-intelligence",
+          "notes": "Add bounded DB-only portfolio and workspace decision briefs plus an exact fail-closed client-safe projection. No AI or provider calls."
+        },
+        {
+          "id": "mcp-structured-operator-contracts",
+          "title": "P3 — Structured outputs and tool annotations",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-17",
+          "owner": "platform-foundation",
+          "notes": "Add validated structuredContent, explicit output schemas, and policy-derived annotations for every active operator tool while preserving text JSON compatibility."
+        },
+        {
+          "id": "mcp-workspace-aliases",
+          "title": "P4 — Auth-safe workspace alias normalization",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "S-M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-17",
+          "owner": "platform-foundation",
+          "notes": "Make workspace_id canonical, centrally accept deprecated workspaceId before authorization/validation, and fail closed on conflicting dual values."
+        },
+        {
+          "id": "mcp-capability-credentials",
+          "title": "P5 — Capability-scoped operator credentials",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "L",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-17",
+          "owner": "platform-foundation",
+          "notes": "Add exhaustive tool capabilities and DB-backed all-workspace operator credentials while preserving legacy keys and the master key as break-glass access. Backend/API first; Settings UI deferred until the UI campaign lands."
+        },
+        {
+          "id": "mcp-usage-telemetry",
+          "title": "P6 — MCP telemetry and usage reporting",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "M-L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-07-17",
+          "owner": "platform-foundation",
+          "notes": "Persist bounded daily aggregates only and distinguish context-byte proxies, paid-trigger counts, and separately attributable provider usage. Never retain arguments, prompts, result bodies, evidence, or credentials."
+        },
+        {
+          "id": "mcp-operator-prompts",
+          "title": "P7 — Desktop workflow prompts",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "S-M",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-07-17",
+          "owner": "platform-foundation",
+          "notes": "Add portfolio triage, client-view review, and safely confirmed matrix-generation prompts after Claude Desktop and ChatGPT Desktop compatibility smoke. Resources remain deferred."
+        }
+      ]
+    },
+    {
       "id": "admin-ux-flow-2026-07",
       "name": "Admin UX flow & ease-of-use (from 2026-07-16 audits)",
       "hours": "~60",

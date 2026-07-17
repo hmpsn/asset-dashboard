@@ -5,6 +5,18 @@ export interface McpToolDefinition<TInputSchema = unknown> {
   readonly inputSchema: TInputSchema;
 }
 
+export const MCP_SERVER_PROFILES = {
+  FULL: 'full',
+  OPERATOR: 'operator',
+} as const;
+
+/**
+ * Transport-level MCP surface selection. Profiles limit discovery and dispatch;
+ * they never replace credential scope, workspace authorization, or tool policy.
+ */
+export type McpServerProfile =
+  (typeof MCP_SERVER_PROFILES)[keyof typeof MCP_SERVER_PROFILES];
+
 export const MCP_TOOL_ERROR_CODES = {
   VALIDATION_FAILED: 'validation_failed',
   FORBIDDEN: 'forbidden',

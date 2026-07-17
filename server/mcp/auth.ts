@@ -8,8 +8,8 @@ const log = createLogger('mcp-auth');
 /**
  * Caller identity attached to an authenticated MCP request.
  *
- * - `scope: 'all'` — the env MCP_API_KEY admin master key. Unchanged behavior:
- *   may operate on every workspace, carries no per-key label.
+ * - `scope: 'all'` with no key ID/label — the env MCP_API_KEY admin master
+ *   key. Unchanged behavior: may operate on every workspace.
  * - `scope: <workspaceId>` — a per-workspace key from the `mcp_api_keys` table.
  *   May ONLY operate on that one workspace (enforced by the canonical tool
  *   registry executor, where the called tool's declared workspace field and
@@ -22,6 +22,20 @@ export interface McpAuthContext {
   label?: string;
   /** mcp_api_keys.id for the authenticating per-workspace key; undefined for master. */
   keyId?: string;
+}
+
+/**
+ * Distinguish the environment master key from a workspace key whose durable
+ * workspace ID happens to equal the reserved scope sentinel `all`.
+ */
+export function isMcpMasterKeyAuth(
+  auth: McpAuthContext | undefined,
+): auth is McpAuthContext & { scope: 'all'; label?: undefined; keyId?: undefined } {
+  return (
+    auth?.scope === 'all'
+    && auth.keyId === undefined
+    && auth.label === undefined
+  );
 }
 
 // Augment the Express Request the same way server/auth.ts and
@@ -99,4 +113,24 @@ export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunctio
     log.warn('MCP_API_KEY env var not set and no matching per-workspace key — rejecting');
   }
   res.status(401).json({ error: 'Unauthorized' });
+}
+
+/**
+ * P1 operator-profile credential boundary.
+ *
+ * This runs only after mcpAuthMiddleware has authenticated the bearer token.
+ * It deliberately checks the resolved scope instead of reading or comparing
+ * bearer material a second time. Capability-scoped operator credentials are a
+ * later phase; until then only the environment master key resolves to `all`.
+ */
+export function mcpMasterKeyOnlyMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!isMcpMasterKeyAuth(req.mcpAuth)) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
 }
