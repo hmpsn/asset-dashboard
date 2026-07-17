@@ -441,6 +441,24 @@ describe('SiteAuditSurface rebuilt', () => {
     expectTextWithClass(/Technical fixes stay in Site Audit and Cockpit until traffic, crawlability, or Core Web Vitals recovery is measurable./i, 't-body');
   });
 
+  it('reports warnings and notices separately from their shared source counts', async () => {
+    const audit = makeAuditState();
+    const auditWithNotices = { ...sampleAudit, warnings: 4, infos: 3 };
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      data: auditWithNotices,
+      rawData: auditWithNotices,
+      workflow: { ...audit.workflow, data: auditWithNotices },
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+
+    const hero = await screen.findByTestId('site-audit-hero');
+    expect(hero).toHaveTextContent('4 warnings');
+    expect(hero).toHaveTextContent('3 notices');
+    expect(hero).not.toHaveTextContent(/7 (?:more )?warnings/i);
+  });
+
   it('hands source image repair to Asset Manager with canonical filter URLs', async () => {
     renderSurface('/ws/ws-1/seo-audit');
 

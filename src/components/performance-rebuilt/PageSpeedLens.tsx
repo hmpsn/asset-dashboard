@@ -418,7 +418,9 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
   const bulk = useAdminPageSpeedBulk(workspaceId, siteId);
   const single = useAdminPageSpeedSingle(workspaceId, siteId);
   const currentSnapshot = strategy === 'mobile' ? mobileSnapshot : desktopSnapshot;
-  const currentBulkResult = (bulk.data?.strategy === strategy ? bulk.data : currentSnapshot.data?.result) ?? null;
+  const rawCurrentBulkResult = (bulk.data?.strategy === strategy ? bulk.data : currentSnapshot.data?.result) ?? null;
+  const hasEmptyBulkResult = rawCurrentBulkResult?.pages.length === 0;
+  const currentBulkResult = hasEmptyBulkResult ? null : rawCurrentBulkResult;
   const currentScannedAt = formatScanDate(currentSnapshot.data?.createdAt);
   const effectiveSelectedPageId = selectedPageId || pages.data?.[0]?.id || '';
   const selectedPage = pages.data?.find((page) => page.id === effectiveSelectedPageId) ?? null;
@@ -443,7 +445,7 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
       { strategy: nextStrategy, maxPages },
       {
         onSuccess: () => toast(`${strategyLabel(nextStrategy)} PageSpeed bulk test complete`, 'success'),
-        onError: (error) => toast(mutationErrorMessage(error, 'PageSpeed bulk test failed'), 'error'),
+        onError: (error) => toast(pageSpeedErrorMessage(mutationErrorMessage(error, 'PageSpeed bulk test failed')), 'error'),
       },
     );
   };
@@ -668,6 +670,16 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
         </div>
       )}
 
+      {mode === 'bulk' && hasEmptyBulkResult && !busy && !hardError && (
+        <ErrorState
+          type="data"
+          title="No pages could be tested"
+          message={pageSpeedErrorMessage('Google PageSpeed Insights returned no results')}
+          action={{ label: 'Retry', onClick: () => runBulk(strategy) }}
+          className="min-h-[320px]"
+        />
+      )}
+
       {mode === 'single' && selectedPage && !hardError && (
         <section className="flex flex-col gap-3" aria-labelledby="selected-page-results-heading">
           <div className="flex flex-wrap items-center gap-2">
@@ -702,7 +714,7 @@ export function PageSpeedLens({ workspaceId, siteId }: PageSpeedLensProps) {
         </div>
       )}
 
-      {mode === 'bulk' && !busy && !currentBulkResult && !hardError && (
+      {mode === 'bulk' && !busy && !currentBulkResult && !hasEmptyBulkResult && !hardError && (
         <EmptyState
           icon={SpeedEmptyIcon}
           title="Run a bulk PageSpeed test"

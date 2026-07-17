@@ -159,6 +159,18 @@ describe('Global Ops Outcomes visual composition', () => {
     expect(screen.getByText('Coverage has not reconciled all measured outcomes.')).toBeInTheDocument();
   });
 
+  it('labels each outcome aggregate with its true measurement window', () => {
+    renderBook();
+
+    expect(screen.queryByText(/rolling 90/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Value delivered / mo (all-time)' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Clicks (28d)' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Wins (all-time)' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'View Acme Dental outcome evidence' }));
+    expect(screen.getByText('Win rate (all-time)')).toBeInTheDocument();
+  });
+
   it('renders attribution-honest recent proof and keeps the workspace route reachable', () => {
     renderBook();
 

@@ -40,7 +40,7 @@ export function OutcomesBookLens() {
         <div className="mb-3 flex items-center gap-2 t-mono font-semibold uppercase tracking-[0.09em] text-[var(--emerald)]">
           <span className="h-[7px] w-[7px] rounded-[var(--radius-pill)] bg-[var(--emerald)]" aria-hidden="true" />
           <span>Action results · across your book</span>
-          <span className="ml-auto hidden normal-case tracking-normal text-[var(--brand-text-dim)] sm:inline">Rolling 90 days</span>
+          <span className="ml-auto hidden normal-case tracking-normal text-[var(--brand-text-dim)] sm:inline">All-time value · 28-day clicks</span>
         </div>
         <h1 className="t-h1 !font-bold text-[var(--brand-text-bright)]">What your work has delivered.</h1>
         <p className="mt-2 max-w-[74ch] t-body leading-relaxed text-[var(--brand-text-muted)]">

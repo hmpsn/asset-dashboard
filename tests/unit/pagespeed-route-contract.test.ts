@@ -69,4 +69,90 @@ describe('single-page PageSpeed route contract', () => {
     expect(site.pages.map((page) => page.url.includes(LOCAL_PROVIDER_FIXTURE.domain))).toEqual([true, true, true]);
     expect(fetchStub).not.toHaveBeenCalled();
   });
+
+  it('returns an error and preserves the prior snapshot when every bulk PageSpeed page fails', async () => {
+    vi.resetModules();
+    const priorSnapshot = {
+      siteId: 'site-pagespeed-failure',
+      createdAt: '2026-07-15T12:00:00.000Z',
+      result: { pages: [{ url: 'https://example.com/', score: 88 }] },
+    };
+    let savedSnapshot = priorSnapshot;
+    const savePageSpeed = vi.fn((_siteId: string, _strategy: string, result: unknown) => {
+      savedSnapshot = { ...priorSnapshot, result: result as typeof priorSnapshot.result };
+    });
+
+    vi.doMock('../../server/pagespeed.js', () => ({
+      runSiteSpeed: vi.fn(async () => ({
+        siteId: 'site-pagespeed-failure',
+        strategy: 'mobile',
+        pages: [],
+        averageScore: 0,
+        averageVitals: { LCP: null, FID: null, CLS: null, FCP: null, INP: null, SI: null, TBT: null, TTI: null },
+        testedAt: '2026-07-16T12:00:00.000Z',
+      })),
+      runSinglePageSpeed: vi.fn(),
+    }));
+    vi.doMock('../../server/performance-store.js', () => ({
+      savePageSpeed,
+      getPageSpeed: vi.fn(() => savedSnapshot),
+      saveSinglePageSpeed: vi.fn(),
+    }));
+    vi.doMock('../../server/auth.js', () => ({
+      requireWorkspaceSiteAccessFromQuery: vi.fn(() => (_req: unknown, _res: unknown, next: () => void) => next()),
+      requireWorkspaceSiteAccess: vi.fn(() => (_req: unknown, _res: unknown, next: () => void) => next()),
+    }));
+    vi.doMock('../../server/workspaces.js', () => ({
+      getWorkspaceBySiteId: vi.fn(() => ({ id: 'ws-pagespeed-failure' })),
+      getWorkspace: vi.fn(),
+      getTokenForSite: vi.fn(),
+    }));
+    vi.doMock('../../server/intelligence/cache-invalidation.js', () => ({
+      invalidateIntelligenceCache: vi.fn(),
+    }));
+
+    const { default: pageSpeedRouter } = await import('../../server/routes/webflow-pagespeed.js');
+    type RouteHandler = (
+      req: { params: Record<string, string>; query: Record<string, string> },
+      res: { status: (code: number) => unknown; json: (body: unknown) => unknown },
+    ) => Promise<unknown>;
+    type RouterLayer = {
+      route?: { path: string; stack: Array<{ handle: RouteHandler }> };
+    };
+    const layers = (pageSpeedRouter as unknown as { stack: RouterLayer[] }).stack;
+    const bulkLayer = layers.find((layer) => layer.route?.path === '/api/webflow/pagespeed/:siteId');
+    const handler = bulkLayer?.route?.stack.at(-1)?.handle;
+    expect(handler).toBeDefined();
+    let status = 200;
+    let body: unknown;
+    const response = {
+      status: (code: number) => {
+        status = code;
+        return response;
+      },
+      json: (value: unknown) => {
+        body = value;
+        return response;
+      },
+    };
+
+    try {
+      await handler?.(
+        { params: { siteId: 'site-pagespeed-failure' }, query: { workspaceId: 'ws-pagespeed-failure' } },
+        response,
+      );
+
+      expect(status).toBeGreaterThanOrEqual(400);
+      expect(body).toMatchObject({ error: expect.stringContaining('No pages could be tested') });
+      expect(savePageSpeed).not.toHaveBeenCalled();
+      expect(savedSnapshot).toBe(priorSnapshot);
+    } finally {
+      vi.doUnmock('../../server/pagespeed.js');
+      vi.doUnmock('../../server/performance-store.js');
+      vi.doUnmock('../../server/auth.js');
+      vi.doUnmock('../../server/workspaces.js');
+      vi.doUnmock('../../server/intelligence/cache-invalidation.js');
+      vi.resetModules();
+    }
+  });
 });

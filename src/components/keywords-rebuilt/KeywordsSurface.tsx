@@ -129,14 +129,16 @@ function SummaryCell({
   label,
   value,
   accent,
+  sub,
 }: {
   label: string;
   value: string | number;
   accent: string;
+  sub?: string;
 }) {
   return (
     <div data-testid="keywords-summary-cell" className="min-w-0 [&>*]:h-full">
-      <MetricTile label={label} value={value} accent={accent} className={SUMMARY_TILE_CLASS} />
+      <MetricTile label={label} value={value} accent={accent} sub={sub} className={SUMMARY_TILE_CLASS} />
     </div>
   );
 }
@@ -345,7 +347,8 @@ export function KeywordsSurface({ workspaceId }: KeywordsSurfaceProps) {
               <SummaryCell
                 label="Monthly value"
                 value={typeof trafficValue === 'number' ? MONEY_FORMAT.format(trafficValue) : '—'}
-                accent="var(--blue)"
+                accent={typeof trafficValue === 'number' ? 'var(--blue)' : 'var(--brand-text-dim)'}
+                sub={typeof trafficValue === 'number' ? undefined : 'Unavailable'}
               />
             </>
           )}

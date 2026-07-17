@@ -343,7 +343,8 @@ function scoreVerdict(score: number): string {
 
 function AuditHero({ data, siteName }: { data: SiteAuditResult; siteName: string }) {
   const indexedPages = data.pages.filter((page) => !page.noindex).length;
-  const remaining = data.warnings + data.infos;
+  const warningCount = `${data.warnings} ${data.warnings === 1 ? 'warning' : 'warnings'}`;
+  const noticeCount = `${data.infos} ${data.infos === 1 ? 'notice' : 'notices'}`;
   const redirects = data.deadLinkSummary?.redirects;
 
   return (
@@ -362,8 +363,8 @@ function AuditHero({ data, siteName }: { data: SiteAuditResult; siteName: string
             </h1>
             <p className="mt-2 max-w-[68ch] t-ui text-[var(--brand-text-muted)]">
               {data.errors > 0
-                ? `${data.errors} critical ${data.errors === 1 ? 'issue needs' : 'issues need'} attention first. ${remaining} more warnings and notices are ordered below by severity and demand.`
-                : `No critical issues. ${remaining} warnings and notices remain, and the site is in good technical shape.`}
+                ? `${data.errors} critical ${data.errors === 1 ? 'issue needs' : 'issues need'} attention first. ${warningCount} and ${noticeCount} are ordered below by severity and demand.`
+                : `No critical issues. ${warningCount} and ${noticeCount} remain, and the site is in good technical shape.`}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge label={`${data.errors} critical`} tone={data.errors > 0 ? 'red' : 'emerald'} variant="outline" size="md" />
