@@ -9,7 +9,7 @@ import { useWorkspaces } from './useWorkspaces';
 import { queryKeys } from '../../lib/queryKeys';
 import { applyClientSuppressions, type ClientSuppression } from '../../lib/audit-suppression-client';
 import { issueToTaskItem, issueToTaskKey } from '../../lib/audit-batch';
-import { normalizePageUrl } from '../../lib/pathUtils';
+import { normalizePageUrl, resolvePagePath } from '../../lib/pathUtils';
 import { buildSiteAuditApprovalPayload } from '../../components/site-audit-rebuilt/siteAuditApproval';
 import { adminPath } from '../../routes';
 import { computePageScore } from '../../../shared/scoring';
@@ -65,6 +65,14 @@ export interface AuditIssueGroup {
     sessions: number;
     pageviews: number;
   };
+}
+
+export interface AuditIssueApplyOutcome {
+  instanceId: string;
+  pageId: string;
+  pagePath: string;
+  status: 'applied' | 'failed';
+  error?: string;
 }
 
 interface SuppressionPayload {
@@ -354,6 +362,41 @@ export function useSiteAuditRebuilt(workspaceId: string) {
     }
   }, [editedSuggestions, siteId, workspaceId]);
 
+  const acceptIssueGroupSuggestions = useCallback(async (
+    instances: AuditIssueInstance[],
+  ): Promise<AuditIssueApplyOutcome[]> => {
+    const outcomes: AuditIssueApplyOutcome[] = [];
+    for (const instance of instances) {
+      if (!instance.page) continue;
+      const base = {
+        instanceId: instance.id,
+        pageId: instance.page.pageId,
+        pagePath: resolvePagePath(instance.page),
+      };
+      if (!instance.issue.suggestedFix) {
+        outcomes.push({
+          ...base,
+          status: 'failed',
+          error: 'No AI suggestion is available for this page.',
+        });
+        continue;
+      }
+      try {
+        const applied = await acceptSuggestion(instance.page, instance.issue);
+        outcomes.push(applied
+          ? { ...base, status: 'applied' }
+          : { ...base, status: 'failed', error: 'No supported change was applied.' });
+      } catch (error) {
+        outcomes.push({
+          ...base,
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'This page could not be updated.',
+        });
+      }
+    }
+    return outcomes;
+  }, [acceptSuggestion]);
+
   const openQuickFix = useCallback((page: SiteAuditPage, issue: SiteAuditIssue) => {
     const check = issue.check.toLowerCase();
     const context = {
@@ -522,6 +565,7 @@ export function useSiteAuditRebuilt(workspaceId: string) {
     suppressPattern,
     unsuppressAll,
     acceptSuggestion,
+    acceptIssueGroupSuggestions,
     openQuickFix,
     openDeadLinks,
     createTaskFromIssue,

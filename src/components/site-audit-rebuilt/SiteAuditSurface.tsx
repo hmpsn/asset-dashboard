@@ -1,12 +1,14 @@
 // @ds-rebuilt
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
+import { issueToTaskKey } from '../../lib/audit-batch';
 import { resolvePagePath } from '../../lib/pathUtils';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { adminPath } from '../../routes';
 import {
   useSiteAuditRebuilt,
+  type AuditIssueApplyOutcome,
   type AuditIssueGroup,
   type SiteAuditPage,
   type SiteAuditResult,
@@ -414,44 +416,52 @@ function IssueDetailDrawer({
   onSuppressIssue: (check: string, slug: string) => Promise<void>;
   onSuppressPattern: (check: string, slug: string) => Promise<void>;
 }) {
-  const [note, setNote] = useState('');
-  const firstPageInstance = group?.instances.find((instance) => instance.page) ?? null;
-  const firstPage = firstPageInstance?.page ?? null;
-  const firstIssue = firstPageInstance?.issue ?? null;
-  const firstPagePath = firstPage ? resolvePagePath(firstPage) : null;
-  const taskKey = firstPage && firstIssue ? `${firstPage.pageId}-${firstIssue.check}-${firstIssue.message.slice(0, 30)}` : '';
-  const fixKey = firstPage && firstIssue ? `${firstPage.pageId}-${firstIssue.check}` : '';
-  const editedSuggestion = firstIssue?.suggestedFix
-    ? audit.editedSuggestions[fixKey] ?? firstIssue.suggestedFix
-    : '';
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [applyAllPreviewOpen, setApplyAllPreviewOpen] = useState(false);
+  const [applyAllRunning, setApplyAllRunning] = useState(false);
+  const [applyOutcomes, setApplyOutcomes] = useState<AuditIssueApplyOutcome[]>([]);
+  const pageInstances = (group?.instances ?? []).filter(
+    (instance): instance is typeof instance & { page: SiteAuditPage } => !!instance.page,
+  );
+  const fixableInstances = pageInstances.filter((instance) => !!instance.issue.suggestedFix);
+  const actionableInstances = fixableInstances.filter((instance) => (
+    !audit.appliedFixes.has(`${instance.page.pageId}-${instance.issue.check}`)
+  ));
+  const outcomeByInstance = useMemo(
+    () => new Map(applyOutcomes.map((outcome) => [outcome.instanceId, outcome])),
+    [applyOutcomes],
+  );
+
+  useEffect(() => {
+    setNotes({});
+    setApplyAllPreviewOpen(false);
+    setApplyAllRunning(false);
+    setApplyOutcomes([]);
+  }, [group?.id]);
+
+  const handleApplyAll = async () => {
+    setApplyAllRunning(true);
+    try {
+      const outcomes = await audit.acceptIssueGroupSuggestions(actionableInstances);
+      setApplyOutcomes(outcomes);
+      setApplyAllPreviewOpen(false);
+    } finally {
+      setApplyAllRunning(false);
+    }
+  };
 
   return (
-    <Drawer
-      open={open}
-      onClose={onClose}
-      title={group?.check ?? 'Audit issue'}
-      eyebrow={group?.categoryLabel}
-      subtitle={group?.message}
-      width={520}
-      footer={firstPage && firstIssue ? (
-        <>
-          <Button variant="secondary" size="sm" onClick={() => onQuickFix(firstPage, firstIssue)}>
-            <Icon name="arrowRight" size="sm" />
-            Open fix
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => onCreateTask(firstPage, firstIssue)}
-            disabled={createdTasks.has(taskKey)}
-          >
-            <Icon name={createdTasks.has(taskKey) ? 'check' : 'plus'} size="sm" />
-            {createdTasks.has(taskKey) ? 'Task added' : 'Add task'}
-          </Button>
-        </>
-      ) : undefined}
-    >
-      {group && (
-        <div className="space-y-5">
+    <>
+      <Drawer
+        open={open}
+        onClose={onClose}
+        title={group?.check ?? 'Audit issue'}
+        eyebrow={group?.categoryLabel}
+        subtitle={group?.message}
+        width={560}
+      >
+        {group && (
+          <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge label={group.severity} tone={SEVERITY_TONE[group.severity]} variant="soft" />
             <Badge label={group.categoryLabel} tone="teal" variant="outline" />
@@ -462,108 +472,160 @@ function IssueDetailDrawer({
           <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-4">
             <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Recommendation</div>
             <p className="t-body text-[var(--brand-text-muted)] mt-1">{group.recommendation}</p>
-            {firstPage && firstIssue?.suggestedFix && (
-              <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--brand-mint-dim)] bg-[var(--brand-mint-dim)] p-3">
-                <div className="t-micro text-[var(--teal)]">AI suggestion</div>
-                <FormTextarea
-                  value={editedSuggestion}
-                  onChange={(value) => {
-                    audit.setEditedSuggestions((current) => ({
-                      ...current,
-                      [fixKey]: value,
-                    }));
-                  }}
-                  rows={3}
-                  className="mt-2"
-                />
-                <CharacterCounter current={editedSuggestion.length} max={320} className="mt-1 justify-end" />
-              </div>
-            )}
           </div>
 
-          {firstPage && firstIssue && (
-            <div className="space-y-3" data-testid="site-audit-issue-actions">
-              <div className="t-caption text-[var(--brand-text-muted)]">
-                Applies to {firstPagePath} only
+          <div data-testid="site-audit-issue-actions">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Affected pages</div>
+                <div className="mt-1 t-caption text-[var(--brand-text-muted)]">
+                  {fixableInstances.length > 1
+                    ? `Choose actions page by page, or preview the same suggestion across all ${fixableInstances.length} affected pages.`
+                    : 'Choose actions for the affected page below.'}
+                </div>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Send to client</div>
-                {flaggedIssues.has(taskKey) && <Badge label="Sent" tone="emerald" variant="soft" />}
-              </div>
-              <FormTextarea
-                value={note}
-                onChange={setNote}
-                placeholder="Optional note for the client"
-                rows={3}
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                {firstIssue.suggestedFix && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onAcceptSuggestion(firstPage, firstIssue)}
-                    loading={applyingFix === fixKey}
-                  >
-                    <Icon name="check" size="sm" />
-                    Accept suggestion
-                  </Button>
-                )}
+              {actionableInstances.length > 1 && (
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => onFlagForClient(firstPage, firstIssue, note)}
-                  loading={flagSending}
-                  disabled={flaggedIssues.has(taskKey)}
+                  onClick={() => setApplyAllPreviewOpen(true)}
                 >
-                  <Icon name="send" size="sm" />
-                  {flaggedIssues.has(taskKey) ? 'Sent to client' : 'Send to client'}
+                  <Icon name="sparkle" size="sm" />
+                  Apply to all {actionableInstances.length} pages
                 </Button>
-              </div>
+              )}
             </div>
-          )}
-
-          <div>
-            <div className="t-ui font-semibold text-[var(--brand-text-bright)] mb-2">Affected pages</div>
             <div className="space-y-2">
-              {group.instances.slice(0, 12).map((instance) => (
-                <div key={instance.id} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+              {group.instances.map((instance) => {
+                const page = instance.page;
+                if (!page) {
+                  return (
+                    <SectionCard key={instance.id} noPadding variant="subtle">
+                      <div className="p-3">
+                        <div className="t-ui text-[var(--brand-text-bright)]">Site-wide issue</div>
+                        <div className="t-caption-sm text-[var(--brand-text-muted)]">{instance.issue.value ?? instance.issue.check}</div>
+                      </div>
+                    </SectionCard>
+                  );
+                }
+                const pagePath = resolvePagePath(page);
+                const taskKey = issueToTaskKey(page, instance.issue);
+                const fixKey = `${page.pageId}-${instance.issue.check}`;
+                const editedSuggestion = instance.issue.suggestedFix
+                  ? audit.editedSuggestions[fixKey] ?? instance.issue.suggestedFix
+                  : '';
+                const outcome = outcomeByInstance.get(instance.id);
+                const applied = audit.appliedFixes.has(fixKey) || outcome?.status === 'applied';
+                const taskCreated = createdTasks.has(taskKey);
+                const sent = flaggedIssues.has(taskKey);
+
+                return (
+                <div
+                  key={instance.id}
+                  data-testid={`site-audit-instance-${page.pageId}`}
+                  className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3"
+                >
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="t-ui text-[var(--brand-text-bright)] truncate">
-                          {instance.page?.page ?? 'Site-wide issue'}
+                          {page.page}
                         </span>
-                        {instance.page?.noindex && <Badge label="noindex excluded" tone="zinc" variant="outline" />}
-                        {instance.page && audit.pageStates.getState?.(instance.page.pageId) && (
+                        {page.noindex && <Badge label="noindex excluded" tone="zinc" variant="outline" />}
+                        {audit.pageStates.getState?.(page.pageId) && (
                           <Badge
-                            label={audit.pageStates.getState(instance.page.pageId)!.status.replace(/-/g, ' ')}
+                            label={audit.pageStates.getState(page.pageId)!.status.replace(/-/g, ' ')}
                             tone="blue"
                             variant="soft"
                           />
                         )}
+                        {applied && <Badge label="Applied" tone="emerald" variant="soft" />}
+                        {outcome?.status === 'failed' && <Badge label="Failed" tone="red" variant="soft" />}
+                        {sent && <Badge label="Sent" tone="emerald" variant="soft" />}
+                        {taskCreated && <Badge label="Task added" tone="emerald" variant="soft" />}
                       </div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">
-                        {instance.page?.slug ?? instance.issue.value ?? instance.issue.check}
+                        {pagePath}
                       </div>
                     </div>
-                    {instance.page && (
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => onSuppressIssue(instance.issue.check, instance.page!.slug)}>
-                          Hide
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => onSuppressPattern(instance.issue.check, instance.page!.slug)}>
-                          Hide pattern
-                        </Button>
-                      </div>
-                    )}
                   </div>
+                  {instance.issue.suggestedFix && (
+                    <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--brand-mint-dim)] bg-[var(--brand-mint-dim)] p-3">
+                      <div className="t-micro text-[var(--teal)]">AI suggestion for {pagePath}</div>
+                      <FormTextarea
+                        aria-label={`AI suggestion for ${pagePath}`}
+                        value={editedSuggestion}
+                        onChange={(value) => {
+                          audit.setEditedSuggestions((current) => ({ ...current, [fixKey]: value }));
+                        }}
+                        rows={2}
+                        className="mt-2"
+                      />
+                      <CharacterCounter current={editedSuggestion.length} max={320} className="mt-1 justify-end" />
+                    </div>
+                  )}
+                  <div className="mt-3 t-ui font-semibold text-[var(--brand-text-bright)]">Send to client</div>
+                  <FormTextarea
+                    aria-label={`Client note for ${pagePath}`}
+                    value={notes[instance.id] ?? ''}
+                    onChange={(value) => setNotes((current) => ({ ...current, [instance.id]: value }))}
+                    placeholder={`Optional client note for ${pagePath}`}
+                    rows={2}
+                    className="mt-3"
+                  />
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    {instance.issue.suggestedFix && (
+                      <Button
+                        aria-label={`Accept suggestion for ${pagePath}`}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => onAcceptSuggestion(page, instance.issue)}
+                        loading={applyingFix === fixKey}
+                        disabled={applied}
+                      >
+                        <Icon name="check" size="sm" />
+                        {applied ? 'Accepted' : 'Accept'}
+                      </Button>
+                    )}
+                    <Button
+                      aria-label={`Send to client for ${pagePath}`}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onFlagForClient(page, instance.issue, notes[instance.id] ?? '')}
+                      loading={flagSending && !sent}
+                      disabled={sent}
+                    >
+                      <Icon name="send" size="sm" />
+                      {sent ? 'Sent' : 'Send to client'}
+                    </Button>
+                    <Button
+                      aria-label={`Add task for ${pagePath}`}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onCreateTask(page, instance.issue)}
+                      loading={audit.creatingTask === taskKey}
+                      disabled={taskCreated}
+                    >
+                      <Icon name={taskCreated ? 'check' : 'plus'} size="sm" />
+                      {taskCreated ? 'Task added' : 'Add task'}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => onQuickFix(page, instance.issue)}>
+                      <Icon name="arrowRight" size="sm" />
+                      Open fix
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => onSuppressIssue(instance.issue.check, page.slug)}>
+                      Hide
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => onSuppressPattern(instance.issue.check, page.slug)}>
+                      Hide pattern
+                    </Button>
+                  </div>
+                  {outcome?.status === 'failed' && outcome.error && (
+                    <div className="mt-2 t-caption-sm text-[var(--red)]">{outcome.error}</div>
+                  )}
                 </div>
-              ))}
-              {group.instances.length > 12 && (
-                <div className="t-caption text-[var(--brand-text-muted)]">
-                  {group.instances.length - 12} more affected pages are not shown above.
-                </div>
-              )}
+                );
+              })}
               <div className="t-caption text-[var(--brand-text-muted)]">
                 Add visible tasks uses the current table filters. Add error tasks, Add all tasks, and Accept all use the full audit.
               </div>
@@ -580,9 +642,51 @@ function IssueDetailDrawer({
               </div>
             </div>
           )}
+          </div>
+        )}
+      </Drawer>
+
+      <Drawer
+        open={applyAllPreviewOpen}
+        onClose={() => setApplyAllPreviewOpen(false)}
+        title={`Apply suggestion to all ${actionableInstances.length} affected pages?`}
+        eyebrow="Review live-site changes"
+        subtitle={group?.message}
+        width={460}
+        footer={(
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setApplyAllPreviewOpen(false)} disabled={applyAllRunning}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => void handleApplyAll()} loading={applyAllRunning}>
+              Apply to {actionableInstances.length} pages
+            </Button>
+          </>
+        )}
+      >
+        <div className="space-y-4">
+          <p className="t-body text-[var(--brand-text-muted)]">
+            Each page is updated separately on the live Webflow site. Successful pages stay applied if another page fails, and these changes cannot be bulk-undone.
+          </p>
+          <SectionCard noPadding variant="subtle">
+            <div className="divide-y divide-[var(--brand-border)]">
+              {actionableInstances.map((instance) => {
+                const pagePath = resolvePagePath(instance.page);
+                const fixKey = `${instance.page.pageId}-${instance.issue.check}`;
+                return (
+                  <div key={instance.id} className="px-4 py-3">
+                    <div className="t-ui font-semibold text-[var(--brand-text-bright)]">{pagePath}</div>
+                    <div className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+                      {audit.editedSuggestions[fixKey] ?? instance.issue.suggestedFix}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
         </div>
-      )}
-    </Drawer>
+      </Drawer>
+    </>
   );
 }
 
