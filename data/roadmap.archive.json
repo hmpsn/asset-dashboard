@@ -104,6 +104,28 @@
           "createdAt": "2026-07-16",
           "owner": "platform",
           "notes": "Shipped honest Open labels, the D4 top-10 verbs with real workspace-aware handlers and disabled states, background-job dispatch for audit/strategy, confirmed Webflow publish, PageSpeed bulk dispatch, and documented debug-workspace filtering."
+        },
+        {
+          "id": "empty-state-repair-sweep",
+          "title": "Empty-state repair: link the 6 dead-end connect states; then the teaching-empty-state gate",
+          "source": "2026-07-16 UX-flow audit §5 budget 4 (54/87 actionless)",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "platform",
+          "notes": "Completed W1.3: all six audited connect/configure empty states now teach and link directly to Workspace Settings > Connections; their temporary actionless-EmptyState allowlist entries were removed and focused navigation tests pin every receiver."
+        },
+        {
+          "id": "global-tab-chrome-context",
+          "title": "Global tabs: last-visited workspace (not workspaces[0]) + honest no-workspace chrome state",
+          "source": "2026-07-16 rebuild audit B3 (carried; mechanism owner-approved, consequences not)",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "platform",
+          "notes": "Completed W1.3: global tabs retain a validated, localStorage-backed last-visited workspace for shell context. With no valid visit history, chrome stays unbound, global breadcrumbs omit the workspace segment, and AdminChat does not mount."
         }
       ],
       "shippedAt": "2026-07-17"

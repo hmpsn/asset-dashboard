@@ -62,17 +62,6 @@
           "notes": "Opportunities is already a column swap (KeywordsTable.tsx:480); Pages/Clusters become Group-by. Aligns with DEF-kw read-model deferrals."
         },
         {
-          "id": "empty-state-repair-sweep",
-          "title": "Empty-state repair: link the 6 dead-end connect states; then the teaching-empty-state gate",
-          "source": "2026-07-16 UX-flow audit §5 budget 4 (54/87 actionless)",
-          "est": "S",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "platform",
-          "notes": "Copy the Competitors teach-with-CTA pattern; TrafficLens etc. name destinations without linking them."
-        },
-        {
           "id": "requests-inbox-spine",
           "title": "Requests: recency-first landing + pending-replies nav badge + labeled nav home",
           "source": "2026-07-16 UX-flow audit §6; rebuild audit B6",
@@ -104,17 +93,6 @@
           "createdAt": "2026-07-16",
           "owner": "analytics",
           "notes": "Either the classification is smarter or the operator is blind — currently unproven."
-        },
-        {
-          "id": "global-tab-chrome-context",
-          "title": "Global tabs: last-visited workspace (not workspaces[0]) + honest no-workspace chrome state",
-          "source": "2026-07-16 rebuild audit B3 (carried; mechanism owner-approved, consequences not)",
-          "est": "S",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "platform",
-          "notes": "Bare /settings currently breadcrumbs a junk debug workspace and binds AdminChat to it."
         },
         {
           "id": "site-audit-per-page-repair-rows",

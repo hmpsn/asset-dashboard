@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MessageSquare } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { featureFlags } from '../../api/misc';
-import { adminPath, type Page } from '../../routes';
+import { adminPath, GLOBAL_TABS, type Page } from '../../routes';
 import { STUDIO_NAME } from '../../constants';
 import { resolveNavLabelById } from '../../lib/navRegistry';
 import { queryKeys } from '../../lib/queryKeys';
@@ -144,7 +144,7 @@ export function RebuiltBreadcrumb({
     const next: BreadcrumbItem[] = [
       { label: 'Command Center', onClick: () => navigate('/') },
     ];
-    if (selected && workspaceLabel) {
+    if (!GLOBAL_TABS.has(tab) && selected && workspaceLabel) {
       next.push({
         label: workspaceLabel,
         onClick: () => navigate(adminPath(selected.id)),

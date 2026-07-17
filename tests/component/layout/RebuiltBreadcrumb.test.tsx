@@ -56,6 +56,14 @@ describe('RebuiltBreadcrumb', () => {
     expect(screen.getAllByTestId('rebuilt-breadcrumb-separator').length).toBeGreaterThan(0);
   });
 
+  it('omits the workspace segment on a global tab with retained chrome context', async () => {
+    renderBreadcrumb('settings', '/settings');
+
+    expect(screen.getByText('Command Center')).toBeInTheDocument();
+    expect(await screen.findByText('Settings')).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByText('acme.com')).not.toBeInTheDocument();
+  });
+
   it('renders a ?tab= sub-segment when the current URL carries one', async () => {
     renderBreadcrumb('content-pipeline', '/ws/ws-1/content-pipeline?tab=briefs');
 

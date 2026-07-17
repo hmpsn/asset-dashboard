@@ -9998,3 +9998,13 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Command handlers are asserted exactly once with workspace/site payloads, disabled states, confirmation, and fixture filtering. Cockpit component coverage clicks a real row for all nine source types. The deep-link contract statically pins both sender and receiver halves for every `?tab=`, `?lens=`, and `?sub=` handoff.
 
 **Files:** `src/components/CommandPalette.tsx`; rebuilt Cockpit surface/work queue; focused Command Palette and Cockpit component tests; `tests/contract/tab-deep-link-wiring.test.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 709. Admin UX W1.3 actionable setup states and honest global chrome context 2026-07-17
+
+**Status:** Complete. Wave 1 closes with direct recovery paths for six rebuilt setup states and truthful workspace context on global admin routes.
+
+**What changed:** Search Console, GA4, Links, Page Intelligence, Asset Manager, and Site Audit setup states now pair their explanation with an `Open Workspace Settings` action targeting the existing Connections receiver. Their six temporary actionless-`EmptyState` allowlist rows are removed, leaving the automated gate to protect these paths. Global tabs no longer borrow `workspaces[0]`: the shell persists the last URL-visited workspace using the same localStorage preference pattern as theme and rail state, validates it against current workspaces, and otherwise renders unbound chrome. Global breadcrumbs omit the workspace segment, and AdminChat mounts only when a real retained workspace exists.
+
+**Tests:** Six navigation tests pin `/ws/:workspaceId/workspace-settings?tab=connections`; App coverage pins both no-history and retained-last-visit global chrome; breadcrumb coverage pins global workspace-segment omission. Focused component suites, typecheck, hooks lint, build, and pr-check cover the closeout.
+
+**Files:** six rebuilt surface components and their focused tests; `scripts/pr-check.ts`; `src/App.tsx`; rebuilt breadcrumb and tests; Global Ops parity contract; `data/roadmap.json`; `FEATURE_AUDIT.md`.
