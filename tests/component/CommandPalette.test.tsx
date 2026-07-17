@@ -9,6 +9,8 @@ const useFeatureFlagMock = vi.fn();
 const anomalyScanMock = vi.fn();
 const startJobMock = vi.fn();
 const toastMock = vi.fn();
+const publishSiteMock = vi.fn();
+const pagespeedBulkMock = vi.fn();
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -34,6 +36,12 @@ vi.mock('../../src/api', () => ({
   anomalies: {
     scan: (...args: unknown[]) => anomalyScanMock(...args),
   },
+  webflow: {
+    publish: (...args: unknown[]) => publishSiteMock(...args),
+  },
+  pageWeight: {
+    pagespeedBulk: (...args: unknown[]) => pagespeedBulkMock(...args),
+  },
 }));
 
 const ws: Workspace = {
@@ -54,6 +62,8 @@ describe('CommandPalette', () => {
     anomalyScanMock.mockReset();
     startJobMock.mockReset();
     toastMock.mockReset();
+    publishSiteMock.mockReset();
+    pagespeedBulkMock.mockReset();
     useFeatureFlagMock.mockReset();
     useFeatureFlagMock.mockReturnValue(false);
     localStorage.clear();
@@ -118,7 +128,7 @@ describe('CommandPalette', () => {
       startJobMock.mockResolvedValue('job-123');
       open(wsWithSite);
 
-      const auditBtn = screen.getByText('Run Audit');
+      const auditBtn = screen.getByText('Run Site Audit');
       fireEvent.click(auditBtn);
 
       await waitFor(() => {
@@ -139,7 +149,7 @@ describe('CommandPalette', () => {
       startJobMock.mockResolvedValue(null);
       open(wsWithSite);
 
-      fireEvent.click(screen.getByText('Run Audit'));
+      fireEvent.click(screen.getByText('Run Site Audit'));
 
       await waitFor(() => {
         expect(toastMock).toHaveBeenCalledWith(
@@ -153,7 +163,7 @@ describe('CommandPalette', () => {
       startJobMock.mockRejectedValue(new Error('network'));
       open(wsWithSite);
 
-      fireEvent.click(screen.getByText('Run Audit'));
+      fireEvent.click(screen.getByText('Run Site Audit'));
 
       await waitFor(() => {
         expect(toastMock).toHaveBeenCalledWith(
@@ -163,12 +173,14 @@ describe('CommandPalette', () => {
       });
     });
 
-    it('navigates to seo-audit tab when workspace has no site linked', () => {
+    it('is honestly disabled when the workspace has no linked site', () => {
       open(ws); // no webflowSiteId
 
-      fireEvent.click(screen.getByText('Run Audit'));
+      const action = screen.getByText('Run Site Audit').closest('button');
 
-      expect(navigateMock).toHaveBeenCalledWith(adminPath(ws.id, 'seo-audit'));
+      expect(action).toBeDisabled();
+      expect(screen.getByText('Link a site to run audits')).toBeInTheDocument();
+      expect(navigateMock).not.toHaveBeenCalled();
       expect(startJobMock).not.toHaveBeenCalled();
     });
 
@@ -176,7 +188,7 @@ describe('CommandPalette', () => {
       startJobMock.mockResolvedValue('job-1');
       open(wsWithSite);
 
-      fireEvent.click(screen.getByText('Run Audit'));
+      fireEvent.click(screen.getByText('Run Site Audit'));
 
       // auditSchedules.enable is not imported — we verify startJob is the path taken
       expect(startJobMock).toHaveBeenCalled();
@@ -290,18 +302,142 @@ describe('CommandPalette', () => {
 
   describe('content planner quick actions', () => {
     it.each([
-      ['Create Content Template', 'action:create-template'],
-      ['Build Content Matrix', 'action:build-matrix'],
+      ['Open Content Template Planner', 'action:create-template'],
+      ['Open Content Matrix Builder', 'action:build-matrix'],
     ])('routes %s to the Planner and preserves recent-action tracking', (label, recentId) => {
-      render(<CommandPalette workspaces={[ws]} selectedWorkspace={ws} onSelectWorkspace={vi.fn()} />);
+      render(<CommandPalette workspaces={[wsWithSite]} selectedWorkspace={wsWithSite} onSelectWorkspace={vi.fn()} />);
       fireEvent.keyDown(window, { key: 'k', metaKey: true });
 
       const input = screen.getByPlaceholderText('Search tools, workspaces, actions...');
       fireEvent.change(input, { target: { value: label } });
       fireEvent.click(screen.getByText(label));
 
-      expect(navigateMock).toHaveBeenCalledWith(`${adminPath(ws.id, 'content-pipeline')}?tab=planner`);
+      expect(navigateMock).toHaveBeenCalledWith(`${adminPath(wsWithSite.id, 'content-pipeline')}?tab=planner`);
       expect(JSON.parse(localStorage.getItem('admin-palette-recent') ?? '[]')).toContain(recentId);
+    });
+  });
+
+  describe('W1.2 command verbs', () => {
+    function open(workspace: Workspace | null = wsWithSite, workspaces: Workspace[] = workspace ? [workspace] : []) {
+      render(<CommandPalette workspaces={workspaces} selectedWorkspace={workspace} onSelectWorkspace={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    }
+
+    it('relabels legacy navigate-only actions with Open and exposes the D4 top-10 verbs', () => {
+      open();
+
+      for (const label of [
+        'Open Schema Generator',
+        'Open Content Briefs',
+        'Open Content Template Planner',
+        'Open Content Matrix Builder',
+        'Open Content Plan',
+      ]) {
+        expect(screen.getByText(label)).toBeInTheDocument();
+      }
+
+      for (const label of [
+        'Run Site Audit',
+        'Scan All Workspaces for Anomalies',
+        'Review & send staged moves',
+        'Fix missing titles/metas',
+        'Reply to client requests',
+        'Record published work',
+        'Publish site to Webflow',
+        'Refresh strategy',
+        'Re-run PageSpeed',
+        'New content brief',
+      ]) {
+        expect(screen.getByText(label)).toBeInTheDocument();
+      }
+
+      for (const staleLabel of ['Generate Schema', 'Create Brief', 'Create Content Template', 'Build Content Matrix', 'View Content Plan']) {
+        expect(screen.queryByText(staleLabel)).not.toBeInTheDocument();
+      }
+    });
+
+    it('filters fixture/debug workspace names with the documented predicate', () => {
+      const debugWorkspaces: Workspace[] = [
+        { ...ws, id: 'debug-1', name: 'cascade-debug-1783977240399' },
+        { ...ws, id: 'debug-2', name: 'dbgSmoke' },
+        { ...ws, id: 'debug-3', name: 'Trigger Check WS' },
+        { ...ws, id: 'debug-4', name: 'Check Set WS' },
+      ];
+      open(ws, [ws, ...debugWorkspaces]);
+
+      expect(screen.getByText('Acme Workspace')).toBeInTheDocument();
+      for (const workspace of debugWorkspaces) {
+        expect(screen.queryByText(workspace.name)).not.toBeInTheDocument();
+      }
+    });
+
+    it('keeps workspace verbs visible but disabled when no workspace is selected', () => {
+      open(null, [ws]);
+
+      expect(screen.getByText('Run Site Audit').closest('button')).toBeDisabled();
+      expect(screen.getByText('Review & send staged moves').closest('button')).toBeDisabled();
+      expect(screen.getByText('Publish site to Webflow').closest('button')).toBeDisabled();
+      expect(screen.getAllByText('No workspace selected').length).toBeGreaterThan(0);
+      expect(screen.getByText('Scan All Workspaces for Anomalies').closest('button')).not.toBeDisabled();
+    });
+
+    it.each([
+      ['Review & send staged moves', `${adminPath(ws.id, 'seo-strategy')}?lens=moves`],
+      ['Fix missing titles/metas', `${adminPath(ws.id, 'seo-editor')}?filter=needs-title`],
+      ['Reply to client requests', `${adminPath(ws.id, 'requests')}?tab=requests`],
+      ['Record published work', adminPath(ws.id, 'outcomes')],
+      ['New content brief', `${adminPath(ws.id, 'content-pipeline')}?tab=briefs`],
+    ])('routes %s to its exact action site', (label, destination) => {
+      open();
+
+      fireEvent.click(screen.getByText(label));
+
+      expect(navigateMock).toHaveBeenCalledTimes(1);
+      expect(navigateMock).toHaveBeenCalledWith(destination);
+    });
+
+    it('publishes through the shared Webflow handler only after confirmation', async () => {
+      publishSiteMock.mockResolvedValue({ success: true });
+      open();
+
+      fireEvent.click(screen.getByText('Publish site to Webflow'));
+      expect(publishSiteMock).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Publish site' }));
+
+      await waitFor(() => {
+        expect(publishSiteMock).toHaveBeenCalledTimes(1);
+        expect(publishSiteMock).toHaveBeenCalledWith('site-abc', 'ws-1');
+      });
+      expect(toastMock).toHaveBeenCalledWith('Site publish started', 'success');
+    });
+
+    it('refreshes strategy through the existing background-job platform', async () => {
+      startJobMock.mockResolvedValue('strategy-job-1');
+      open();
+
+      fireEvent.click(screen.getByText('Refresh strategy'));
+
+      await waitFor(() => {
+        expect(startJobMock).toHaveBeenCalledTimes(1);
+        expect(startJobMock).toHaveBeenCalledWith('keyword-strategy', {
+          workspaceId: 'ws-1',
+          mode: 'full',
+        });
+      });
+      expect(toastMock).toHaveBeenCalledWith('Strategy generation started', 'success');
+    });
+
+    it('re-runs PageSpeed through the existing bulk handler with workspace context', async () => {
+      pagespeedBulkMock.mockResolvedValue({ pages: [{ id: 'page-1' }] });
+      open();
+
+      fireEvent.click(screen.getByText('Re-run PageSpeed'));
+
+      await waitFor(() => {
+        expect(pagespeedBulkMock).toHaveBeenCalledTimes(1);
+        expect(pagespeedBulkMock).toHaveBeenCalledWith('site-abc', 'mobile', 3, 'ws-1');
+      });
+      expect(toastMock).toHaveBeenCalledWith('Mobile PageSpeed test complete', 'success');
     });
   });
 
