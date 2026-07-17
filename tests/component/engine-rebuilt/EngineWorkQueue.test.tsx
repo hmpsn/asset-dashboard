@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { EngineWorkQueue } from '../../../src/components/engine-rebuilt/EngineWorkQueue';
 import type { WorkQueueClassification } from '../../../shared/types/work-queue';
+import { expectNoA11yViolations } from '../a11y';
 
 const WORK_QUEUE: WorkQueueClassification = {
   streams: { opt: 0, send: 0, money: 1, unclassified: 1 },
@@ -24,6 +25,25 @@ const WORK_QUEUE: WorkQueueClassification = {
 };
 
 describe('EngineWorkQueue say-it-aloud vocabulary', () => {
+  it('meets the accessibility floor with a populated work queue', async () => {
+    const { container } = render(
+      <EngineWorkQueue
+        workQueue={WORK_QUEUE}
+        stream="all"
+        onStreamChange={vi.fn()}
+        activeSourceTypes={new Set()}
+        sourceTypeCounts={{ work_order: 1, churn_signal: 1 }}
+        onToggleSourceType={vi.fn()}
+        onClearSourceTypes={vi.fn()}
+        clientName="Acme"
+        clientInitials="AC"
+        onOpenItem={vi.fn()}
+      />,
+    );
+
+    await expectNoA11yViolations(container);
+  });
+
   it('uses Growth and Needs triage with plain-language descriptions', () => {
     render(
       <EngineWorkQueue
