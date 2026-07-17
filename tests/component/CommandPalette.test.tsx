@@ -231,21 +231,24 @@ describe('CommandPalette', () => {
     });
   });
 
-  // ── Keyword Hub nav (post-W4-cutover: unconditional) ─────────────────────────
-  // The Hub is the only keyword surface. The palette shows "Keyword Hub"
-  // unconditionally; the retired "Rank Tracker" entry and the old "Keywords"
-  // label never appear, regardless of flag state.
+  // ── Keyword navigation (registry label resolves with shell state) ─────────────
   describe('keyword nav', () => {
     function open() {
       render(<CommandPalette workspaces={[ws]} selectedWorkspace={ws} onSelectWorkspace={vi.fn()} />);
       fireEvent.keyDown(window, { key: 'k', metaKey: true });
     }
 
-    it('NAV_ITEMS show "Keyword Hub", never the retired "Rank Tracker" / "Keywords"', () => {
+    it('shows the canonical rebuilt label when the shell flag is on', () => {
       useFeatureFlagMock.mockReturnValue(true);
       open();
-      expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
+      expect(screen.getByText('Keywords')).toBeInTheDocument();
       expect(screen.queryByText('Rank Tracker')).not.toBeInTheDocument();
+      expect(screen.queryByText('Keyword Hub')).not.toBeInTheDocument();
+    });
+
+    it('preserves the legacy registry label when the shell flag is off', () => {
+      open();
+      expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
       expect(screen.queryByText('Keywords')).not.toBeInTheDocument();
     });
   });
@@ -256,21 +259,30 @@ describe('CommandPalette', () => {
       fireEvent.keyDown(window, { key: 'k', metaKey: true });
     }
 
-    it('uses the Cockpit label and folds Content Performance when the shell flag is on', () => {
+    it('uses registry labels and rebuilt registry zones when the shell flag is on', () => {
       useFeatureFlagMock.mockReturnValue(true);
       open();
 
       expect(useFeatureFlagMock).toHaveBeenCalledWith('ui-rebuild-shell');
-      expect(screen.getByText('Cockpit')).toBeInTheDocument();
-      expect(screen.queryByText('Home')).not.toBeInTheDocument();
+      for (const label of ['Cockpit', 'Insights Engine', 'Keywords', 'Asset Manager', 'Content Pipeline']) {
+        expect(screen.getByText(label)).toBeInTheDocument();
+      }
+      for (const legacyLabel of ['Home', 'Strategy', 'Keyword Hub', 'Assets', 'Pipeline']) {
+        expect(screen.queryByText(legacyLabel)).not.toBeInTheDocument();
+      }
+      expect(screen.getAllByText('Strategy & Content').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Search & Site Health').length).toBeGreaterThan(0);
       expect(screen.queryByText('Content Perf')).not.toBeInTheDocument();
-      expect(screen.getByText('Pipeline')).toBeInTheDocument();
     });
 
     it('preserves the legacy labels and Content Performance home when the shell flag is off', () => {
       open();
 
       expect(screen.getByText('Home')).toBeInTheDocument();
+      expect(screen.getAllByText('Strategy').length).toBeGreaterThan(0);
+      expect(screen.getByText('Keyword Hub')).toBeInTheDocument();
+      expect(screen.getByText('Assets')).toBeInTheDocument();
+      expect(screen.getByText('Pipeline')).toBeInTheDocument();
       expect(screen.getByText('Content Perf')).toBeInTheDocument();
       expect(screen.queryByText('Cockpit')).not.toBeInTheDocument();
     });

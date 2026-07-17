@@ -172,7 +172,7 @@ const columns: DataColumn[] = [
   },
   {
     key: 'opportunity',
-    label: 'Opp',
+    label: 'Opportunity',
     width: '148px',
     render: (_value, record) => {
       const row = (record as VisualRow).source;

@@ -137,7 +137,7 @@ export function statusLabel(status: KeywordCommandCenterStatus): string {
     case KEYWORD_COMMAND_CENTER_STATUS.IN_STRATEGY: return 'In Strategy';
     case KEYWORD_COMMAND_CENTER_STATUS.TRACKED: return 'Tracked';
     case KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW: return 'Needs Review';
-    case KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE: return 'Raw Evidence';
+    case KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE: return 'Seen in search';
     case KEYWORD_COMMAND_CENTER_STATUS.DECLINED: return 'Declined';
     case KEYWORD_COMMAND_CENTER_STATUS.RETIRED: return 'Retired';
   }
@@ -194,7 +194,7 @@ export function buildLocalSeoState(
     : lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CHECKED
       ? 'Checked locally'
       : lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.RAW_EVIDENCE
-        ? 'Raw local evidence'
+        ? 'Seen in search'
         : lifecycle === KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.CANDIDATE
           ? 'Local candidate'
           : 'Not checked';

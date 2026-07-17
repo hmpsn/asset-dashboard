@@ -47,6 +47,8 @@ import {
   buildFilterFacetsFromCounts,
   trackedKeywordMatchesFilter,
 } from '../../server/keyword-command-center.js';
+import { buildFilters } from '../../server/domains/keyword-command-center/row-query.js';
+import { buildLocalSeoState } from '../../server/domains/keyword-command-center/row-lifecycle.js';
 import {
   KEYWORD_COMMAND_CENTER_STATUS,
   KEYWORD_COMMAND_CENTER_FILTERS,
@@ -305,6 +307,7 @@ describe('sourceFromExplanation', () => {
       nextAction: { type: 'review_evidence' as const, label: 'Review', detail: 'Check evidence' },
     });
     expect(result.kind).toBe('raw_evidence');
+    expect(result.label).toBe('Raw provider evidence');
     expect(result.detail).toBe('competitor.com');
   });
 
@@ -550,8 +553,8 @@ describe('statusLabel', () => {
     expect(statusLabel(KEYWORD_COMMAND_CENTER_STATUS.NEEDS_REVIEW)).toBe('Needs Review');
   });
 
-  it('RAW_EVIDENCE → "Raw Evidence"', () => {
-    expect(statusLabel(KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE)).toBe('Raw Evidence');
+  it('RAW_EVIDENCE → "Seen in search"', () => {
+    expect(statusLabel(KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE)).toBe('Seen in search');
   });
 
   it('DECLINED → "Declined"', () => {
@@ -616,6 +619,34 @@ describe('localPriority', () => {
     );
     expect(result.priority).toBe(KEYWORD_COMMAND_CENTER_LOCAL_PRIORITY.LOW_PRIORITY);
     expect(result.priorityLabel).toBe('Low priority');
+  });
+});
+
+describe('buildLocalSeoState', () => {
+  it('uses the canonical raw-evidence lifecycle display label without changing the lifecycle id', () => {
+    const state = buildLocalSeoState({
+      keyword: 'dentist near me',
+      normalizedKeyword: 'dentist near me',
+      sourceLabels: [],
+      metrics: {},
+      rawEvidenceOnly: true,
+      localCandidate: {
+        keyword: 'dentist near me',
+        normalizedKeyword: 'dentist near me',
+        source: 'local_variant',
+        sourceLabel: 'Local variant',
+        detail: 'Candidate',
+        selected: false,
+        score: 10,
+        reasons: [],
+        intent: 'transactional',
+      },
+    }, KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE, undefined, 1);
+
+    expect(state).toEqual(expect.objectContaining({
+      lifecycle: KEYWORD_COMMAND_CENTER_LOCAL_LIFECYCLE.RAW_EVIDENCE,
+      lifecycleLabel: 'Seen in search',
+    }));
   });
 });
 
@@ -1289,6 +1320,16 @@ describe('buildFilterFacetsFromCounts', () => {
     expect(f?.count).toBe(9);
   });
 
+  it('uses the canonical raw-evidence filter label without changing the filter id or count', () => {
+    const result = buildFilterFacetsFromCounts(counts);
+    const rawEvidence = result.find(f => f.id === KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE);
+    expect(rawEvidence).toEqual({
+      id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE,
+      label: 'Seen in search',
+      count: counts.rawEvidence,
+    });
+  });
+
   it('all facets have id, label, and count', () => {
     const result = buildFilterFacetsFromCounts(counts);
     for (const facet of result) {
@@ -1306,6 +1347,21 @@ describe('buildFilterFacetsFromCounts', () => {
     expect(ids).toContain(KEYWORD_COMMAND_CENTER_FILTERS.LOCAL_CANDIDATES);
     expect(ids).toContain(KEYWORD_COMMAND_CENTER_FILTERS.PROVIDER_DEGRADED);
     expect(ids).not.toContain(KEYWORD_COMMAND_CENTER_FILTERS.NOT_CHECKED);
+  });
+});
+
+describe('buildFilters', () => {
+  it('uses the canonical raw-evidence filter label without changing the filter id or count', () => {
+    const result = buildFilters([
+      makeRow({ lifecycleStatus: KEYWORD_COMMAND_CENTER_STATUS.RAW_EVIDENCE }),
+    ]);
+    const rawEvidence = result.find(f => f.id === KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE);
+
+    expect(rawEvidence).toEqual({
+      id: KEYWORD_COMMAND_CENTER_FILTERS.RAW_EVIDENCE,
+      label: 'Seen in search',
+      count: 1,
+    });
   });
 });
 

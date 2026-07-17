@@ -27,6 +27,28 @@
           "createdAt": "2026-07-16",
           "owner": "platform",
           "notes": "D3-ratified all 8 budgets in docs/rules/usability-budgets.md; added the 1440×900 fold/action probe and PR-readiness gates; added green ratchet rules for actionless rebuilt EmptyStates (54 audited exceptions, including 6 TODO-W1.3 repairs) and new RebuiltSidebar label overrides (5 temporary W0.3 exceptions), with full pr-check self-test/governance coverage."
+        },
+        {
+          "id": "nav-naming-closure",
+          "title": "One name per destination: owner picks per contested pair; move sidebar overrides into navRegistry",
+          "source": "2026-07-16 UX-flow audit §5 budget 6; rebuild audit B6",
+          "est": "S",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "platform",
+          "notes": "W0.3 complete: D2 sidebar winners now resolve through navRegistry labelWhenOn; rebuilt Sidebar, Breadcrumb/document title, and Command Palette zones consume the registry while flag-OFF labels remain unchanged. The W0.2 hardcoded-label allowlist was removed."
+        },
+        {
+          "id": "vocabulary-say-it-aloud-pass",
+          "title": "Dense-trio vocabulary pass (Backing moves live → Moves in progress, etc.) via ui-vocabulary + lexicon",
+          "source": "2026-07-16 UX-flow audit §5 budget 8",
+          "est": "S",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "platform",
+          "notes": "W0.3 complete across the conventions judge's replacement sites: Engine, Cockpit, Keywords, the shared lifecycle badge, and Site Audit use the registered say-it-aloud labels; Site Audit hands Decaying pages to Content Pipeline's canonical Content Health tab. Persisted discriminators money, unclassified, and raw_evidence remain unchanged, and legacy flag-OFF display paths retain compatibility copy."
         }
       ],
       "shippedAt": "2026-07-17"

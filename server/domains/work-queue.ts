@@ -223,7 +223,7 @@ export function classifyWorkQueue(input: WorkQueueClassifierInput): WorkQueueCla
     addItem(items, {
       stream: 'money',
       id: 'monetization-content',
-      title: `${pendingMoney.length} monetization play${pendingMoney.length === 1 ? '' : 's'} to price or pitch`,
+      title: `${pendingMoney.length} growth play${pendingMoney.length === 1 ? '' : 's'} to propose`,
       meta: pendingMoney.slice(0, 2).map(requestTitle).join(' · '),
       sourceType: 'content_request',
       impact: 'revenue',

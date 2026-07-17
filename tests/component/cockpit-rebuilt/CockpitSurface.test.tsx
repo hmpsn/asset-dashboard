@@ -305,16 +305,27 @@ describe('CockpitSurface rebuilt', () => {
     expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
   });
 
-  it('keeps the Risk deep link truthful without selecting Optimizations', async () => {
+  it('keeps the Needs triage deep link truthful without selecting Optimizations', async () => {
     renderSurface(`/ws/${workspaceId}?stream=unclassified`);
 
     expect(await screen.findByText('Client has not viewed the portal')).toBeInTheDocument();
     expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /^Risk/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /^Needs triage/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /Client risk/ })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('radio', { name: /Optimizations/ })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: /To send/ })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByRole('radio', { name: /Monetization/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /Growth/ })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('uses the canonical Growth and Needs triage vocabulary across the stream tiles and queue', async () => {
+    renderSurface();
+
+    expect(await screen.findByRole('radio', { name: /Growth/ })).toBeInTheDocument();
+    expect(screen.getByText('to propose')).toBeInTheDocument();
+    expect(screen.getByText('Upsell and value-proof work backed by measured results.')).toBeInTheDocument();
+    expect(screen.getAllByText('Needs triage').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Monetization')).not.toBeInTheDocument();
+    expect(screen.queryByText('Risk and unclassified')).not.toBeInTheDocument();
   });
 
   it('keeps internal rebuild and migration language out of the visible Cockpit UI', async () => {

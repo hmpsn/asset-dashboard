@@ -9964,3 +9964,13 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 **Spec corrections:** The production-rich voice hypothesis is only partially right. Rich authority can make the closure proof fail, but the proof does not recursively embed prior stages: generation, initial audit, automatic refinement, and post-refinement audit are each validated as independent provider envelopes. The preferred direct-create path therefore decouples page generation without weakening or re-deriving that safety proof. The spec's item 3 and item 7c were already complete in the current tree: one-page runs retain deterministic set checks while skipping the cross-page model audit/reservation, and all 18 MCP families already use `json_v1` errors.
 
 **Files:** brand-identity domain create transaction; brand MCP schema/handler/instructions/inventory; matrix budget conversion; focused brand-write, real-HTTP MCP plumbing, budget, registry, workspace-scope, dispatch, and instruction tests; MCP generation rule; roadmap and audit.
+
+### 706. Admin UX W0.3 naming and say-it-aloud vocabulary closure 2026-07-17
+
+**Status:** Complete across every conventions-judge replacement site while preserving flag-OFF compatibility and persisted identifiers.
+
+**What changed:** The rebuilt Cockpit now uses the same Growth, to propose, measured-results, and Needs triage wording as Insights Engine. The shared Keyword Command Center lifecycle badge renders `raw_evidence` as Seen in search without changing the stored status. Site Audit's decay disclosure is now Decaying pages and hands operators directly to Content Pipeline's canonical Content Health tab through the existing `?tab=content-health` receiver.
+
+**Compatibility:** Internal work-stream and lifecycle discriminators (`money`, `unclassified`, `raw_evidence`) are unchanged. Legacy flag-OFF Keyword Hub and Site Audit copy remains untouched under D8.
+
+**Files:** rebuilt Cockpit work queue and tests; rebuilt Site Audit surface and tests; shared status badge registry and test; roadmap completion note.

@@ -15,8 +15,9 @@
 //   - The keyword-hub relabel/hide logic was duplicated three times.
 //
 // All three surfaces now consume this registry for identity, label, group,
-// needsSite, and description. Presentation concerns (group ordering, group
-// colors, icon sizes, badges, focus-mode strip) stay LOCAL to each surface.
+// needsSite, and description. Rebuilt-shell surfaces also consume its zone
+// ordering and labels. Visual presentation concerns (group colors, icon sizes,
+// badges, focus-mode strip) stay LOCAL to each surface.
 //
 // Adding a `Page` union value? Add it here OR to NON_REGISTRY_PAGES. The
 // contract test `tests/contract/nav-registry-completeness.test.ts` fails if a
@@ -85,6 +86,21 @@ export interface NavEntry {
   flagBehavior?: NavFlagBehavior;
 }
 
+export type RebuiltNavZoneKey =
+  | 'top'
+  | 'strategy-content'
+  | 'search-site-health'
+  | 'optimization'
+  | 'client-facing'
+  | 'admin';
+
+export interface RebuiltNavZone {
+  key: RebuiltNavZoneKey;
+  /** Title-case shared label; visual consumers may transform casing. */
+  label: string;
+  items: readonly Page[];
+}
+
 /**
  * Page union values intentionally NOT in the registry, with the reason.
  *
@@ -103,6 +119,37 @@ export const NON_REGISTRY_PAGES: Page[] = [
   'workspace-settings', // reached via per-workspace settings, not the main nav
   'competitors',    // dedicated interior page; rebuilt sidebar presents it locally, global nav remains unchanged
 ];
+
+/** Rebuilt-shell destination zones shared by the sidebar and Command Palette. */
+export const REBUILT_NAV_ZONES: readonly RebuiltNavZone[] = [
+  { key: 'top', label: '', items: ['home', 'seo-strategy'] },
+  {
+    key: 'strategy-content',
+    label: 'Strategy & Content',
+    items: ['seo-keywords', 'competitors', 'content-pipeline', 'local-seo'],
+  },
+  {
+    key: 'search-site-health',
+    label: 'Search & Site Health',
+    items: ['analytics-hub', 'page-intelligence', 'seo-audit', 'performance', 'links', 'media'],
+  },
+  { key: 'optimization', label: 'Optimization', items: ['seo-editor', 'seo-schema', 'rewrite', 'brand'] },
+  { key: 'client-facing', label: 'Client-Facing', items: ['outcomes', 'requests'] },
+  {
+    key: 'admin',
+    label: 'Admin',
+    items: ['outcomes-overview', 'prospect', 'ai-usage', 'roadmap', 'features', 'diagnostics'],
+  },
+];
+
+const REBUILT_NAV_ZONE_LABEL_BY_ID = new globalThis.Map<Page, string>(
+  REBUILT_NAV_ZONES.flatMap((zone) => zone.items.map((id) => [id, zone.label] as const)),
+);
+
+/** Resolve the rebuilt-shell zone label for a destination. */
+export function resolveRebuiltNavZoneLabel(id: Page): string | undefined {
+  return REBUILT_NAV_ZONE_LABEL_BY_ID.get(id);
+}
 
 /**
  * The registry. Order within a group is presentation; surfaces that care about
@@ -128,13 +175,16 @@ export const NAV_REGISTRY: NavEntry[] = [
   { id: 'links', label: 'Links', icon: Link2, group: 'site-health', needsSite: true,
     description: 'Internal links, broken links, and redirect management' },
   { id: 'media', label: 'Assets', icon: Image, group: 'site-health',
-    description: 'Images, alt text, and media optimization' },
+    description: 'Images, alt text, and media optimization',
+    flagBehavior: { flag: 'ui-rebuild-shell', labelWhenOn: 'Asset Manager' } },
 
   // ── Strategy ──
   { id: 'seo-strategy', label: 'Strategy', icon: Target, group: 'seo-strategy', needsSite: true,
-    description: 'Keyword strategy with page-keyword mapping' },
+    description: 'Keyword strategy with page-keyword mapping',
+    flagBehavior: { flag: 'ui-rebuild-shell', labelWhenOn: 'Insights Engine' } },
   { id: 'seo-keywords', label: 'Keyword Hub', icon: ListChecks, group: 'seo-strategy', needsSite: true,
-    description: 'Unified keyword surface: lifecycle, tracking, national + local rank, and handoffs' },
+    description: 'Unified keyword surface: lifecycle, tracking, national + local rank, and handoffs',
+    flagBehavior: { flag: 'ui-rebuild-shell', labelWhenOn: 'Keywords' } },
   { id: 'page-intelligence', label: 'Page Intelligence', icon: Search, group: 'seo-strategy', needsSite: true,
     description: 'Per-page keyword analysis, metrics, and optimization' },
   { id: 'local-seo', label: 'Local Presence', icon: MapPinned, group: 'seo-strategy', needsSite: true,
@@ -152,7 +202,8 @@ export const NAV_REGISTRY: NavEntry[] = [
 
   // ── Content ──
   { id: 'content-pipeline', label: 'Pipeline', icon: Clipboard, group: 'content', needsSite: true,
-    description: 'Briefs, posts, and subscriptions in one view' },
+    description: 'Briefs, posts, and subscriptions in one view',
+    flagBehavior: { flag: 'ui-rebuild-shell', labelWhenOn: 'Content Pipeline' } },
   // Drift fix: `requests` does NOT need a site — client communication must work
   // during onboarding, before a Webflow site is linked.
   { id: 'requests', label: 'Requests', icon: MessageSquare, group: 'content',

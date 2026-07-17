@@ -1,10 +1,11 @@
 // @ds-rebuilt
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MessageSquare } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { featureFlags } from '../../api/misc';
 import { adminPath, type Page } from '../../routes';
+import { STUDIO_NAME } from '../../constants';
 import { resolveNavLabelById } from '../../lib/navRegistry';
 import { queryKeys } from '../../lib/queryKeys';
 import { FEATURE_FLAGS, type FeatureFlagKey } from '../../../shared/types/feature-flags';
@@ -133,6 +134,11 @@ export function RebuiltBreadcrumb({
   const workspaceTitle = workspaces.length === 1 ? '1 workspace' : `${workspaces.length} workspaces`;
   const subTab = searchParams.get('tab');
   const subTabLabel = subTab ? SUB_TAB_LABELS_BY_PAGE[tab]?.[subTab] : undefined;
+  const activeTabLabel = fallbackTabLabel(tab, isFlagEnabled);
+
+  useEffect(() => {
+    document.title = `${activeTabLabel} — ${STUDIO_NAME}`;
+  }, [activeTabLabel]);
 
   const items = useMemo<BreadcrumbItem[]>(() => {
     const next: BreadcrumbItem[] = [
@@ -145,14 +151,14 @@ export function RebuiltBreadcrumb({
       });
     }
     if (tab !== 'home') {
-      next.push({ label: fallbackTabLabel(tab, isFlagEnabled), current: !subTabLabel });
+      next.push({ label: activeTabLabel, current: !subTabLabel });
     }
     if (subTabLabel) {
       next.push({ label: subTabLabel, current: true });
     }
     if (next.length > 0) next[next.length - 1].current = true;
     return next;
-  }, [isFlagEnabled, navigate, selected, subTabLabel, tab, workspaceLabel]);
+  }, [activeTabLabel, navigate, selected, subTabLabel, tab, workspaceLabel]);
 
   return (
     <nav

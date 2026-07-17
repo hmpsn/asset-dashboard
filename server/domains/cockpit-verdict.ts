@@ -97,7 +97,7 @@ export function buildCockpitVerdict({
     return {
       status: 'at_risk',
       headline: 'This client needs operator attention before the next send.',
-      narrative: `${blockedItems} risk signal${blockedItems === 1 ? '' : 's'} and ${unclassified} unclassified item${unclassified === 1 ? '' : 's'} need triage before this workspace reads as steady.`,
+      narrative: `${blockedItems} risk signal${blockedItems === 1 ? '' : 's'} and ${unclassified} item${unclassified === 1 ? '' : 's'} not yet sorted need triage before this workspace reads as steady.`,
       generatedAt: generatedAt.toISOString(),
       evidence,
     };
@@ -109,7 +109,7 @@ export function buildCockpitVerdict({
       headline: send > 0
         ? 'Client-facing work is ready to review and send.'
         : 'The cockpit has optimization work queued for this client.',
-      narrative: `${send} send item${send === 1 ? '' : 's'}, ${opt} optimization item${opt === 1 ? '' : 's'}, and ${money} money item${money === 1 ? '' : 's'} are waiting in the shared work queue.`,
+      narrative: `${send} send item${send === 1 ? '' : 's'}, ${opt} optimization item${opt === 1 ? '' : 's'}, and ${money} growth play${money === 1 ? '' : 's'} are waiting in the shared work queue.`,
       generatedAt: generatedAt.toISOString(),
       evidence,
     };

@@ -246,7 +246,7 @@ function ClientTrustSpinePreview({
         : 'The client preview will combine the verdict, value frame, and proof once a point of view is drafted.');
   const moveCount = recommendationsReady ? `${curatedCount} / ${totalMoves}` : '—';
   const moveSummary = recommendationsReady
-    ? `${stagedCount} staged · ${curatedCount} with client`
+    ? `${stagedCount} added · ${curatedCount} with client`
     : recommendationsSummary;
 
   return (
@@ -270,7 +270,7 @@ function ClientTrustSpinePreview({
               Client portal preview · {workspaceName}
             </span>
             <span className="ml-auto flex-none">
-              {basis ? <ProvenanceChip basis={basis} /> : <Badge label="proof pending" tone="zinc" variant="soft" size="sm" />}
+              {basis ? <ProvenanceChip basis={basis} /> : <Badge label="measuring" tone="zinc" variant="soft" size="sm" />}
             </span>
           </div>
           <div className="p-5">
@@ -305,7 +305,7 @@ function ClientTrustSpinePreview({
                 accent="var(--brand-text-bright)"
               />
               <MetricTile
-                label="Backing moves live"
+                label="Moves in progress"
                 value={moveCount}
                 sub={moveSummary}
                 accent="var(--blue)"
@@ -353,7 +353,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
     ? 'Loading recommendation queue'
     : recommendationsUnavailable
       ? 'Recommendation queue unavailable'
-      : `${engine.stagedCount} staged · ${engine.curatedCount} with client`;
+      : `${engine.stagedCount} added · ${engine.curatedCount} with client`;
   const selectedMove = useMemo(
     () => engine.cockpitRecs.find((rec) => rec.id === selectedMoveId) ?? null,
     [engine.cockpitRecs, selectedMoveId],
@@ -407,7 +407,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
       </Button>
       {!canSendIssue && (
         <span id={sendHelperId} className="whitespace-nowrap t-caption-sm text-[var(--brand-text-muted)]">
-          0 staged — stage moves below to send
+          No moves added — add moves below before sending
         </span>
       )}
       <Button
@@ -418,10 +418,10 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
         onClick={engine.sendIssue}
         data-testid="engine-topbar-send-btn"
         aria-describedby={!canSendIssue ? sendHelperId : undefined}
-        title={!canSendIssue ? '0 staged — stage moves below to send' : undefined}
+        title={!canSendIssue ? 'No moves added — add moves below before sending' : undefined}
       >
         <Icon name="send" size="sm" />
-        Send {engine.stagedCount} staged
+        Send client update ({engine.stagedCount})
       </Button>
     </>
   );
@@ -684,7 +684,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               icon={Target}
               trailing={basis
                 ? <ProvenanceChip basis={basis} />
-                : <Badge label="proof pending" tone="zinc" variant="soft" size="sm" />}
+                : <Badge label="measuring" tone="zinc" variant="soft" size="sm" />}
             />
             <MetricTile
               label="Recovered so far"
@@ -694,7 +694,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               icon={BarChart3}
             />
             <MetricTile
-              label="Backing moves live"
+              label="Moves in progress"
               value={backingMovesValue}
               sub={backingMovesSummary}
               accent="var(--blue)"

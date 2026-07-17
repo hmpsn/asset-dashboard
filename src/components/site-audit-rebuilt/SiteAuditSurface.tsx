@@ -599,6 +599,10 @@ function AuditEvidence({
     navigate(`${adminPath(workspaceId, 'media')}?filter=${filter}`);
   };
 
+  const openContentHealth = () => {
+    navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=content-health`);
+  };
+
   return (
     <div data-testid="site-audit-support">
       <Disclosure
@@ -624,13 +628,16 @@ function AuditEvidence({
           </Disclosure>
 
           <Disclosure
-            summary="Content Health"
+            summary="Decaying pages"
             badges={[{ label: 'Content evidence', tone: 'blue' }]}
             defaultOpen={activeEvidence === 'content-decay'}
           >
             <p className="mb-3 t-body text-[var(--brand-text-muted)]">
               Review pages whose freshness or performance needs attention alongside technical findings.
             </p>
+            <Button variant="link" size="sm" className="mb-3" onClick={openContentHealth}>
+              View in Content Pipeline
+            </Button>
             <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
               <ContentDecay workspaceId={workspaceId} />
             </Suspense>

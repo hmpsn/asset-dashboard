@@ -5933,7 +5933,7 @@ describe('Rule: RebuiltSidebar hardcoded nav label override', () => {
     expect(runRule(RULE, [file])).toHaveLength(0);
   });
 
-  it('allows only the five audited overrides that W0.3 removes', () => {
+  it('flags every hardcoded override, including the five removed by W0.3', () => {
     const file = write(
       uniqPath('rule-rebuilt-sidebar-label', 'src/components/layout/RebuiltSidebar.tsx'),
       lines(
@@ -5951,14 +5951,14 @@ describe('Rule: RebuiltSidebar hardcoded nav label override', () => {
     );
 
     const hits = runRule(RULE, [file]);
-    expect(hits).toHaveLength(1);
-    expect(hits[0].line).toBe(8);
+    expect(hits).toHaveLength(6);
+    expect(hits.map((hit) => hit.line)).toEqual([3, 4, 5, 6, 7, 8]);
   });
 
-  it('documents D3 governance and mandatory W0.3 allowlist deletion', () => {
+  it('documents D3 governance and the all-override ban', () => {
     const check = CHECKS.find((candidate) => candidate.name === RULE);
     expect(check?.claudeMdRef).toBe('#uiux-rules-mandatory');
-    expect(check?.message).toContain('W0.3');
+    expect(check?.message).toContain('All item label overrides are banned');
     expect(check?.message).toContain('// rebuilt-nav-label-ok');
 
     const governance = readFileSync(

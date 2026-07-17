@@ -87,6 +87,11 @@ describe('CommandPalette — real rebuilt-shell flag transition', () => {
     });
     expect(screen.queryByText('Home')).not.toBeInTheDocument();
     expect(screen.queryByText('Content Perf')).not.toBeInTheDocument();
-    expect(screen.getByText('Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Insights Engine')).toBeInTheDocument();
+    expect(screen.getByText('Keywords')).toBeInTheDocument();
+    expect(screen.getByText('Asset Manager')).toBeInTheDocument();
+    expect(screen.getByText('Content Pipeline')).toBeInTheDocument();
+    expect(screen.getAllByText('Strategy & Content').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Search & Site Health').length).toBeGreaterThan(0);
   });
 });

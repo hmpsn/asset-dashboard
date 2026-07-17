@@ -1575,7 +1575,8 @@ describe('EngineSurface rebuilt', () => {
     expectScopedTextWithClass(preview, '$18,450', 't-stat');
     expectScopedTextWithClass(preview, 'Recovered so far', 't-caption');
     expectScopedTextWithClass(preview, '$2,760', 't-stat');
-    expectScopedTextWithClass(preview, 'Backing moves live', 't-caption');
+    expectScopedTextWithClass(preview, 'Moves in progress', 't-caption');
+    expect(within(preview).queryByText('Backing moves live')).not.toBeInTheDocument();
     expectScopedTextWithClass(preview, '0 / 1', 't-stat');
     expect(within(preview).queryByText(/The client sees the verdict, value frame, and proof/)).not.toBeInTheDocument();
   });
@@ -1644,15 +1645,15 @@ describe('EngineSurface rebuilt', () => {
     expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-included-rec-ids', '');
   });
 
-  it('keeps the send action exact-once and explains the disabled zero-staged state', async () => {
+  it('keeps the client-update action exact-once and explains the disabled empty state', async () => {
     const first = renderSurface();
 
     expect(await screen.findByTestId('engine-rebuilt-surface')).toBeInTheDocument();
     const restingFallback = screen.getByTestId('engine-topbar-actions-fallback');
-    const restingSend = within(restingFallback).getByRole('button', { name: 'Send 0 staged' });
+    const restingSend = within(restingFallback).getByRole('button', { name: 'Send client update (0)' });
     expect(restingSend).toBeDisabled();
-    expect(restingSend).toHaveAccessibleDescription('0 staged — stage moves below to send');
-    expect(within(restingFallback).getByText('0 staged — stage moves below to send')).toBeVisible();
+    expect(restingSend).toHaveAccessibleDescription('No moves added — add moves below before sending');
+    expect(within(restingFallback).getByText('No moves added — add moves below before sending')).toBeVisible();
     expect(screen.getAllByTestId('engine-topbar-send-btn')).toHaveLength(1);
     fireEvent.click(restingSend);
     expect(mocks.sendIssue).not.toHaveBeenCalled();
@@ -1669,7 +1670,7 @@ describe('EngineSurface rebuilt', () => {
     await screen.findByTestId('engine-section-backing-moves');
     const fallback = screen.getByTestId('engine-topbar-actions-fallback');
     expect(screen.queryByTestId('engine-backing-send-bar')).not.toBeInTheDocument();
-    const stagedSend = within(fallback).getByRole('button', { name: 'Send 2 staged' });
+    const stagedSend = within(fallback).getByRole('button', { name: 'Send client update (2)' });
     expect(stagedSend).toBeEnabled();
     expect(screen.getAllByTestId('engine-topbar-send-btn')).toHaveLength(1);
     fireEvent.click(stagedSend);

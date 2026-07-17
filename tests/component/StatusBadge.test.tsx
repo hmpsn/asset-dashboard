@@ -87,8 +87,15 @@ describe('StatusBadge', () => {
   });
 
   it('renders Keyword Command Center lifecycle statuses', () => {
-    render(<StatusBadge domain="keyword-command-center" status="needs_review" />);
+    render(
+      <>
+        <StatusBadge domain="keyword-command-center" status="needs_review" />
+        <StatusBadge domain="keyword-command-center" status="raw_evidence" />
+      </>,
+    );
     expect(screen.getByText('Needs Review')).toBeInTheDocument();
+    expect(screen.getByText('Seen in search')).toBeInTheDocument();
+    expect(screen.queryByText('Raw Evidence')).not.toBeInTheDocument();
   });
 
   it('hides unknown statuses by default', () => {

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RebuiltSidebar } from '../../../src/components/layout/RebuiltSidebar';
-import { NAV_REGISTRY_BY_ID } from '../../../src/lib/navRegistry';
+import { NAV_REGISTRY_BY_ID, resolveNavLabel } from '../../../src/lib/navRegistry';
 import { queryKeys } from '../../../src/lib/queryKeys';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
@@ -20,7 +20,7 @@ vi.mock('../../../src/hooks/admin/useNotifications', () => ({
   useNotifications: () => ({ data: [] }),
 }));
 
-let featureFlagResponse: Partial<Record<FeatureFlagKey, boolean>> = {};
+let featureFlagResponse: Partial<Record<FeatureFlagKey, boolean>> = { 'ui-rebuild-shell': true };
 vi.mock('../../../src/api/misc', async () => {
   const actual = await vi.importActual<typeof import('../../../src/api/misc')>('../../../src/api/misc');
   return {
@@ -56,8 +56,7 @@ function renderSidebar(overrides: Partial<typeof defaultProps> = {}) {
   // reads the flags SYNCHRONOUSLY from render 1 — no loading→loaded transition to race.
   // The old test waited on that async resolution with waitFor's default 1000ms timeout,
   // which flaked under CI's resource-constrained component shard. Seeding matches the
-  // resolved-flag state each test declares via `featureFlagResponse` (empty = the same
-  // FEATURE_FLAGS defaults the loading fallback used, so unrelated tests are unaffected).
+  // resolved-flag state each test declares via `featureFlagResponse`.
   queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
   return render(
     <QueryClientProvider client={queryClient}>
@@ -76,7 +75,7 @@ describe('RebuiltSidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    featureFlagResponse = {};
+    featureFlagResponse = { 'ui-rebuild-shell': true };
   });
 
   afterEach(() => {
@@ -103,6 +102,15 @@ describe('RebuiltSidebar', () => {
 
     for (const label of ['Keywords', 'Competitors', 'Content Pipeline', 'Local Presence', 'Asset Manager', 'Action Results']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+    }
+    const flagOn = (flag: FeatureFlagKey) => flag === 'ui-rebuild-shell';
+    for (const [id, label] of [
+      ['seo-strategy', 'Insights Engine'],
+      ['seo-keywords', 'Keywords'],
+      ['content-pipeline', 'Content Pipeline'],
+      ['media', 'Asset Manager'],
+    ] as const) {
+      expect(resolveNavLabel(NAV_REGISTRY_BY_ID[id], flagOn)).toBe(label);
     }
     expect(screen.queryByRole('button', { name: 'Content Perf' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'MONITORING' })).not.toBeInTheDocument();
