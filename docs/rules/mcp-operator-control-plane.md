@@ -81,15 +81,15 @@ program plan, the allowlist census, and the discovery/invocation tests together.
 
 ## P1 acceptance checklist
 
-- [ ] `/mcp` full discovery and initialize instructions are byte-identical to the
+- [x] `/mcp` full discovery and initialize instructions are byte-identical to the
       pre-P1 baseline.
-- [ ] `/mcp/operator` authenticates only the master key in P1.
-- [ ] Operator discovery is exactly the registered intersection of the canonical
+- [x] `/mcp/operator` authenticates only the canonical master identity in P1.
+- [x] Operator discovery is exactly the registered intersection of the canonical
       25-name allowlist.
-- [ ] A hidden registered tool returns `not_found` and its handler is not called.
-- [ ] Compact projection preserves every non-description schema field.
-- [ ] Discovery plus instructions is no more than 32 KiB UTF-8.
-- [ ] Existing workspace keys and `/mcp` calls remain compatible.
-- [ ] No UI, database, paid-call, generation, approval, send, or publication
+- [x] A hidden registered tool returns `not_found` and its handler is not called.
+- [x] Compact projection preserves every validation field, including fields named
+      `description`, while removing schema annotation prose.
+- [x] Discovery plus instructions is no more than 32 KiB UTF-8 (25,217 bytes).
+- [x] Existing workspace keys and `/mcp` calls remain compatible.
+- [x] No UI, database, paid-call, generation, approval, send, or publication
       behavior changes.
-

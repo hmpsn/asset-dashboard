@@ -287,6 +287,26 @@
       "shippedAt": "2026-07-17"
     },
     {
+      "id": "sprint-mcp-operator-control-plane-2026-07-17-terminal-history",
+      "name": "✅ SHIPPED — MCP Operator Control Plane",
+      "hours": "Seven staging-first backend phases; one PR at a time",
+      "rationale": "Terminal item history split from sprint-mcp-operator-control-plane-2026-07-17. Make desktop administration compact, deterministic, and safer while the Insights Engine remains the authoritative database and client-view layer. Preserve the full MCP surface for advanced work and avoid the active UI rebuild.",
+      "items": [
+        {
+          "id": "mcp-operator-profile",
+          "title": "P1 — Compact desktop operator profile",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-17",
+          "owner": "platform-foundation",
+          "notes": "Shipped the additive master-key POST /mcp/operator boundary with compact instructions, one canonical 25-name allowlist, discovery and pre-dispatch invocation enforcement, and generic json_v1 not_found for hidden, reserved, and unknown tools. P1 discovers 22 registered names; P2 activates the three reserved read models. The combined operator discovery and instructions are 25,217 UTF-8 bytes, while full POST /mcp discovery/instruction hashes remain exact. Schema compaction preserves validation constraints and fields literally named description. Canonical master identity is distinguished from workspace-key metadata even if a workspace ID collides with the all sentinel. No UI, database, paid invocation, approval, send, or publication behavior changed. P2 remains blocked until staging MCP smoke passes."
+        }
+      ],
+      "shippedAt": "2026-07-17"
+    },
+    {
       "id": "sprint-productized-content-templates-2026-07-16-terminal-history",
       "name": "✅ SHIPPED — Productized Content Templates — overrides, optional sections, and library reuse",
       "hours": "TBD — four small staging-first PRs after MCP legibility",

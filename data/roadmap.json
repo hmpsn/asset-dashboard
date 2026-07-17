@@ -7,17 +7,6 @@
       "rationale": "Make desktop administration compact, deterministic, and safer while the Insights Engine remains the authoritative database and client-view layer. Preserve the full MCP surface for advanced work and avoid the active UI rebuild.",
       "items": [
         {
-          "id": "mcp-operator-profile",
-          "title": "P1 — Compact desktop operator profile",
-          "source": "2026-07-17 MCP Operator Control Plane program",
-          "est": "M",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-17",
-          "owner": "platform-foundation",
-          "notes": "Add master-key POST /mcp/operator with compact instructions, one canonical 25-name allowlist, discovery and invocation enforcement, generic not_found for hidden tools, and a <=32 KiB UTF-8 discovery-plus-instructions contract. P1 discovers the 22 currently registered names; P2 activates the three reserved read models. Preserve POST /mcp byte-for-byte and touch no UI or database surface."
-        },
-        {
           "id": "mcp-operator-briefs",
           "title": "P2 — Deterministic decision and client views",
           "source": "2026-07-17 MCP Operator Control Plane program",

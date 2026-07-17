@@ -10112,3 +10112,16 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Added route coverage for the 90-day interval, multi-checkpoint deduplication, out-of-window exclusion, `not_acted_on` exclusion, attribution buckets, and zero-evidence workspaces. Updated the rebuilt Outcomes Book component suite for server totals, unified headings, attribution copy, loading, and empty-window states. No migration or feature-flag change.
 
 **Files:** outcome portfolio shared types; canonical windowed outcome reader; portfolio service and route; outcomes API/query key/hook; rebuilt Outcomes Book lens/table; focused integration and component tests; GO-004 parity/owner docs; deferred ledger and roadmap.
+### 716. Compact desktop MCP operator profile 2026-07-17
+
+**Status:** Complete in P1. The additive desktop control-plane surface is ready for staging MCP handshake and read-only invocation smoke before P2 begins.
+
+**What it does:** Adds master-key `POST /mcp/operator` while retaining the existing `POST /mcp` endpoint unchanged for advanced work and legacy clients. Operator discovery is the registered intersection of one canonical 25-name allowlist: 22 existing tools ship in P1 and the three deterministic Insights-backed read models remain reserved for P2. Discovery and invocation share the same enforced boundary, so hidden, reserved, and unknown names return one generic `json_v1 not_found` response before alias validation, workspace authorization, or handler dispatch.
+
+**Efficiency and compatibility:** Explicit compact instructions and schema-aware projection reduce the combined operator orientation payload to 25,217 UTF-8 bytes, below the 32 KiB contract and about 84.5% below the 161,898-byte full orientation baseline. The projection removes only JSON Schema annotation prose; it preserves validation constraints, arbitrary default/example/const data, and legitimate input fields named `description`. Full-profile discovery and instructions retain their exact byte counts and SHA-256 hashes.
+
+**Security and gates:** P1 accepts only the canonical environment-master identity. Workspace keys are rejected generically at both router middleware and request-handler defense, including the sentinel-collision case where a workspace ID equals `all`; the full executor now also keeps that identity workspace-scoped. Tool semantics are unchanged: preview remains free and side-effect free, paid generation still requires an exact accepted preview plus explicit human confirmation, generated work stops for review, and no approval, client send, or publication authority was added.
+
+**Tests:** Focused unit and real spawned-server integration coverage pins the 25/22/3 census, exact full-profile hashes over HTTP, compact byte budget, deep immutability, schema-field preservation, hidden/reserved/unknown error indistinguishability, handler non-dispatch, master-only authentication, workspace-key compatibility on `/mcp`, and sentinel-collision fail-closed behavior.
+
+**Files:** MCP profile contracts, registry projection/dispatch, server/router/auth boundary, inventory documentation, control-plane rule and implementation plan, focused unit/integration tests, roadmap, and audit. No UI or database files changed.
