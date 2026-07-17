@@ -4,20 +4,22 @@ const h = vi.hoisted(() => ({
   routerPost: vi.fn(),
   postHandler: null as null | ((req: any, res: any) => Promise<void>),
   mcpAuthMiddleware: vi.fn(),
+  mcpMasterKeyOnlyMiddleware: vi.fn(),
   handleMcpRequest: vi.fn(),
   loggerError: vi.fn(),
 }));
 
 vi.mock('express', () => ({
   Router: () => ({
-    post: h.routerPost.mockImplementation((_path: string, _mw: unknown, handler: (req: any, res: any) => Promise<void>) => {
-      h.postHandler = handler;
+    post: h.routerPost.mockImplementation((...args: unknown[]) => {
+      h.postHandler = args.at(-1) as (req: any, res: any) => Promise<void>;
     }),
   }),
 }));
 
 vi.mock('../../server/mcp/auth.js', () => ({
   mcpAuthMiddleware: h.mcpAuthMiddleware,
+  mcpMasterKeyOnlyMiddleware: h.mcpMasterKeyOnlyMiddleware,
 }));
 
 vi.mock('../../server/mcp/server.js', () => ({
@@ -33,6 +35,12 @@ import router from '../../server/mcp/index.js';
 describe('mcp router', () => {
   it('registers POST / with auth middleware', () => {
     expect(router).toBeDefined();
+    expect(h.routerPost).toHaveBeenCalledWith(
+      '/operator',
+      h.mcpAuthMiddleware,
+      h.mcpMasterKeyOnlyMiddleware,
+      expect.any(Function),
+    );
     expect(h.routerPost).toHaveBeenCalledWith('/', h.mcpAuthMiddleware, expect.any(Function));
     expect(h.postHandler).toBeTypeOf('function');
   });

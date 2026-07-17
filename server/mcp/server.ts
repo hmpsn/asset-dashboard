@@ -6,13 +6,18 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types';
 import type { Request, Response } from 'express';
+import type { McpServerProfile } from '../../shared/types/mcp-runtime.js';
+import { MCP_SERVER_PROFILES } from '../../shared/types/mcp-runtime.js';
 import { createLogger } from '../logger.js';
 import { isServerRequestId } from '../request-correlation.js';
 import { MCP_SERVER_INSTRUCTIONS } from './instructions.js';
+import { MCP_OPERATOR_PROFILE_INSTRUCTIONS } from './profiles.js';
 import type { McpAuthContext } from './auth.js';
 import {
   executeMcpTool,
+  executeOperatorMcpTool,
   listMcpToolDefinitions,
+  listMcpToolDefinitionsForProfile,
 } from './tool-registry.js';
 
 const log = createLogger('mcp-server');
@@ -28,25 +33,39 @@ function requestIdFor(req: Request): string {
 // The MCP SDK's stateless transport cannot be reused across requests — doing
 // so causes message-ID collisions. Discovery, scope, and dispatch all resolve
 // through the canonical registry applied to each fresh Server instance.
-function createMcpServer(auth: McpAuthContext, requestId: string) {
+function createMcpServer(
+  auth: McpAuthContext,
+  requestId: string,
+  profile: McpServerProfile,
+) {
+  const isOperator = profile === MCP_SERVER_PROFILES.OPERATOR;
+  const instructions = isOperator
+    ? MCP_OPERATOR_PROFILE_INSTRUCTIONS
+    : MCP_SERVER_INSTRUCTIONS;
+  const toolDefinitions = isOperator
+    ? listMcpToolDefinitionsForProfile(profile)
+    : listMcpToolDefinitions();
+  const executeTool = isOperator
+    ? executeOperatorMcpTool
+    : executeMcpTool;
   const mcpServer = new Server(
     { name: 'hmpsn-studio', version: '1.0.0' },
-    { capabilities: { tools: {} }, instructions: MCP_SERVER_INSTRUCTIONS },
+    { capabilities: { tools: {} }, instructions },
   );
 
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: listMcpToolDefinitions(),
+    tools: toolDefinitions,
   }));
 
   mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
-    const knownDefinition = listMcpToolDefinitions().find(definition => definition.name === name);
+    const knownDefinition = toolDefinitions.find(definition => definition.name === name);
     log.debug(
       knownDefinition ? { tool: knownDefinition.name } : { knownTool: false },
       'MCP tool call',
     );
 
-    return executeMcpTool({
+    return executeTool({
       name,
       args: args ?? {},
       auth,
@@ -57,12 +76,22 @@ function createMcpServer(auth: McpAuthContext, requestId: string) {
   return mcpServer;
 }
 
-export async function handleMcpRequest(req: Request, res: Response): Promise<void> {
+export async function handleMcpRequest(
+  req: Request,
+  res: Response,
+  profile: McpServerProfile = MCP_SERVER_PROFILES.FULL,
+): Promise<void> {
   // Defense in depth: mcpAuthMiddleware always sets req.mcpAuth before this
   // handler runs. If it is somehow absent, fail closed rather than defaulting
   // to all-workspace scope.
   const auth = req.mcpAuth;
-  if (!auth) {
+  if (
+    !auth
+    || (
+      profile === MCP_SERVER_PROFILES.OPERATOR
+      && auth.scope !== 'all'
+    )
+  ) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
@@ -73,7 +102,7 @@ export async function handleMcpRequest(req: Request, res: Response): Promise<voi
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
-  const server = createMcpServer(auth, requestIdFor(req));
+  const server = createMcpServer(auth, requestIdFor(req), profile);
   await server.connect(transport);
   try {
     await transport.handleRequest(req, res, req.body as unknown);

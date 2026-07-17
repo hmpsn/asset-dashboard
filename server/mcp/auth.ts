@@ -100,3 +100,23 @@ export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunctio
   }
   res.status(401).json({ error: 'Unauthorized' });
 }
+
+/**
+ * P1 operator-profile credential boundary.
+ *
+ * This runs only after mcpAuthMiddleware has authenticated the bearer token.
+ * It deliberately checks the resolved scope instead of reading or comparing
+ * bearer material a second time. Capability-scoped operator credentials are a
+ * later phase; until then only the environment master key resolves to `all`.
+ */
+export function mcpMasterKeyOnlyMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (req.mcpAuth?.scope !== 'all') {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
+}

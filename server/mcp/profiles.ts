@@ -37,7 +37,7 @@ export const MCP_OPERATOR_TOOL_NAMES = Object.freeze([
 export type McpOperatorToolName = (typeof MCP_OPERATOR_TOOL_NAMES)[number];
 
 export const MCP_OPERATOR_TOOL_DESCRIPTIONS = Object.freeze({
-  list_workspaces: 'List bounded workspace summaries and durable workspace IDs.',
+  list_workspaces: 'List workspace summaries and durable workspace IDs.',
   get_portfolio_brief: 'Read the bounded deterministic studio priority brief.',
   get_workspace_decision_brief: 'Read bounded blockers, decisions, risks, and safe next actions.',
   get_client_view: 'Read exactly the client-safe, tier-gated intelligence projection.',
@@ -79,7 +79,7 @@ export function operatorToolDescription(toolName: McpOperatorToolName): string {
 
 export const MCP_OPERATOR_PROFILE_INSTRUCTIONS = `${STUDIO_NAME} desktop operator profile. Use this compact surface for external studio administration; use the full /mcp endpoint only when an advanced tool is genuinely required.
 
-Start with list_workspaces and copy durable IDs exactly. Match each tool's schema, including workspace_id versus workspaceId. Read tools are bounded and deterministic unless their schema explicitly says otherwise.
+Start with list_workspaces and copy durable IDs exactly. Match each tool's schema, including workspace_id versus workspaceId. Read tools are deterministic; use their bounded query options whenever available.
 
 Brand identity and voice remain human-governed. create_brand_deliverable and update_brand_deliverable save review-gated drafts; they do not approve content. Finalized voice and approved identity remain mandatory wherever generation requires them.
 

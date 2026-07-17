@@ -37,14 +37,85 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function stripSchemaDescriptions(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stripSchemaDescriptions);
+const SCHEMA_MAP_KEYWORDS = new Set([
+  '$defs',
+  'definitions',
+  'dependentSchemas',
+  'patternProperties',
+  'properties',
+]);
+const SCHEMA_VALUE_KEYWORDS = new Set([
+  'additionalItems',
+  'additionalProperties',
+  'contains',
+  'contentSchema',
+  'else',
+  'if',
+  'items',
+  'not',
+  'propertyNames',
+  'then',
+  'unevaluatedItems',
+  'unevaluatedProperties',
+]);
+const SCHEMA_ARRAY_KEYWORDS = new Set(['allOf', 'anyOf', 'oneOf', 'prefixItems']);
+
+function cloneJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(cloneJsonValue);
   if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [key, cloneJsonValue(child)]),
+  );
+}
+
+function stripSchemaDescriptions(value: unknown): unknown {
+  if (typeof value === 'boolean' || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(stripSchemaDescriptions);
+
   return Object.fromEntries(
     Object.entries(value)
       .filter(([key]) => key !== 'description')
-      .map(([key, child]) => [key, stripSchemaDescriptions(child)]),
+      .map(([key, child]) => {
+        if (SCHEMA_MAP_KEYWORDS.has(key) && child && typeof child === 'object' && !Array.isArray(child)) {
+          return [key, Object.fromEntries(
+            Object.entries(child).map(([mapKey, schema]) => [mapKey, stripSchemaDescriptions(schema)]),
+          )];
+        }
+        if (SCHEMA_ARRAY_KEYWORDS.has(key) && Array.isArray(child)) {
+          return [key, child.map(stripSchemaDescriptions)];
+        }
+        if (SCHEMA_VALUE_KEYWORDS.has(key)) {
+          return [key, Array.isArray(child)
+            ? child.map(stripSchemaDescriptions)
+            : stripSchemaDescriptions(child)];
+        }
+        if (key === 'dependencies' && child && typeof child === 'object' && !Array.isArray(child)) {
+          return [key, Object.fromEntries(
+            Object.entries(child).map(([dependency, schemaOrNames]) => [
+              dependency,
+              Array.isArray(schemaOrNames)
+                ? cloneJsonValue(schemaOrNames)
+                : stripSchemaDescriptions(schemaOrNames),
+            ]),
+          )];
+        }
+        return [key, cloneJsonValue(child)];
+      }),
   );
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  expect(value).not.toBeNull();
+  expect(typeof value).toBe('object');
+  expect(Array.isArray(value)).toBe(false);
+  return value as Record<string, unknown>;
+}
+
+function expectDeeplyFrozen(value: unknown, seen = new WeakSet<object>()): void {
+  if (value === null || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  expect(Object.isFrozen(value)).toBe(true);
+  for (const child of Object.values(value)) expectDeeplyFrozen(child, seen);
 }
 
 function operatorDefinitions(): Tool[] {
@@ -103,6 +174,8 @@ describe('MCP compact operator profile contract', () => {
     const projected = operatorDefinitions();
 
     expect(projected.length).toBeGreaterThan(0);
+    expectDeeplyFrozen(projected);
+    expect(() => projected.push(projected[0]!)).toThrow(TypeError);
     for (const definition of projected) {
       const canonicalDefinition = canonicalByName.get(definition.name);
       expect(canonicalDefinition, `missing canonical ${definition.name}`).toBeDefined();
@@ -114,8 +187,19 @@ describe('MCP compact operator profile contract', () => {
       expect(definition.inputSchema).toEqual(
         stripSchemaDescriptions(canonicalDefinition!.inputSchema),
       );
-      expect(JSON.stringify(definition.inputSchema)).not.toContain('"description"');
     }
+
+    const createTemplate = projected.find(
+      definition => definition.name === 'create_content_template',
+    );
+    expect(createTemplate).toBeDefined();
+    const rootProperties = objectRecord(createTemplate!.inputSchema.properties);
+    const templateSchema = objectRecord(rootProperties.template);
+    const templateProperties = objectRecord(templateSchema.properties);
+    expect(templateProperties).toHaveProperty('description');
+    const variablesSchema = objectRecord(templateProperties.variables);
+    const variableItemSchema = objectRecord(variablesSchema.items);
+    expect(objectRecord(variableItemSchema.properties)).toHaveProperty('description');
 
     expect(JSON.stringify(listMcpToolDefinitions())).toBe(canonicalJsonBefore);
   });
@@ -177,16 +261,23 @@ describe('MCP compact operator profile contract', () => {
       });
     expect(handler).toHaveBeenCalledTimes(2);
 
-    const hidden = await operator({
-      ...baseRequest,
-      name: 'get_workspace_overview',
-      args: { workspaceId: 'ws-1' },
-    });
-    expect(parseJsonV1(hidden)).toEqual({
+    const notFoundEnvelope = {
       code: 'not_found',
       message: 'The requested tool does not exist.',
       retryable: false,
-    });
+    };
+    for (const name of [
+      'get_workspace_overview',
+      'get_portfolio_brief',
+      'whsec_abcdefghijklmnopqrstuvwxyz',
+    ]) {
+      const hidden = await operator({
+        ...baseRequest,
+        name,
+        args: { workspaceId: 'ws-1', workspace_id: 'ws-2' },
+      });
+      expect(parseJsonV1(hidden)).toEqual(notFoundEnvelope);
+    }
     expect(handler).toHaveBeenCalledTimes(2);
 
     await expect(operator({ ...baseRequest, name: 'list_workspaces', args: {} }))

@@ -1,9 +1,13 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types';
 import type {
+  McpServerProfile,
   McpToolDefinition,
   McpToolExecutionContext,
 } from '../../shared/types/mcp-runtime.js';
-import { MCP_TOOL_ERROR_CODES } from '../../shared/types/mcp-runtime.js';
+import {
+  MCP_SERVER_PROFILES,
+  MCP_TOOL_ERROR_CODES,
+} from '../../shared/types/mcp-runtime.js';
 import { createLogger } from '../logger.js';
 import type { McpAuthContext } from './auth.js';
 import {
@@ -14,6 +18,11 @@ import {
   mcpUnexpectedToolError,
 } from './tool-errors.js';
 import { runWithMcpToolExecutionContext } from './tool-execution-context.js';
+import {
+  isMcpToolAllowedInProfile,
+  operatorToolDescription,
+  type McpOperatorToolName,
+} from './profiles.js';
 import { workspaceTools, handleWorkspaceTool } from './tools/workspaces.js';
 import { intelligenceTools, handleIntelligenceTool } from './tools/intelligence.js';
 import { insightTools, handleInsightTool } from './tools/insights.js';
@@ -421,6 +430,162 @@ export function listMcpToolDefinitions(): Tool[] {
   ) as Tool[];
 }
 
+const SCHEMA_MAP_KEYWORDS = new Set([
+  '$defs',
+  'definitions',
+  'dependentSchemas',
+  'patternProperties',
+  'properties',
+]);
+
+const SCHEMA_ARRAY_KEYWORDS = new Set([
+  'allOf',
+  'anyOf',
+  'oneOf',
+  'prefixItems',
+]);
+
+const SCHEMA_VALUE_KEYWORDS = new Set([
+  'additionalItems',
+  'additionalProperties',
+  'contains',
+  'contentSchema',
+  'else',
+  'if',
+  'items',
+  'not',
+  'propertyNames',
+  'then',
+  'unevaluatedItems',
+  'unevaluatedProperties',
+]);
+
+function snapshotSchemaMap<T>(
+  value: T,
+  seen: WeakMap<object, unknown>,
+): T {
+  if (value === null || typeof value !== 'object') return value;
+
+  const prior = seen.get(value);
+  if (prior !== undefined) return prior as T;
+
+  if (Array.isArray(value)) return snapshotValue(value, seen);
+
+  const copy: Record<PropertyKey, unknown> = {};
+  seen.set(value, copy);
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !('value' in descriptor)) continue;
+    copy[key] = snapshotSchemaNode(descriptor.value, seen);
+  }
+  return Object.freeze(copy) as T;
+}
+
+function snapshotSchemaArray<T>(
+  value: T,
+  seen: WeakMap<object, unknown>,
+): T {
+  if (!Array.isArray(value)) return snapshotSchemaNode(value, seen);
+
+  const prior = seen.get(value);
+  if (prior !== undefined) return prior as T;
+
+  const copy: unknown[] = [];
+  seen.set(value, copy);
+  for (const item of value) copy.push(snapshotSchemaNode(item, seen));
+  return Object.freeze(copy) as T;
+}
+
+function snapshotDependencies<T>(
+  value: T,
+  seen: WeakMap<object, unknown>,
+): T {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return snapshotValue(value, seen);
+  }
+
+  const prior = seen.get(value);
+  if (prior !== undefined) return prior as T;
+
+  const copy: Record<PropertyKey, unknown> = {};
+  seen.set(value, copy);
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !('value' in descriptor)) continue;
+    copy[key] = Array.isArray(descriptor.value)
+      ? snapshotValue(descriptor.value, seen)
+      : snapshotSchemaNode(descriptor.value, seen);
+  }
+  return Object.freeze(copy) as T;
+}
+
+/**
+ * Compact one JSON Schema node without changing its validation contract.
+ *
+ * `description` is removed only when it is the annotation keyword on a schema
+ * node. Schema-map entries are arbitrary caller field/definition names, so a
+ * property literally named `description` must survive. Non-schema values such
+ * as defaults, examples, const values, and enum members are copied verbatim.
+ */
+function snapshotSchemaNode<T>(
+  value: T,
+  seen = new WeakMap<object, unknown>(),
+): T {
+  if (value === null || typeof value !== 'object') return value;
+
+  const prior = seen.get(value);
+  if (prior !== undefined) return prior as T;
+  if (Array.isArray(value)) return snapshotValue(value, seen);
+
+  const copy: Record<PropertyKey, unknown> = {};
+  seen.set(value, copy);
+  for (const key of Reflect.ownKeys(value)) {
+    if (key === 'description') continue;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !('value' in descriptor)) continue;
+
+    if (typeof key === 'string' && SCHEMA_MAP_KEYWORDS.has(key)) {
+      copy[key] = snapshotSchemaMap(descriptor.value, seen);
+    } else if (typeof key === 'string' && SCHEMA_ARRAY_KEYWORDS.has(key)) {
+      copy[key] = snapshotSchemaArray(descriptor.value, seen);
+    } else if (typeof key === 'string' && SCHEMA_VALUE_KEYWORDS.has(key)) {
+      copy[key] = snapshotSchemaArray(descriptor.value, seen);
+    } else if (key === 'dependencies') {
+      copy[key] = snapshotDependencies(descriptor.value, seen);
+    } else {
+      copy[key] = snapshotValue(descriptor.value, seen);
+    }
+  }
+  return Object.freeze(copy) as T;
+}
+
+function operatorDefinition(definition: Tool): Tool {
+  return snapshotValue({
+    ...definition,
+    description: operatorToolDescription(definition.name as McpOperatorToolName),
+    inputSchema: snapshotSchemaNode(definition.inputSchema),
+  });
+}
+
+/**
+ * Return the immutable discovery surface for one server profile.
+ *
+ * The full profile intentionally delegates to the historical zero-argument
+ * discovery function. The operator profile creates an independent compact
+ * projection, so reducing its prose can never mutate the canonical catalog.
+ */
+export function listMcpToolDefinitionsForProfile(
+  profile: McpServerProfile,
+): Tool[] {
+  if (profile === MCP_SERVER_PROFILES.FULL) return listMcpToolDefinitions();
+
+  return Object.freeze(
+    [...MCP_TOOL_REGISTRY.values()]
+      .filter(entry => isMcpToolAllowedInProfile(profile, entry.definition.name))
+      .map(entry => operatorDefinition(entry.definition as Tool)),
+  ) as Tool[];
+}
+
 export function getDeclaredWorkspaceField(
   toolName: string,
 ): McpWorkspaceField | undefined {
@@ -469,11 +634,34 @@ function forbiddenError(
   });
 }
 
+function operatorNotFoundError(): CallToolResult {
+  return mcpToolError(MCP_TOOL_ERROR_CONTRACTS.JSON_V1, {
+    legacyText: 'Unknown tool.',
+    envelope: {
+      code: MCP_TOOL_ERROR_CODES.NOT_FOUND,
+      message: 'The requested tool does not exist.',
+      retryable: false,
+    },
+  });
+}
+
 /** Build an executor around an immutable registry (production or isolated test fixture). */
 export function createMcpToolExecutor(
   registry: McpToolRegistry,
+  profile: McpServerProfile = MCP_SERVER_PROFILES.FULL,
 ): (request: ExecuteMcpToolRequest) => Promise<CallToolResult> {
-  return request => executeRegisteredMcpTool(registry, request);
+  return request => {
+    if (
+      profile === MCP_SERVER_PROFILES.OPERATOR
+      && (
+        !isMcpToolAllowedInProfile(profile, request.name)
+        || !registry.has(request.name)
+      )
+    ) {
+      return Promise.resolve(operatorNotFoundError());
+    }
+    return executeRegisteredMcpTool(registry, request);
+  };
 }
 
 /** Authorize, attribute, and dispatch one tool through the supplied registry. */
@@ -613,3 +801,9 @@ async function executeRegisteredMcpTool(
 
 /** Production executor backed by the canonical immutable registry snapshot. */
 export const executeMcpTool = createMcpToolExecutor(MCP_TOOL_REGISTRY);
+
+/** Compact operator executor with invocation-enforced allowlisting. */
+export const executeOperatorMcpTool = createMcpToolExecutor(
+  MCP_TOOL_REGISTRY,
+  MCP_SERVER_PROFILES.OPERATOR,
+);

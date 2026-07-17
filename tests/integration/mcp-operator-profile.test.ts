@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
 const MCP_MASTER_KEY = 'test-mcp-operator-master-key';
 const OPERATOR_PATH = '/mcp/operator';
+const FULL_DISCOVERY_SHA256 = 'd09ca70b54fa0e92e391f4dbfd3ccde951244aaca653cc6afe08434565460596';
+const FULL_INSTRUCTIONS_SHA256 = '442536613942c966472445b3d5519c4629d63bbebfed78e5b90295c1c68c67fd';
 const ctx = createEphemeralTestContext(import.meta.url, {
   env: { MCP_API_KEY: MCP_MASTER_KEY },
 });
@@ -33,6 +36,10 @@ interface McpCallResult {
 let workspace: SeededFullWorkspace;
 let workspaceKeyId: string | undefined;
 let workspacePlaintextKey: string | undefined;
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
 
 async function mcpPost(
   path: string,
@@ -202,9 +209,11 @@ describe('MCP operator profile HTTP boundary', () => {
     const initialized = await initialize('/mcp', MCP_MASTER_KEY);
     expect(typeof initialized.instructions).toBe('string');
     expect(Buffer.byteLength(initialized.instructions!, 'utf8')).toBe(11_862);
+    expect(sha256(initialized.instructions!)).toBe(FULL_INSTRUCTIONS_SHA256);
 
     const tools = await listTools('/mcp', MCP_MASTER_KEY);
     expect(tools).toHaveLength(102);
+    expect(sha256(JSON.stringify(tools))).toBe(FULL_DISCOVERY_SHA256);
     expect(tools.some(tool => tool.name === 'get_workspace_overview')).toBe(true);
 
     const result = await callTool('/mcp', MCP_MASTER_KEY, 'get_workspace_overview', {
