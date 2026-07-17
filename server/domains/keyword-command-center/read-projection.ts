@@ -26,7 +26,8 @@ export interface KeywordCommandCenterReadProjection {
 }
 
 function trafficValueFromPages(pages: PageKeywordMap[]): number | null {
-  if (!pages.some(page => page.cpc != null)) return null;
+  // Live rows store absent provider CPC as 0, not NULL — a positive cpc is the only evidence signal.
+  if (!pages.some(page => (page.cpc ?? 0) > 0)) return null;
   const total = pages.reduce((sum, page) => sum + keywordDollarValue({
     clicks: page.clicks ?? 0,
     cpc: page.cpc ?? 0,

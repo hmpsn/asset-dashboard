@@ -70,6 +70,23 @@ describe('Keyword Command Center monthly value projection', () => {
     expect(projection.trafficValueMonthly).toBeNull();
   });
 
+  it('returns null when every stored cpc is 0 (live rows store absent provider cpc as 0, not NULL)', () => {
+    const workspace = createWorkspace('KCC Monthly Value Zero CPC');
+    workspaceIds.push(workspace.id);
+    upsertPageKeywordsBatch(workspace.id, [{
+      pagePath: '/services',
+      pageTitle: 'Services',
+      primaryKeyword: 'dental services',
+      secondaryKeywords: [],
+      clicks: 40,
+      cpc: 0,
+    }]);
+
+    const projection = buildKeywordCommandCenterReadProjection(workspace, { includeSummary: true });
+
+    expect(projection.trafficValueMonthly).toBeNull();
+  });
+
   it('returns the computed value when page keywords carry provider value evidence', () => {
     const workspace = createWorkspace('KCC Monthly Value Measured');
     workspaceIds.push(workspace.id);
