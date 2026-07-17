@@ -48,6 +48,7 @@ import {
   Toggle,
   Toolbar,
   ToolbarSpacer,
+  WorkbenchFrame,
   scoreColor,
   cn,
   type IconName,
@@ -290,7 +291,7 @@ function CategoryCards({
   const scoreByCategory = new Map(data.map((score) => [score.category, score]));
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="site-audit-categories">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6" data-testid="site-audit-categories">
       {PROTOTYPE_CATEGORY_ORDER.map((category) => scoreByCategory.get(category)).filter((score) => !!score).map((score) => {
         const active = activeCategories.has(score.category);
         const issueCount = score.errors + score.warnings + score.infos;
@@ -307,26 +308,25 @@ function CategoryCards({
               active={active}
               onClick={() => onToggleCategory(score.category)}
               aria-label={`Filter issues by ${label}`}
-              className="px-4 py-[14px]"
+              className="px-3 py-2.5"
             >
               <div>
-                <div className="mb-3 flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                   <span
-                    className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-[var(--radius-md)]"
+                    className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-[var(--radius-md)]"
                     style={{ color: accent, background: `color-mix(in srgb, ${accent} 12%, transparent)` }}
                   >
                     <Icon name={CATEGORY_ICON[score.category]} size="sm" />
                   </span>
-                  <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{label}</span>
+                  <span className="t-caption-sm truncate font-semibold text-[var(--brand-text-bright)]">{label}</span>
                   {/* stat-primitive-ok: compact score is the trailing value within a category filter card, not a standalone KPI */}
                   <span className="ml-auto t-stat-sm" style={{ color: accent }}>{formatScore(score.score)}</span>
                 </div>
-                <Meter value={score.score} color={accent} ariaLabel={`${label} score`} height={5} />
-                <div className="mt-2.5 flex items-center justify-between gap-3 t-caption-sm text-[var(--brand-text-muted)]">
+                <div className="mt-1.5 flex items-center justify-between gap-2 t-micro text-[var(--brand-text-muted)]">
                   <span className={cn(issueCount === 0 && 'text-[var(--emerald)]')}>
                     {issueCount === 0 ? 'Clean' : `${issueCount} issue${issueCount === 1 ? '' : 's'}`}
                   </span>
-                  <span>{score.affectedPages} affected {score.affectedPages === 1 ? 'page' : 'pages'}</span>
+                  <span>{score.affectedPages} {score.affectedPages === 1 ? 'page' : 'pages'}</span>
                 </div>
               </div>
             </ClickableRow>
@@ -352,10 +352,10 @@ function AuditHero({ data, siteName }: { data: SiteAuditResult; siteName: string
   return (
     <div data-testid="site-audit-hero">
       <SectionCard noPadding>
-        <div className="grid items-center gap-[26px] px-5 py-[22px] sm:grid-cols-[132px_minmax(0,1fr)] sm:px-[26px]">
-          <div className="relative mx-auto h-[132px] w-[132px]">
-            <MetricRing score={data.siteScore} size={132} strokeWidth={10} noAnimation />
-            <span className="absolute inset-x-0 top-[91px] text-center t-micro uppercase tracking-[0.08em] text-[var(--brand-text-dim)]">
+        <div className="grid items-center gap-4 px-4 py-3 sm:grid-cols-[72px_minmax(0,1fr)]">
+          <div className="relative mx-auto h-[72px] w-[72px]">
+            <MetricRing score={data.siteScore} size={72} strokeWidth={7} noAnimation />
+            <span className="absolute inset-x-0 top-[48px] text-center t-micro uppercase tracking-[0.08em] text-[var(--brand-text-dim)]">
               Health
             </span>
           </div>
@@ -363,17 +363,17 @@ function AuditHero({ data, siteName }: { data: SiteAuditResult; siteName: string
             <h1 className="t-h2 text-[var(--brand-text-bright)]">
               {siteName} is {scoreVerdict(data.siteScore)}.
             </h1>
-            <p className="mt-2 max-w-[68ch] t-ui text-[var(--brand-text-muted)]">
+            <p className="mt-1 max-w-[78ch] t-ui text-[var(--brand-text-muted)]">
               {data.errors > 0
                 ? `${data.errors} critical ${data.errors === 1 ? 'issue needs' : 'issues need'} attention first. ${warningCount} and ${noticeCount} are ordered below by severity and demand.`
                 : `No critical issues. ${warningCount} and ${noticeCount} remain, and the site is in good technical shape.`}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge label={`${data.errors} critical`} tone={data.errors > 0 ? 'red' : 'emerald'} variant="outline" size="md" />
-              <Badge label={`${data.warnings} warnings`} tone="amber" variant="outline" size="md" />
-              <Badge label={`${formatInteger(indexedPages)} indexable`} tone="emerald" variant="outline" size="md" />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge label={`${data.errors} critical`} tone={data.errors > 0 ? 'red' : 'emerald'} variant="outline" />
+              <Badge label={`${data.warnings} warnings`} tone="amber" variant="outline" />
+              <Badge label={`${formatInteger(indexedPages)} indexable`} tone="emerald" variant="outline" />
               {redirects != null && (
-                <Badge label={`${formatInteger(redirects)} redirects`} tone={redirects > 10 ? 'amber' : 'emerald'} variant="outline" size="md" />
+                <Badge label={`${formatInteger(redirects)} redirects`} tone={redirects > 10 ? 'amber' : 'emerald'} variant="outline" />
               )}
             </div>
           </div>
@@ -870,86 +870,107 @@ function AuditLens({
   }
 
   return (
-    <div className="space-y-[14px]" data-testid="site-audit-rebuilt-audit">
-      <AuditHero data={data} siteName={audit.siteName || 'Connected site'} />
+    <div data-testid="site-audit-rebuilt-audit">
+      <WorkbenchFrame
+        collectionLabel="Site Audit issues and supporting evidence"
+        pinnedClassName="pb-3"
+        pinned={(
+          <div className="space-y-2.5">
+            <AuditHero data={data} siteName={audit.siteName || 'Connected site'} />
 
-      <CategoryCards
-        data={audit.categoryScores}
-        activeCategories={categoryFilters}
-        onToggleCategory={toggleCategory}
-      />
+            <CategoryCards
+              data={audit.categoryScores}
+              activeCategories={categoryFilters}
+              onToggleCategory={toggleCategory}
+            />
 
-      <CwvStrip data={data} />
+            <CwvStrip data={data} />
 
-      <Toolbar label="Site Audit actions" className="w-full">
-        <Segmented
-          value={sortMode}
-          onChange={(value) => setSortMode(value as SiteAuditSortMode)}
-          options={[
-            { value: 'severity', label: 'Severity' },
-            { value: 'traffic', label: 'Traffic' },
-          ]}
-        />
-        <ToolbarSpacer />
-        <Toggle
-          checked={!audit.workflow.skipLinkCheck}
-          onChange={(checked) => audit.workflow.setSkipLinkCheck(!checked)}
-          label="Dead-link scan"
-        />
-        <Button size="sm" variant="secondary" onClick={() => setScheduleOpen(true)}>
-          <Icon name="clock" size="sm" />
-          Schedule
-        </Button>
-        <Button size="sm" variant="secondary" onClick={handleSaveAndShare} loading={audit.savingReport}>
-          <Icon name="send" size="sm" />
-          Save &amp; share
-        </Button>
-        <Button size="sm" variant="secondary" onClick={() => setReportModalOpen(true)}>
-          <Icon name="download" size="sm" />
-          Export
-        </Button>
-        <Button size="sm" variant="secondary" onClick={handleRunAudit} disabled={!audit.siteId || audit.workflow.loading}>
-          <Icon name="refresh" size="sm" />
-          Re-run audit
-        </Button>
-      </Toolbar>
+            <Toolbar label="Site Audit actions" className="w-full">
+              <Segmented
+                value={sortMode}
+                onChange={(value) => setSortMode(value as SiteAuditSortMode)}
+                options={[
+                  { value: 'severity', label: 'Severity' },
+                  { value: 'traffic', label: 'Traffic' },
+                ]}
+              />
+              <ToolbarSpacer />
+              <Toggle
+                checked={!audit.workflow.skipLinkCheck}
+                onChange={(checked) => audit.workflow.setSkipLinkCheck(!checked)}
+                label="Dead-link scan"
+              />
+              <Button size="sm" variant="secondary" onClick={() => setScheduleOpen(true)}>
+                <Icon name="clock" size="sm" />
+                Schedule
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handleSaveAndShare} loading={audit.savingReport}>
+                <Icon name="send" size="sm" />
+                Save &amp; share
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setReportModalOpen(true)}>
+                <Icon name="download" size="sm" />
+                Export
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handleRunAudit} disabled={!audit.siteId || audit.workflow.loading}>
+                <Icon name="refresh" size="sm" />
+                Re-run audit
+              </Button>
+            </Toolbar>
 
-      {activeEvidence !== null && (
-        <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
-      )}
-
-      <div data-testid="site-audit-bulk-actions">
-        <SectionCard noPadding variant="subtle">
-          <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-mint-dim)] text-[var(--teal)]">
-              <Icon name="sparkle" size="sm" />
-            </span>
-            <div className="min-w-[210px] flex-1">
-              <div className="t-ui font-semibold text-[var(--brand-text-bright)]">
-                {pendingFixes} AI-fixable {pendingFixes === 1 ? 'suggestion' : 'suggestions'} across titles, meta &amp; page fields
-              </div>
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                Apply supported edits in bulk or turn the current issue set into operator tasks.
-              </div>
+            <div data-testid="site-audit-bulk-actions">
+              <SectionCard noPadding variant="subtle">
+                <div className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                  <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-mint-dim)] text-[var(--teal)]">
+                    <Icon name="sparkle" size="sm" />
+                  </span>
+                  <div className="min-w-[210px] flex-1">
+                    <div className="t-ui font-semibold text-[var(--brand-text-bright)]">
+                      {pendingFixes} AI-fixable {pendingFixes === 1 ? 'suggestion' : 'suggestions'} across titles, meta &amp; page fields
+                    </div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                      Apply supported edits in bulk or turn the current issue set into operator tasks.
+                    </div>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('errors')} loading={audit.batchCreating}>
+                    Add error tasks
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('filtered')} loading={audit.batchCreating}>
+                    Add visible tasks
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('all')} loading={audit.batchCreating}>
+                    Add all tasks
+                  </Button>
+                  <Button size="sm" onClick={() => setAcceptAllConfirmOpen(true)} disabled={bulkApplying || pendingFixes === 0}>
+                    <Icon name="sparkle" size="sm" />
+                    {bulkApplying
+                      ? (bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting…')
+                      : `Accept all ${pendingFixes}`}
+                  </Button>
+                </div>
+              </SectionCard>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('errors')} loading={audit.batchCreating}>
-              Add error tasks
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('filtered')} loading={audit.batchCreating}>
-              Add visible tasks
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('all')} loading={audit.batchCreating}>
-              Add all tasks
-            </Button>
-            <Button size="sm" onClick={() => setAcceptAllConfirmOpen(true)} disabled={bulkApplying || pendingFixes === 0}>
-              <Icon name="sparkle" size="sm" />
-              {bulkApplying
-                ? (bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting…')
-                : `Accept all ${pendingFixes}`}
-            </Button>
+
+            <BulkAcceptPanel
+              workspaceId={audit.workspace?.id ?? ''}
+              siteId={audit.siteId}
+              data={data as SeoAuditResult}
+              appliedFixes={audit.appliedFixes}
+              setAppliedFixes={audit.setAppliedFixes}
+              editedSuggestions={audit.editedSuggestions}
+              onBulkApplyingChange={setBulkApplying}
+              onBulkProgressChange={setBulkProgress}
+              onBulkError={setBulkError}
+              onRegisterHandlers={(handlers) => { bulkHandlersRef.current = handlers; }}
+            />
           </div>
-        </SectionCard>
-      </div>
+        )}
+      >
+        <div className="space-y-3 pr-1">
+          {activeEvidence !== null && (
+            <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
+          )}
 
       <ConfirmDialog
         open={acceptAllConfirmOpen}
@@ -959,19 +980,6 @@ function AuditLens({
         onConfirm={handleConfirmAcceptAll}
         onCancel={() => setAcceptAllConfirmOpen(false)}
         variant="destructive"
-      />
-
-      <BulkAcceptPanel
-        workspaceId={audit.workspace?.id ?? ''}
-        siteId={audit.siteId}
-        data={data as SeoAuditResult}
-        appliedFixes={audit.appliedFixes}
-        setAppliedFixes={audit.setAppliedFixes}
-        editedSuggestions={audit.editedSuggestions}
-        onBulkApplyingChange={setBulkApplying}
-        onBulkProgressChange={setBulkProgress}
-        onBulkError={setBulkError}
-        onRegisterHandlers={(handlers) => { bulkHandlersRef.current = handlers; }}
       />
 
       {data.deadLinkDetails && data.deadLinkDetails.length > 0 && (
@@ -1062,6 +1070,8 @@ function AuditLens({
       {(data as SiteAuditResult & { snapshotId?: string }).snapshotId && (
         <ActionItemsPanel snapshotId={(data as SiteAuditResult & { snapshotId: string }).snapshotId} />
       )}
+        </div>
+      </WorkbenchFrame>
 
       <IssueDetailDrawer
         group={selectedGroup}

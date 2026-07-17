@@ -395,6 +395,26 @@ describe('SiteAuditSurface rebuilt', () => {
     ]);
   });
 
+  it('bounds the loaded audit to one workbench collection with decision controls pinned', async () => {
+    renderSurface('/ws/ws-1/seo-audit?sub=audit');
+
+    await screen.findByTestId('site-audit-rebuilt-audit');
+    const frame = screen.getByTestId('workbench-frame');
+    expect(frame).toHaveStyle({
+      height: 'calc(100vh - var(--shell-topbar) - var(--page-pad-y) - var(--page-pad-bottom))',
+    });
+
+    const pinned = screen.getByTestId('workbench-pinned');
+    expect(within(pinned).getByTestId('site-audit-hero')).toBeInTheDocument();
+    expect(within(pinned).getByTestId('site-audit-categories')).toBeInTheDocument();
+    expect(within(pinned).getByTestId('site-audit-bulk-actions')).toBeInTheDocument();
+
+    const collections = frame.querySelectorAll('[data-workbench-collection]');
+    expect(collections).toHaveLength(1);
+    expect(collections[0]).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
+    expect(within(collections[0] as HTMLElement).getByTestId('site-audit-issues')).toBeInTheDocument();
+  });
+
   it('uses the compact local history composition instead of the legacy shared view', async () => {
     renderSurface('/ws/ws-1/seo-audit?sub=history');
 
