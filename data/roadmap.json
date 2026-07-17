@@ -84,28 +84,6 @@
           "notes": "Nothing currently tells the operator a client replied without opening the surface."
         },
         {
-          "id": "cockpit-handoff-item-identity",
-          "title": "Cockpit queue hops carry item identity (?lens=/?item= deep links, two-halves contract)",
-          "source": "2026-07-16 UX-flow audit §6",
-          "est": "S",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "cockpit",
-          "notes": "Stops the re-find tax when landing on large surfaces."
-        },
-        {
-          "id": "command-palette-verbs",
-          "title": "⌘K: honesty relabel (Open …) + top-10 action verbs + hide debug workspaces",
-          "source": "2026-07-16 UX-flow audit §6",
-          "est": "M",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-07-16",
-          "owner": "platform",
-          "notes": "Verb dispatch list in the audit verdicts JSON."
-        },
-        {
           "id": "ai-visibility-flag-on-home",
           "title": "AI Visibility: give the LLM-mention panel a rebuilt flag-ON home",
           "source": "2026-07-16 rebuild audit §6 item (carried)",
@@ -159,6 +137,17 @@
           "createdAt": "2026-07-16",
           "owner": "cockpit",
           "notes": "Server-side per-workspace classification already exists; closes the dual-shell seam; restores presence + Needs-attention triage."
+        },
+        {
+          "id": "cockpit-handoff-per-item-deeplink",
+          "title": "Cockpit handoffs: typed per-item identity on aggregate rows + ?issue=/?item= receivers (Site Audit, Requests, Content Pipeline)",
+          "source": "2026-07-17 W1.2 NEEDS_CONTEXT — deferred from cockpit-handoff-item-identity; pairs with site-audit-per-page-repair-rows (W3.3)",
+          "est": "L",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-07-17",
+          "owner": "cockpit",
+          "notes": "W1.2 delivered section/lens routing (the journey judge's actual recommendation). This is the bigger per-item version: work-queue rows are currently aggregates with no retained item id, and targets lack ?issue=/?item= receivers. Needs typed identities on the classifier + new receivers across 3+ surfaces."
         }
       ]
     },

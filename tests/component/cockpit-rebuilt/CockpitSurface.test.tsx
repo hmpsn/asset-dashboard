@@ -447,11 +447,11 @@ describe('CockpitSurface rebuilt', () => {
     fireEvent.click(sendAction);
     expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/requests?tab=requests`);
     fireEvent.click(optimizationAction);
-    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/content-pipeline?tab=content-health`);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/seo-audit?sub=content-decay`);
     fireEvent.click(moneyAction);
-    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/content-pipeline?tab=briefs`);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/content-pipeline?tab=planner`);
     fireEvent.click(riskAction);
-    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/requests?tab=requests`);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/requests?tab=signals`);
 
     expect(within(queue).queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
     expect(within(queue).queryByRole('button', { name: 'Propose' })).not.toBeInTheDocument();
@@ -470,14 +470,44 @@ describe('CockpitSurface rebuilt', () => {
     expect(coreGrid.compareDocumentPosition(weekly) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('opens the carried-over work-order panel from a work-order queue row', async () => {
+  it.each<[WorkQueueSourceType, string]>([
+    ['request', `/ws/${workspaceId}/requests?tab=requests`],
+    ['work_order', `/ws/${workspaceId}/content-pipeline?tab=intake`],
+    ['content_request', `/ws/${workspaceId}/content-pipeline?tab=briefs`],
+    ['content_pipeline', `/ws/${workspaceId}/content-pipeline?tab=planner`],
+    ['rank_drop', `/ws/${workspaceId}/seo-keywords?lens=rankings`],
+    ['content_decay', `/ws/${workspaceId}/seo-audit?sub=content-decay`],
+    ['audit_error', `/ws/${workspaceId}/seo-audit`],
+    ['setup_gap', `/ws/${workspaceId}/workspace-settings?tab=connections`],
+    ['churn_signal', `/ws/${workspaceId}/requests?tab=signals`],
+  ])('routes the %s queue row to its most specific existing receiver', async (sourceType, destination) => {
+    const item: WorkQueueItem = {
+      stream: sourceType === 'request' || sourceType === 'churn_signal' ? 'unclassified' : 'opt',
+      id: `route-${sourceType}`,
+      title: `Route ${sourceType}`,
+      meta: 'Display metadata must not become route identity',
+      sourceType,
+    };
+    const routedQueue: WorkQueueClassification = {
+      streams: {
+        opt: item.stream === 'opt' ? 1 : 0,
+        send: 0,
+        money: 0,
+        unclassified: item.stream === 'unclassified' ? 1 : 0,
+      },
+      items: [item],
+    };
+    mocks.cockpitState = makeCockpitState({ workQueue: routedQueue });
     renderSurface();
 
-    fireEvent.click(await screen.findByRole('button', { name: /Open panel/i }));
+    const title = await screen.findByText(`Route ${sourceType}`);
+    const row = title.parentElement?.parentElement;
+    expect(row).not.toBeNull();
+    fireEvent.click(within(row as HTMLElement).getByRole('button'));
 
-    expect(await screen.findByTestId('work-order-panel')).toHaveTextContent(`Work orders for ${workspaceId}`);
-    expect(screen.getAllByTestId('work-order-panel')).toHaveLength(1);
-    expect(screen.getAllByRole('dialog', { name: /Work orders/i })).toHaveLength(1);
+    expect(mocks.navigate).toHaveBeenCalledTimes(1);
+    expect(mocks.navigate).toHaveBeenCalledWith(destination);
+    expect(mocks.navigate.mock.calls[0]?.[0]).not.toContain('Display metadata');
   });
 
   it('opens the activity drawer from the toolbar', async () => {
