@@ -13,6 +13,7 @@ const mockSetSkipLinkCheck = vi.fn();
 const mockRefreshAuditHistory = vi.fn();
 const mockSaveSchedule = vi.fn();
 const mockUseSiteAuditRebuilt = vi.fn();
+const mockAcceptAll = vi.fn(async () => undefined);
 
 vi.mock('../../../src/hooks/admin/useSiteAuditRebuilt', async () => {
   const actual = await vi.importActual<typeof import('../../../src/hooks/admin/useSiteAuditRebuilt')>(
@@ -41,7 +42,7 @@ vi.mock('../../../src/components/audit/ActionItemsPanel', () => ({
 }));
 vi.mock('../../../src/components/audit/BulkAcceptPanel', () => ({
   BulkAcceptPanel: ({ onRegisterHandlers }: { onRegisterHandlers: (handlers: { acceptAll: () => Promise<void>; cancel: () => void }) => void }) => {
-    onRegisterHandlers({ acceptAll: async () => undefined, cancel: () => undefined });
+    onRegisterHandlers({ acceptAll: mockAcceptAll, cancel: () => undefined });
     return <div data-testid="site-audit-bulk-panel" />;
   },
 }));
@@ -427,6 +428,73 @@ describe('SiteAuditSurface rebuilt', () => {
     expectTextWithClass('Send to client', 't-ui');
     expectTextWithClass('Affected pages', 't-ui');
     expectTextWithClass('Home', 't-ui');
+  });
+
+  it('states the first-page action scope and the filter-selective batch semantics in the issue drawer', async () => {
+    const audit = makeAuditState();
+    const titleGroup = issueGroups[0];
+    const additionalPages = [
+      { ...sampleAudit.pages[0], pageId: 'page-about', page: 'About', slug: 'about', url: '/about' },
+      { ...sampleAudit.pages[0], pageId: 'page-contact', page: 'Contact', slug: 'contact', url: '/contact' },
+    ];
+    const threePageGroup: AuditIssueGroup = {
+      ...titleGroup,
+      affectedPages: 3,
+      instances: [
+        titleGroup.instances[0],
+        ...additionalPages.map((page) => ({
+          id: `${page.pageId}-title-Missing title`,
+          page,
+          issue: page.issues[0],
+        })),
+      ],
+    };
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      issueGroups: [threePageGroup, issueGroups[1]],
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+    fireEvent.click(await screen.findByText('Missing title'));
+
+    const drawer = screen.getByRole('dialog', { name: 'title' });
+    const actions = within(drawer).getByTestId('site-audit-issue-actions');
+    expect(within(actions).getByText('Applies to /home only')).toBeVisible();
+    expect(within(actions).getByRole('button', { name: 'Accept suggestion' })).toBeInTheDocument();
+    expect(within(actions).getByRole('button', { name: 'Send to client' })).toBeInTheDocument();
+    expect(within(drawer).getByText(
+      'Add visible tasks uses the current table filters. Add error tasks, Add all tasks, and Accept all use the full audit.',
+    )).toBeVisible();
+  });
+
+  it('confirms the real live-site consequences before accepting all fixes', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept all 1' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Apply AI fixes to the live Webflow site?' });
+    expect(within(dialog).getByText(/up to 1 AI-suggested fix/i)).toBeVisible();
+    expect(within(dialog).getByText(/titles, meta descriptions, and page fields/i)).toBeVisible();
+    expect(within(dialog).getByText(/marks those pages live/i)).toBeVisible();
+    expect(within(dialog).getByText(/fewer than 1 may change/i)).toBeVisible();
+    expect(within(dialog).getByText(/cannot be bulk-undone/i)).toBeVisible();
+    expect(mockAcceptAll).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply to live site' }));
+
+    await waitFor(() => expect(mockAcceptAll).toHaveBeenCalledTimes(1));
+    expect(mockAcceptAll).toHaveBeenCalledWith();
+  });
+
+  it('cancels Accept all without applying any fixes', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept all 1' }));
+    const dialog = screen.getByRole('dialog', { name: 'Apply AI fixes to the live Webflow site?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Apply AI fixes to the live Webflow site?' })).not.toBeInTheDocument();
+    expect(mockAcceptAll).not.toHaveBeenCalled();
   });
 
   it('uses styleguide roles for the audit decision console', async () => {

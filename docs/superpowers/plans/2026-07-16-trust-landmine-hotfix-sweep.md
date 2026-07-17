@@ -268,7 +268,7 @@ All work is **behavior-correcting** (bug-fix class), not new behavior. No `broad
 
 **Evidence:** "Accept all 785" applies 785 AI suggestions in one click with no preview/undo affordance (browser walk; seats 1/3/4).
 
-**Contract:** clicking Accept-all opens the existing `ConfirmDialog` stating precisely what will happen using real counts from the data the surface already holds (total suggestions; the field kinds affected — titles/metas/page fields; and that acceptance creates operator work items per the existing flow — derive the true consequence sentence from the accept handler, don't guess). Confirm proceeds exactly as today; cancel is a no-op. Non-destructive dialog semantics (Enter confirms).
+**Contract (AMENDED during execution — the implementer's NEEDS_CONTEXT stop was correct):** the original consequence sentence ("creates operator work items") contradicted the real accept flow — `bulkAcceptFixes` writes DIRECTLY to the live Webflow site (titles, meta descriptions, OG/page fields), marks pages live, records activity, and resolves recommendations; and `pendingFixes` can overstate what applies because the server skips unrecognized checks. Amended: clicking Accept-all opens the existing `ConfirmDialog` BEFORE any mutation, stating the true consequence — immediately applies up to N fixes directly to the live site, fewer than N may change (skipped checks), cannot be bulk-undone — with DESTRUCTIVE dialog semantics (Cancel owns Enter) because this is a live-site write. Confirm proceeds exactly as today; cancel is a no-op.
 
 **Test assertions:** click Accept-all → dialog visible, contains the N from fixtures; accept mutation NOT yet called; confirm → called exactly once with unchanged args; cancel path → never called.
 

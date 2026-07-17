@@ -2,6 +2,7 @@
 import { Suspense, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
+import { resolvePagePath } from '../../lib/pathUtils';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { adminPath } from '../../routes';
 import {
@@ -26,6 +27,7 @@ import {
   Button,
   CharacterCounter,
   ClickableRow,
+  ConfirmDialog,
   DataTable,
   Disclosure,
   Drawer,
@@ -416,6 +418,7 @@ function IssueDetailDrawer({
   const firstPageInstance = group?.instances.find((instance) => instance.page) ?? null;
   const firstPage = firstPageInstance?.page ?? null;
   const firstIssue = firstPageInstance?.issue ?? null;
+  const firstPagePath = firstPage ? resolvePagePath(firstPage) : null;
   const taskKey = firstPage && firstIssue ? `${firstPage.pageId}-${firstIssue.check}-${firstIssue.message.slice(0, 30)}` : '';
   const fixKey = firstPage && firstIssue ? `${firstPage.pageId}-${firstIssue.check}` : '';
   const editedSuggestion = firstIssue?.suggestedFix
@@ -479,7 +482,10 @@ function IssueDetailDrawer({
           </div>
 
           {firstPage && firstIssue && (
-            <div className="space-y-3">
+            <div className="space-y-3" data-testid="site-audit-issue-actions">
+              <div className="t-caption text-[var(--brand-text-muted)]">
+                Applies to {firstPagePath} only
+              </div>
               <div className="flex items-center justify-between gap-2">
                 <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Send to client</div>
                 {flaggedIssues.has(taskKey) && <Badge label="Sent" tone="emerald" variant="soft" />}
@@ -555,9 +561,12 @@ function IssueDetailDrawer({
               ))}
               {group.instances.length > 12 && (
                 <div className="t-caption text-[var(--brand-text-muted)]">
-                  {group.instances.length - 12} more affected pages are included in batch actions.
+                  {group.instances.length - 12} more affected pages are not shown above.
                 </div>
               )}
+              <div className="t-caption text-[var(--brand-text-muted)]">
+                Add visible tasks uses the current table filters. Add error tasks, Add all tasks, and Accept all use the full audit.
+              </div>
             </div>
           </div>
 
@@ -675,6 +684,7 @@ function AuditLens({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportView, setReportView] = useState<'html' | 'csv' | null>(null);
+  const [acceptAllConfirmOpen, setAcceptAllConfirmOpen] = useState(false);
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [, setBulkError] = useState<string | null>(null);
@@ -781,6 +791,11 @@ function AuditLens({
     } catch (error) {
       toast(mutationErrorMessage(error, 'Bulk fixes could not start'), 'error');
     }
+  };
+
+  const handleConfirmAcceptAll = () => {
+    setAcceptAllConfirmOpen(false);
+    void handleAcceptAll();
   };
 
   const handleClearSuppressions = async () => {
@@ -919,7 +934,7 @@ function AuditLens({
             <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('all')} loading={audit.batchCreating}>
               Add all tasks
             </Button>
-            <Button size="sm" onClick={handleAcceptAll} disabled={bulkApplying || pendingFixes === 0}>
+            <Button size="sm" onClick={() => setAcceptAllConfirmOpen(true)} disabled={bulkApplying || pendingFixes === 0}>
               <Icon name="sparkle" size="sm" />
               {bulkApplying
                 ? (bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting…')
@@ -928,6 +943,16 @@ function AuditLens({
           </div>
         </SectionCard>
       </div>
+
+      <ConfirmDialog
+        open={acceptAllConfirmOpen}
+        title="Apply AI fixes to the live Webflow site?"
+        message={`This immediately applies up to ${pendingFixes} AI-suggested ${pendingFixes === 1 ? 'fix' : 'fixes'} — titles, meta descriptions, and page fields — directly to the live Webflow site and marks those pages live. Unrecognized checks are skipped, so fewer than ${pendingFixes} may change. These changes cannot be bulk-undone.`}
+        confirmLabel="Apply to live site"
+        onConfirm={handleConfirmAcceptAll}
+        onCancel={() => setAcceptAllConfirmOpen(false)}
+        variant="destructive"
+      />
 
       <BulkAcceptPanel
         workspaceId={audit.workspace?.id ?? ''}

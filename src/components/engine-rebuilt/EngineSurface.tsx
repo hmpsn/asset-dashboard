@@ -379,6 +379,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
     />
   );
   const canSendIssue = engine.stagedCount > 0;
+  const sendHelperId = `engine-topbar-send-helper-${workspaceId}`;
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
@@ -404,19 +405,24 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
         <Icon name="refresh" size="sm" />
         Refresh
       </Button>
-      {canSendIssue && (
-        <Button
-          variant="primary"
-          size="sm"
-          loading={engine.issueBulkSend.isPending}
-          disabled={engine.issueBulkSend.isPending}
-          onClick={engine.sendIssue}
-          data-testid="engine-topbar-send-btn"
-        >
-          <Icon name="send" size="sm" />
-          Send {engine.stagedCount} staged
-        </Button>
+      {!canSendIssue && (
+        <span id={sendHelperId} className="whitespace-nowrap t-caption-sm text-[var(--brand-text-muted)]">
+          0 staged — stage moves below to send
+        </span>
       )}
+      <Button
+        variant="primary"
+        size="sm"
+        loading={engine.issueBulkSend.isPending}
+        disabled={engine.issueBulkSend.isPending || !canSendIssue}
+        onClick={engine.sendIssue}
+        data-testid="engine-topbar-send-btn"
+        aria-describedby={!canSendIssue ? sendHelperId : undefined}
+        title={!canSendIssue ? '0 staged — stage moves below to send' : undefined}
+      >
+        <Icon name="send" size="sm" />
+        Send {engine.stagedCount} staged
+      </Button>
     </>
   );
 

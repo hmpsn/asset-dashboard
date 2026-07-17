@@ -1644,28 +1644,37 @@ describe('EngineSurface rebuilt', () => {
     expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-included-rec-ids', '');
   });
 
-  it('keeps the staged-set send action exact-once in the topbar action host fallback', async () => {
+  it('keeps the send action exact-once and explains the disabled zero-staged state', async () => {
     const first = renderSurface();
 
     expect(await screen.findByTestId('engine-rebuilt-surface')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Send issue' })).not.toBeInTheDocument();
+    const restingFallback = screen.getByTestId('engine-topbar-actions-fallback');
+    const restingSend = within(restingFallback).getByRole('button', { name: 'Send 0 staged' });
+    expect(restingSend).toBeDisabled();
+    expect(restingSend).toHaveAccessibleDescription('0 staged — stage moves below to send');
+    expect(within(restingFallback).getByText('0 staged — stage moves below to send')).toBeVisible();
+    expect(screen.getAllByTestId('engine-topbar-send-btn')).toHaveLength(1);
+    fireEvent.click(restingSend);
+    expect(mocks.sendIssue).not.toHaveBeenCalled();
     expect(screen.queryByTestId('engine-backing-send-bar')).not.toBeInTheDocument();
 
     first.unmount();
     mocks.engineState = makeEngineState({
-      stagedRecIds: new Set(['rec-1']),
-      stagedSendableIds: ['rec-1'],
-      stagedCount: 1,
+      stagedRecIds: new Set(['rec-1', 'rec-2']),
+      stagedSendableIds: ['rec-1', 'rec-2'],
+      stagedCount: 2,
     });
     renderSurface();
 
     await screen.findByTestId('engine-section-backing-moves');
     const fallback = screen.getByTestId('engine-topbar-actions-fallback');
     expect(screen.queryByTestId('engine-backing-send-bar')).not.toBeInTheDocument();
-    expect(within(fallback).getByRole('button', { name: 'Send 1 staged' })).toBeEnabled();
-    expect(screen.getAllByRole('button', { name: /Send(?: 1 staged| issue)/ })).toHaveLength(1);
-    fireEvent.click(within(fallback).getByRole('button', { name: 'Send 1 staged' }));
+    const stagedSend = within(fallback).getByRole('button', { name: 'Send 2 staged' });
+    expect(stagedSend).toBeEnabled();
+    expect(screen.getAllByTestId('engine-topbar-send-btn')).toHaveLength(1);
+    fireEvent.click(stagedSend);
     expect(mocks.sendIssue).toHaveBeenCalledTimes(1);
+    expect(mocks.sendIssue).toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }));
   });
 
   it('opens the Local SEO setup drawer exactly once from operational disclosures', async () => {
