@@ -1,25 +1,6 @@
 {
   "sprints": [
     {
-      "id": "sprint-mcp-open-work-2026-07-17",
-      "name": "MCP — Open Work",
-      "hours": "P0 first — unblock the first paid matrix generation before follow-on MCP work",
-      "rationale": "A real staged Rinse matrix cell reached zero blockers for the first time on 2026-07-17, then preview_content_matrix_generation entered its previously unexercised ready-path tail and returned a generic internal_error. This blocks every paid content-matrix generation run and is the top platform blocker until the ready preview succeeds for the staged single-cell and multi-cell reproductions.",
-      "items": [
-        {
-          "id": "mcp-matrix-ready-preview-internal-error",
-          "title": "Fix fully-unblocked matrix preview internal_error",
-          "source": "2026-07-17 IE MCP staged Rinse reproduction; server/domains/content/matrix-generation/preview.ts:461,481-535",
-          "est": "S-M",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-07-17",
-          "owner": "content-pipeline",
-          "notes": "TOP BLOCKER; complete before every lower-priority MCP item. Reproduce against staged workspace ws_2ceaeb6c-0820-4da5-941e-ad9eae643993, matrix mtx_bb621f1e…, and cells cell_00556298… / cell_fe723bee… at cell revision 3; the durable state has finalized voice, approved identity, and verified service-availability/service-details evidence. Production logs retained request IDs but not the exception or stack, so add safe ready-tail stage diagnostics before the root fix. The formerly blocked path exits at preview.ts:461; the first fully-ready path runs buildContentGenerationContextV2, estimateMatrixGenerationCellBudget, evidenceRange, fingerprinting, batch budgeting, and MCP projection. Fix the confirmed root cause and add a production-shaped regression fixture with approved operator-authored differentiators and objection handling. Acceptance: identical single-cell and multi-cell previews return ready with stable fingerprints and bounded budgets; the prior blocked result remains unchanged when one requirement is missing; known context/budget/evidence/fingerprint failures map to a safe typed json_v1 error with stable code plus field_path/constraint/stage details; unexpected exceptions remain generic and secret-safe while logs retain request correlation and a safe stage classification. Preserve every deliberate gate: preview performs no paid work, evidence/voice/identity requirements stay blocking, exact revisions/fingerprints/budget ceilings remain mandatory, human review is not bypassed, and no generation/publish call is started automatically. After staging-green verification, hand back the exact ready preview payload so the owner can explicitly authorize start_content_matrix_generation. || [LOCAL IMPLEMENTATION 2026-07-17] A production-shaped synthetic fixture locally reproduced the leading diagnosis: ContentGenerationContextBudgetError when full finalized voice plus approved identity exceeded the global context defaults. Added matrix-only bounded context handling, all six safe stage boundaries, typed/redacted MCP errors, production-shaped single/two-cell determinism and no-side-effect coverage. Production did not retain the original exception, so staging diagnostics must confirm the classification before this is called the durable root cause. The item intentionally remains pending until the exact durable Rinse cells return ready on staging; do not invoke paid start automatically."
-        }
-      ]
-    },
-    {
       "id": "admin-ux-flow-2026-07",
       "name": "Admin UX flow & ease-of-use (from 2026-07-16 audits)",
       "hours": "~60",
