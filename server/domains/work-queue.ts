@@ -187,6 +187,7 @@ export function classifyWorkQueue(input: WorkQueueClassifierInput): WorkQueueCla
   }
 
   for (const signal of input.churnSignals ?? []) {
+    if (signal.severity !== 'critical' && signal.severity !== 'warning') continue;
     addItem(items, {
       stream: 'unclassified',
       id: `churn-${signal.id}`,
