@@ -2,7 +2,7 @@
   "version": 1,
   "updatedAt": "2026-07-16T05:27:59.000Z",
   "tolerance": 0.05,
-  "total": 1830477,
+  "total": 1831418,
   "entries": {
     "css:assets/index.css": 37315,
     "css:vendor/fontawesome/fontawesome-sharp-regular-subset.min.css": 1203,
@@ -229,7 +229,7 @@
     "js:src/components/SeoAudit.tsx": 15566,
     "js:src/components/SeoEditorWrapper.tsx": 13470,
     "js:src/components/SettingsPanel.tsx": 4277,
-    "js:src/components/site-audit-rebuilt/SiteAuditSurface.tsx": 10686,
+    "js:src/components/site-audit-rebuilt/SiteAuditSurface.tsx": 11627,
     "js:src/components/SiteArchitecture.tsx": 3735,
     "js:src/components/WorkspaceHome.tsx": 7680,
     "js:src/components/WorkspaceOverview.tsx": 4605,
