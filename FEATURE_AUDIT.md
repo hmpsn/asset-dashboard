@@ -10087,7 +10087,19 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 
 **Files:** matrix-generation preview and context-budget diagnostics; MCP content-matrix adapter; focused unit/contract tests; MCP generation rule; roadmap and audit.
 
-### 711. Admin UX W4.2c GO-004 Outcomes Book portfolio rollup 2026-07-17
+### 711. Admin UX W4.1a book-level Cockpit server rollup 2026-07-17
+
+**Status:** Complete for the server-rollup phase. W4.1b surface and W4.1c navigation/journey integration remain pending.
+
+**What changed:** Adds `GET /api/cockpit/portfolio`, a read-only cross-workspace Command Center model. For every visible active workspace, the server reads the same inputs used by Workspace Home, calls the canonical `classifyWorkQueue()` and `buildCockpitVerdict()` domain functions, and returns the complete classification/verdict pair in a summary row. Rows are ranked without an opaque score: cockpit verdict priority (`at_risk`, `watch`, `establishing`, `on_track`), then negative queue items, unclassified items, total queue items, workspace name, and workspace ID.
+
+**Honesty and scope:** Workspace, attention, queue-stream, queue-item, and verdict counts are exactly reconcilable from the returned rows and carry an explicit `reconciled` status. `valueAtStake` and `recoveredSoFar` remain `not_yet_reconcilable` with `null` values because workspace money frames may use different attribution bases and measurement windows; the rollup never sums verdict evidence or fabricates a book number. The route respects JWT workspace visibility, excludes archived workspaces through the canonical list read, and performs no writes, broadcasts, or cache mutation. No migration, new intelligence source/slice, or WS event was needed.
+
+**Tests:** Unit coverage pins deterministic attention ranking and exact-only aggregation, including proof that money evidence is ignored. Integration coverage invokes the real Express route over real workspace-backed inputs and verifies per-workspace classifier/verdict parity plus the honest totals contract.
+
+**Files:** shared Cockpit portfolio types; Cockpit portfolio domain and route; app route registration; focused unit/integration tests; roadmap and feature audit.
+
+### 715. Admin UX W4.2c GO-004 Outcomes Book portfolio rollup 2026-07-17
 
 **Status:** Complete. The rebuilt Outcomes Book now has one truthful server-owned portfolio window instead of a permanent unavailable banner and mixed all-time/28-day row metrics.
 
