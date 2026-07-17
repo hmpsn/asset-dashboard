@@ -10034,3 +10034,15 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Six navigation tests pin `/ws/:workspaceId/workspace-settings?tab=connections`; App coverage pins both no-history and retained-last-visit global chrome; breadcrumb coverage pins global workspace-segment omission. Focused component suites, typecheck, hooks lint, build, and pr-check cover the closeout.
 
 **Files:** six rebuilt surface components and their focused tests; `scripts/pr-check.ts`; `src/App.tsx`; rebuilt breadcrumb and tests; Global Ops parity contract; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 710. MCP fully-ready matrix preview diagnostic and context-budget repair 2026-07-17
+
+**Status:** Implemented locally; the roadmap item remains pending until the exact durable Rinse single-cell and two-cell previews pass on staging.
+
+**Leading diagnosis and repair:** A production-shaped synthetic fixture locally reproduces `ContentGenerationContextBudgetError` when finalized voice plus approved identity exceed the shared 2,400/1,400/600-token context defaults. The original production exception was not retained, so the exact durable staging classification remains the confirmation gate. Matrix preview now uses a dedicated bounded frozen-authority/context contract derived through the existing input-reservation estimator. Complete finalized voice and approved identity are preserved below the ceiling, apart from existing boundary-whitespace normalization; overflow fails closed with a typed field-addressed precondition instead of truncating authority. Shared context defaults are unchanged.
+
+**Diagnostics and safety:** Context assembly, cell budgeting, evidence range, preview fingerprint, batch budgeting, and MCP projection have explicit stage boundaries. Expected authority-budget failures return stable `precondition_failed` details; unexpected failures remain generic `internal_error`. Logs retain request ID, tool, stage, and safe classification only—never prompts, evidence, exception text, stacks, or secrets. Preview remains deterministic and side-effect free: it performs no provider call, run/job/artifact mutation, approval, send, or publish, and never invokes paid generation.
+
+**Tests:** Production-shaped finalized voice plus approved `differentiators` and `objection_handling` reproduce the prior global-budget failure, then pass under the bounded matrix contract. Single-cell and two-cell previews are stable across retries, remain under batch ceilings, preserve the blocked path, and leave run/job/brief/post counts unchanged. MCP contracts cover ready projection, serialization-stage classification, typed overflow, request correlation, and secret redaction.
+
+**Files:** matrix-generation preview and context-budget diagnostics; MCP content-matrix adapter; focused unit/contract tests; MCP generation rule; roadmap and audit.

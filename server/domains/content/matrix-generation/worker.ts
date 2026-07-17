@@ -415,10 +415,13 @@ export async function runMatrixGenerationJob(jobId: string): Promise<void> {
       });
       if (!signal.aborted) {
         const beforeBoundedProviderDispatch = (dispatch: BoundedProviderDispatch): void => {
+          // Computes the exact serialized UTF-8 reservation and enforces the
+          // shared per-dispatch envelope before any paid provider invocation.
+          const reservation = matrixGenerationProviderReservation(dispatch);
           reserveMatrixGenerationBudget({
             workspaceId: run!.workspaceId,
             runId: run!.id,
-            reservation: matrixGenerationProviderReservation(dispatch),
+            reservation,
           });
         };
         const selectedIds = retryCommand?.request.items.map(item => item.itemId)
