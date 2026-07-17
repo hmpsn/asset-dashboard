@@ -27,6 +27,7 @@ import {
   Button,
   CharacterCounter,
   ClickableRow,
+  ConfirmDialog,
   DataTable,
   Disclosure,
   Drawer,
@@ -683,6 +684,7 @@ function AuditLens({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportView, setReportView] = useState<'html' | 'csv' | null>(null);
+  const [acceptAllConfirmOpen, setAcceptAllConfirmOpen] = useState(false);
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [, setBulkError] = useState<string | null>(null);
@@ -789,6 +791,11 @@ function AuditLens({
     } catch (error) {
       toast(mutationErrorMessage(error, 'Bulk fixes could not start'), 'error');
     }
+  };
+
+  const handleConfirmAcceptAll = () => {
+    setAcceptAllConfirmOpen(false);
+    void handleAcceptAll();
   };
 
   const handleClearSuppressions = async () => {
@@ -927,7 +934,7 @@ function AuditLens({
             <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('all')} loading={audit.batchCreating}>
               Add all tasks
             </Button>
-            <Button size="sm" onClick={handleAcceptAll} disabled={bulkApplying || pendingFixes === 0}>
+            <Button size="sm" onClick={() => setAcceptAllConfirmOpen(true)} disabled={bulkApplying || pendingFixes === 0}>
               <Icon name="sparkle" size="sm" />
               {bulkApplying
                 ? (bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting…')
@@ -936,6 +943,16 @@ function AuditLens({
           </div>
         </SectionCard>
       </div>
+
+      <ConfirmDialog
+        open={acceptAllConfirmOpen}
+        title="Apply AI fixes to the live Webflow site?"
+        message={`This immediately applies up to ${pendingFixes} AI-suggested ${pendingFixes === 1 ? 'fix' : 'fixes'} — titles, meta descriptions, and page fields — directly to the live Webflow site and marks those pages live. Unrecognized checks are skipped, so fewer than ${pendingFixes} may change. These changes cannot be bulk-undone.`}
+        confirmLabel="Apply to live site"
+        onConfirm={handleConfirmAcceptAll}
+        onCancel={() => setAcceptAllConfirmOpen(false)}
+        variant="destructive"
+      />
 
       <BulkAcceptPanel
         workspaceId={audit.workspace?.id ?? ''}
