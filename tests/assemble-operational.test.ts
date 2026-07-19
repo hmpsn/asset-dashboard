@@ -60,7 +60,7 @@ vi.mock('../server/jobs.js', () => ({
 }));
 
 vi.mock('../server/approvals.js', () => ({
-  listBatches: vi.fn(() => [
+  readApprovalBatchesForIntelligence: vi.fn(() => [
     {
       id: 'b1',
       items: [
@@ -217,8 +217,8 @@ describe('assembleOperational', () => {
       { id: 'j3', status: 'done', type: 'audit' } as any,
     ]);
 
-    const { listBatches } = await import('../server/approvals.js');
-    vi.mocked(listBatches).mockReturnValue([
+    const { readApprovalBatchesForIntelligence } = await import('../server/approvals.js');
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValue([
       {
         id: 'b1',
         items: [
@@ -442,7 +442,7 @@ describe('assembleOperational', () => {
     const { listActivity } = await import('../server/activity-log.js');
     const { loadRecommendations } = await import('../server/recommendations.js');
     const { listJobs } = await import('../server/jobs.js');
-    const { listBatches } = await import('../server/approvals.js');
+    const { readApprovalBatchesForIntelligence } = await import('../server/approvals.js');
     const { getClientActionQueueStats } = await import('../server/client-actions.js');
     const { getAnnotations } = await import('../server/analytics-annotations.js');
     const { listAnnotations } = await import('../server/annotations.js');
@@ -455,7 +455,7 @@ describe('assembleOperational', () => {
     vi.mocked(listActivity).mockReturnValue([]);
     vi.mocked(loadRecommendations).mockReturnValue({ recommendations: [] } as any);
     vi.mocked(listJobs).mockReturnValue([]);
-    vi.mocked(listBatches).mockReturnValue([]);
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValue([]);
     vi.mocked(getClientActionQueueStats).mockReturnValue({ pending: 0, oldestAge: null });
     vi.mocked(getAnnotations).mockReturnValue([]);
     vi.mocked(listAnnotations).mockReturnValue([]);

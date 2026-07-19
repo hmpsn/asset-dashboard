@@ -25,7 +25,7 @@ vi.mock('../server/churn-signals.js', () => ({
 }));
 
 vi.mock('../server/approvals.js', () => ({
-  listBatches: vi.fn(() => []),
+  readApprovalBatchesForIntelligence: vi.fn(() => []),
 }));
 
 vi.mock('../server/roi.js', () => ({
@@ -306,9 +306,9 @@ describe('assembleClientSignals', () => {
     expect(typeof cs.compositeHealthScore === 'number' || cs.compositeHealthScore === null).toBe(true);
   });
 
-  it('populates approvalPatterns from listBatches', async () => {
-    const { listBatches } = await import('../server/approvals.js');
-    vi.mocked(listBatches).mockReturnValueOnce([
+  it('populates approvalPatterns from readApprovalBatchesForIntelligence', async () => {
+    const { readApprovalBatchesForIntelligence } = await import('../server/approvals.js');
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValueOnce([
       { id: 'b1', items: [{ status: 'approved' }, { status: 'approved' }, { status: 'pending' }] } as any,
     ]);
 
@@ -425,14 +425,14 @@ describe('assembleClientSignals', () => {
 
   it('survives when all data sources throw', async () => {
     const { listChurnSignals } = await import('../server/churn-signals.js');
-    const { listBatches } = await import('../server/approvals.js');
+    const { readApprovalBatchesForIntelligence } = await import('../server/approvals.js');
     const { listClientUsers } = await import('../server/client-users.js');
     const { computeROI } = await import('../server/roi.js');
     const { listRequests } = await import('../server/requests.js');
     const { listSessions } = await import('../server/chat-memory.js');
 
     vi.mocked(listChurnSignals).mockImplementationOnce(() => { throw new Error('churn db down'); });
-    vi.mocked(listBatches).mockImplementationOnce(() => { throw new Error('approvals db down'); });
+    vi.mocked(readApprovalBatchesForIntelligence).mockImplementationOnce(() => { throw new Error('approvals db down'); });
     vi.mocked(listClientUsers).mockImplementationOnce(() => { throw new Error('users db down'); });
     vi.mocked(computeROI).mockImplementationOnce(() => { throw new Error('roi db down'); });
     vi.mocked(listRequests).mockImplementationOnce(() => { throw new Error('requests db down'); });
