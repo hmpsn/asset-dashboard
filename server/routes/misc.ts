@@ -17,6 +17,7 @@ import { triggerOptimize } from '../processor.js';
 import { listSites, getPageDom } from '../webflow.js';
 import { getAllPageStates, getTokenForSite, getWorkspace, getWorkspaceBySiteId, listWorkspaces } from '../workspaces.js';
 import { getWorkspacePages } from '../workspace-data.js';
+import { suggestSvgFilename } from '../domains/webflow-assets/svg-naming.js';
 import { createLogger } from '../logger.js';
 import { isProgrammingError } from '../errors.js';
 import { requireWorkspaceAccess, requireWorkspaceSiteAccess, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
@@ -153,9 +154,20 @@ Rules:
 - Include brand/business name if visible in the image
 Just output the filename slug, nothing else.`;
 
-    // Try vision-enhanced naming if we have an image URL
+    const isSvg = contentType?.includes('svg') || ext === 'svg';
+
+    // Try content-enhanced naming if we have an image URL.
     let suggestion: string | null = null;
-    if (imageUrl && !contentType?.includes('svg')) {
+    if (imageUrl && isSvg) {
+      // SVGs are XML, not pixels — a vision model can't "see" them, so the old code
+      // skipped straight to filename-only naming and produced generic guesses. Feed
+      // the SVG SOURCE instead so the model can derive a real, specific name.
+      try {
+        suggestion = await suggestSvgFilename(client, imageUrl, promptText);
+      } catch (sErr) {
+        log.info({ detail: sErr instanceof Error ? sErr.message : sErr }, 'SVG naming fallback to text-only');
+      }
+    } else if (imageUrl) {
       try {
         // Download and prepare image for vision
         const sharp: typeof SharpConstructor = (await import('sharp')).default; // dynamic-import-ok
@@ -186,7 +198,7 @@ Just output the filename slug, nothing else.`;
       }
     }
 
-    // Fallback to text-only if vision didn't work
+    // Fallback to text-only if the content-enhanced attempt didn't produce a name
     if (!suggestion) {
       const response = await client.chat.completions.create({
         model: 'gpt-5.4-nano',
