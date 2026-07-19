@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { WorkspaceIntelligence } from '../../shared/types/intelligence.js';
 import {
   projectOperatorPortfolioBrief,
   projectOperatorWorkspaceDecisionBrief,
@@ -48,6 +49,7 @@ function row(
     effectiveTier: 'growth',
     liveDomain: `${workspaceId}.example.com`,
     pendingDecisions: {
+      availability: 'available',
       total: approvals + requests + clientActions,
       counts: { approvals, requests, clientActions },
       items,
@@ -125,6 +127,7 @@ describe('P2 workspace decision projection', () => {
           annotations: [],
           pendingJobs: 0,
           pendingDecisions: {
+            availability: 'available',
             total: 30,
             counts: { approvals: 15, requests: 0, clientActions: 15 },
             items: pendingDecisions,
@@ -134,7 +137,12 @@ describe('P2 workspace decision projection', () => {
       25,
     );
 
-    expect(brief.pending_decisions).toMatchObject({ total: 30, returned: 25, has_more: true });
+    expect(brief.pending_decisions).toMatchObject({
+      available: true,
+      total: 30,
+      returned: 25,
+      has_more: true,
+    });
     expect(brief.pending_decisions.items).toHaveLength(25);
     expect(brief.pending_decisions.items[0]!.source).toEqual({
       source_type: 'approval_item',
@@ -166,5 +174,55 @@ describe('P2 workspace decision projection', () => {
     expect(brief.next_safe_actions.map(item => item.action_code))
       .not.toContain('no_action_required');
     expect(brief.next_safe_actions[0]).toMatchObject({ action_code: 'inspect_data_availability' });
+  });
+
+  it('reports a pending-decision subread failure even when all five slices assembled', () => {
+    const intel = {
+      version: 1,
+      workspaceId: 'ws-1',
+      assembledAt: '2026-07-19T00:00:00.000Z',
+      insights: {
+        all: [], byType: {}, countsByType: {}, countsByTypeBySeverity: {},
+        bySeverity: {}, topByImpact: [],
+      },
+      contentPipeline: {
+        briefs: { total: 0, byStatus: {} },
+        posts: { total: 0, byStatus: {} },
+        matrices: { total: 0, cellsPlanned: 0, cellsPublished: 0 },
+        requests: { pending: 0, inProgress: 0, delivered: 0 },
+        workOrders: { active: 0 },
+        coverageGaps: [],
+        seoEdits: { pending: 0, applied: 0, inReview: 0 },
+      },
+      siteHealth: {
+        auditScore: null, auditScoreDelta: null, deadLinks: 0, redirectChains: 0,
+        schemaErrors: 0, orphanPages: 0, cwvPassRate: { mobile: null, desktop: null },
+      },
+      clientSignals: {
+        keywordFeedback: { approved: [], rejected: [], patterns: { approveRate: 0, topRejectionReasons: [] } },
+        contentGapVotes: [], businessPriorities: [], effectiveBusinessPriorities: [],
+        approvalPatterns: { approvalRate: 0, avgResponseTime: null },
+        recentChatTopics: [], churnRisk: null,
+      },
+      operational: {
+        recentActivity: [], annotations: [], pendingJobs: 0,
+        pendingDecisions: {
+          availability: 'unavailable',
+          total: 0,
+          counts: { approvals: 0, requests: 0, clientActions: 0 },
+          items: [],
+        },
+      },
+    } satisfies WorkspaceIntelligence;
+    const brief = projectOperatorWorkspaceDecisionBrief(
+      { workspaceId: 'ws-1', name: 'Workspace One', effectiveTier: 'growth' },
+      intel,
+      10,
+    );
+
+    expect(brief.slice_availability.unavailable).toEqual([]);
+    expect(brief.pending_decisions.available).toBe(false);
+    expect(brief.blockers).toContainEqual(expect.objectContaining({ reason_code: 'data_unavailable' }));
+    expect(brief.next_safe_actions[0]?.action_code).toBe('inspect_data_availability');
   });
 });

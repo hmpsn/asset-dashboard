@@ -329,6 +329,11 @@ function attachPageStates(ws: Workspace): Workspace {
 const stmts = createStmtCache(() => ({
   listAll: db.prepare(`SELECT * FROM workspaces`),
   listActive: db.prepare(`SELECT * FROM workspaces WHERE archived_at IS NULL`),
+  listActiveIdentities: db.prepare(`
+    SELECT id, name, live_domain, tier, trial_ends_at
+    FROM workspaces
+    WHERE archived_at IS NULL
+  `),
   getById: db.prepare<[id: string]>(`SELECT * FROM workspaces WHERE id = ?`),
   getBySiteId: db.prepare<[siteId: string]>(`SELECT * FROM workspaces WHERE webflow_site_id = ?`),
   setIssuePushedWeek: db.prepare<[weekOf: string | null, id: string]>(
@@ -488,6 +493,32 @@ export function getTokenForSite(siteId: string): string | null {
 export function listWorkspaces(options: { includeArchived?: boolean } = {}): Workspace[] {
   const rows = (options.includeArchived ? stmts().listAll.all() : stmts().listActive.all()) as WorkspaceRow[];
   return rows.map(r => attachPageStates(rowToWorkspace(r)));
+}
+
+export interface WorkspaceIdentity {
+  id: string;
+  name: string;
+  liveDomain: string | null;
+  tier: Workspace['tier'];
+  trialEndsAt?: string;
+}
+
+/** Skinny active-workspace read for bounded portfolio projections. */
+export function listWorkspaceIdentities(): WorkspaceIdentity[] {
+  const rows = stmts().listActiveIdentities.all() as Array<{
+    id: string;
+    name: string;
+    live_domain: string | null;
+    tier: Workspace['tier'];
+    trial_ends_at: string | null;
+  }>;
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    liveDomain: row.live_domain,
+    tier: row.tier,
+    ...(row.trial_ends_at ? { trialEndsAt: row.trial_ends_at } : {}),
+  }));
 }
 
 export function createWorkspace(name: string, webflowSiteId?: string, webflowSiteName?: string): Workspace {

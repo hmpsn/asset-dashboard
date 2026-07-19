@@ -595,6 +595,7 @@ export interface OperationalSlice {
    * compact decision read models; it is intentionally omitted from prompt formatters.
    */
   pendingDecisions?: {
+    availability: 'available' | 'unavailable';
     total: number;
     counts: {
       approvals: number;

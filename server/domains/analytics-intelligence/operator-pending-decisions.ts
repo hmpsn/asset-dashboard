@@ -2,13 +2,61 @@ import { Buffer } from 'node:buffer';
 
 import type { OperationalSlice } from '../../../shared/types/intelligence.js';
 import { MCP_OPERATOR_BRIEF_LIMITS } from '../../../shared/types/mcp-operator-briefs.js';
-import { listBatches } from '../../approvals.js';
-import { listClientActions } from '../../client-actions.js';
-import { listRequests } from '../../requests.js';
+import db from '../../db/index.js';
+import { createStmtCache } from '../../db/stmt-cache.js';
 
-type PendingDecision = NonNullable<
-  OperationalSlice['pendingDecisions']
->['items'][number];
+type PendingDecisionSummary = NonNullable<OperationalSlice['pendingDecisions']>;
+type PendingDecision = PendingDecisionSummary['items'][number];
+
+interface PendingProjectionRow {
+  workspace_id: string;
+  source_id: string;
+  parent_id: string | null;
+  label: string;
+  priority: string | null;
+  created_at: string;
+}
+
+const approvalProjectionSql = `
+  SELECT
+    batch.workspace_id,
+    CAST(json_extract(item.value, '$.id') AS TEXT) AS source_id,
+    batch.id AS parent_id,
+    batch.name || ': ' || COALESCE(json_extract(item.value, '$.pageTitle'), '')
+      || ' — ' || COALESCE(json_extract(item.value, '$.field'), '') AS label,
+    'medium' AS priority,
+    COALESCE(json_extract(item.value, '$.createdAt'), batch.created_at) AS created_at
+  FROM approval_batches AS batch
+  JOIN json_each(CASE WHEN json_valid(batch.items) THEN batch.items ELSE '[]' END) AS item
+  WHERE COALESCE(json_extract(item.value, '$.status'), 'pending') = 'pending'
+    AND json_type(item.value, '$.id') = 'text'
+`;
+
+const requestProjectionSql = `
+  SELECT workspace_id, id AS source_id, NULL AS parent_id, title AS label,
+    priority, created_at
+  FROM requests
+  WHERE status = 'new'
+`;
+
+const clientActionProjectionSql = `
+  SELECT workspace_id, id AS source_id, NULL AS parent_id, title AS label,
+    priority, created_at
+  FROM client_actions
+  WHERE status = 'pending'
+`;
+
+const stmts = createStmtCache(() => ({
+  approvalsByWorkspace: db.prepare(`${approvalProjectionSql} AND batch.workspace_id = ?`),
+  requestsByWorkspace: db.prepare(`${requestProjectionSql} AND workspace_id = ?`),
+  clientActionsByWorkspace: db.prepare(`${clientActionProjectionSql} AND workspace_id = ?`),
+  allActiveApprovals: db.prepare(`${approvalProjectionSql}
+    AND EXISTS (SELECT 1 FROM workspaces WHERE id = batch.workspace_id AND archived_at IS NULL)`),
+  allActiveRequests: db.prepare(`${requestProjectionSql}
+    AND EXISTS (SELECT 1 FROM workspaces WHERE id = requests.workspace_id AND archived_at IS NULL)`),
+  allActiveClientActions: db.prepare(`${clientActionProjectionSql}
+    AND EXISTS (SELECT 1 FROM workspaces WHERE id = client_actions.workspace_id AND archived_at IS NULL)`),
+}));
 
 const PRIORITY_RANK: Record<PendingDecision['priority'], number> = {
   urgent: 0,
@@ -16,6 +64,10 @@ const PRIORITY_RANK: Record<PendingDecision['priority'], number> = {
   medium: 2,
   low: 3,
 };
+
+function normalizedPriority(value: string | null): PendingDecision['priority'] {
+  return value === 'urgent' || value === 'high' || value === 'low' ? value : 'medium';
+}
 
 function boundedLabel(value: string, fallback: string): string {
   const normalized = value.replace(/\s+/g, ' ').trim() || fallback;
@@ -34,80 +86,92 @@ function boundedLabel(value: string, fallback: string): string {
   return bounded.trimEnd();
 }
 
-function comparePendingDecisions(
-  left: PendingDecision,
-  right: PendingDecision,
-): number {
-  const priorityDifference =
-    PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority];
-  if (priorityDifference !== 0) return priorityDifference;
-
-  const createdAtDifference = left.createdAt.localeCompare(right.createdAt);
-  if (createdAtDifference !== 0) return createdAtDifference;
-
-  const sourceTypeDifference = left.sourceType.localeCompare(right.sourceType);
-  if (sourceTypeDifference !== 0) return sourceTypeDifference;
-
-  return left.sourceId.localeCompare(right.sourceId);
+function comparePendingDecisions(left: PendingDecision, right: PendingDecision): number {
+  return PRIORITY_RANK[left.priority] - PRIORITY_RANK[right.priority]
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.sourceType.localeCompare(right.sourceType)
+    || left.sourceId.localeCompare(right.sourceId);
 }
 
-/**
- * Builds the payload-free operational queue consumed by compact MCP read models.
- * The result contains only durable references and bounded display metadata.
- */
-export function readOperatorPendingDecisions(
-  workspaceId: string,
-): NonNullable<OperationalSlice['pendingDecisions']> {
-  const approvalItems: PendingDecision[] = listBatches(workspaceId).flatMap(
-    (batch) =>
-      batch.items
-        .filter((item) => item.status === 'pending')
-        .map((item) => ({
-          sourceType: 'approval_item' as const,
-          sourceId: item.id,
-          parentId: batch.id,
-          label: boundedLabel(
-            `${batch.name}: ${item.pageTitle} — ${item.field}`,
-            'Pending approval',
-          ),
-          priority: 'medium' as const,
-          createdAt: item.createdAt,
-        })),
-  );
+function projectRows(
+  rows: readonly PendingProjectionRow[],
+  sourceType: PendingDecision['sourceType'],
+): PendingDecision[] {
+  return rows.map((row) => ({
+    sourceType,
+    sourceId: row.source_id,
+    parentId: row.parent_id,
+    label: boundedLabel(row.label, sourceType === 'approval_item'
+      ? 'Pending approval'
+      : sourceType === 'client_request'
+        ? 'New client request'
+        : 'Pending client action'),
+    priority: normalizedPriority(row.priority),
+    createdAt: row.created_at,
+  }));
+}
 
-  const clientRequests: PendingDecision[] = listRequests(workspaceId)
-    .filter((request) => request.status === 'new')
-    .map((request) => ({
-      sourceType: 'client_request' as const,
-      sourceId: request.id,
-      parentId: null,
-      label: boundedLabel(request.title, 'New client request'),
-      priority: request.priority,
-      createdAt: request.createdAt,
-    }));
-
-  const clientActions: PendingDecision[] = listClientActions(workspaceId)
-    .filter((action) => action.status === 'pending')
-    .map((action) => ({
-      sourceType: 'client_action' as const,
-      sourceId: action.id,
-      parentId: null,
-      label: boundedLabel(action.title, 'Pending client action'),
-      priority: action.priority,
-      createdAt: action.createdAt,
-    }));
-
-  const pending = [...approvalItems, ...clientRequests, ...clientActions].sort(
-    comparePendingDecisions,
-  );
+function buildSummary(
+  approvalRows: readonly PendingProjectionRow[],
+  requestRows: readonly PendingProjectionRow[],
+  clientActionRows: readonly PendingProjectionRow[],
+): PendingDecisionSummary {
+  const approvals = projectRows(approvalRows, 'approval_item');
+  const requests = projectRows(requestRows, 'client_request');
+  const clientActions = projectRows(clientActionRows, 'client_action');
+  const pending = [...approvals, ...requests, ...clientActions].sort(comparePendingDecisions);
 
   return {
+    availability: 'available',
     total: pending.length,
     counts: {
-      approvals: approvalItems.length,
-      requests: clientRequests.length,
+      approvals: approvals.length,
+      requests: requests.length,
       clientActions: clientActions.length,
     },
     items: pending.slice(0, MCP_OPERATOR_BRIEF_LIMITS.maxListLimit),
   };
+}
+
+/** Read one workspace's bounded decision metadata using SELECT-only projections. */
+export function readOperatorPendingDecisions(workspaceId: string): PendingDecisionSummary {
+  return buildSummary(
+    stmts().approvalsByWorkspace.all(workspaceId) as PendingProjectionRow[],
+    stmts().requestsByWorkspace.all(workspaceId) as PendingProjectionRow[],
+    stmts().clientActionsByWorkspace.all(workspaceId) as PendingProjectionRow[],
+  );
+}
+
+/** Read all active workspaces in three bounded-column queries for portfolio assembly. */
+export function readAllOperatorPendingDecisions(): ReadonlyMap<string, PendingDecisionSummary> {
+  const approvals = stmts().allActiveApprovals.all() as PendingProjectionRow[];
+  const requests = stmts().allActiveRequests.all() as PendingProjectionRow[];
+  const clientActions = stmts().allActiveClientActions.all() as PendingProjectionRow[];
+  const groupByWorkspace = (rows: readonly PendingProjectionRow[]) => {
+    const grouped = new Map<string, PendingProjectionRow[]>();
+    for (const row of rows) {
+      const workspaceRows = grouped.get(row.workspace_id) ?? [];
+      workspaceRows.push(row);
+      grouped.set(row.workspace_id, workspaceRows);
+    }
+    return grouped;
+  };
+  const approvalGroups = groupByWorkspace(approvals);
+  const requestGroups = groupByWorkspace(requests);
+  const clientActionGroups = groupByWorkspace(clientActions);
+  const workspaceIds = new Set([
+    ...approvalGroups.keys(),
+    ...requestGroups.keys(),
+    ...clientActionGroups.keys(),
+  ]);
+  const summaries = new Map<string, PendingDecisionSummary>();
+
+  for (const workspaceId of workspaceIds) {
+    summaries.set(workspaceId, buildSummary(
+      approvalGroups.get(workspaceId) ?? [],
+      requestGroups.get(workspaceId) ?? [],
+      clientActionGroups.get(workspaceId) ?? [],
+    ));
+  }
+  return summaries;
 }

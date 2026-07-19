@@ -56,16 +56,20 @@ const nullableNumberSchema = z.number().finite().nullable();
 const nullableStringSchema = z.string().nullable();
 
 export const getPortfolioBriefInputSchema = z.object({
-  limit: boundedLimitSchema.default(MCP_OPERATOR_BRIEF_LIMITS.defaultListLimit),
+  limit: boundedLimitSchema
+    .describe('Maximum portfolio rows to return; defaults to 10 and caps at 25.')
+    .default(MCP_OPERATOR_BRIEF_LIMITS.defaultListLimit),
 }).strict();
 
 export const getWorkspaceDecisionBriefInputSchema = z.object({
-  workspace_id: workspaceIdSchema,
-  queue_limit: boundedLimitSchema.default(MCP_OPERATOR_BRIEF_LIMITS.defaultListLimit),
+  workspace_id: workspaceIdSchema.describe('Durable workspace ID to inspect.'),
+  queue_limit: boundedLimitSchema
+    .describe('Maximum decisions, blockers, and risk signals to return; defaults to 10 and caps at 25.')
+    .default(MCP_OPERATOR_BRIEF_LIMITS.defaultListLimit),
 }).strict();
 
 export const getClientViewInputSchema = z.object({
-  workspace_id: workspaceIdSchema,
+  workspace_id: workspaceIdSchema.describe('Durable workspace ID whose client-safe view to return.'),
 }).strict();
 
 export const mcpOperatorSourceRefSchema = z.object({
@@ -156,6 +160,7 @@ export const workspaceDecisionBriefDataSchema = z.object({
   }).strict(),
   blockers: z.array(blockerSchema).max(MCP_OPERATOR_BRIEF_LIMITS.maxListLimit),
   pending_decisions: z.object({
+    available: z.boolean(),
     total: nonnegativeIntegerSchema,
     returned: nonnegativeIntegerSchema,
     has_more: z.boolean(),

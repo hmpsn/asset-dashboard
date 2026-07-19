@@ -19,9 +19,11 @@ import { buildWorkspaceIntelligence } from '../../workspace-intelligence.js';
 import {
   computeEffectiveTier,
   getWorkspace,
-  listWorkspaces,
+  listWorkspaceIdentities,
 } from '../../workspaces.js';
-import { readOperatorPendingDecisions } from './operator-pending-decisions.js';
+import {
+  readAllOperatorPendingDecisions,
+} from './operator-pending-decisions.js';
 
 export const OPERATOR_DECISION_INTELLIGENCE_SLICES = [
   'insights',
@@ -139,12 +141,18 @@ export function projectOperatorPortfolioBrief(
 }
 
 export function buildOperatorPortfolioBrief(limit: number): PortfolioBriefData {
-  const rows: OperatorPortfolioWorkspaceRow[] = listWorkspaces().map((workspace) => ({
+  const pendingByWorkspace = readAllOperatorPendingDecisions();
+  const rows: OperatorPortfolioWorkspaceRow[] = listWorkspaceIdentities().map((workspace) => ({
     workspaceId: workspace.id,
     name: workspace.name,
     effectiveTier: computeEffectiveTier(workspace),
     liveDomain: workspace.liveDomain ?? null,
-    pendingDecisions: readOperatorPendingDecisions(workspace.id),
+    pendingDecisions: pendingByWorkspace.get(workspace.id) ?? {
+      availability: 'available',
+      total: 0,
+      counts: { approvals: 0, requests: 0, clientActions: 0 },
+      items: [],
+    },
   }));
   return projectOperatorPortfolioBrief(rows, limit);
 }
@@ -174,6 +182,7 @@ function insightSourceRefs(
 function blockerProjection(
   intel: WorkspaceIntelligence,
   unavailable: readonly OperatorDecisionSlice[],
+  pendingDecisionsAvailable: boolean,
   limit: number,
 ): DecisionBlocker[] {
   const blockers: DecisionBlocker[] = [];
@@ -245,12 +254,13 @@ function blockerProjection(
     source_refs: warningRisk.slice(0, limit).map(churnSourceRef),
   } : null);
 
-  add(unavailable.length > 0 ? {
-    reason_code: 'data_unavailable', severity: 'high', count: unavailable.length, source_refs: [],
+  const unavailableCount = unavailable.length + (pendingDecisionsAvailable ? 0 : 1);
+  add(unavailableCount > 0 ? {
+    reason_code: 'data_unavailable', severity: 'high', count: unavailableCount, source_refs: [],
   } : null);
 
   const bounded = blockers.slice(0, limit);
-  if (unavailable.length > 0 && !bounded.some((blocker) => blocker.reason_code === 'data_unavailable')) {
+  if (unavailableCount > 0 && !bounded.some((blocker) => blocker.reason_code === 'data_unavailable')) {
     bounded[bounded.length - 1] = blockers[blockers.length - 1]!;
   }
   return bounded;
@@ -292,7 +302,13 @@ function pendingDecisionProjection(
     priority: item.priority,
     created_at: item.createdAt,
   }));
-  return { total, returned: items.length, has_more: total > items.length, items };
+  return {
+    available: pendingDecisions?.availability === 'available',
+    total,
+    returned: items.length,
+    has_more: total > items.length,
+    items,
+  };
 }
 
 function firstBlocker(
@@ -406,7 +422,8 @@ export function projectOperatorWorkspaceDecisionBrief(
   const unavailable = OPERATOR_DECISION_INTELLIGENCE_SLICES.filter(
     (slice) => !available.includes(slice),
   );
-  const blockers = blockerProjection(intel, unavailable, queueLimit);
+  const pendingDecisionsAvailable = intel.operational?.pendingDecisions?.availability === 'available';
+  const blockers = blockerProjection(intel, unavailable, pendingDecisionsAvailable, queueLimit);
   const pendingDecisions = pendingDecisionProjection(intel.operational?.pendingDecisions, queueLimit);
   const clientRiskSignals = clientRiskProjection(intel, queueLimit);
 

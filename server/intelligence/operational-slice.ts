@@ -209,6 +209,7 @@ export async function assembleOperational(
     'assembleOperational: pending decisions',
     workspaceId,
     {
+      availability: 'unavailable',
       total: 0,
       counts: { approvals: 0, requests: 0, clientActions: 0 },
       items: [],
