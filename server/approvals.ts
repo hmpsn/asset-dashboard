@@ -55,7 +55,7 @@ const stmts = createStmtCache(() => ({
   ),
 }));
 
-function rowToBatch(row: BatchRow): ApprovalBatch {
+function rowToBatch(row: BatchRow, persistLegacyHealing = true): ApprovalBatch {
   const rawItems = parseJsonFallback<unknown[]>(row.items, []);
   let healed = false;
   let dropped = 0;
@@ -72,7 +72,7 @@ function rowToBatch(row: BatchRow): ApprovalBatch {
   if (dropped > 0) {
     log.warn({ batchId: row.id, workspaceId: row.workspace_id, dropped, total: rawItems.length }, 'approval_batches.items: dropped invalid items');
   }
-  if (healed) {
+  if (healed && persistLegacyHealing) {
     stmts().update.run({ id: row.id, workspace_id: row.workspace_id, items: JSON.stringify(items), status: row.status, updated_at: new Date().toISOString() });
   }
   return {
@@ -130,7 +130,19 @@ export function createBatch(
 
 export function listBatches(workspaceId: string): ApprovalBatch[] {
   const rows = stmts().selectByWorkspace.all(workspaceId) as BatchRow[];
-  return rows.map(rowToBatch);
+  return rows.map(row => rowToBatch(row));
+}
+
+/**
+ * Read approval batches for intelligence projections without mutating legacy rows.
+ *
+ * Normal approval CRUD reads retain their historical self-healing behavior. Intelligence
+ * assembly is a read boundary, though, so missing legacy item statuses are normalized to
+ * `pending` in memory without persisting that repair or changing `updated_at`.
+ */
+export function readApprovalBatchesForIntelligence(workspaceId: string): ApprovalBatch[] {
+  const rows = stmts().selectByWorkspace.all(workspaceId) as BatchRow[];
+  return rows.map(row => rowToBatch(row, false));
 }
 
 export interface ListBatchesPagedResult {
@@ -150,7 +162,7 @@ export function listBatchesPaged(
   const total = Number(countRow.cnt) || 0;
   const rows = stmts().selectByWorkspacePaged.all(workspaceId, limit, offset) as BatchRow[];
   return {
-    items: rows.map(rowToBatch),
+    items: rows.map(row => rowToBatch(row)),
     total,
     limit,
     offset,

@@ -254,7 +254,9 @@ function blockerProjection(
     source_refs: warningRisk.slice(0, limit).map(churnSourceRef),
   } : null);
 
-  const unavailableCount = unavailable.length + (pendingDecisionsAvailable ? 0 : 1);
+  const pendingSubreadUnavailable = !pendingDecisionsAvailable
+    && !unavailable.includes('operational');
+  const unavailableCount = unavailable.length + (pendingSubreadUnavailable ? 1 : 0);
   add(unavailableCount > 0 ? {
     reason_code: 'data_unavailable', severity: 'high', count: unavailableCount, source_refs: [],
   } : null);

@@ -196,8 +196,8 @@ export async function assembleClientSignals(
     workspaceId,
     { approvalRate: 0, avgResponseTime: null as number | null },
     async () => {
-      const { listBatches } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const batches: ApprovalBatch[] = listBatches(workspaceId);
+      const { readApprovalBatchesForIntelligence } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const batches: ApprovalBatch[] = readApprovalBatchesForIntelligence(workspaceId);
       let approved = 0,
         total = 0;
       for (const batch of batches) {

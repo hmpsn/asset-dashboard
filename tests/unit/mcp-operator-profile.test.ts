@@ -23,8 +23,8 @@ const registryModule = await import('../../server/mcp/tool-registry.js') as unkn
   listMcpToolDefinitionsForProfile?: (profile: McpServerProfile) => Tool[];
 };
 
-const FULL_DISCOVERY_BYTES = 157_249;
-const FULL_DISCOVERY_SHA256 = 'b8178da1ab61dcb9abeb6bd2c6c41953ce97bbf6cf4151c39a8e552bb9c7c9cb';
+const FULL_DISCOVERY_BYTES = 161_047;
+const FULL_DISCOVERY_SHA256 = '90411aa165a7d3f69f3dda99673ce90074f47e12d2c87b849a2f9eeeb223b13c';
 const FULL_INSTRUCTIONS_BYTES = 11_862;
 const FULL_INSTRUCTIONS_SHA256 = '442536613942c966472445b3d5519c4629d63bbebfed78e5b90295c1c68c67fd';
 
@@ -97,6 +97,41 @@ function stripSchemaDescriptions(value: unknown): unknown {
         return [key, cloneJsonValue(child)];
       }),
   );
+}
+
+function expandLocalSchemaRefs(schema: unknown): unknown {
+  const definitions = new Map<string, Record<string, unknown>>();
+  const indexDefinitions = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(indexDefinitions);
+      return;
+    }
+    if (value === null || typeof value !== 'object') return;
+    const node = value as Record<string, unknown>;
+    if (typeof node.$id === 'string') definitions.set(node.$id, node);
+    Object.values(node).forEach(indexDefinitions);
+  };
+  indexDefinitions(schema);
+
+  const expand = (value: unknown, resolving = new Set<string>()): unknown => {
+    if (Array.isArray(value)) return value.map(child => expand(child, resolving));
+    if (value === null || typeof value !== 'object') return value;
+    const node = value as Record<string, unknown>;
+    if (typeof node.$ref === 'string') {
+      const definitionId = node.$ref;
+      const target = definitions.get(definitionId);
+      if (!target || resolving.has(definitionId)) {
+        throw new Error(`Invalid compact schema ref: ${node.$ref}`);
+      }
+      return expand(target, new Set([...resolving, definitionId]));
+    }
+    return Object.fromEntries(
+      Object.entries(node)
+        .filter(([key]) => key !== 'definitions' && key !== '$id')
+        .map(([key, child]) => [key, expand(child, resolving)]),
+    );
+  };
+  return expand(schema);
 }
 
 function objectRecord(value: unknown): Record<string, unknown> {
@@ -179,7 +214,7 @@ describe('MCP compact operator profile contract', () => {
           definition.name as keyof typeof MCP_OPERATOR_TOOL_DESCRIPTIONS
         ],
       );
-      expect(definition.inputSchema).toEqual(
+      expect(expandLocalSchemaRefs(definition.inputSchema)).toEqual(
         stripSchemaDescriptions(canonicalDefinition!.inputSchema),
       );
       if (canonicalDefinition!.outputSchema) {

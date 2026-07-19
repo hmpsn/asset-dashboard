@@ -5,7 +5,7 @@ import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-s
 
 const MCP_MASTER_KEY = 'test-mcp-operator-master-key';
 const OPERATOR_PATH = '/mcp/operator';
-const FULL_DISCOVERY_SHA256 = 'b8178da1ab61dcb9abeb6bd2c6c41953ce97bbf6cf4151c39a8e552bb9c7c9cb';
+const FULL_DISCOVERY_SHA256 = '90411aa165a7d3f69f3dda99673ce90074f47e12d2c87b849a2f9eeeb223b13c';
 const FULL_INSTRUCTIONS_SHA256 = '442536613942c966472445b3d5519c4629d63bbebfed78e5b90295c1c68c67fd';
 const ctx = createEphemeralTestContext(import.meta.url, {
   env: { MCP_API_KEY: MCP_MASTER_KEY },

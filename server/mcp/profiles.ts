@@ -37,31 +37,31 @@ export const MCP_OPERATOR_TOOL_NAMES = Object.freeze([
 export type McpOperatorToolName = (typeof MCP_OPERATOR_TOOL_NAMES)[number];
 
 export const MCP_OPERATOR_TOOL_DESCRIPTIONS = Object.freeze({
-  list_workspaces: 'List workspace summaries and durable workspace IDs.',
-  get_portfolio_brief: 'Read the bounded deterministic studio priority brief.',
-  get_workspace_decision_brief: 'Read bounded blockers, decisions, risks, and safe next actions.',
-  get_client_view: 'Read exactly the client-safe, tier-gated intelligence projection.',
-  get_brand_identity: 'Read approved and draft brand-identity deliverables for one workspace.',
-  create_brand_deliverable: 'Create an operator-authored brand deliverable as a review-gated draft.',
-  update_brand_deliverable: 'Revision-safely update a review-gated brand deliverable.',
-  get_brand_voice: 'Read finalized voice authority, prerequisites, and eligible anchors.',
-  list_content_templates: 'List bounded content-template summaries for one workspace.',
-  get_content_template: 'Read one content template and its exact revision.',
-  create_content_template: 'Create a workspace-owned content template without generation.',
-  update_content_template: 'Revision-safely update a content template without generation.',
-  create_content_matrix: 'Create a validated Cartesian matrix without previewing or generating.',
-  update_content_matrix_cell: 'Revision-safely override one matrix cell and invalidate old previews.',
-  list_content_matrices: 'List bounded content-matrix summaries for one workspace.',
-  get_content_matrix: 'Read one matrix and a bounded, revision-tied page of cells.',
-  resolve_content_matrix_cells: 'Resolve structures and blockers without AI or paid work.',
-  accept_content_template_generation_upgrade: 'Accept or reject one exact deterministic template upgrade.',
-  preview_content_matrix_generation: 'Freeze authority, blockers, fingerprint, and estimate without paid work.',
-  resolve_content_matrix_evidence: 'Revision-safely resolve one stable evidence requirement.',
-  start_content_matrix_generation: 'Start explicitly confirmed paid generation from exact accepted previews.',
-  get_content_matrix_generation: 'Read bounded durable outcomes for a matrix-generation run.',
-  retry_content_matrix_generation: 'Retry explicitly selected failed checkpoints under exact revisions.',
-  get_job_status: 'Poll one background job by its durable job ID.',
-  send_to_client: 'Explicitly send a saved review target to the client and notify them.',
+  list_workspaces: 'List workspaces; return IDs.',
+  get_portfolio_brief: 'Read bounded priority queue.',
+  get_workspace_decision_brief: 'Read blockers, risks, safe actions.',
+  get_client_view: 'Read exact client-safe view.',
+  get_brand_identity: 'Read identity drafts/approvals.',
+  create_brand_deliverable: 'Create review-gated draft.',
+  update_brand_deliverable: 'Update draft by revision.',
+  get_brand_voice: 'Read finalized voice.',
+  list_content_templates: 'List bounded templates.',
+  get_content_template: 'Read template/revision.',
+  create_content_template: 'Create template; no generation.',
+  update_content_template: 'Update template by revision.',
+  create_content_matrix: 'Create validated matrix.',
+  update_content_matrix_cell: 'Update cell by revision.',
+  list_content_matrices: 'List bounded matrices.',
+  get_content_matrix: 'Read matrix/cell page.',
+  resolve_content_matrix_cells: 'Resolve cells/blockers.',
+  accept_content_template_generation_upgrade: 'Accept/reject exact upgrade.',
+  preview_content_matrix_generation: 'Preview blockers/fingerprint/cost.',
+  resolve_content_matrix_evidence: 'Resolve stable evidence.',
+  start_content_matrix_generation: 'Start confirmed paid generation.',
+  get_content_matrix_generation: 'Read generation outcomes.',
+  retry_content_matrix_generation: 'Retry failed checkpoints.',
+  get_job_status: 'Poll background job.',
+  send_to_client: 'Send saved target to client.',
 } satisfies Readonly<Record<McpOperatorToolName, string>>);
 
 const operatorToolNames = new Set<string>(MCP_OPERATOR_TOOL_NAMES);
@@ -77,16 +77,10 @@ export function operatorToolDescription(toolName: McpOperatorToolName): string {
   return MCP_OPERATOR_TOOL_DESCRIPTIONS[toolName];
 }
 
-export const MCP_OPERATOR_PROFILE_INSTRUCTIONS = `${STUDIO_NAME} desktop operator profile. Use this compact surface for external studio administration; use the full /mcp endpoint only when an advanced tool is genuinely required.
+export const MCP_OPERATOR_PROFILE_INSTRUCTIONS = `${STUDIO_NAME} operator. Start with list_workspaces; copy IDs and follow schemas.
 
-Start with list_workspaces and copy durable IDs exactly. Match each tool's schema, including workspace_id versus workspaceId. Read tools are deterministic; use their bounded query options whenever available.
+Brand drafts are not approvals; generation requires finalized voice and approved identity.
 
-Brand identity and voice remain human-governed. create_brand_deliverable and update_brand_deliverable save review-gated drafts; they do not approve content. Finalized voice and approved identity remain mandatory wherever generation requires them.
+For matrices, resolve cells/evidence, accept the exact upgrade, then preview. Preview is free and side-effect-free. Before paid start/retry, show targets, fingerprint, estimate, and limits; get explicit human confirmation—never infer it. Generation ends at human review; never auto-approve, send, or publish.
 
-For matrix work: list/get the template and matrix, resolve exact cells, accept only an exact proposed template upgrade, preview, resolve typed evidence blockers, then preview again. Preview is free and side-effect free. It freezes exact source/artifact revisions, authority, fingerprint, omissions, and the paid-work estimate.
-
-start_content_matrix_generation and retry_content_matrix_generation trigger paid provider work. Before either call, show the human the ready targets, accepted fingerprint/estimate, and hard limits, then require explicit confirmation. Never infer confirmation and never call paid generation merely because preview is ready. Generation stops at human review and never auto-approves, sends, or publishes.
-
-send_to_client creates a client-facing review request and may notify the client. Require explicit human intent for the exact target before calling it.
-
-On conflict, re-read the resource and use current revisions; never force a stale edit. Poll returned jobs with get_job_status. Errors use the json_v1 envelope with code, message, retryable, and optional safe details. Hidden tools are unavailable on this profile.`;
+send_to_client needs explicit intent for its saved target. On conflict, re-read revisions. Poll with get_job_status. Hidden tools are unavailable; use full /mcp for advanced work.`;

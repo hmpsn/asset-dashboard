@@ -18,6 +18,7 @@ import {
   mcpUnexpectedToolError,
 } from './tool-errors.js';
 import { runWithMcpToolExecutionContext } from './tool-execution-context.js';
+import { compactMcpJsonSchema } from './json-schema.js';
 import {
   isMcpToolAllowedInProfile,
   operatorToolDescription,
@@ -571,10 +572,11 @@ function snapshotSchemaNode<T>(
 }
 
 function operatorDefinition(definition: Tool): Tool {
+  const inputSchema = snapshotSchemaNode(definition.inputSchema);
   return snapshotValue({
     ...definition,
     description: operatorToolDescription(definition.name as McpOperatorToolName),
-    inputSchema: snapshotSchemaNode(definition.inputSchema),
+    inputSchema: compactMcpJsonSchema(inputSchema),
     ...(definition.outputSchema
       ? { outputSchema: snapshotSchemaNode(definition.outputSchema) }
       : {}),

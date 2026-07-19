@@ -170,7 +170,10 @@ describe('P2 workspace decision projection', () => {
       'clientSignals',
       'operational',
     ]);
-    expect(brief.blockers).toContainEqual(expect.objectContaining({ reason_code: 'data_unavailable' }));
+    expect(brief.blockers).toContainEqual(expect.objectContaining({
+      reason_code: 'data_unavailable',
+      count: 5,
+    }));
     expect(brief.next_safe_actions.map(item => item.action_code))
       .not.toContain('no_action_required');
     expect(brief.next_safe_actions[0]).toMatchObject({ action_code: 'inspect_data_availability' });

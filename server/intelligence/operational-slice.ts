@@ -168,8 +168,8 @@ export async function assembleOperational(
     workspaceId,
     { pending: 0, oldestAge: null },
     async () => {
-      const { listBatches } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const batches: ApprovalBatch[] = listBatches(workspaceId);
+      const { readApprovalBatchesForIntelligence } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const batches: ApprovalBatch[] = readApprovalBatchesForIntelligence(workspaceId);
       let pending = 0;
       let oldestMs = 0;
       for (const batch of batches) {
