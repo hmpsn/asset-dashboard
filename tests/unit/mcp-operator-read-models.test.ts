@@ -10,18 +10,47 @@ function row(
   name: string,
   pending: { approvals?: number; requests?: number; clientActions?: number },
 ): OperatorPortfolioWorkspaceRow {
+  const approvals = pending.approvals ?? 0;
+  const requests = pending.requests ?? 0;
+  const clientActions = pending.clientActions ?? 0;
+  const decision = (
+    sourceType: 'approval_item' | 'client_request' | 'client_action',
+    sourceId: string,
+    index: number,
+  ) => ({
+    sourceType,
+    sourceId,
+    parentId: sourceType === 'approval_item' ? `batch-${workspaceId}-${index}` : null,
+    label: `${sourceType} ${index}`,
+    priority: 'medium' as const,
+    createdAt: `2026-07-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
+  });
+  const items = [
+    ...Array.from({ length: approvals }, (_, index) => decision(
+      'approval_item',
+      `approval-${workspaceId}-${index}`,
+      index,
+    )),
+    ...Array.from({ length: requests }, (_, index) => decision(
+      'client_request',
+      `request-${workspaceId}-${index}`,
+      index,
+    )),
+    ...Array.from({ length: clientActions }, (_, index) => decision(
+      'client_action',
+      `action-${workspaceId}-${index}`,
+      index,
+    )),
+  ];
   return {
     workspaceId,
     name,
     effectiveTier: 'growth',
     liveDomain: `${workspaceId}.example.com`,
-    pendingApprovals: pending.approvals ?? 0,
-    pendingRequests: pending.requests ?? 0,
-    pendingClientActions: pending.clientActions ?? 0,
-    drillDownIds: {
-      approvals: Array.from({ length: pending.approvals ?? 0 }, (_, index) => `approval-${workspaceId}-${index}`),
-      requests: Array.from({ length: pending.requests ?? 0 }, (_, index) => `request-${workspaceId}-${index}`),
-      clientActions: Array.from({ length: pending.clientActions ?? 0 }, (_, index) => `action-${workspaceId}-${index}`),
+    pendingDecisions: {
+      total: approvals + requests + clientActions,
+      counts: { approvals, requests, clientActions },
+      items,
     },
   };
 }
@@ -91,7 +120,16 @@ describe('P2 workspace decision projection', () => {
         workspaceId: 'ws-1',
         assembledAt: '2026-07-19T00:00:00.000Z',
         insights: { all: [], byType: {}, countsByType: {}, countsByTypeBySeverity: {}, bySeverity: {}, topByImpact: [] },
-        operational: { recentActivity: [], annotations: [], pendingJobs: 0, pendingDecisions: { total: 30, items: pendingDecisions } },
+        operational: {
+          recentActivity: [],
+          annotations: [],
+          pendingJobs: 0,
+          pendingDecisions: {
+            total: 30,
+            counts: { approvals: 15, requests: 0, clientActions: 15 },
+            items: pendingDecisions,
+          },
+        },
       },
       25,
     );
