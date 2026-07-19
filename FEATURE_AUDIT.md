@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 717** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 718** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 718. Insights-backed MCP operator briefs and exact client view 2026-07-19
+
+**What it does:** Activates all 25 tools on the compact `/mcp/operator` desktop surface by adding three deterministic read models: a master-only portfolio priority brief, a workspace decision brief, and an exact client-safe view. Portfolio assembly uses skinny workspace identities, exact aggregate queue counts, and one bounded detail query only for the selected top workspaces. The decision brief purpose-selects five of the Insights Engine's 15 registered slices—Insights, Content Pipeline, Site Health, Client Signals, and Operational—and returns bounded blockers, durable source IDs, client risks, and deterministic next-safe-action codes. The client view reuses the same tier selector and scrubbed projection as the public client endpoint for Free, active trial, Growth, and Premium.
+
+**Reliability and safety:** Intelligence approval reads normalize legacy missing statuses in memory without writing. Request, approval, churn, and production client-action mutation seams keep caches fresh. Slice and subread failures remain explicit `data_unavailable` states and cannot become `no_action_required`. Queue/risk ordering is deterministic, outputs are strict Zod-validated structured content plus backward-compatible text JSON, and advertised draft-07 schemas are losslessly deduplicated. The operator catalog plus instructions is 32,222 bytes. No read model invokes AI/providers, paid work, jobs, sends, approvals, or publication.
+
+**Why it matters:** Desktop administration can start with a compact portfolio triage call, drill into one workspace, and inspect exactly what a client can see without downloading the full intelligence object or paying for model/provider work. This reduces orientation tokens and repeated database loading while preserving the Insights Engine as the authoritative storage and client-view layer.
+
+**Boundaries and verification:** `/mcp` remains backward compatible; `/mcp/operator` remains master-key-only until capability credentials ship in P5. There is no UI, migration, feature flag, staging/local database sync, or production-data mutation. Two independent release reviews approved runtime/spec/security and quality/backward-compatibility/performance. Focused unit, contract, and real MCP HTTP integration coverage includes read-only legacy rows, bounded SQL, failure states, schema equivalence, auth scope, and all four client-tier cases: Free, active trial resolving to Growth, Growth, and Premium.
+
+**Files:** MCP operator brief contracts, registry/schema/profile/tool modules; analytics-intelligence operator read models; Operational and Client Signals slice availability/read boundaries; workspace/request/churn supporting reads; focused unit/contract/integration tests; MCP docs, roadmap, and this audit.
 
 ---
 
@@ -10142,9 +10156,9 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Files:** outcome portfolio shared types; canonical windowed outcome reader; portfolio service and route; outcomes API/query key/hook; rebuilt Outcomes Book lens/table; focused integration and component tests; GO-004 parity/owner docs; deferred ledger and roadmap.
 ### 716. Compact desktop MCP operator profile 2026-07-17
 
-**Status:** Complete in P1. The additive desktop control-plane surface is ready for staging MCP handshake and read-only invocation smoke before P2 begins.
+**Status:** Complete historical P1 baseline. P2 subsequently activated the three reserved read models; see feature #718.
 
-**What it does:** Adds master-key `POST /mcp/operator` while retaining the existing `POST /mcp` endpoint unchanged for advanced work and legacy clients. Operator discovery is the registered intersection of one canonical 25-name allowlist: 22 existing tools ship in P1 and the three deterministic Insights-backed read models remain reserved for P2. Discovery and invocation share the same enforced boundary, so hidden, reserved, and unknown names return one generic `json_v1 not_found` response before alias validation, workspace authorization, or handler dispatch.
+**What it did in P1:** Added master-key `POST /mcp/operator` while retaining the existing `POST /mcp` endpoint unchanged for advanced work and legacy clients. Operator discovery was the registered intersection of one canonical 25-name allowlist: 22 existing tools shipped in P1 while three deterministic Insights-backed read models were reserved for P2. P2 now registers all 25. Discovery and invocation share the same enforced boundary, so hidden and unknown names return one generic `json_v1 not_found` response before alias validation, workspace authorization, or handler dispatch.
 
 **Efficiency and compatibility:** Explicit compact instructions and schema-aware projection reduce the combined operator orientation payload to 25,217 UTF-8 bytes, below the 32 KiB contract and about 84.5% below the 161,898-byte full orientation baseline. The projection removes only JSON Schema annotation prose; it preserves validation constraints, arbitrary default/example/const data, and legitimate input fields named `description`. Full-profile discovery and instructions retain their exact byte counts and SHA-256 hashes.
 
@@ -10153,3 +10167,18 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Focused unit and real spawned-server integration coverage pins the 25/22/3 census, exact full-profile hashes over HTTP, compact byte budget, deep immutability, schema-field preservation, hidden/reserved/unknown error indistinguishability, handler non-dispatch, master-only authentication, workspace-key compatibility on `/mcp`, and sentinel-collision fail-closed behavior.
 
 **Files:** MCP profile contracts, registry projection/dispatch, server/router/auth boundary, inventory documentation, control-plane rule and implementation plan, focused unit/integration tests, roadmap, and audit. No UI or database files changed.
+### 717. Model version upgrade + model manifest + currency tripwire 2026-07-19
+
+**Status:** Complete. Insights Engine LLM calls moved to current model generations behind a new single-source model manifest, with a provider-level model-currency tripwire.
+
+**What it does:** All Claude-side creative generation (brand deliverables, website copy, post/blog sections, calibration, blueprint strategy, pSEO matrix batch) now runs on `claude-opus-4-8` uniformly — no per-op split — with explicit adaptive thinking + high effort injected by the helper layer. OpenAI tiers move `gpt-5.4`→`gpt-5.6-terra`, `gpt-5.4-mini`/`-nano`→`gpt-5.6-luna`, `gpt-5.5`→`gpt-5.6-sol` (creative recovery stays deliberately cross-provider). Two RETIRED Claude 3.5 IDs that 404 on live calls were removed from the Anthropic helper union. `claude-haiku-4-5` tool-use utility and `gpt-image-2` are unchanged; `claude-sonnet-5` stays available as the per-call escape-hatch tier.
+
+**Manifest consolidation:** New `server/model-manifest.ts` is the single source of truth for semantic roles → concrete model IDs, the previously-duplicated pricing tables (openai-helpers `estimateCost` + platform-observability-report `estimateAiCostUsd` both delegate; historical rows retained so cost dashboards keep pricing old usage entries), and per-family request-param rules (sampling params 400 on Opus 4.7+/Sonnet 5 and are stripped by the helper; `CLAUDE_TEMP` deleted from the creative dispatch; `gpt-5.6-sol` accepts only default temperature). Registry + call sites import roles — the next upgrade is an edit to one file. Contract: `docs/rules/model-manifest.md`.
+
+**Tripwire:** `npm run verify:model-currency` iterates manifest model IDs against Anthropic/OpenAI models APIs — fails on 404/retired, warns on deprecation metadata, skips without keys (`secret-backed` governance class). Wired into the nightly workflow with repo secrets and as a non-blocking startup alert (`runStartupModelCurrencyCheck`, Sentry + error log). Verified live: all 8 manifest IDs resolve.
+
+**Cost/latency re-baseline:** count_tokens() on a representative IE creative prompt measured ~1.46× input tokens on the new tokenizer; Claude-side creative spend ~2.2× vs the 4.6 baseline (owner-approved with numbers); GPT moves price-identical except mini/nano (+33% / 5×, approved). Creative Anthropic op timeouts raised (90s→240s background, 60s→120s sync regen) and 4096 thinking-headroom tokens added at the helper so adaptive thinking never starves content budgets.
+
+**Tests:** Full-suite sweep to new IDs; new pricing-table coverage (current tiers + historical rows + luna fallback); openai-helpers format tests retargeted to the 5.6 family; keyword-site-synthesis contract test repinned.
+
+**Files:** model manifest + rule doc; anthropic/openai helpers; ai dispatcher; operation registry; content-posts-ai creative dispatch; copy-generation; ~28 server call sites; model-currency checker + verify script + governance registry + nightly workflow + startup wiring; test sweep.

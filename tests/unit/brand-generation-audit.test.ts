@@ -191,7 +191,7 @@ describe('brand generation audits', () => {
         tokens: { prompt: 100, completion: 20, total: 120 },
         execution: {
           runId: 'audit-run-1', operation: 'brand-deliverable-audit', provider: 'openai',
-          model: 'gpt-5.5', attempts: 1, cacheOutcome: 'bypass', startedAt: now,
+          model: 'gpt-5.6-sol', attempts: 1, cacheOutcome: 'bypass', startedAt: now,
           completedAt: '2026-07-13T12:00:01.000Z', durationMs: 1_000,
         },
       } satisfies AICallResult;
@@ -221,7 +221,7 @@ describe('brand generation audits', () => {
       tokens: { prompt: 100, completion: 2_501, total: 2_601 },
       execution: {
         runId: 'audit-run-2', operation: 'brand-deliverable-audit', provider: 'openai',
-        model: 'gpt-5.5', attempts: 1, cacheOutcome: 'bypass', startedAt: now,
+        model: 'gpt-5.6-sol', attempts: 1, cacheOutcome: 'bypass', startedAt: now,
         completedAt: '2026-07-13T12:00:01.000Z', durationMs: 1_000,
       },
     } satisfies AICallResult));

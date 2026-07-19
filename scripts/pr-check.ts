@@ -843,6 +843,10 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // superset) is rendered by formatClientSignalsSection. The raw field remains in the type
   // for the assembler + public-portal write boundary; it is never a prompt target.
   'businessPriorities',
+  // churnSignalsAvailability is operator control-plane metadata. It tells bounded
+  // decision projections whether an empty churn queue is authoritative; prompt
+  // formatters must not turn an internal read-status bit into client prose.
+  'churnSignalsAvailability',
   // OperationalSlice
   // none
   // PageElementSlice top-level fields (`pagePath`, `catalog`) are both
@@ -1918,6 +1922,7 @@ export const CHECKS: Check[] = [
       'server/websocket.ts', // WebSocket message parsing, not DB columns
       'server/openai-helpers.ts', // disk-based usage log files + AI response text parser, not DB columns
       'server/__tests__/openai-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
+      'server/__tests__/anthropic-helpers-format.test.ts', // parsing mock fetch request body in tests, not DB columns
       'server/semrush.ts', // legacy disk files: SEMRush API usage log + credit log files (not DB columns)
       'server/providers/dataforseo-provider.ts', // disk files: DataForSEO credit log files (not DB columns)
       'server/monthly-report.ts', // disk files: sent-report tracking + report output files (not DB columns)

@@ -18,12 +18,17 @@ import {
   mcpUnexpectedToolError,
 } from './tool-errors.js';
 import { runWithMcpToolExecutionContext } from './tool-execution-context.js';
+import { compactMcpJsonSchema } from './json-schema.js';
 import {
   isMcpToolAllowedInProfile,
   operatorToolDescription,
   type McpOperatorToolName,
 } from './profiles.js';
 import { workspaceTools, handleWorkspaceTool } from './tools/workspaces.js';
+import {
+  operatorBriefTools,
+  handleOperatorBriefTool,
+} from './tools/operator-briefs.js';
 import { intelligenceTools, handleIntelligenceTool } from './tools/intelligence.js';
 import { insightTools, handleInsightTool } from './tools/insights.js';
 import { contentTools, handleContentTool } from './tools/content.js';
@@ -318,6 +323,13 @@ const MCP_TOOL_FAMILY_REGISTRATIONS: readonly McpToolFamilyRegistration[] = Obje
     errorContract: jsonV1Contract,
   },
   {
+    family: 'operator-briefs',
+    tools: operatorBriefTools,
+    handler: handleOperatorBriefTool,
+    globalToolNames: ['get_portfolio_brief'],
+    errorContract: jsonV1Contract,
+  },
+  {
     family: 'intelligence',
     tools: intelligenceTools,
     handler: handleIntelligenceTool,
@@ -560,10 +572,14 @@ function snapshotSchemaNode<T>(
 }
 
 function operatorDefinition(definition: Tool): Tool {
+  const inputSchema = snapshotSchemaNode(definition.inputSchema);
   return snapshotValue({
     ...definition,
     description: operatorToolDescription(definition.name as McpOperatorToolName),
-    inputSchema: snapshotSchemaNode(definition.inputSchema),
+    inputSchema: compactMcpJsonSchema(inputSchema),
+    ...(definition.outputSchema
+      ? { outputSchema: snapshotSchemaNode(definition.outputSchema) }
+      : {}),
   });
 }
 

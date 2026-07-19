@@ -5,6 +5,7 @@
  */
 
 import db from './db/index.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { getAllGscPages, getQueryPageData } from './search-console.js';
 import type { CustomDateRange } from './google-analytics.js';
@@ -254,7 +255,7 @@ Keep each bullet to 1-2 sentences. Be specific to this page's situation.`;
 
   const result = await callAI({
     operation: 'content-decay',
-    model: 'gpt-5.4-mini',
+    model: MODEL_ROLES.utilityExtraction,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
     temperature: 0.3,

@@ -61,7 +61,7 @@ vi.mock('../../server/ai.js', () => ({
         executionChainId: options.executionChainId,
         operation: options.operation ?? 'copy-generation',
         provider: 'anthropic',
-        model: 'claude-sonnet-4-6',
+        model: 'claude-opus-4-8',
         attempts: 1,
         cacheOutcome: 'miss',
         startedAt: '2026-07-14T00:00:00.000Z',

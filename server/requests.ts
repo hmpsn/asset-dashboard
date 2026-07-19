@@ -12,6 +12,7 @@ import { getUploadRoot } from './data-dir.js';
 import { sanitizePlainText } from './html-sanitize.js';
 import { validateTransition, REQUEST_TRANSITIONS } from './state-machines.js';
 import { STUDIO_NAME } from './constants.js';
+import { invalidateIntelligenceCache } from './intelligence/cache-invalidation.js';
 
 const UPLOAD_ROOT = getUploadRoot();
 
@@ -205,6 +206,8 @@ export function createRequest(workspaceId: string, data: {
     updated_at: request.updatedAt,
   });
 
+  invalidateIntelligenceCache(workspaceId);
+
   return request;
 }
 
@@ -243,6 +246,8 @@ export function updateRequest(workspaceId: string, id: string, updates: Partial<
     updated_at: merged.updatedAt,
   });
 
+  invalidateIntelligenceCache(workspaceId);
+
   return merged;
 }
 
@@ -276,6 +281,8 @@ export function addAttachmentsToRequest(workspaceId: string, requestId: string, 
     updated_at: existing.updatedAt,
   });
 
+  invalidateIntelligenceCache(workspaceId);
+
   return existing;
 }
 
@@ -283,16 +290,22 @@ export function addNote(workspaceId: string, requestId: string, author: 'client'
   const existing = getRequest(requestId);
   if (!existing || existing.workspaceId !== workspaceId) return null;
 
+  // One event, one timestamp: the note's creation IS the request's update.
+  // Two separate `new Date()` calls here can straddle a millisecond boundary,
+  // making pending-replies `newestAt` (note.createdAt) diverge from the
+  // request's updatedAt by 1ms — a real consumer-visible inconsistency that
+  // also flaked the unit test.
+  const now = new Date().toISOString();
   const note: RequestNote = {
     id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     author,
     content: sanitizePlainText(content).trim(),
     attachments: attachments && attachments.length > 0 ? attachments : undefined,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   };
 
   existing.notes.push(note);
-  existing.updatedAt = new Date().toISOString();
+  existing.updatedAt = now;
 
   stmts().update.run({
     id: existing.id,
@@ -310,10 +323,14 @@ export function addNote(workspaceId: string, requestId: string, author: 'client'
     updated_at: existing.updatedAt,
   });
 
+  invalidateIntelligenceCache(workspaceId);
+
   return existing;
 }
 
 export function deleteRequest(workspaceId: string, id: string): boolean {
   const info = stmts().deleteById.run(id, workspaceId);
-  return info.changes > 0;
+  const deleted = info.changes > 0;
+  if (deleted) invalidateIntelligenceCache(workspaceId);
+  return deleted;
 }

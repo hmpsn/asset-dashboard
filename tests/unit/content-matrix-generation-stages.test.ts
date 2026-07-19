@@ -124,7 +124,7 @@ describe('matrix generation post stage', () => {
         runId: 'brief-run',
         operation: 'generate_content_brief',
         provider: 'openai',
-        model: 'gpt-5.4',
+        model: 'gpt-5.6-terra',
         inputFingerprint: 'a'.repeat(64),
         startedAt: '2026-07-14T12:00:00.000Z',
         completedAt: '2026-07-14T12:00:01.000Z',

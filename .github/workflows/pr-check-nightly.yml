@@ -35,6 +35,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: npm run verify:staging-merge-integrity -- --since-days 365 --blocking-merged-since 2026-05-29 --soft-gate
+      # Model-currency tripwire, ARMED: fails if any manifest model ID has
+      # been retired by its provider (the guard that would have caught the
+      # retired Claude 3.5 IDs ~9 months earlier). --require-keys makes a
+      # missing/rotated-out secret or a revoked key fail the run loudly — a
+      # disarmed tripwire must never look green. Requires the ANTHROPIC_API_KEY
+      # and OPENAI_API_KEY repo secrets; see scripts/verify-model-currency.ts.
+      - name: Verify model currency against provider APIs
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npm run verify:model-currency -- --require-keys
       - name: Upload scan output on failure
         if: failure()
         uses: actions/upload-artifact@v7

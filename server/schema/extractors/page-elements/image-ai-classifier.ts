@@ -20,6 +20,7 @@
  *   - AI returns a role outside the {hero, informative, decorative} set
  */
 import OpenAI from 'openai';
+import { MODEL_ROLES } from '../../../model-manifest.js';
 import type { PageImage } from '../../../../shared/types/page-elements.js';
 import { logTokenUsage } from '../../../openai-helpers.js';
 import { fetchImageAsBase64 } from './image-fetch.js';
@@ -30,7 +31,7 @@ import { createLogger } from '../../../logger.js';
 const log = createLogger('schema/extractors/image-ai-classifier');
 
 const VALID_ROLES = new Set<PageImage['role']>(['hero', 'informative', 'decorative']);
-const MODEL = 'gpt-5.4-mini' as const;
+const MODEL = MODEL_ROLES.utilityExtraction;
 
 const CLASSIFIER_PROMPT = `Classify this image into ONE of three roles for SEO schema markup:
 - "hero": the page's lead image, conveying the primary subject. Usually large and visually prominent.
@@ -123,7 +124,7 @@ export async function aiClassifyImages(
 
       const text = (response.choices?.[0]?.message?.content ?? '').trim();
       if (!text) {
-        // Empty content (rare gpt-5.4-mini failure mode: refusal, content filter).
+        // Empty content (rare utility-model failure mode: refusal, content filter).
         // Avoid JSON.parse(''), which throws unnecessarily — budget already
         // consumed; stay rule-classified.
         result.push(image);

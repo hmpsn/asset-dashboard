@@ -3,7 +3,7 @@
  * (2026-06-09 audit confirmed #6 — PR 4 Task 1/2).
  *
  * buildCopyGenerationContext Layer 4.5 called generateBrief() unconditionally on
- * every copy generation AND every single-section regenerate — a gpt-5.4 7000-token
+ * every copy generation AND every single-section regenerate — a synthesis-tier 7000-token
  * research-mode call (+ up to 4 context assemblies) discarded except for ~8 summary
  * lines. Blueprint entries already carry a briefId pointing to a persisted brief;
  * the context must reuse it. Section regenerate must skip brief enrichment entirely.

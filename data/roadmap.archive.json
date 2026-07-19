@@ -1,6 +1,37 @@
 {
   "sprints": [
     {
+      "id": "sprint-mcp-operator-control-plane-2026-07-17-terminal-history",
+      "name": "✅ SHIPPED — MCP Operator Control Plane",
+      "hours": "Seven staging-first backend phases; one PR at a time",
+      "rationale": "Terminal item history split from sprint-mcp-operator-control-plane-2026-07-17. Make desktop administration compact, deterministic, and safer while the Insights Engine remains the authoritative database and client-view layer. Preserve the full MCP surface for advanced work and avoid the active UI rebuild.",
+      "items": [
+        {
+          "id": "mcp-operator-profile",
+          "title": "P1 — Compact desktop operator profile",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-17",
+          "owner": "platform-foundation",
+          "notes": "Shipped the additive master-key POST /mcp/operator boundary with compact instructions, one canonical 25-name allowlist, discovery and pre-dispatch invocation enforcement, and generic json_v1 not_found for hidden, reserved, and unknown tools. P1 discovers 22 registered names; P2 activates the three reserved read models. The combined operator discovery and instructions are 25,217 UTF-8 bytes, while full POST /mcp discovery/instruction hashes remain exact. Schema compaction preserves validation constraints and fields literally named description. Canonical master identity is distinguished from workspace-key metadata even if a workspace ID collides with the all sentinel. No UI, database, paid invocation, approval, send, or publication behavior changed. P2 subsequently shipped its three read models on 2026-07-19."
+        },
+        {
+          "id": "mcp-operator-briefs",
+          "title": "P2 — Deterministic decision and client views",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-17",
+          "owner": "analytics-intelligence",
+          "notes": "Completed 2026-07-19. Added bounded DB-only portfolio and five-of-fifteen-slice workspace decision briefs plus the exact fail-closed public client projection for Free, active trial, Growth, and Premium. Exact counts use skinny aggregate reads; details load once only for selected top workspaces. Partial subreads fail closed, approval intelligence reads are non-mutating, outputs provide validated structuredContent plus text JSON, and lossless schema compaction keeps the 25-tool operator orientation at 32,222 bytes. No UI, migration, AI/provider call, paid trigger, job, send, approval, publication, or database sync. Two independent release reviews approved final HEAD."
+        }
+      ],
+      "shippedAt": "2026-07-19"
+    },
+    {
       "id": "admin-ux-flow-2026-07-terminal-history",
       "name": "✅ SHIPPED — Admin UX flow & ease-of-use (from 2026-07-16 audits)",
       "hours": "~60",
@@ -293,26 +324,6 @@
           "createdAt": "2026-07-17",
           "owner": "content-pipeline",
           "notes": "Completed 2026-07-17. A production-shaped fixture confirmed ContentGenerationContextBudgetError when full finalized voice plus approved identity exceeded the global context defaults. The repair adds matrix-only bounded context handling, all six safe stage boundaries, typed/redacted MCP errors, and deterministic single/two-cell coverage without changing shared defaults or weakening evidence, voice, identity, revision, fingerprint, human-review, paid-work, send, approval, or publication gates. An isolated staging canary preserved the blocked path and returned ready for one and two cells with stable fingerprints and finite budgets; its temporary key and workspace were deleted. After production deployment of main merge 973bb2a1d90934a300770d7bb0f200c9734422ad, the exact durable Rinse workspace, matrix, and two cells passed read-only production acceptance: single-cell ready, two-cell ready, deterministic retry, and finite batch budget. No paid generation was invoked; start_content_matrix_generation remains owner-authorized."
-        }
-      ],
-      "shippedAt": "2026-07-17"
-    },
-    {
-      "id": "sprint-mcp-operator-control-plane-2026-07-17-terminal-history",
-      "name": "✅ SHIPPED — MCP Operator Control Plane",
-      "hours": "Seven staging-first backend phases; one PR at a time",
-      "rationale": "Terminal item history split from sprint-mcp-operator-control-plane-2026-07-17. Make desktop administration compact, deterministic, and safer while the Insights Engine remains the authoritative database and client-view layer. Preserve the full MCP surface for advanced work and avoid the active UI rebuild.",
-      "items": [
-        {
-          "id": "mcp-operator-profile",
-          "title": "P1 — Compact desktop operator profile",
-          "source": "2026-07-17 MCP Operator Control Plane program",
-          "est": "M",
-          "priority": "P1",
-          "status": "done",
-          "createdAt": "2026-07-17",
-          "owner": "platform-foundation",
-          "notes": "Shipped the additive master-key POST /mcp/operator boundary with compact instructions, one canonical 25-name allowlist, discovery and pre-dispatch invocation enforcement, and generic json_v1 not_found for hidden, reserved, and unknown tools. P1 discovers 22 registered names; P2 activates the three reserved read models. The combined operator discovery and instructions are 25,217 UTF-8 bytes, while full POST /mcp discovery/instruction hashes remain exact. Schema compaction preserves validation constraints and fields literally named description. Canonical master identity is distinguished from workspace-key metadata even if a workspace ID collides with the all sentinel. No UI, database, paid invocation, approval, send, or publication behavior changed. P2 remains blocked until staging MCP smoke passes."
         }
       ],
       "shippedAt": "2026-07-17"

@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
   getWorkspace: vi.fn(),
   computeEffectiveTier: vi.fn(),
   getAllPageStates: vi.fn(),
-  listBatches: vi.fn(),
+  readApprovalBatchesForIntelligence: vi.fn(),
+  readOperatorPendingDecisions: vi.fn(),
   getClientActionQueueStats: vi.fn(),
   loadRecommendations: vi.fn(),
   getPendingActions: vi.fn(),
@@ -49,7 +50,11 @@ vi.mock('../../server/page-edit-states.js', () => ({
 }));
 
 vi.mock('../../server/approvals.js', () => ({
-  listBatches: mocks.listBatches,
+  readApprovalBatchesForIntelligence: mocks.readApprovalBatchesForIntelligence,
+}));
+
+vi.mock('../../server/domains/analytics-intelligence/operator-pending-decisions.js', () => ({
+  readOperatorPendingDecisions: mocks.readOperatorPendingDecisions,
 }));
 
 vi.mock('../../server/client-actions.js', () => ({
@@ -135,7 +140,7 @@ beforeEach(() => {
     'page-2': { pageId: 'page-2', status: 'fix-proposed', updatedAt: '2026-05-01T00:00:00Z' },
   });
 
-  mocks.listBatches.mockReturnValue([
+  mocks.readApprovalBatchesForIntelligence.mockReturnValue([
     {
       items: [
         { status: 'pending', createdAt: '2026-05-25T10:00:00.000Z' },
@@ -148,6 +153,12 @@ beforeEach(() => {
       ],
     },
   ]);
+  mocks.readOperatorPendingDecisions.mockReturnValue({
+    availability: 'available',
+    total: 0,
+    counts: { approvals: 0, requests: 0, clientActions: 0 },
+    items: [],
+  });
 
   mocks.getClientActionQueueStats.mockReturnValue({ pending: 5, oldestAge: 3 });
 
@@ -266,8 +277,11 @@ describe('assembleOperational', () => {
     mocks.getUsageSummary.mockImplementation(() => {
       throw new Error('usage unavailable');
     });
-    mocks.listBatches.mockImplementation(() => {
+    mocks.readApprovalBatchesForIntelligence.mockImplementation(() => {
       throw new Error('approvals unavailable');
+    });
+    mocks.readOperatorPendingDecisions.mockImplementation(() => {
+      throw new Error('pending decisions unavailable');
     });
     mocks.getClientActionQueueStats.mockImplementation(() => {
       throw new Error('client queue unavailable');
@@ -299,6 +313,12 @@ describe('assembleOperational', () => {
       pendingJobs: 0,
       timeSaved: null,
       approvalQueue: { pending: 0, oldestAge: null },
+      pendingDecisions: {
+        availability: 'unavailable',
+        total: 0,
+        counts: { approvals: 0, requests: 0, clientActions: 0 },
+        items: [],
+      },
       clientActionQueue: { pending: 0, oldestAge: null },
       recommendationQueue: { fixNow: 0, fixSoon: 0, fixLater: 0 },
       actionBacklog: { pendingMeasurement: 0, oldestAge: null },

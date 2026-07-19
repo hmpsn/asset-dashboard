@@ -162,6 +162,7 @@ export async function assembleClientSignals(
       return {
         churnFetchSucceeded: true,
         churnSignals: signals.map((s) => ({
+          id: s.id,
           type: s.type,
           severity: s.severity,
           detectedAt: s.detectedAt,
@@ -188,6 +189,9 @@ export async function assembleClientSignals(
   churnSignals = churnData.churnSignals;
   churnRisk = churnData.churnRisk;
   churnFetchSucceeded = churnData.churnFetchSucceeded;
+  const churnSignalsAvailability: NonNullable<
+    ClientSignalsSlice['churnSignalsAvailability']
+  > = churnFetchSucceeded ? 'available' : 'unavailable';
 
   // Approval patterns
   const approvalPatterns = await readOptionalSlicePart(
@@ -195,8 +199,8 @@ export async function assembleClientSignals(
     workspaceId,
     { approvalRate: 0, avgResponseTime: null as number | null },
     async () => {
-      const { listBatches } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const batches: ApprovalBatch[] = listBatches(workspaceId);
+      const { readApprovalBatchesForIntelligence } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const batches: ApprovalBatch[] = readApprovalBatchesForIntelligence(workspaceId);
       let approved = 0,
         total = 0;
       for (const batch of batches) {
@@ -583,6 +587,7 @@ export async function assembleClientSignals(
     approvalPatterns,
     recentChatTopics,
     churnRisk,
+    churnSignalsAvailability,
     churnSignals,
     roi,
     engagement,

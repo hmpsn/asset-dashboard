@@ -32,12 +32,13 @@ update this file in the same commit.
 
 ### Server profiles
 
-| Endpoint | P1 credential | Discovery | Intended use |
-|----------|---------------|-----------|--------------|
-| `POST /mcp` | Master key or per-workspace key, subject to existing scope rules | All 102 canonical tools and the unchanged full instructions | Advanced and backward-compatible access |
+| Endpoint | Credential | Discovery | Intended use |
+|----------|------------|-----------|--------------|
+| `POST /mcp` | Master key or per-workspace key, subject to existing scope rules | All 105 canonical tools and the unchanged full instructions | Advanced and backward-compatible access |
 | `POST /mcp/operator` | Master key only | Compact registered intersection of the canonical 25-name operator allowlist | Normal desktop studio administration |
 
-P1 exposes 22 already-registered operator tools: `list_workspaces`, `get_brand_identity`,
+The operator profile exposes 25 tools: `list_workspaces`, `get_portfolio_brief`,
+`get_workspace_decision_brief`, `get_client_view`, `get_brand_identity`,
 `create_brand_deliverable`, `update_brand_deliverable`, `get_brand_voice`,
 `list_content_templates`, `get_content_template`, `create_content_template`,
 `update_content_template`, `create_content_matrix`, `update_content_matrix_cell`,
@@ -45,14 +46,14 @@ P1 exposes 22 already-registered operator tools: `list_workspaces`, `get_brand_i
 `accept_content_template_generation_upgrade`, `preview_content_matrix_generation`,
 `resolve_content_matrix_evidence`, `start_content_matrix_generation`,
 `get_content_matrix_generation`, `retry_content_matrix_generation`, `get_job_status`, and
-`send_to_client`. The canonical allowlist also reserves `get_portfolio_brief`,
-`get_workspace_decision_brief`, and `get_client_view` for P2; they are not discoverable or
-callable until their handlers are registered.
+`send_to_client`.
 
 Operator discovery replaces top-level prose with explicit compact descriptions and removes only
 nested JSON-schema `description` metadata. All schema validation constraints remain intact, and
-the serialized tool catalog plus operator instructions is contract-tested at no more than 32 KiB
-UTF-8. Discovery and invocation use the same allowlist: calling any hidden or unregistered tool
+the serialized tool catalog plus operator instructions is contract-tested at 32,222 bytes, below
+the 32 KiB UTF-8 ceiling. Repeated input/output schema subtrees use lossless draft-07 references;
+no validation field is removed to meet the budget. Discovery and invocation use the same allowlist:
+calling any hidden or unregistered tool
 returns the generic `json_v1` `not_found` envelope without reflecting the supplied name.
 
 The operator profile changes neither tool semantics nor authorization inside allowed handlers.
@@ -62,8 +63,8 @@ automatic approval, client-send, or publication path.
 
 ### Workspace scope and parameter casing (gotcha)
 
-Most tools operate on **one** client workspace. Six tools are explicitly global and therefore
-master-key only: `list_workspaces`, `create_workspace`, `list_library_templates`,
+Most tools operate on **one** client workspace. Seven tools are explicitly global and therefore
+master-key only: `list_workspaces`, `get_portfolio_brief`, `create_workspace`, `list_library_templates`,
 `get_library_template`, `promote_template_to_library`, and `instantiate_library_template`.
 `get_pending_work` has a declared, optional `workspaceId`; omitting it requests a cross-workspace
 summary and is also master-key only.
@@ -155,11 +156,11 @@ failure classes; unknown names and mismatched workspace values are never logged 
 ## Tool inventory
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
-dispatch, workspace scope, and error compatibility. It composes **18 categories** for a total of
-**102 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+dispatch, workspace scope, and error compatibility. It composes **19 categories** for a total of
+**105 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
-name with inert invalid input, asserts the exact 18 family-array→handler identities, and pins the
+name with inert invalid input, asserts the exact 19 family-array→handler identities, and pins the
 handled-name manifests for families that validate workspace input before dispatch. Discovery
 therefore cannot silently outgrow or be paired with the wrong family switch.
 
@@ -174,6 +175,17 @@ increments the paid-call counter.
 | `create_workspace` | W | Create a workspace for onboarding/automation. |
 | `update_workspace` | W | Update a workspace via an allowlist of safe operational fields. |
 | `delete_workspace` | W | Delete a workspace (requires `confirm: "delete_workspace"`). **Destructive.** |
+
+### operator briefs (`tools/operator-briefs.ts`)
+| Tool | R/W | Purpose |
+|------|-----|---------|
+| `get_portfolio_brief` | R | Master-only, DB-only deterministic studio priority queue. Defaults to 10 workspaces and caps at 25; returns exact counts plus bounded durable drill-down IDs. |
+| `get_workspace_decision_brief` | R | Bounded blockers, pending decisions, client risks, and deterministic next-safe-action hints from five purpose-selected intelligence slices. The engine still has 15 registered slices; this read model intentionally uses only `insights`, `contentPipeline`, `siteHealth`, `clientSignals`, and `operational`. |
+| `get_client_view` | R | Exact public, tier-gated client intelligence projection. It fails closed rather than falling back to admin-only learnings. |
+
+All three return legacy text JSON plus validated `structuredContent: { data: ... }` under explicit
+root-object output schemas. They make no AI/provider call and trigger no paid work, job, mutation,
+broadcast, approval, send, or publication path.
 
 ### intelligence (`tools/intelligence.ts`)
 | Tool | R/W | Purpose |

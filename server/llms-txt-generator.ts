@@ -12,6 +12,7 @@
  * - Summary cache in SQLite for fast re-generation
  */
 import { getSiteSubdomain, discoverCmsUrls, buildStaticPathSet } from './webflow-pages.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { getWorkspacePages } from './workspace-data.js';
 import { getWorkspace } from './workspaces.js';
 import { listPageKeywords } from './page-keywords.js';
@@ -451,7 +452,7 @@ async function generatePageSummary(
 ): Promise<string | null> {
   try {
     const result = await callAI({
-      model: 'gpt-5.4-mini',
+      model: MODEL_ROLES.utilityExtraction,
       system: 'You are a concise web content summarizer. Summarize the given page in 2-3 sentences for an AI assistant. Capture what the page is about, what services or expertise it represents, and who the target audience is. Use only the supplied page, keyword, and business evidence. Do not infer offerings, audiences, or claims that are not present; omit unsupported details instead. Be factual and precise. Do not use marketing language or Markdown.',
       messages: [{
         role: 'user',

@@ -65,7 +65,7 @@ function aiResult(text: string): AICallResult {
       runId: 'set-audit-run',
       operation: 'content-matrix-set-audit',
       provider: 'openai',
-      model: 'gpt-5.4',
+      model: 'gpt-5.6-terra',
       attempts: 1,
       cacheOutcome: 'bypass',
       startedAt: now,

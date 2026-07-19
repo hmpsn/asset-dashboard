@@ -2,6 +2,7 @@
  * misc routes — extracted from server/index.ts
  */
 import { Router } from 'express';
+import { MODEL_ROLES } from '../model-manifest.js';
 
 const router = Router();
 
@@ -181,7 +182,7 @@ Just output the filename slug, nothing else.`;
           const base64 = smallBuf.toString('base64');
 
           const visionRes = await client.chat.completions.create({
-            model: 'gpt-5.4-nano',
+            model: MODEL_ROLES.utilityExtraction,
             max_completion_tokens: 60,
             messages: [{
               role: 'user',
@@ -201,7 +202,7 @@ Just output the filename slug, nothing else.`;
     // Fallback to text-only if the content-enhanced attempt didn't produce a name
     if (!suggestion) {
       const response = await client.chat.completions.create({
-        model: 'gpt-5.4-nano',
+        model: MODEL_ROLES.utilityExtraction,
         max_completion_tokens: 60,
         messages: [{ role: 'user', content: promptText }],
       });

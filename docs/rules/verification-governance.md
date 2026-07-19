@@ -64,3 +64,10 @@ deterministic, and safe without secrets.
 The governance check fails when a new verifier is unclassified, when a blocking
 verifier is not wired into CI, when a secret-backed verifier is accidentally
 wired into CI, or when active docs/tooling reference a deleted verifier.
+
+A secret-backed verifier may run in CI only when **explicitly provisioned**:
+add the script → workflow entry to `SECRET_BACKED_PROVISIONED_WORKFLOWS` in
+`scripts/report-verification-governance.ts` (with the secrets configured in
+that workflow). Any wiring outside the provisioned list still fails. Current
+example: `verify:model-currency` runs armed in the scheduled
+`pr-check-nightly.yml` (never blocks a PR/push).

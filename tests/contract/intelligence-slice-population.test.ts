@@ -199,7 +199,7 @@ vi.mock('../../server/churn-signals.js', () => ({
 }));
 
 vi.mock('../../server/approvals.js', () => ({
-  listBatches: vi.fn(() => []),
+  readApprovalBatchesForIntelligence: vi.fn(() => []),
 }));
 
 vi.mock('../../server/client-users.js', () => ({

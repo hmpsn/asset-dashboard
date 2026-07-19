@@ -2,8 +2,8 @@
  * content-brief-regenerate-job — W6.2
  *
  * Moves the two synchronous brief AI operations onto the background job platform:
- *   - regenerate       (full brief regeneration with feedback — gpt-5.4, 7000 tokens, research mode)
- *   - regenerate-outline (outline-only regeneration — gpt-5.4, 4000 tokens)
+ *   - regenerate       (full brief regeneration with feedback — synthesis-tier model, 7000 tokens, research mode)
+ *   - regenerate-outline (outline-only regeneration — synthesis-tier model, 4000 tokens)
  *
  * Both previously held the HTTP connection open for 30–120s with no jobId and no
  * dedupe. The routes now create a CONTENT_BRIEF_REGENERATE job, return 202 { jobId },

@@ -337,7 +337,7 @@ function provenance(operation: string): GenerationProvenance {
     runId: `${operation}-${randomUUID()}`,
     operation,
     provider: 'openai',
-    model: 'gpt-5.4',
+    model: 'gpt-5.6-terra',
     inputFingerprint: 'a'.repeat(64),
     startedAt: timestamp,
     completedAt: timestamp,

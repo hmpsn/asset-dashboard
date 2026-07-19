@@ -88,7 +88,7 @@ function makeMinimalOptions(ws: Workspace, overrides: Partial<PersistKeywordStra
 }
 
 const provenance: GenerationProvenance = {
-  runId: 'run-k1b', operation: 'keyword-site-synthesis', provider: 'openai', model: 'gpt-5.4-mini',
+  runId: 'run-k1b', operation: 'keyword-site-synthesis', provider: 'openai', model: 'gpt-5.6-luna',
   inputFingerprint: 'effective-input-sha256', startedAt: '2026-07-13T00:00:00.000Z', completedAt: '2026-07-13T00:00:01.000Z',
 };
 

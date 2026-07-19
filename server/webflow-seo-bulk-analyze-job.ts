@@ -1,4 +1,5 @@
 import { addActivity } from './activity-log.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { parseJsonSafe } from './db/json-validation.js';
 import { isProgrammingError } from './errors.js';
@@ -109,7 +110,7 @@ Provide your analysis as a JSON object:
 IMPORTANT: Return ONLY valid JSON.`;
 
         const aiResult = await callAI({
-          model: 'gpt-5.4-mini',
+          model: MODEL_ROLES.utilityExtraction,
           system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
           messages: [{ role: 'user', content: prompt }],
           maxTokens: 600,

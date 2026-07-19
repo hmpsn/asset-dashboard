@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { MODEL_ROLES } from './model-manifest.js';
 import fs from 'fs';
 import path from 'path';
 import { createLogger } from './logger.js';
@@ -110,7 +111,7 @@ export async function generateAltText(filePath: string, context?: string): Promi
     let svgPrompt = `Write a concise alt text (one sentence, under 125 characters) for this SVG image used on a website. Be descriptive and specific. Do not start with "Image of" or "An image of". Just output the alt text, nothing else.\n\n${svgContent}`;
     if (context) svgPrompt += `\n\nContext: ${context}`;
     const response = await callWithRetry(() => openai.chat.completions.create({
-      model: 'gpt-5.4-nano',
+      model: MODEL_ROLES.utilityExtraction,
       max_completion_tokens: 150,
       messages: [{ role: 'user', content: svgPrompt }],
     }));
@@ -133,7 +134,7 @@ export async function generateAltText(filePath: string, context?: string): Promi
     const mimeType = 'image/jpeg' as const;
 
     const response = await callWithRetry(() => openai.chat.completions.create({
-      model: 'gpt-5.4-nano',
+      model: MODEL_ROLES.utilityExtraction,
       max_completion_tokens: 150,
       messages: [{
         role: 'user',

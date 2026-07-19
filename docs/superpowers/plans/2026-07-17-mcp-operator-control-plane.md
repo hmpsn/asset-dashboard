@@ -44,6 +44,27 @@ are one coupled implementation task. Tests have exclusive ownership and are
 committed red before implementation begins. Shared docs and contracts are owned
 sequentially by the orchestrator.
 
+P2 execution:
+
+```text
+typed brief/output schemas + slice ID guardrails commit
+  → red unit/contract/integration tests
+  → bounded pending-decision slice projection
+  → pure deterministic operator read models
+  → MCP adapter + canonical registry activation
+  → focused verification + byte-budget measurement
+  → two independent GPT-5.5 reviews
+  → full verification + staging PR/CI/deploy smoke
+```
+
+P2 keeps the Insights Engine facade authoritative. The workspace decision brief
+requests a purpose-specific five-of-fifteen projection: exactly `insights`,
+`contentPipeline`, `siteHealth`, `clientSignals`, and `operational`. The other ten
+registered slices remain available to their existing consumers and the full MCP
+surface. The client view uses the exact tier selector and public projection.
+Portfolio assembly reads existing persistence stores only. No builder may call AI,
+a provider, a job starter, a mutation, or a paid-operation counter.
+
 ## Phase acceptance
 
 ### P1 — Compact Desktop Operator Profile
@@ -60,8 +81,23 @@ sequentially by the orchestrator.
 
 ### P2 — Insights-backed operator read models
 
-Add bounded deterministic portfolio, workspace-decision, and client-safe views.
-No AI/provider calls; the client projection must match the public tier-gated view.
+- `get_portfolio_brief` defaults to 10 rows, caps at 25, and ranks only after a
+  total-order comparison of pending requests, approval items, client actions,
+  workspace name, and workspace ID. It returns stable reason codes and bounded
+  durable drill-down IDs, never Cockpit prose or intelligence payloads.
+- `get_workspace_decision_brief` defaults each queue to 10 and caps at 25. It
+  projects only bounded blockers, pending decisions, client-risk signals,
+  explicit slice availability, and deterministic next-safe-action codes.
+- `get_client_view` uses `computeEffectiveTier()`,
+  `clientIntelligenceSlicesForTier()`, and `buildClientIntelligenceView()` in the
+  same sequence as the public route. Missing client-safe learnings fail closed.
+- All three retain text JSON and add schema-validated
+  `structuredContent: { data }` under explicit root-object output schemas.
+- No raw insight data, prompt blocks, evidence, current/proposed approval values,
+  client-action payloads, request descriptions, churn descriptions, recent
+  activity prose, AI/provider calls, jobs, mutations, or paid calls.
+- Exclude `src/**`, AdminChat, navigation, design-system files, migrations, and
+  active UI-rebuild surfaces.
 
 ### P3 — Structured contracts
 
@@ -105,6 +141,31 @@ Test agent owns only new P1 test files. Implementation agent owns only the MCP
 transport/registry/auth files explicitly assigned after the red-test commit. Any
 need for another file is `NEEDS_CONTEXT` and stops that agent.
 
+## File ownership — P2
+
+Orchestrator owns shared contracts and coordination files:
+
+- `shared/types/mcp-operator-briefs.ts`
+- `shared/types/mcp-runtime.ts`
+- `shared/types/intelligence.ts`
+- `docs/rules/mcp-operator-control-plane.md`
+- this plan
+- sequential closeout edits to `server/mcp/README.md`, `FEATURE_AUDIT.md`, and
+  `data/roadmap.json`
+
+After the contracts commit, implementation ownership is exclusive:
+
+- Insights slice agent: bounded pending-decision reader plus
+  `server/intelligence/operational-slice.ts`.
+- Read-model agent: `server/domains/analytics-intelligence/operator-read-models.ts`.
+- MCP adapter agent: `server/mcp/tools/operator-briefs.ts` and the canonical
+  registry registration.
+- Test agent: only new P2 test files and explicitly assigned census fixtures.
+
+An agent that requires a file outside its assignment stops with `NEEDS_CONTEXT`.
+The orchestrator reconciles shared-file changes, adjudicates review findings, and
+is the only writer for closeout documentation.
+
 ## Verification
 
 - Focused unit, contract, and real-HTTP integration tests with red → green proof.
@@ -117,4 +178,3 @@ need for another file is `NEEDS_CONTEXT` and stops that agent.
 - independent code-quality/backward-compatibility/performance review
 - staging `/mcp` and `/mcp/operator` handshake, discovery-byte, hidden-tool, and
   representative invocation smoke; no paid call.
-

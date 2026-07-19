@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { MODEL_ROLES } from './model-manifest.js';
 import { callAI } from './ai.js';
 import { isProgrammingError } from './errors.js';
 import {
@@ -89,7 +90,7 @@ async function generateWorkspaceContextResult(type: WorkspaceContextJobType, wor
     const aiResult = await callAI({
       operation: 'knowledge-base-gen',
       provider: 'openai',
-      model: 'gpt-5.4',
+      model: MODEL_ROLES.structuredSynthesis,
       system: 'You are a business analyst. Given scraped website content, extract a structured knowledge base that an AI content writer and chatbot can use to understand this business. Be specific and factual — only include information that is clearly stated or strongly implied on the website.',
       messages: [{
         role: 'user',
@@ -144,7 +145,7 @@ Be concise but specific. Use bullet points. Only include information actually fo
     const aiResult = await callAI({
       operation: 'brand-voice-gen',
       provider: 'openai',
-      model: 'gpt-5.4',
+      model: MODEL_ROLES.structuredSynthesis,
       system: 'You are a brand strategist and copywriting expert. Given scraped website content, analyze the writing style, tone, and voice patterns used across the site. Be specific and evidence-based — only describe patterns you actually observe in the content.',
       messages: [{
         role: 'user',
@@ -193,7 +194,7 @@ Be specific and actionable. An AI writer should be able to follow this guide to 
   const aiResult = await callAI({
     operation: 'personas-gen',
     provider: 'openai',
-    model: 'gpt-5.4',
+    model: MODEL_ROLES.structuredSynthesis,
     system: 'You are a marketing strategist. Given scraped website content, identify the distinct audience segments this business targets. Be specific and evidence-based — only identify personas that are clearly implied by the website\'s messaging, services, case studies, or content.',
     messages: [{
       role: 'user',

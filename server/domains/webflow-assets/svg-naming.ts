@@ -8,6 +8,8 @@
  * /api/smart-name in routes/misc.ts.
  */
 
+import { MODEL_ROLES } from '../../model-manifest.js';
+
 /**
  * Minimal structural type for the OpenAI chat client — keeps this trivially mockable.
  * `create` uses method syntax (bivariant params) so the real, more-strictly-typed
@@ -43,7 +45,7 @@ export async function suggestSvgFilename(
   if (svgText.length > 20000) svgText = svgText.slice(0, 20000) + '\n<!-- truncated -->';
 
   const completion = await client.chat.completions.create({
-    model: 'gpt-5.4-nano',
+    model: MODEL_ROLES.utilityExtraction,
     max_completion_tokens: 60,
     messages: [{ role: 'user', content: `${promptText}\n\nSVG source:\n${svgText}` }],
   });

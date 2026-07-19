@@ -11,6 +11,10 @@ import {
   handleWorkspaceTool,
 } from '../../server/mcp/tools/workspaces.js';
 import {
+  operatorBriefTools,
+  handleOperatorBriefTool,
+} from '../../server/mcp/tools/operator-briefs.js';
+import {
   intelligenceTools,
   handleIntelligenceTool,
 } from '../../server/mcp/tools/intelligence.js';
@@ -83,6 +87,11 @@ const EXPECTED_FAMILY_REGISTRATIONS: readonly ExpectedFamilyRegistration[] = [
     family: 'workspaces',
     toolNames: workspaceTools.map(tool => tool.name),
     handler: handleWorkspaceTool,
+  },
+  {
+    family: 'operator-briefs',
+    toolNames: operatorBriefTools.map(tool => tool.name),
+    handler: handleOperatorBriefTool,
   },
   {
     family: 'intelligence',
@@ -226,7 +235,7 @@ async function assertDefinitionIsDispatched(entry: McpToolRegistryEntry): Promis
 
 describe('MCP definition-to-handler dispatch census', () => {
   it('pairs every production family definition with its exact family handler', () => {
-    expect(EXPECTED_FAMILY_REGISTRATIONS).toHaveLength(18);
+    expect(EXPECTED_FAMILY_REGISTRATIONS).toHaveLength(19);
 
     for (const expected of EXPECTED_FAMILY_REGISTRATIONS) {
       const entries = [...MCP_TOOL_REGISTRY.values()]
@@ -266,7 +275,7 @@ describe('MCP definition-to-handler dispatch census', () => {
   });
 
   it('routes every registered production definition into its family handler', async () => {
-    expect(MCP_TOOL_REGISTRY.size).toBe(102);
+    expect(MCP_TOOL_REGISTRY.size).toBe(105);
     for (const entry of MCP_TOOL_REGISTRY.values()) {
       await assertDefinitionIsDispatched(entry);
     }

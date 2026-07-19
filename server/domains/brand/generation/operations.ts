@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { MODEL_ROLES } from '../../../model-manifest.js';
 
 import type {
   AICallOptions,
@@ -794,7 +795,7 @@ async function creativeDispatch<TOutput>(
       researchMode: true,
       maxRetries: 0,
       signal: input.signal,
-      openAIModel: 'gpt-5.5',
+      openAIModel: MODEL_ROLES.creativeRecovery,
       allowProviderFallback: false,
       beforeProviderDispatch: async dispatch => {
         const reservation = providerReservation(
@@ -873,7 +874,7 @@ async function creativeDispatch<TOutput>(
     aiResult = await deps.callStructuredAI({
       operation,
       provider: 'openai',
-      model: 'gpt-5.5',
+      model: MODEL_ROLES.creativeRecovery,
       messages: [{
         role: 'user',
         content: `${prompt.systemPrompt}\n\n${prompt.userPrompt}`,

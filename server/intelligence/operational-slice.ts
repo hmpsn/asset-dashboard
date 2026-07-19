@@ -168,8 +168,8 @@ export async function assembleOperational(
     workspaceId,
     { pending: 0, oldestAge: null },
     async () => {
-      const { listBatches } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      const batches: ApprovalBatch[] = listBatches(workspaceId);
+      const { readApprovalBatchesForIntelligence } = await import('../approvals.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      const batches: ApprovalBatch[] = readApprovalBatchesForIntelligence(workspaceId);
       let pending = 0;
       let oldestMs = 0;
       for (const batch of batches) {
@@ -199,6 +199,25 @@ export async function assembleOperational(
       const { getClientActionQueueStats } =
         await import('../client-actions.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
       return getClientActionQueueStats(workspaceId);
+    },
+    { logger: log },
+  );
+
+  const pendingDecisions = await readOptionalSlicePart<
+    OperationalSlice['pendingDecisions']
+  >(
+    'assembleOperational: pending decisions',
+    workspaceId,
+    {
+      availability: 'unavailable',
+      total: 0,
+      counts: { approvals: 0, requests: 0, clientActions: 0 },
+      items: [],
+    },
+    async () => {
+      const { readOperatorPendingDecisions } =
+        await import('../domains/analytics-intelligence/operator-pending-decisions.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      return readOperatorPendingDecisions(workspaceId);
     },
     { logger: log },
   );
@@ -331,6 +350,7 @@ export async function assembleOperational(
     timeSaved,
     approvalQueue,
     clientActionQueue,
+    pendingDecisions,
     recommendationQueue,
     actionBacklog,
     detectedPlaybooks,
