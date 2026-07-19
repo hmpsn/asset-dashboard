@@ -10797,7 +10797,7 @@ describe('Rule: Direct callOpenAI/callAnthropic import outside dispatcher', () =
       uniqPath('rule-ai-dispatcher', 'server/routes/brief.ts'),
       lines(
         "import { callAI } from '../ai.js';",
-        "const result = await callAI({ model: 'gpt-5.4-mini', prompt: 'hello' });",
+        "const result = await callAI({ model: 'gpt-5.6-luna', prompt: 'hello' });",
       ),
     );
     expect(runRule(RULE, [file])).toHaveLength(0);

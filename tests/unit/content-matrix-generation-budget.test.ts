@@ -279,7 +279,7 @@ function aiResult(options: AICallOptions, text: string): AICallResult {
       executionChainId: options.executionChainId,
       operation: options.operation,
       provider,
-      model: provider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-5.4',
+      model: provider === 'anthropic' ? 'claude-opus-4-8' : 'gpt-5.6-terra',
       attempts: 1,
       cacheOutcome: 'bypass',
       startedAt: NOW,

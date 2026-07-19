@@ -11,7 +11,7 @@
 
 **hmpsn.studio** is an SEO/web analytics agency platform. React 19 + Vite 8 + TailwindCSS 4 + React Router DOM 7 (frontend), Express + TypeScript (backend), SQLite via better-sqlite3 (storage).
 
-Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via `SeoDataProvider` interface in `server/seo-data-provider.ts`), Stripe, OpenAI (GPT-5.4 family, default `gpt-5.4-mini`; `gpt-5.4` for higher-quality ops; `gpt-5.4-nano` for bulk/cheap ops; `gpt-5.5` for complex cross-context), Anthropic (Claude for creative prose).
+Integrations: Webflow, Google Search Console, GA4, SEMRush, DataForSEO (both via `SeoDataProvider` interface in `server/seo-data-provider.ts`), Stripe, OpenAI (GPT-5.6 family: `gpt-5.6-terra` for structured synthesis, `gpt-5.6-luna` for bulk/cheap utility ops, `gpt-5.6-sol` for creative recovery + complex cross-context), Anthropic (`claude-opus-4-8` for ALL creative prose; `claude-haiku-4-5` for tool-use utility extraction). **Model IDs, pricing, and per-family request-param rules live in `server/model-manifest.ts` (single source of truth — see `docs/rules/model-manifest.md`); never inline a model-ID string literal at a call site.**
 
 - **Routing** — React Router DOM 7. `src/routes.ts` defines `Page` + `ClientTab` types, `adminPath()` + `clientPath()` helpers. Admin: `/ws/:workspaceId/:tab?`. Client: `/client/:workspaceId/:tab?` (betaMode variant: `/client/beta/:workspaceId/:tab?`). **Inbox sub-routing:** the Inbox tab uses `?tab=decisions|reviews|conversations` (`InboxFilter` values, not `ClientTab` values) — the `?tab=` deep-link two-halves contract applies here too. Legacy aliases still work: `approvals→decisions`, `requests→conversations`, `content→reviews`. **Retired tab:** `schema-review` was removed as a standalone `ClientTab` (old bookmarks redirect → `/inbox?tab=reviews`; `SchemaReviewModal` now mounts inside Inbox). For the current `Page` / `ClientTab` unions, read `src/routes.ts` directly instead of copying snapshot lists into docs.
 - **API Client** — Typed fetch wrappers live in `src/api/`. No raw `fetch()` in components.
@@ -385,6 +385,7 @@ as quick guidance plus links to the canonical rule docs.
 | `docs/rules/platform-domain-event-definitions.md` | Canonical `WS_EVENTS` workspace-scoped domain-event catalog + source of truth |
 | `docs/rules/verification-governance.md` | `verify:*` script classification — which checks belong in PR CI vs push CI vs manual-only |
 | `docs/rules/performance-budgets.md` | Platform performance budgets (source of truth: `scripts/performance-budgets.ts`) |
+| `docs/rules/model-manifest.md` | Model manifest contract — semantic roles → model IDs, single pricing table, per-family request-param rules, model-currency tripwire |
 | `docs/rules/design-system-enforcement.md` | The automated + manual rules that enforce the design system across the codebase |
 | `docs/rules/rules-lifecycle.md` | What belongs in `docs/rules/` (durable platform contracts) vs point-in-time audits; how rule docs are added/retired |
 | `docs/rules/local-seo-visibility.md` | Local SEO visibility contracts — location backfill queue, keyword enrichment, market primary |

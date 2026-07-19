@@ -11,7 +11,7 @@ const provenance = {
   runId: 'run_1',
   operation: 'content-brief-generate',
   provider: 'openai' as const,
-  model: 'gpt-5.4',
+  model: 'gpt-5.6-terra',
   inputFingerprint: 'a'.repeat(64),
   startedAt: '2026-07-13T10:00:00.000Z',
   completedAt: '2026-07-13T10:00:01.000Z',

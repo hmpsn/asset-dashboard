@@ -152,7 +152,7 @@ describe('generateAiRecommendations', () => {
 
     expect(mockCallAI).toHaveBeenCalledOnce();
     const callArgs = mockCallAI.mock.calls[0][0];
-    expect(callArgs.model).toBe('gpt-5.4-mini');
+    expect(callArgs.model).toBe('gpt-5.6-luna');
     expect(callArgs.feature).toBe('seo-audit-recs');
     expect(callArgs.responseFormat).toEqual({ type: 'json_object' });
 

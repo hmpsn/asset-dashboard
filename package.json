@@ -55,6 +55,7 @@
     "verify:lexicon": "tsx scripts/lexicon-registry.ts",
     "verify:governance": "tsx scripts/report-verification-governance.ts",
     "verify:stripe-prices": "tsx scripts/verify-stripe-prices.ts",
+    "verify:model-currency": "tsx scripts/verify-model-currency.ts",
     "verify:deprecations": "tsx scripts/deprecation-lifecycle.ts",
     "verify:platform-health-cadence": "tsx scripts/platform-health-cadence.ts",
     "verify:adr-log": "tsx scripts/adr-log.ts",

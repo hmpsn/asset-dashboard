@@ -114,7 +114,7 @@ describe('buildWorkspaceObservabilityReport', () => {
       entries: [
         {
           feature: 'content-brief',
-          model: 'gpt-5.4-mini',
+          model: 'gpt-5.6-luna',
           promptTokens: 1000,
           completionTokens: 700,
           totalTokens: 1700,
@@ -123,7 +123,7 @@ describe('buildWorkspaceObservabilityReport', () => {
         },
         {
           feature: 'content-brief',
-          model: 'gpt-5.4-mini',
+          model: 'gpt-5.6-luna',
           promptTokens: 500,
           completionTokens: 300,
           totalTokens: 800,
@@ -132,7 +132,7 @@ describe('buildWorkspaceObservabilityReport', () => {
         },
         {
           feature: 'schema-generator',
-          model: 'gpt-5.4',
+          model: 'gpt-5.6-terra',
           promptTokens: 800,
           completionTokens: 400,
           totalTokens: 1200,

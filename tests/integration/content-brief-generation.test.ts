@@ -386,7 +386,7 @@ describe('generateBrief — happy path', () => {
     expect(brief.generationProvenance).toMatchObject({
       operation: 'content-brief-generate',
       provider: 'openai',
-      model: 'gpt-5.4',
+      model: 'gpt-5.6-terra',
     });
     expect(brief.generationProvenance?.inputFingerprint).toMatch(/^[0-9a-f]{64}$/);
   });

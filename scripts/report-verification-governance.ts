@@ -151,6 +151,11 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     owner: 'billing-monetization',
     rationale: 'Requires Stripe configuration/secrets and must remain outside normal PR CI.',
   },
+  'verify:model-currency': {
+    classification: 'secret-backed',
+    owner: 'platform-foundation',
+    rationale: 'Requires provider API keys (Anthropic/OpenAI); runs in the nightly workflow and skips gracefully without keys, so it must stay outside normal PR CI.',
+  },
   'verify:deprecations': {
     classification: 'release-check',
     owner: 'platform-foundation',
@@ -265,6 +270,25 @@ function workflowRunsScript(workflowSources: SourceFile[], scriptName: string): 
   return workflowSources.some(file => scriptRegex.test(file.source));
 }
 
+/**
+ * Secret-backed verifiers are "manual only unless explicitly provisioned"
+ * (docs/rules/verification-governance.md). This is the explicit provisioning
+ * list: script → workflow files (basename) that intentionally run it WITH the
+ * required secrets configured. Any other workflow wiring of a secret-backed
+ * script still fails the governance check — the guard stays strict; this list
+ * is the sanctioned exception channel, not a loophole.
+ */
+export const SECRET_BACKED_PROVISIONED_WORKFLOWS: Record<string, readonly string[]> = {
+  // Model-currency tripwire runs ARMED in the scheduled nightly (never blocks
+  // a PR/push) using the ANTHROPIC_API_KEY / OPENAI_API_KEY repo secrets.
+  'verify:model-currency': ['pr-check-nightly.yml'],
+};
+
+function workflowIsProvisionedFor(file: SourceFile, scriptName: string): boolean {
+  const provisioned = SECRET_BACKED_PROVISIONED_WORKFLOWS[scriptName] ?? [];
+  return provisioned.some(name => file.path === name || file.path.endsWith(path.sep + name) || file.path.endsWith(`/${name}`));
+}
+
 function isCiWorkflow(file: SourceFile): boolean {
   return file.path === CI_WORKFLOW_PATH || file.path.endsWith(path.sep + CI_WORKFLOW_PATH);
 }
@@ -295,7 +319,10 @@ export function buildVerificationGovernanceReport(
 
   const secretBackedBlockingScripts = registryScripts
     .filter(scriptName => registry[scriptName].classification === 'secret-backed')
-    .filter(scriptName => workflowRunsScript(workflowSources, scriptName));
+    .filter(scriptName => workflowRunsScript(
+      workflowSources.filter(file => !workflowIsProvisionedFor(file, scriptName)),
+      scriptName,
+    ));
 
   const deletedReferenceMatches: DeletedReferenceMatch[] = [];
   for (const file of [...activeDocSources, ...workflowSources]) {

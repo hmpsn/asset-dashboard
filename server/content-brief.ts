@@ -1,4 +1,5 @@
 import db from './db/index.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { formatPageMapForPrompt } from './intelligence/formatters.js';
 import {
@@ -1174,7 +1175,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   throwIfSignalAborted(options.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const aiResult = await callAI({
     operation: 'content-brief-regenerate',
-    model: 'gpt-5.4',
+    model: MODEL_ROLES.structuredSynthesis,
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 7000,
@@ -1348,7 +1349,7 @@ Rules:
   throwIfSignalAborted(options.signal, BRIEF_GENERATION_CANCELLED_MESSAGE);
   const aiResult = await callAI({
     operation: 'content-brief-outline',
-    model: 'gpt-5.4',
+    model: MODEL_ROLES.structuredSynthesis,
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
@@ -1931,7 +1932,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   });
   const aiResult = await callAI({
     operation: 'content-brief-generate',
-    model: 'gpt-5.4',
+    model: MODEL_ROLES.structuredSynthesis,
     system: systemPrompt,
     messages: briefMessages,
     maxTokens: 7000,

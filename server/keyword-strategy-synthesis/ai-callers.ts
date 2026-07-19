@@ -1,4 +1,5 @@
 import { callAI } from '../ai.js';
+import { MODEL_ROLES } from '../model-manifest.js';
 import type { AIOperationId } from '../ai-operation-registry.js';
 import { buildSystemPrompt } from '../prompt-assembly.js';
 import { createHash } from 'crypto';
@@ -28,7 +29,7 @@ export async function callKeywordStrategyAI(
 
   const result = await callAI({
     operation: 'keyword-strategy',
-    model: 'gpt-5.4-mini',
+    model: MODEL_ROLES.utilityExtraction,
     system,
     messages: aiMessages,
     maxTokens,

@@ -21,7 +21,7 @@ function execution(
     executionChainId: 'job_chain_1',
     operation,
     provider: 'openai',
-    model: 'gpt-5.4',
+    model: 'gpt-5.6-terra',
     attempts: 1,
     cacheOutcome: 'miss',
     startedAt,

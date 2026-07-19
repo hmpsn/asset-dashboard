@@ -5,6 +5,7 @@
  * @writes chat_memory, activities
  */
 import { Router, type Request, type Response } from 'express';
+import { MODEL_ROLES } from '../model-manifest.js';
 import { verifyToken } from '../auth.js';
 import { verifyAdminToken, APP_PASSWORD, requireClientPortalAuth } from '../middleware.js';
 import { validate, z } from '../middleware/validate.js';
@@ -126,7 +127,7 @@ function parseBoundedQueryString(
 
 // ── AI intent classification ──────────────────────────────────────────────────
 // Runs in parallel with the main chat call — zero added latency.
-// Uses gpt-5.4-nano (cheapest model) for a simple JSON classification.
+// Uses the utility-extraction model (cheapest tier) for a simple JSON classification.
 // Returns null on any failure — intent detection must never block chat.
 async function classifyMessageIntent(
   question: string,
@@ -140,7 +141,7 @@ async function classifyMessageIntent(
   const contextBlock = contextLines ? `Recent conversation:\n${contextLines}\n\n` : '';
 
   const result = await callAI({
-    model: 'gpt-5.4-nano',
+    model: MODEL_ROLES.utilityExtraction,
     system: `Classify the intent of a client message sent to an SEO analytics platform. Return ONLY valid JSON with a single field "intent".
 
 Values:
@@ -625,7 +626,7 @@ ${hasGrounding ? seoContextBlock : '(No additional workspace intelligence is ava
     const [mainResult, intentResult] = await Promise.allSettled([
       callAI({
         operation: 'client-search-chat',
-        model: 'gpt-5.4',
+        model: MODEL_ROLES.structuredSynthesis,
         system: systemPrompt,
         messages: [
           ...historyMessages.slice(-10),

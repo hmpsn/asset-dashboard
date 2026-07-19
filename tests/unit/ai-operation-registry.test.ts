@@ -60,7 +60,7 @@ describe('AI operation registry', () => {
     expect(getAIOperationRuntimeDefaults('monthly-digest')).toMatchObject({
       feature: 'monthly-digest',
       defaultProvider: 'openai',
-      defaultModel: 'gpt-5.4-nano',
+      defaultModel: 'gpt-5.6-luna',
       defaultResponseFormat: { type: 'json_object' },
     });
   });
@@ -70,7 +70,7 @@ describe('AI operation registry', () => {
     expect(runtimeDefaults).toEqual({
       feature: 'content-post-seo-meta',
       defaultProvider: 'openai',
-      defaultModel: 'gpt-5.4',
+      defaultModel: 'gpt-5.6-terra',
       defaultResponseFormat: { type: 'json_object' },
       defaultMaxRetries: 3,
       defaultTimeoutMs: 60_000,

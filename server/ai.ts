@@ -7,6 +7,7 @@
  */
 
 import { callOpenAI } from './openai-helpers.js';
+import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL } from './model-manifest.js';
 import { callAnthropic } from './anthropic-helpers.js';
 import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
 import { randomUUID } from 'crypto';
@@ -18,7 +19,7 @@ export interface AICallOptions {
   operation?: AIOperationId;
   /** Provider to use. Defaults to 'openai'. */
   provider?: 'openai' | 'anthropic';
-  /** Model override. Defaults to provider's default (gpt-5.4-mini / claude-sonnet-4-6). */
+  /** Model override. Defaults to the provider's manifest default (see server/model-manifest.ts). */
   model?: string;
   /** System prompt (mapped to OpenAI system message or Anthropic system field). */
   system?: string;
@@ -162,7 +163,7 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
     const completedAt = new Date();
     const cacheOutcome = result.execution?.cacheOutcome ?? 'miss';
     const originRunId = result.execution?.originRunId;
-    if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? 'claude-sonnet-4-6'} reused ${cacheOutcome} result`, runId, originRunId, executionChainId: opts.executionChainId, provider, model: model ?? 'claude-sonnet-4-6', attempts: result.execution?.attempts ?? 1, cacheOutcome, fallbackUsed: opts.fallbackUsed });
+    if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? DEFAULT_ANTHROPIC_MODEL} reused ${cacheOutcome} result`, runId, originRunId, executionChainId: opts.executionChainId, provider, model: model ?? DEFAULT_ANTHROPIC_MODEL, attempts: result.execution?.attempts ?? 1, cacheOutcome, fallbackUsed: opts.fallbackUsed });
     return {
       text: result.text,
       tokens: { prompt: result.promptTokens, completion: result.completionTokens, total: result.totalTokens },
@@ -171,7 +172,7 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
         ...(opts.executionChainId ? { executionChainId: opts.executionChainId } : {}),
         operation,
         provider,
-        model: model ?? 'claude-sonnet-4-6',
+        model: model ?? DEFAULT_ANTHROPIC_MODEL,
         attempts: result.execution?.attempts ?? 1,
         ...(opts.fallbackUsed !== undefined ? { fallbackUsed: opts.fallbackUsed } : {}),
         ...(originRunId && originRunId !== runId ? { originRunId } : {}),
@@ -206,7 +207,7 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
   const completedAt = new Date();
   const cacheOutcome = result.execution?.cacheOutcome ?? 'miss';
   const originRunId = result.execution?.originRunId;
-  if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? 'gpt-5.4-mini'} reused ${cacheOutcome} result`, runId, originRunId, executionChainId: opts.executionChainId, provider, model: model ?? 'gpt-5.4-mini', attempts: result.execution?.attempts ?? 1, cacheOutcome, fallbackUsed: opts.fallbackUsed });
+  if (cacheOutcome === 'hit' || cacheOutcome === 'inflight') recordOperationTrace({ source: 'ai', operation, status: 'success', durationMs: Date.now() - startedMs, workspaceId: opts.workspaceId, message: `${model ?? DEFAULT_OPENAI_MODEL} reused ${cacheOutcome} result`, runId, originRunId, executionChainId: opts.executionChainId, provider, model: model ?? DEFAULT_OPENAI_MODEL, attempts: result.execution?.attempts ?? 1, cacheOutcome, fallbackUsed: opts.fallbackUsed });
 
   return {
     text: result.text,
@@ -216,7 +217,7 @@ export async function callAI(opts: AICallOptions): Promise<AICallResult> {
       ...(opts.executionChainId ? { executionChainId: opts.executionChainId } : {}),
       operation,
       provider,
-      model: model ?? 'gpt-5.4-mini',
+      model: model ?? DEFAULT_OPENAI_MODEL,
       attempts: result.execution?.attempts ?? 1,
       ...(opts.fallbackUsed !== undefined ? { fallbackUsed: opts.fallbackUsed } : {}),
       ...(originRunId && originRunId !== runId ? { originRunId } : {}),

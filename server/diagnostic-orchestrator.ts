@@ -12,6 +12,7 @@
  */
 
 import { createLogger } from './logger.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { getWorkspace } from './workspaces.js';
 import { getPageTrend, getQueryPageData, getSearchPeriodComparison, getAllGscPages } from './search-console.js';
 import { getGA4LandingPages } from './google-analytics.js';
@@ -455,7 +456,7 @@ Rules for remediation:
 
   const result = await callAI({
     operation: 'diagnostic-root-causes',
-    model: 'gpt-5.4',
+    model: MODEL_ROLES.structuredSynthesis,
     system: systemPrompt,
     messages: [{ role: 'user', content: JSON.stringify(context) }],
     maxTokens: 3000,

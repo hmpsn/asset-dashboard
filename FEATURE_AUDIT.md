@@ -10153,3 +10153,18 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Focused unit and real spawned-server integration coverage pins the 25/22/3 census, exact full-profile hashes over HTTP, compact byte budget, deep immutability, schema-field preservation, hidden/reserved/unknown error indistinguishability, handler non-dispatch, master-only authentication, workspace-key compatibility on `/mcp`, and sentinel-collision fail-closed behavior.
 
 **Files:** MCP profile contracts, registry projection/dispatch, server/router/auth boundary, inventory documentation, control-plane rule and implementation plan, focused unit/integration tests, roadmap, and audit. No UI or database files changed.
+### 717. Model version upgrade + model manifest + currency tripwire 2026-07-19
+
+**Status:** Complete. Insights Engine LLM calls moved to current model generations behind a new single-source model manifest, with a provider-level model-currency tripwire.
+
+**What it does:** All Claude-side creative generation (brand deliverables, website copy, post/blog sections, calibration, blueprint strategy, pSEO matrix batch) now runs on `claude-opus-4-8` uniformly — no per-op split — with explicit adaptive thinking + high effort injected by the helper layer. OpenAI tiers move `gpt-5.4`→`gpt-5.6-terra`, `gpt-5.4-mini`/`-nano`→`gpt-5.6-luna`, `gpt-5.5`→`gpt-5.6-sol` (creative recovery stays deliberately cross-provider). Two RETIRED Claude 3.5 IDs that 404 on live calls were removed from the Anthropic helper union. `claude-haiku-4-5` tool-use utility and `gpt-image-2` are unchanged; `claude-sonnet-5` stays available as the per-call escape-hatch tier.
+
+**Manifest consolidation:** New `server/model-manifest.ts` is the single source of truth for semantic roles → concrete model IDs, the previously-duplicated pricing tables (openai-helpers `estimateCost` + platform-observability-report `estimateAiCostUsd` both delegate; historical rows retained so cost dashboards keep pricing old usage entries), and per-family request-param rules (sampling params 400 on Opus 4.7+/Sonnet 5 and are stripped by the helper; `CLAUDE_TEMP` deleted from the creative dispatch; `gpt-5.6-sol` accepts only default temperature). Registry + call sites import roles — the next upgrade is an edit to one file. Contract: `docs/rules/model-manifest.md`.
+
+**Tripwire:** `npm run verify:model-currency` iterates manifest model IDs against Anthropic/OpenAI models APIs — fails on 404/retired, warns on deprecation metadata, skips without keys (`secret-backed` governance class). Wired into the nightly workflow with repo secrets and as a non-blocking startup alert (`runStartupModelCurrencyCheck`, Sentry + error log). Verified live: all 8 manifest IDs resolve.
+
+**Cost/latency re-baseline:** count_tokens() on a representative IE creative prompt measured ~1.46× input tokens on the new tokenizer; Claude-side creative spend ~2.2× vs the 4.6 baseline (owner-approved with numbers); GPT moves price-identical except mini/nano (+33% / 5×, approved). Creative Anthropic op timeouts raised (90s→240s background, 60s→120s sync regen) and 4096 thinking-headroom tokens added at the helper so adaptive thinking never starves content budgets.
+
+**Tests:** Full-suite sweep to new IDs; new pricing-table coverage (current tiers + historical rows + luna fallback); openai-helpers format tests retargeted to the 5.6 family; keyword-site-synthesis contract test repinned.
+
+**Files:** model manifest + rule doc; anthropic/openai helpers; ai dispatcher; operation registry; content-posts-ai creative dispatch; copy-generation; ~28 server call sites; model-currency checker + verify script + governance registry + nightly workflow + startup wiring; test sweep.

@@ -133,15 +133,15 @@ describe('logTokenUsage + flushToDisk', () => {
     for (let i = 0; i < 20; i++) {
       logTokenUsage({
         promptTokens: 10, completionTokens: 5, totalTokens: 15,
-        model: 'gpt-5.4-mini', feature: 'test-feature',
+        model: 'gpt-5.6-luna', feature: 'test-feature',
       });
     }
     expect(mocks.writeFileSync).toHaveBeenCalled();
   });
 
   it('flushToDisk writes all pending entries to disk', () => {
-    logTokenUsage({ promptTokens: 5, completionTokens: 3, totalTokens: 8, model: 'gpt-5.4-mini', feature: 'test' });
-    logTokenUsage({ promptTokens: 7, completionTokens: 2, totalTokens: 9, model: 'gpt-5.5', feature: 'other' });
+    logTokenUsage({ promptTokens: 5, completionTokens: 3, totalTokens: 8, model: 'gpt-5.6-luna', feature: 'test' });
+    logTokenUsage({ promptTokens: 7, completionTokens: 2, totalTokens: 9, model: 'gpt-5.6-sol', feature: 'other' });
     flushToDisk();
     expect(mocks.writeFileSync).toHaveBeenCalledOnce();
     const written = JSON.parse(mocks.writeFileSync.mock.calls[0][1] as string) as TokenUsage[];
@@ -151,7 +151,7 @@ describe('logTokenUsage + flushToDisk', () => {
   });
 
   it('entries include a timestamp ISO string', () => {
-    logTokenUsage({ promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.4', feature: 'ts-check' });
+    logTokenUsage({ promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.6-terra', feature: 'ts-check' });
     flushToDisk();
     const written = JSON.parse(mocks.writeFileSync.mock.calls[0][1] as string) as TokenUsage[];
     const entry = written.find((e: TokenUsage) => e.feature === 'ts-check');
@@ -181,8 +181,8 @@ describe('getTokenUsage', () => {
     const today = new Date().toISOString().slice(0, 10);
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'gpt-5.4-mini', feature: 'chat', workspaceId: 'ws-A', timestamp: `${today}T10:00:00.000Z` },
-      { promptTokens: 200, completionTokens: 80, totalTokens: 280, model: 'gpt-5.4-mini', feature: 'chat', workspaceId: 'ws-B', timestamp: `${today}T11:00:00.000Z` },
+      { promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'gpt-5.6-luna', feature: 'chat', workspaceId: 'ws-A', timestamp: `${today}T10:00:00.000Z` },
+      { promptTokens: 200, completionTokens: 80, totalTokens: 280, model: 'gpt-5.6-luna', feature: 'chat', workspaceId: 'ws-B', timestamp: `${today}T11:00:00.000Z` },
     ]));
     const result = getTokenUsage('ws-A');
     expect(result.entries).toHaveLength(1);
@@ -194,7 +194,7 @@ describe('getTokenUsage', () => {
     const today = new Date().toISOString().slice(0, 10);
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 1000, completionTokens: 500, totalTokens: 1500, model: 'gpt-5.4-mini', feature: 'audit', workspaceId: 'ws-X', timestamp: `${today}T08:00:00.000Z` },
+      { promptTokens: 1000, completionTokens: 500, totalTokens: 1500, model: 'gpt-5.6-luna', feature: 'audit', workspaceId: 'ws-X', timestamp: `${today}T08:00:00.000Z` },
     ]));
     const result = getTokenUsage('ws-X');
     expect(result.estimatedCost).toBeGreaterThan(0);
@@ -213,9 +213,9 @@ describe('getUsageByFeature', () => {
     const today = new Date().toISOString().slice(0, 10);
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 50, completionTokens: 30, totalTokens: 80, model: 'gpt-5.4-mini', feature: 'seo-audit', workspaceId: 'ws-1', timestamp: `${today}T09:00:00.000Z` },
-      { promptTokens: 40, completionTokens: 20, totalTokens: 60, model: 'gpt-5.4-mini', feature: 'seo-audit', workspaceId: 'ws-1', timestamp: `${today}T10:00:00.000Z` },
-      { promptTokens: 100, completionTokens: 60, totalTokens: 160, model: 'claude-sonnet-4-6', feature: 'content-brief', workspaceId: 'ws-1', timestamp: `${today}T11:00:00.000Z` },
+      { promptTokens: 50, completionTokens: 30, totalTokens: 80, model: 'gpt-5.6-luna', feature: 'seo-audit', workspaceId: 'ws-1', timestamp: `${today}T09:00:00.000Z` },
+      { promptTokens: 40, completionTokens: 20, totalTokens: 60, model: 'gpt-5.6-luna', feature: 'seo-audit', workspaceId: 'ws-1', timestamp: `${today}T10:00:00.000Z` },
+      { promptTokens: 100, completionTokens: 60, totalTokens: 160, model: 'claude-opus-4-8', feature: 'content-brief', workspaceId: 'ws-1', timestamp: `${today}T11:00:00.000Z` },
     ]));
 
     const result = getUsageByFeature('ws-1');
@@ -230,8 +230,8 @@ describe('getUsageByFeature', () => {
     const today = new Date().toISOString().slice(0, 10);
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.4-mini', feature: 'cheap', workspaceId: null, timestamp: `${today}T09:00:00.000Z` },
-      { promptTokens: 10000, completionTokens: 5000, totalTokens: 15000, model: 'gpt-5.5', feature: 'expensive', workspaceId: null, timestamp: `${today}T10:00:00.000Z` },
+      { promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.6-luna', feature: 'cheap', workspaceId: null, timestamp: `${today}T09:00:00.000Z` },
+      { promptTokens: 10000, completionTokens: 5000, totalTokens: 15000, model: 'gpt-5.6-sol', feature: 'expensive', workspaceId: null, timestamp: `${today}T10:00:00.000Z` },
     ]));
     const result = getUsageByFeature();
     expect(result[0].feature).toBe('expensive');
@@ -259,7 +259,7 @@ describe('getTimeSaved', () => {
     const today = new Date().toISOString().slice(0, 10);
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'gpt-5.4-mini', feature: 'content-brief', workspaceId: 'ws-1', timestamp: `${today}T10:00:00.000Z` },
+      { promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'gpt-5.6-luna', feature: 'content-brief', workspaceId: 'ws-1', timestamp: `${today}T10:00:00.000Z` },
     ]));
     const result = getTimeSaved('ws-1');
     expect(result.totalMinutesSaved).toBe(150);
@@ -270,7 +270,7 @@ describe('getTimeSaved', () => {
     const today = new Date().toISOString().slice(0, 10);
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.4-mini', feature: 'unknown-feature-xyz', workspaceId: 'ws-2', timestamp: `${today}T10:00:00.000Z` },
+      { promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.6-luna', feature: 'unknown-feature-xyz', workspaceId: 'ws-2', timestamp: `${today}T10:00:00.000Z` },
     ]));
     const result = getTimeSaved('ws-2');
     expect(result.totalMinutesSaved).toBe(10);
@@ -281,7 +281,7 @@ describe('getTimeSaved', () => {
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     // keyword-strategy = 240 min = 4 hours exactly
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'gpt-5.4', feature: 'keyword-strategy', workspaceId: 'ws-3', timestamp: `${today}T10:00:00.000Z` },
+      { promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'gpt-5.6-terra', feature: 'keyword-strategy', workspaceId: 'ws-3', timestamp: `${today}T10:00:00.000Z` },
     ]));
     const result = getTimeSaved('ws-3');
     expect(result.totalHoursSaved).toBe(4);
@@ -292,9 +292,9 @@ describe('getTimeSaved', () => {
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     // seo-rewrite=15, alt-text=5
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.4-mini', feature: 'seo-rewrite', workspaceId: 'ws-4', timestamp: `${today}T10:00:00.000Z` },
-      { promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.4-mini', feature: 'seo-rewrite', workspaceId: 'ws-4', timestamp: `${today}T11:00:00.000Z` },
-      { promptTokens: 5, completionTokens: 2, totalTokens: 7, model: 'gpt-5.4-nano', feature: 'alt-text', workspaceId: 'ws-4', timestamp: `${today}T12:00:00.000Z` },
+      { promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.6-luna', feature: 'seo-rewrite', workspaceId: 'ws-4', timestamp: `${today}T10:00:00.000Z` },
+      { promptTokens: 10, completionTokens: 5, totalTokens: 15, model: 'gpt-5.6-luna', feature: 'seo-rewrite', workspaceId: 'ws-4', timestamp: `${today}T11:00:00.000Z` },
+      { promptTokens: 5, completionTokens: 2, totalTokens: 7, model: 'gpt-5.6-luna', feature: 'alt-text', workspaceId: 'ws-4', timestamp: `${today}T12:00:00.000Z` },
     ]));
     const result = getTimeSaved('ws-4');
     expect(result.totalMinutesSaved).toBe(35); // 15+15+5
@@ -329,8 +329,8 @@ describe('getUsageByDay', () => {
     const today = new Date().toISOString().slice(0, 10);
     mocks.readdirSync.mockReturnValue([`${today}.json`]);
     mocks.readFileSync.mockReturnValue(JSON.stringify([
-      { promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'gpt-5.4-mini', feature: 'chat', workspaceId: null, timestamp: `${today}T10:00:00.000Z` },
-      { promptTokens: 200, completionTokens: 100, totalTokens: 300, model: 'claude-sonnet-4-6', feature: 'content-post', workspaceId: null, timestamp: `${today}T10:30:00.000Z` },
+      { promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'gpt-5.6-luna', feature: 'chat', workspaceId: null, timestamp: `${today}T10:00:00.000Z` },
+      { promptTokens: 200, completionTokens: 100, totalTokens: 300, model: 'claude-opus-4-8', feature: 'content-post', workspaceId: null, timestamp: `${today}T10:30:00.000Z` },
     ]));
     const result = getUsageByDay(undefined, 1);
     const todayEntry = result.find(r => r.date === today);

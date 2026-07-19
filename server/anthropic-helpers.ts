@@ -5,6 +5,12 @@
  */
 
 import { logTokenUsage } from './openai-helpers.js';
+import {
+  DEFAULT_ANTHROPIC_MODEL,
+  MODEL_ROLES,
+  getAnthropicRequestPolicy,
+  type AnthropicChatModel,
+} from './model-manifest.js';
 import { createLogger } from './logger.js';
 import { composeTimeoutSignal, throwIfSignalAborted } from './abort-helpers.js';
 import { buildProviderRetryDelayMs, RetryableProviderError, withProviderRetry } from './ai-provider-retry.js';
@@ -22,11 +28,7 @@ interface ChatMessage {
 }
 
 interface AnthropicChatOptions {
-  model?:
-    | 'claude-sonnet-4-6'
-    | 'claude-haiku-4-5-20251001'
-    | 'claude-3-5-sonnet-20241022'
-    | 'claude-3-5-haiku-20241022';
+  model?: AnthropicChatModel;
   system?: string;
   messages: ChatMessage[];
   maxTokens?: number;
@@ -62,7 +64,7 @@ interface AnthropicChatResult {
  * exponential backoff, timeout, and token tracking.
  */
 export async function callAnthropic(opts: AnthropicChatOptions): Promise<AnthropicChatResult> {
-  const model = opts.model ?? 'claude-sonnet-4-6';
+  const model = opts.model ?? DEFAULT_ANTHROPIC_MODEL;
   const cachePolicy = opts.signal ? { mode: 'none' } as const : (opts.cachePolicy ?? { mode: 'inflight' } as const);
   const key = AIRequestDeduplicator.createKey({
     provider: 'anthropic',
@@ -94,11 +96,11 @@ export async function callAnthropic(opts: AnthropicChatOptions): Promise<Anthrop
 
 async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<AnthropicChatResult> {
   const {
-    model = 'claude-sonnet-4-6',
+    model = DEFAULT_ANTHROPIC_MODEL,
     system,
     messages,
     maxTokens = 2000,
-    temperature = 0.7,
+    temperature,
     feature,
     workspaceId,
     maxRetries = 3,
@@ -128,12 +130,18 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
 
+  // Per-family request rules live in the manifest — call sites must not carry
+  // model-specific param knowledge (sampling params 400 on Opus 4.7+/Sonnet 5;
+  // Opus creative calls opt into adaptive thinking + high effort explicitly).
+  const policy = getAnthropicRequestPolicy(model);
   const bodyObj: Record<string, unknown> = {
     model,
     messages,
-    max_tokens: maxTokens,
-    temperature,
+    max_tokens: maxTokens + policy.thinkingHeadroomTokens,
   };
+  if (policy.supportsSamplingParams) bodyObj.temperature = temperature ?? 0.7;
+  if (policy.thinking) bodyObj.thinking = policy.thinking;
+  if (policy.outputConfig) bodyObj.output_config = policy.outputConfig;
   if (system) bodyObj.system = system;
 
   const body = JSON.stringify(bodyObj);
@@ -264,7 +272,7 @@ export async function callAnthropicWithTools(opts: {
   signal?: AbortSignal;
 }): Promise<AnthropicToolUseResult> {
   const {
-    model = 'claude-haiku-4-5-20251001',
+    model = MODEL_ROLES.utilityExtractionAnthropic,
     system,
     userMessage,
     tools,
@@ -288,11 +296,16 @@ export async function callAnthropicWithTools(opts: {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
+  // Headroom via the same manifest policy as the chat path: zero for the
+  // Haiku default, but the documented `claude-sonnet-5` escape hatch runs
+  // adaptive thinking (Sonnet 5's omitted-field default), which would
+  // otherwise share the caller's maxTokens and starve the tool-use output.
+  const toolPolicy = getAnthropicRequestPolicy(model);
   const bodyObj: Record<string, unknown> = {
     model,
     messages: [{ role: 'user', content: userMessage }],
     tools,
-    max_tokens: maxTokens,
+    max_tokens: maxTokens + toolPolicy.thinkingHeadroomTokens,
   };
   if (system) bodyObj.system = system;
   if (forceTool) bodyObj.tool_choice = { type: 'tool', name: forceTool };

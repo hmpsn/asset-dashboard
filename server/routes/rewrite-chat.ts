@@ -4,6 +4,7 @@
  * POST /api/rewrite-chat/:workspaceId/load-page — fetch + parse a page for the content pane
  */
 import { Router } from 'express';
+import { MODEL_ROLES } from '../model-manifest.js';
 import { getWorkspace } from '../workspaces.js';
 import { callAI } from '../ai.js';
 import { getLatestSnapshot } from '../reports.js';
@@ -336,7 +337,7 @@ ${pageAssist.blocks.keywordBlock}${pageAssist.blocks.brandVoiceBlock}${pageAssis
     ];
 
     const aiResult = await callAI({
-      model: 'gpt-5.4',
+      model: MODEL_ROLES.structuredSynthesis,
       system: systemPrompt,
       messages,
       temperature: 0.6,

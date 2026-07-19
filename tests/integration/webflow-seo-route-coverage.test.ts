@@ -335,7 +335,7 @@ describe('Webflow SEO copy route coverage', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
       feature: 'content-score',
-      model: 'gpt-5.4-mini',
+      model: 'gpt-5.6-luna',
     });
     expect(calls[0].messages[1]?.content).toContain('PAGE METADATA EVIDENCE');
     expect(calls[0].messages[1]?.content).toContain('<untrusted_user_content>');

@@ -25,7 +25,7 @@ function aiResult(
       runId: 'ai-run-1',
       operation: 'brand-deliverable-generate',
       provider,
-      model: provider === 'openai' ? 'gpt-5.5' : 'claude-sonnet-4-6',
+      model: provider === 'openai' ? 'gpt-5.6-sol' : 'claude-opus-4-8',
       attempts: 1,
       ...(fallbackUsed === undefined ? {} : { fallbackUsed }),
       cacheOutcome: 'bypass',
@@ -220,7 +220,7 @@ describe('brand generation AI operations', () => {
     expect(result.provenance).toMatchObject({
       runId: 'ai-run-1',
       provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      model: 'claude-opus-4-8',
       inputFingerprint: reservations[0].effectiveInputFingerprint,
     });
     expect(result.effectiveInputFingerprint).toBe(reservations[0].effectiveInputFingerprint);

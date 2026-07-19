@@ -128,7 +128,7 @@ beforeAll(async () => {
     runId: 'run_private_export',
     operation: 'content-brief-generate',
     provider: 'openai',
-    model: 'gpt-5.4',
+    model: 'gpt-5.6-terra',
     inputFingerprint: 'c'.repeat(64),
     startedAt: '2026-07-13T10:00:00.000Z',
     completedAt: '2026-07-13T10:00:01.000Z',

@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { MODEL_ROLES } from './model-manifest.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { parseJsonFallback } from './db/json-validation.js';
@@ -303,7 +304,7 @@ Return only valid JSON, no markdown.`;
   let result;
   try {
     result = await callAI({
-      model: 'gpt-5.4-mini',
+      model: MODEL_ROLES.utilityExtraction,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
       feature: 'copy-intelligence',

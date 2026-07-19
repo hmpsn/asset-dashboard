@@ -144,7 +144,7 @@ describe('content post generation progress', () => {
           executionChainId: options.executionChainId,
           operation: 'content-post-introduction',
           provider: 'openai',
-          model: 'gpt-5.4-mini',
+          model: 'gpt-5.6-luna',
           attempts: 1,
           cacheOutcome: 'miss',
           startedAt: timestamp,

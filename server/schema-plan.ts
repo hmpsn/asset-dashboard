@@ -4,6 +4,7 @@
  * and produce a blueprint that guides per-page schema generation.
  */
 import crypto from 'crypto';
+import { MODEL_ROLES } from './model-manifest.js';
 import { SCHEMA_ROLE_PRIMARY_TYPE, type SchemaSitePlan, type CanonicalEntity, type PageRoleAssignment, type SchemaPageRole } from '../shared/types/schema-plan.ts';
 import type { KeywordStrategy, PageKeywordMap } from '../shared/types/workspace.ts';
 import { callAI } from './ai.js';
@@ -344,7 +345,7 @@ IMPORTANT:
   try {
     const result = await callAI({
       operation: 'schema-plan-generate',
-      model: 'gpt-5.4-mini',
+      model: MODEL_ROLES.utilityExtraction,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
       temperature: 0.1,

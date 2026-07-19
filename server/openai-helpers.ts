@@ -5,6 +5,12 @@
 import fs from 'fs';
 import path from 'path';
 import { getDataDir } from './data-dir.js';
+import {
+  DEFAULT_OPENAI_MODEL,
+  estimateModelCostUsd,
+  getOpenAIRequestPolicy,
+  type OpenAIChatModel,
+} from './model-manifest.js';
 import { createLogger } from './logger.js';
 import { aiDeduplicator } from './ai-deduplication.js';
 import type * as AiDeduplication from './ai-deduplication.js';
@@ -104,33 +110,9 @@ function loadEntriesFromDisk(since?: string, days?: number): TokenUsage[] {
 
 // --- Cost estimation per model ---
 
-/** Per-token pricing (USD). Updated May 2026. */
+/** Delegates to the single pricing table in server/model-manifest.ts. */
 function estimateCost(entry: TokenUsage): number {
-  const m = entry.model;
-  // GPT-5.5
-  if (m.startsWith('gpt-5.5')) return (entry.promptTokens * 0.000005) + (entry.completionTokens * 0.00003);
-  // GPT-5.4 nano
-  if (m.startsWith('gpt-5.4-nano')) return (entry.promptTokens * 0.0000002) + (entry.completionTokens * 0.00000125);
-  // GPT-5.4 mini
-  if (m.startsWith('gpt-5.4-mini')) return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
-  // GPT-5.4
-  if (m.startsWith('gpt-5.4')) return (entry.promptTokens * 0.0000025) + (entry.completionTokens * 0.000015);
-  // Historical GPT-4.1 nano
-  if (m === 'gpt-4.1-nano') return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
-  // Historical GPT-4.1 mini
-  if (m === 'gpt-4.1-mini') return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
-  // Historical GPT-4.1
-  if (m.startsWith('gpt-4.1')) return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
-  // Claude Sonnet 4+
-  if (m.includes('claude-sonnet-4')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
-  // Claude Haiku 4.5
-  if (m.includes('claude-haiku-4-5')) return (entry.promptTokens * 0.000001) + (entry.completionTokens * 0.000005);
-  // Claude 3.5 Sonnet
-  if (m.includes('claude-3-5-sonnet')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
-  // Claude 3.5 Haiku
-  if (m.includes('claude-3-5-haiku')) return (entry.promptTokens * 0.0000008) + (entry.completionTokens * 0.000004);
-  // Fallback: current default OpenAI mini pricing
-  return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
+  return estimateModelCostUsd(entry);
 }
 
 function getProvider(model: string): 'openai' | 'anthropic' {
@@ -243,17 +225,7 @@ interface ChatMessage {
 }
 
 interface OpenAIChatOptions {
-  model?:
-    | 'gpt-5.5'
-    | 'gpt-5.4'
-    | 'gpt-5.4-mini'
-    | 'gpt-5.4-nano'
-    | 'chat-latest'
-    | 'gpt-4.1-nano'
-    | 'gpt-4.1-mini'
-    | 'gpt-4.1'
-    | 'gpt-4o-mini'
-    | 'gpt-4o';
+  model?: OpenAIChatModel;
   messages: ChatMessage[];
   maxTokens?: number;
   temperature?: number;
@@ -291,7 +263,7 @@ interface OpenAIChatResult {
  */
 export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatResult> {
   const {
-    model = 'gpt-5.4-mini',
+    model = DEFAULT_OPENAI_MODEL,
     messages,
     maxTokens = 1000,
     temperature = 0.7,
@@ -308,9 +280,10 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     fallbackUsed,
   } = opts;
 
-  // GPT-5.5 currently accepts only its default temperature (1).
-  // Omitting the field keeps creative fallbacks compatible with that contract.
-  const requestTemperature = model.startsWith('gpt-5.5') ? undefined : temperature;
+  // Some model families accept only their default temperature (gpt-5.5 and its
+  // successor gpt-5.6-sol). The manifest owns that rule; omitting the field
+  // keeps creative fallbacks compatible with those contracts.
+  const requestTemperature = getOpenAIRequestPolicy(model).supportsCustomTemperature ? temperature : undefined;
 
   // Cancellable requests are per-job work; counting them as explicit bypasses keeps
   // governance telemetry truthful without sharing an abortable promise.
@@ -343,7 +316,7 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
  */
 async function executeOpenAICall(opts: OpenAIChatOptions): Promise<OpenAIChatResult> {
   const {
-    model = 'gpt-5.4-mini',
+    model = DEFAULT_OPENAI_MODEL,
     messages,
     maxTokens = 1000,
     temperature,
