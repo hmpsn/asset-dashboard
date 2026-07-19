@@ -147,9 +147,34 @@ describe('estimateAiCostUsd', () => {
     expect(result).toBeCloseTo(0.0005, 8);
   });
 
-  it('uses the default (gpt-5.4-mini) rates for unknown models', () => {
+  it('uses the default (gpt-5.6-luna, current utility tier) rates for unknown models', () => {
     const result = estimateAiCostUsd({ promptTokens: 1000, completionTokens: 1000, model: 'unknown-model-123' });
-    expect(result).toBeCloseTo(0.00525, 8);
+    expect(result).toBeCloseTo(0.007, 8);
+  });
+
+  it('uses gpt-5.6-terra rates for the current synthesis tier', () => {
+    const result = estimateAiCostUsd({ promptTokens: 1000, completionTokens: 1000, model: 'gpt-5.6-terra' });
+    expect(result).toBeCloseTo(0.0175, 8);
+  });
+
+  it('uses gpt-5.6-sol rates for the creative-recovery tier', () => {
+    const result = estimateAiCostUsd({ promptTokens: 1000, completionTokens: 1000, model: 'gpt-5.6-sol' });
+    expect(result).toBeCloseTo(0.035, 8);
+  });
+
+  it('uses Opus rates for claude-opus-4-8 (current creative writer)', () => {
+    const result = estimateAiCostUsd({ promptTokens: 1000, completionTokens: 1000, model: 'claude-opus-4-8' });
+    expect(result).toBeCloseTo(0.03, 8);
+  });
+
+  it('uses Sonnet 5 rates for the claude-sonnet-5 escape-hatch tier', () => {
+    const result = estimateAiCostUsd({ promptTokens: 1000, completionTokens: 1000, model: 'claude-sonnet-5' });
+    expect(result).toBeCloseTo(0.018, 8);
+  });
+
+  it('keeps pricing historical Sonnet 4.x usage entries (cost dashboards re-price old logs)', () => {
+    const result = estimateAiCostUsd({ promptTokens: 1000, completionTokens: 1000, model: 'claude-sonnet-4-6' });
+    expect(result).toBeCloseTo(0.018, 8);
   });
 });
 

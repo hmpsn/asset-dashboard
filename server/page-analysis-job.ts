@@ -1,4 +1,5 @@
 import { addActivity } from './activity-log.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { broadcastToWorkspace } from './broadcast.js';
 import { debouncedPageAnalysisInvalidate, invalidateSubCachePrefix } from './bridge-infrastructure.js';
 import { parseJsonSafe } from './db/json-validation.js';
@@ -324,7 +325,7 @@ Provide your analysis as a JSON object:
 IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONLY valid JSON.`;
 
           const aiResult = await callAI({
-            model: 'gpt-5.4-mini',
+            model: MODEL_ROLES.utilityExtraction,
             system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
             messages: [{ role: 'user', content: prompt }],
             maxTokens: 1000,

@@ -3,7 +3,7 @@
  *
  * The site-level synthesis call (siteKeywords, opportunities, contentGaps,
  * quickWins) is the highest-leverage AI call in the platform. This contract pins
- * the upgraded model allocation (gpt-5.4) and asserts the schema-validation +
+ * the upgraded model allocation (the manifest's structured-synthesis tier) and asserts the schema-validation +
  * execution contract stays intact after the upgrade — the closed-set pool + Zod
  * validation + background-only execution must not regress.
  *
@@ -16,8 +16,8 @@ describe('keyword-site-synthesis operation contract', () => {
   const policy = getAIOperationPolicyMetadata('keyword-site-synthesis');
   const runtimeDefaults = getAIOperationRuntimeDefaults('keyword-site-synthesis');
 
-  it('runs on the gpt-5.4 model tier (upgraded from gpt-5.4-mini)', () => {
-    expect(runtimeDefaults.defaultModel).toBe('gpt-5.4');
+  it('runs on the full structured-synthesis model tier (not the utility tier)', () => {
+    expect(runtimeDefaults.defaultModel).toBe('gpt-5.6-terra');
   });
 
   it('keeps the long timeout profile appropriate for the bigger model', () => {

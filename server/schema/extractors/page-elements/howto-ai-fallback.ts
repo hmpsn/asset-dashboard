@@ -19,6 +19,7 @@
  * falls through to no-op for that index.
  */
 import type { PageList, HowToStep } from '../../../../shared/types/page-elements.js';
+import { MODEL_ROLES } from '../../../model-manifest.js';
 import { callAI } from '../../../ai.js';
 import { tryConsumeAiBudget } from './ai-budget.js';
 import type { AiBudget } from './ai-budget.js';
@@ -75,7 +76,7 @@ export async function aiDisambiguateHowTo(
     try {
       const response = await callAI({
         provider: 'openai',
-        model: 'gpt-5.4-mini',
+        model: MODEL_ROLES.utilityExtraction,
         feature: 'schema-ai-element-classifier',
         workspaceId: opts.workspaceId,
         maxTokens: 50,
@@ -85,7 +86,7 @@ export async function aiDisambiguateHowTo(
           content: DISAMBIG_PROMPT + items.map((t, idx) => `${idx + 1}. ${t}`).join('\n'),
         }],
       });
-      // Empty AI content (rare gpt-5.4-mini failure mode: refusal, content filter)
+      // Empty AI content (rare utility-model failure mode: refusal, content filter)
       // would crash JSON.parse('') — guard so the budget slot doesn't double-cost via stack unwind.
       const text = (response.text ?? '').trim();
       if (!text) {

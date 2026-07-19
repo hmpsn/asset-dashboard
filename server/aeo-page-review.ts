@@ -10,6 +10,7 @@
  */
 
 import { callAI } from './ai.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { buildIntelPrompt } from './workspace-intelligence.js';
 import type { SeoIssue } from './seo-audit.js';
 import { createLogger } from './logger.js';
@@ -227,7 +228,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
 
   const aiResult = await callAI({
     operation: 'aeo-page-review',
-    model: 'gpt-5.4',
+    model: MODEL_ROLES.structuredSynthesis,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 5000,
     temperature: 0.4,

@@ -39,7 +39,7 @@ describe('AIRequestDeduplicator.createKey', () => {
   it('differs when model changes', () => {
     const base = { messages: [{ role: 'user', content: 'x' }] };
     const k1 = AIRequestDeduplicator.createKey({ model: 'gpt-4', ...base });
-    const k2 = AIRequestDeduplicator.createKey({ model: 'gpt-3.5-turbo', ...base });
+    const k2 = AIRequestDeduplicator.createKey({ model: 'gpt-5.6-luna', ...base });
     expect(k1).not.toBe(k2);
   });
 

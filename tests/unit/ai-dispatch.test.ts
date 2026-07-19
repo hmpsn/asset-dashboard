@@ -33,7 +33,7 @@ describe('callAI', () => {
     });
 
     await callAI({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-5.6-luna',
       messages: [{ role: 'user', content: 'Return JSON.' }],
       feature: 'unit-test',
       responseFormat: { type: 'json_object' },
@@ -54,7 +54,7 @@ describe('callAI', () => {
     });
 
     await callAI({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-5.6-luna',
       system: 'Return only valid JSON.',
       messages: [{ role: 'user', content: 'Classify this note.' }],
       feature: 'unit-test-system-json',
@@ -80,7 +80,7 @@ describe('callAI', () => {
     const controller = new AbortController();
 
     await callAI({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-5.6-luna',
       messages: [{ role: 'user', content: 'Draft this.' }],
       feature: 'unit-test-options',
       maxRetries: 1,
@@ -105,7 +105,7 @@ describe('callAI', () => {
     });
 
     await callAI({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-5.6-luna',
       system: 'Return JSON.',
       messages: [{ role: 'user', content: 'Summarize this evidence.' }],
       feature: 'unit-test-research-openai',
@@ -133,7 +133,7 @@ describe('callAI', () => {
 
     await callAI({
       provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      model: 'claude-opus-4-8',
       system: 'Write carefully.',
       messages: [{ role: 'user', content: 'Draft this.' }],
       feature: 'unit-test-research-anthropic',
@@ -156,7 +156,7 @@ describe('callAI', () => {
 
     await callAI({
       provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      model: 'claude-opus-4-8',
       system: 'Write clearly.',
       messages: [{ role: 'user', content: 'Draft this.' }],
       feature: 'unit-test-anthropic-options',
@@ -188,7 +188,7 @@ describe('callAI', () => {
     });
 
     expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
-      model: 'gpt-5.4-mini',
+      model: 'gpt-5.6-luna',
       feature: 'schema-plan',
       maxRetries: 3,
       timeoutMs: 90_000,
@@ -218,7 +218,7 @@ describe('callAI', () => {
         runId: expect.any(String),
         operation: 'copy-generation',
         provider: 'anthropic',
-        model: 'claude-sonnet-4-6',
+        model: 'claude-opus-4-8',
         attempts: 1,
         cacheOutcome: 'miss',
         startedAt: expect.any(String),
@@ -268,7 +268,7 @@ describe('callAI', () => {
 
     await callAI({
       operation: 'schema-plan',
-      model: 'gpt-5.4',
+      model: 'gpt-5.6-terra',
       maxRetries: 1,
       timeoutMs: 12_000,
       messages: [{ role: 'user', content: 'override defaults' }],
@@ -277,7 +277,7 @@ describe('callAI', () => {
     });
 
     expect(mocks.callOpenAI).toHaveBeenCalledWith(expect.objectContaining({
-      model: 'gpt-5.4',
+      model: 'gpt-5.6-terra',
       feature: 'schema-plan-override',
       operation: 'schema-plan',
       cachePolicy: { mode: 'ttl', ttlMs: 300_000 },

@@ -4,6 +4,7 @@
  */
 
 import db from './db/index.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { callAI } from './ai.js';
 import { parseJsonFallback } from './db/json-validation.js';
 import { createStmtCache } from './db/stmt-cache.js';
@@ -448,7 +449,7 @@ export async function generateSessionSummary(
         .join('\n');
 
       const result = await callAI({
-        model: 'gpt-5.4-nano',
+        model: MODEL_ROLES.utilityExtraction,
         system: 'Summarize this conversation in 1-2 sentences. Focus on the key topics discussed, questions asked, and any preferences or concerns the user expressed. Be concise.',
         messages: [{ role: 'user', content: transcript }],
         maxTokens: 150,

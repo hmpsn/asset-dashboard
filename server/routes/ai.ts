@@ -2,6 +2,7 @@
  * ai routes — extracted from server/index.ts
  */
 import { Router } from 'express';
+import { MODEL_ROLES } from '../model-manifest.js';
 
 const router = Router();
 
@@ -70,7 +71,7 @@ router.post('/api/admin-chat', aiLimiter, requireWorkspaceAccessFromBody(), asyn
     const maxTokens = assembled.mode === 'analyst' ? 2000 : 3000;
 
     const aiResult = await callAI({
-      model: 'gpt-5.4',
+      model: MODEL_ROLES.structuredSynthesis,
       system: systemPrompt,
       messages: [
         ...historyMessages.slice(-10),

@@ -7,6 +7,7 @@ import { callAI, renderAIProviderInput, type AICallOptions, type AICallResult } 
 import { getAIOperationRuntimeDefaults, type AIOperationId } from './ai-operation-registry.js';
 import { parseStructuredAIOutput, StructuredAIOutputError } from './ai-structured-output.js';
 import { isAnthropicConfigured } from './anthropic-helpers.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import {
   buildSystemPrompt,
   buildSystemPromptFromAuthority,
@@ -43,9 +44,11 @@ const log = createLogger('content-posts-ai');
 // AI model config — Claude for creative prose, GPT for structured tasks.
 // Claude produces more natural, less formulaic writing. GPT excels at
 // JSON output, unification editing, and SEO meta generation.
-const CONTENT_MODEL = 'gpt-5.4';         // fallback + structured tasks
-const CLAUDE_MODEL = 'claude-sonnet-4-6' as const;
-const CLAUDE_TEMP = 0.7;
+// Concrete IDs live in server/model-manifest.ts; the Claude path deliberately
+// sends no temperature (removed on Opus 4.8 — the helper enforces per-family
+// param rules) and gets adaptive thinking + high effort from the same policy.
+const CONTENT_MODEL = MODEL_ROLES.structuredSynthesis; // fallback + structured tasks
+const CLAUDE_MODEL = MODEL_ROLES.creativeWriter;
 
 const seoMetaResponseSchema = z.object({
   seoTitle: z.string().trim().min(1),
@@ -98,7 +101,11 @@ export interface CreativeAICallOptions {
   maxTokens: number;
   feature?: string;
   workspaceId: string;
-  /** Optional temperature override (default: 0.7 for both providers) */
+  /**
+   * Optional temperature override for the OpenAI fallback only. The Claude
+   * path never sends temperature — sampling params are removed on Opus 4.8
+   * (any value 400s); steer variance via the prompt instead.
+   */
   temperature?: number;
   /**
    * When true: enforce JSON output on the GPT fallback via responseFormat,
@@ -111,7 +118,7 @@ export interface CreativeAICallOptions {
   /** Optional caller cancellation signal. */
   signal?: AbortSignal;
   /** Optional quality-tier fallback for complex cross-context creative work. */
-  openAIModel?: 'gpt-5.4' | 'gpt-5.5';
+  openAIModel?: typeof MODEL_ROLES.structuredSynthesis | typeof MODEL_ROLES.creativeRecovery;
   /** B2 sets zero so every paid dispatcher invocation is reserved explicitly. */
   maxRetries?: number;
   /** Bounded callers may disable the automatic Claude-to-OpenAI fallback. */
@@ -165,7 +172,6 @@ export async function callCreativeAIWithMetadata(
   opts: CreativeAICallOptions,
 ): Promise<AICallResult> {
   const { systemPrompt, userPrompt, maxTokens, feature, workspaceId } = opts;
-  const temperature = opts.temperature ?? CLAUDE_TEMP;
   const json = opts.json === true;
   const featureLabel = feature ?? opts.operation ?? 'creative-ai';
   const executionChainId = opts.executionChainId ?? randomUUID();
@@ -194,11 +200,12 @@ export async function callCreativeAIWithMetadata(
         model: CLAUDE_MODEL,
         ...providerInput,
         maxTokens,
-        temperature,
         feature,
         workspaceId,
         maxRetries: opts.maxRetries,
-        timeoutMs: 90_000,
+        // Opus 4.8 at high effort runs longer than the Sonnet-era 90s budget;
+        // a timeout here converts a slow success into a paid retry + GPT fallback.
+        timeoutMs: 240_000,
         researchMode,
         signal: opts.signal,
         executionChainId,
@@ -246,7 +253,7 @@ export async function callCreativeAIWithMetadata(
     model: opts.openAIModel ?? CONTENT_MODEL,
     ...providerInput,
     maxTokens,
-    temperature,
+    temperature: opts.temperature,
     feature,
     workspaceId,
     maxRetries: opts.maxRetries,

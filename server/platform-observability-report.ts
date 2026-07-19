@@ -5,6 +5,7 @@ import {
   getSlowRouteTelemetry,
 } from './platform-observability.js';
 import { getTokenUsage } from './openai-helpers.js';
+import { estimateModelCostUsd } from './model-manifest.js';
 import type {
   ObservabilityAiFeatureMetric,
   ObservabilityCriticalSyncStatus,
@@ -43,24 +44,13 @@ export function avg(values: number[]): number | null {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
+/** Delegates to the single pricing table in server/model-manifest.ts. */
 export function estimateAiCostUsd(entry: {
   promptTokens: number;
   completionTokens: number;
   model: string;
 }): number {
-  const model = entry.model;
-  if (model.startsWith('gpt-5.5')) return (entry.promptTokens * 0.000005) + (entry.completionTokens * 0.00003);
-  if (model.startsWith('gpt-5.4-nano')) return (entry.promptTokens * 0.0000002) + (entry.completionTokens * 0.00000125);
-  if (model.startsWith('gpt-5.4-mini')) return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
-  if (model.startsWith('gpt-5.4')) return (entry.promptTokens * 0.0000025) + (entry.completionTokens * 0.000015);
-  if (model.startsWith('gpt-4.1-nano')) return (entry.promptTokens * 0.0000001) + (entry.completionTokens * 0.0000004);
-  if (model.startsWith('gpt-4.1-mini')) return (entry.promptTokens * 0.0000004) + (entry.completionTokens * 0.0000016);
-  if (model.startsWith('gpt-4.1')) return (entry.promptTokens * 0.000002) + (entry.completionTokens * 0.000008);
-  if (model.includes('claude-sonnet-4')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
-  if (model.includes('claude-haiku-4-5')) return (entry.promptTokens * 0.000001) + (entry.completionTokens * 0.000005);
-  if (model.includes('claude-3-5-sonnet')) return (entry.promptTokens * 0.000003) + (entry.completionTokens * 0.000015);
-  if (model.includes('claude-3-5-haiku')) return (entry.promptTokens * 0.0000008) + (entry.completionTokens * 0.000004);
-  return (entry.promptTokens * 0.00000075) + (entry.completionTokens * 0.0000045);
+  return estimateModelCostUsd(entry);
 }
 
 function buildFailedJobs(workspaceId: string, since: string): ObservabilityFailedJob[] {

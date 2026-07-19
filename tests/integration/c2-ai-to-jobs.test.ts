@@ -78,7 +78,7 @@ vi.mock('../../server/copy-generation.js', async (importOriginal) => {
       if (state.generateCopyResult) return state.generateCopyResult;
       return {
         sections: [{ id: 's1', title: 'Intro', content: 'Generated intro copy.' }],
-        metadata: { generatedAt: '2026-06-10T00:00:00.000Z', model: 'gpt-5.4-mini' },
+        metadata: { generatedAt: '2026-06-10T00:00:00.000Z', model: 'gpt-5.6-luna' },
       };
     }),
   };

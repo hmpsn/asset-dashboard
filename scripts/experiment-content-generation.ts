@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { MODEL_ROLES } from '../server/model-manifest.js';
 import { z } from 'zod';
 import {
   prepareBriefContextInputSchema,
@@ -283,7 +284,7 @@ export function parseExperimentArgs(argv: string[]): ExperimentCliOptions {
     variants,
     includePosts: values.has('--include-posts') || values.has('--quality-audit'),
     mcpUrl: values.get('--mcp-url') ?? process.env.MCP_URL ?? 'http://localhost:3001/mcp',
-    model: values.get('--model') ?? 'gpt-5.4',
+    model: values.get('--model') ?? MODEL_ROLES.structuredSynthesis,
     maxTokens: Number(values.get('--max-tokens') ?? 5000),
     outDir: values.get('--out-dir') ?? path.join('artifacts', 'content-experiments', `${new Date().toISOString().replace(/[:.]/g, '-')}-${slugify(topic)}`),
   };
@@ -301,7 +302,7 @@ export function parseBatchExperimentArgs(argv: string[]): BatchCliOptions {
     variants: parseVariantList(values.get('--variants') ?? 'current,concise,blended'),
     includePosts: values.has('--include-posts') || values.has('--quality-audit'),
     mcpUrl: values.get('--mcp-url') ?? process.env.MCP_URL ?? 'http://localhost:3001/mcp',
-    model: values.get('--model') ?? 'gpt-5.4',
+    model: values.get('--model') ?? MODEL_ROLES.structuredSynthesis,
     maxTokens: Number(values.get('--max-tokens') ?? 5000),
     outDir: values.get('--out-dir') ?? path.join('artifacts', 'content-experiments', `batch-${new Date().toISOString().replace(/[:.]/g, '-')}`),
   };

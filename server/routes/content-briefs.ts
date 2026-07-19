@@ -249,7 +249,7 @@ router.post('/api/content-briefs/:workspaceId/generate', requireWorkspaceAccess(
 
 // Regenerate a brief with user feedback (async — returns 202 { jobId })
 //
-// W6.2: heavyweight AI regeneration (gpt-5.4, 7000 tokens, research mode) moved onto
+// W6.2: heavyweight AI regeneration (synthesis-tier model, 7000 tokens, research mode) moved onto
 // the background job platform. The job persists the new brief to the content_briefs
 // store and broadcasts BRIEF_UPDATED on completion (declared cross-lane contract:
 // ContentBriefs.tsx is re-wired by a sibling lane). Failures surface via the job

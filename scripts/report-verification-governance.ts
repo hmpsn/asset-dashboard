@@ -151,6 +151,11 @@ export const VERIFICATION_GOVERNANCE_REGISTRY = {
     owner: 'billing-monetization',
     rationale: 'Requires Stripe configuration/secrets and must remain outside normal PR CI.',
   },
+  'verify:model-currency': {
+    classification: 'secret-backed',
+    owner: 'platform-foundation',
+    rationale: 'Requires provider API keys (Anthropic/OpenAI); runs in the nightly workflow and skips gracefully without keys, so it must stay outside normal PR CI.',
+  },
   'verify:deprecations': {
     classification: 'release-check',
     owner: 'platform-foundation',

@@ -2,6 +2,7 @@
  * google routes — extracted from server/index.ts
  */
 import { Router, type Request, type RequestHandler, type Response } from 'express';
+import { MODEL_ROLES } from '../model-manifest.js';
 
 const router = Router();
 
@@ -310,7 +311,7 @@ Current search data context:
 ${JSON.stringify(context, null, 2)}`;
 
     const aiResult = await callAI({
-      model: 'gpt-5.4',
+      model: MODEL_ROLES.structuredSynthesis,
       system: systemPrompt,
       messages: [{ role: 'user', content: question }],
       temperature: 0.7,

@@ -75,7 +75,7 @@ vi.mock('../../server/ai.js', () => ({
       aiState.systemPromptsByOp['client-search-chat'] = opts.system ?? '';
       return { text: 'Here is your analytics summary.', tokens: { prompt: 0, completion: 0, total: 0 } };
     }
-    // intent classification (gpt-5.4-nano) — return null intent
+    // intent classification (utility-extraction model) — return null intent
     return { text: '{"intent": null}', tokens: { prompt: 0, completion: 0, total: 0 } };
   }),
 }));

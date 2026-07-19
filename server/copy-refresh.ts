@@ -8,6 +8,7 @@
  */
 
 import { listBlueprints } from './page-strategy.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { getSectionsForEntry } from './copy-review.js';
 import { loadDecayAnalysis } from './content-decay.js';
 import { callAI } from './ai.js';
@@ -185,7 +186,7 @@ Prioritize sections that are most likely contributing to the decline (outdated i
 
   try {
     const result = await callAI({
-      model: 'gpt-5.4-mini',
+      model: MODEL_ROLES.utilityExtraction,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
       temperature: 0.4,

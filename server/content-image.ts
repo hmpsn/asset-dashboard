@@ -4,6 +4,7 @@
  */
 
 import fs from 'fs';
+import { MODEL_ROLES } from './model-manifest.js';
 import path from 'path';
 import os from 'os';
 import { uploadAsset } from './webflow.js';
@@ -44,7 +45,7 @@ export async function generateFeaturedImage(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-image-2',
+        model: MODEL_ROLES.image,
         prompt,
         n: 1,
         size: '1536x1024',

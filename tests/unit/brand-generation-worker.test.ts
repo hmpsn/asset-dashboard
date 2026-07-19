@@ -361,7 +361,7 @@ const provenance = {
   runId: 'ai-run-1',
   operation: 'brand-deliverable-generate',
   provider: 'anthropic' as const,
-  model: 'claude-opus-4-6',
+  model: 'claude-opus-4-8',
   inputFingerprint: FINGERPRINT,
   startedAt: NOW,
   completedAt: NOW,

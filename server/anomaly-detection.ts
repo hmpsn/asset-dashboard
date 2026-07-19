@@ -15,6 +15,7 @@
  */
 
 import crypto from 'crypto';
+import { MODEL_ROLES } from './model-manifest.js';
 import db from './db/index.js';
 import { createStmtCache } from './db/stmt-cache.js';
 import { getClientPortalUrl, listWorkspaces, type Workspace } from './workspaces.js';
@@ -529,7 +530,7 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string, wo
     ).join('\n');
 
     const result = await callAI({
-      model: 'gpt-5.4-mini',
+      model: MODEL_ROLES.utilityExtraction,
       system: buildSystemPrompt(workspaceId, `You are an SEO analyst. Given the detected anomalies for a website, write a brief 2-3 sentence executive summary that highlights the most important changes and suggests what to investigate first. Be specific and actionable. Don't repeat every anomaly — focus on the story.`),
       messages: [
         {

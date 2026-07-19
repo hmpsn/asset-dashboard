@@ -2,6 +2,7 @@
  * AI keyword analysis & content scoring routes — extracted from webflow.ts
  */
 import { Router } from 'express';
+import { MODEL_ROLES } from '../model-manifest.js';
 import { callAI } from '../ai.js';
 import { getConfiguredProvider, getProviderDisplayName } from '../seo-data-provider.js';
 import { getWorkspace } from '../workspaces.js';
@@ -118,7 +119,7 @@ IMPORTANT:
 Return ONLY valid JSON, no markdown, no explanation.`;
 
     const aiResult = await callAI({
-      model: 'gpt-5.4-mini',
+      model: MODEL_ROLES.utilityExtraction,
       system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,

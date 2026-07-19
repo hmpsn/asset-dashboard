@@ -3,6 +3,7 @@
 // Note: mutates results[].issues[].suggestedFix in-place — no DB writes.
 
 import { callAI } from './ai.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { buildWorkspaceIntelligence, formatForPrompt } from './workspace-intelligence.js';
 import { getBrandName, getWorkspace, getWorkspaceBySiteId } from './workspaces.js';
 import { createLogger } from './logger.js';
@@ -162,7 +163,7 @@ Respond in this exact JSON format (only include fields that need fixing):
 {"title":"...","metaDescription":"...","ogTitle":"..."}`;
 
           const aiResult = await callAI({
-            model: 'gpt-5.4-mini',
+            model: MODEL_ROLES.utilityExtraction,
             system: buildSystemPrompt(wsId ?? '', 'You are an expert SEO copywriter. Return only valid JSON matching the requested shape. Use provided page evidence and workspace context only; do not invent services, outcomes, statistics, or claims.'),
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.6,

@@ -56,7 +56,7 @@ function makeStories(n: number): BriefingStory[] {
 function adminMetadata(): BriefingSourceMetadata {
   return {
     candidateCount: 8,
-    model: 'claude-sonnet-4-6',
+    model: 'claude-opus-4-8',
     provider: 'anthropic',
     generationMs: 4_321,
   };

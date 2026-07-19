@@ -2,6 +2,7 @@
 // 8-layer context assembly and AI copy generation engine for the Copy Pipeline.
 
 import { randomUUID } from 'node:crypto';
+import { MODEL_ROLES } from './model-manifest.js';
 import { createLogger } from './logger.js';
 import { callAI, renderAIProviderInput, type AICallOptions } from './ai.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
@@ -147,7 +148,7 @@ ${context}`;
   const initialCall = await callTrackedCopyAI({
     operation: 'copy-generation',
     provider: 'anthropic',
-    model: 'claude-sonnet-4-6',
+    model: MODEL_ROLES.creativeWriter,
     maxTokens: 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: `Generate copy for "${entry.name}" (${entry.pageType} page). Return only valid JSON.` }],
@@ -167,7 +168,7 @@ ${context}`;
     const repairCall = await callTrackedCopyAI({
       operation: 'copy-generation',
       provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      model: MODEL_ROLES.creativeWriter,
       maxTokens: 8000,
       system: systemPrompt,
       messages: [{
@@ -297,7 +298,7 @@ ${context}`;
   const trackedCall = await callTrackedCopyAI({
     operation: 'copy-regeneration',
     provider: 'anthropic',
-    model: 'claude-sonnet-4-6',
+    model: MODEL_ROLES.creativeWriter,
     maxTokens: 2000,
     system: systemPrompt,
     messages: [{ role: 'user', content: 'Regenerate this section. Return only valid JSON.' }],

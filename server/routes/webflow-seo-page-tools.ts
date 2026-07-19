@@ -4,6 +4,7 @@
  * @reads workspaces, page_keywords, workspace_intelligence, webflow_api
  */
 import { Router } from 'express';
+import { MODEL_ROLES } from '../model-manifest.js';
 
 import { requireWorkspaceAccessFromBody, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
 import { parseJsonSafe } from '../db/json-validation.js';
@@ -194,7 +195,7 @@ Return ONLY valid JSON, no markdown fences.`;
 
   try {
     const aiResult = await callAI({
-      model: 'gpt-5.4-mini',
+      model: MODEL_ROLES.utilityExtraction,
       system: buildSystemPrompt(workspaceId, 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.'),
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
