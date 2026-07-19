@@ -203,6 +203,24 @@ export async function assembleOperational(
     { logger: log },
   );
 
+  const pendingDecisions = await readOptionalSlicePart<
+    OperationalSlice['pendingDecisions']
+  >(
+    'assembleOperational: pending decisions',
+    workspaceId,
+    {
+      total: 0,
+      counts: { approvals: 0, requests: 0, clientActions: 0 },
+      items: [],
+    },
+    async () => {
+      const { buildOperatorPendingDecisions } =
+        await import('../domains/analytics-intelligence/operator-pending-decisions.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
+      return buildOperatorPendingDecisions(workspaceId);
+    },
+    { logger: log },
+  );
+
   // Recommendation queue
   const recommendationQueue = await readOptionalSlicePart(
     'assembleOperational: recommendation queue',
@@ -331,6 +349,7 @@ export async function assembleOperational(
     timeSaved,
     approvalQueue,
     clientActionQueue,
+    pendingDecisions,
     recommendationQueue,
     actionBacklog,
     detectedPlaybooks,
