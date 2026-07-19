@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   routerPost: vi.fn(),
+  routerGet: vi.fn(),
+  routerDelete: vi.fn(),
   postHandler: null as null | ((req: any, res: any) => Promise<void>),
+  getHandlers: new Map<string, (req: any, res: any) => void>(),
+  deleteHandlers: new Map<string, (req: any, res: any) => void>(),
   mcpAuthMiddleware: vi.fn(),
   mcpMasterKeyOnlyMiddleware: vi.fn(),
   handleMcpRequest: vi.fn(),
@@ -13,6 +17,12 @@ vi.mock('express', () => ({
   Router: () => ({
     post: h.routerPost.mockImplementation((...args: unknown[]) => {
       h.postHandler = args.at(-1) as (req: any, res: any) => Promise<void>;
+    }),
+    get: h.routerGet.mockImplementation((path: string, handler: (req: any, res: any) => void) => {
+      h.getHandlers.set(path, handler);
+    }),
+    delete: h.routerDelete.mockImplementation((path: string, handler: (req: any, res: any) => void) => {
+      h.deleteHandlers.set(path, handler);
     }),
   }),
 }));
@@ -63,6 +73,24 @@ describe('mcp router', () => {
     expect(h.loggerError).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: 'Internal server error' });
+  });
+
+  it('registers GET and DELETE 405 handlers for both MCP profiles', () => {
+    for (const path of ['/', '/operator']) {
+      expect(h.routerGet).toHaveBeenCalledWith(path, expect.any(Function));
+      expect(h.routerDelete).toHaveBeenCalledWith(path, expect.any(Function));
+
+      for (const handler of [h.getHandlers.get(path), h.deleteHandlers.get(path)]) {
+        const res = {
+          set: vi.fn().mockReturnThis(),
+          status: vi.fn().mockReturnThis(),
+          json: vi.fn().mockReturnThis(),
+        };
+        handler!({}, res);
+        expect(res.set).toHaveBeenCalledWith('Allow', 'POST');
+        expect(res.status).toHaveBeenCalledWith(405);
+      }
+    }
   });
 
   it('skips response write when headers are already sent', async () => {
