@@ -72,3 +72,57 @@ export function toMcpJsonSchema(schema: ZodTypeAny): { type: 'object'; [key: str
   const wrapped = { type: 'object', ...normalized };
   return mergeBranchProperties(wrapped) as { type: 'object'; [key: string]: unknown };
 }
+
+function compactOutputNode(
+  value: unknown,
+  depth: number,
+): Record<string, unknown> {
+  const node = toRecord(value) ?? {};
+  const compact: Record<string, unknown> = {};
+
+  for (const key of ['type', 'enum', 'const', 'minimum', 'maximum', 'minItems', 'maxItems']) {
+    if (key in node) compact[key] = node[key];
+  }
+
+  for (const unionKey of ['anyOf', 'oneOf'] as const) {
+    if (Array.isArray(node[unionKey])) {
+      compact[unionKey] = node[unionKey].map(branch => compactOutputNode(branch, depth));
+    }
+  }
+
+  const properties = toRecord(node.properties);
+  if (properties && depth > 0) {
+    compact.properties = Object.fromEntries(
+      Object.entries(properties).map(([name, child]) => [
+        name,
+        compactOutputNode(child, depth - 1),
+      ]),
+    );
+    const required = toStringArray(node.required);
+    if (required.length > 0) compact.required = required;
+    if (typeof node.additionalProperties === 'boolean') {
+      compact.additionalProperties = node.additionalProperties;
+    }
+  }
+
+  if (node.items !== undefined) {
+    compact.items = compactOutputNode(node.items, Math.max(0, depth - 1));
+  }
+  return compact;
+}
+
+/**
+ * Compact discovery projection for large structured read models.
+ *
+ * The canonical Zod schema still validates the complete result before dispatch.
+ * Discovery retains the strict `{ data: ... }` root plus data-field names, types,
+ * enums, bounds, and one nested field level without repeating deep item schemas.
+ */
+export function toMcpCompactOutputSchema(
+  schema: ZodTypeAny,
+): { type: 'object'; [key: string]: unknown } {
+  return compactOutputNode(toMcpJsonSchema(schema), 3) as {
+    type: 'object';
+    [key: string]: unknown;
+  };
+}

@@ -1,8 +1,9 @@
-import type {
-  ClientViewData,
-  McpOperatorSourceRef,
-  PortfolioBriefData,
-  WorkspaceDecisionBriefData,
+import {
+  MCP_OPERATOR_BRIEF_LIMITS,
+  type ClientViewData,
+  type McpOperatorSourceRef,
+  type PortfolioBriefData,
+  type WorkspaceDecisionBriefData,
 } from '../../../shared/types/mcp-operator-briefs.js';
 import type {
   ChurnSignalSummary,
@@ -100,7 +101,9 @@ export function projectOperatorPortfolioBrief(
       approvals,
       clientActions,
       total: requests + approvals + clientActions,
-      drillDownIds: items.slice(0, 9).map(pendingSourceRef),
+      drillDownIds: items
+        .slice(0, MCP_OPERATOR_BRIEF_LIMITS.maxDrillDownIdsPerWorkspace)
+        .map(pendingSourceRef),
     };
   });
 

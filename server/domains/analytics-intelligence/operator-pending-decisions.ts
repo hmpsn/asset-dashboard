@@ -1,12 +1,10 @@
 import { Buffer } from 'node:buffer';
 
 import type { OperationalSlice } from '../../../shared/types/intelligence.js';
+import { MCP_OPERATOR_BRIEF_LIMITS } from '../../../shared/types/mcp-operator-briefs.js';
 import { listBatches } from '../../approvals.js';
 import { listClientActions } from '../../client-actions.js';
 import { listRequests } from '../../requests.js';
-
-const PENDING_DECISION_LIMIT = 25;
-const MAX_LABEL_BYTES = 160;
 
 type PendingDecision = NonNullable<
   OperationalSlice['pendingDecisions']
@@ -21,7 +19,7 @@ const PRIORITY_RANK: Record<PendingDecision['priority'], number> = {
 
 function boundedLabel(value: string, fallback: string): string {
   const normalized = value.replace(/\s+/g, ' ').trim() || fallback;
-  if (Buffer.byteLength(normalized, 'utf8') <= MAX_LABEL_BYTES) {
+  if (Buffer.byteLength(normalized, 'utf8') <= MCP_OPERATOR_BRIEF_LIMITS.maxDecisionLabelBytes) {
     return normalized;
   }
 
@@ -29,7 +27,7 @@ function boundedLabel(value: string, fallback: string): string {
   let byteLength = 0;
   for (const character of normalized) {
     const characterBytes = Buffer.byteLength(character, 'utf8');
-    if (byteLength + characterBytes > MAX_LABEL_BYTES) break;
+    if (byteLength + characterBytes > MCP_OPERATOR_BRIEF_LIMITS.maxDecisionLabelBytes) break;
     bounded += character;
     byteLength += characterBytes;
   }
@@ -110,6 +108,6 @@ export function readOperatorPendingDecisions(
       requests: clientRequests.length,
       clientActions: clientActions.length,
     },
-    items: pending.slice(0, PENDING_DECISION_LIMIT),
+    items: pending.slice(0, MCP_OPERATOR_BRIEF_LIMITS.maxListLimit),
   };
 }

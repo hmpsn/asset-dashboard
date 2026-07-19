@@ -6,10 +6,8 @@ import {
   getClientViewInputSchema,
   getPortfolioBriefInputSchema,
   getWorkspaceDecisionBriefInputSchema,
-  portfolioBriefOutputSchema,
-  workspaceDecisionBriefOutputSchema,
 } from '../../shared/types/mcp-operator-briefs.js';
-import { toMcpJsonSchema } from '../../server/mcp/json-schema.js';
+import { operatorBriefTools } from '../../server/mcp/tools/operator-briefs.js';
 import {
   OPERATOR_DECISION_INTELLIGENCE_SLICES,
 } from '../../server/domains/analytics-intelligence/operator-read-models.js';
@@ -52,12 +50,9 @@ describe('P2 MCP operator brief contracts', () => {
   });
 
   it('advertises strict root-object output schemas for all three tools', () => {
-    for (const schema of [
-      portfolioBriefOutputSchema,
-      workspaceDecisionBriefOutputSchema,
-      clientViewOutputSchema,
-    ]) {
-      const jsonSchema = toMcpJsonSchema(schema) as Record<string, unknown>;
+    expect(operatorBriefTools).toHaveLength(3);
+    for (const tool of operatorBriefTools) {
+      const jsonSchema = tool.outputSchema as Record<string, unknown>;
       expect(jsonSchema.type).toBe('object');
       expect(jsonSchema.required).toEqual(['data']);
       expect(jsonSchema.additionalProperties).toBe(false);

@@ -67,10 +67,10 @@ function parseErrorText(result: Awaited<ReturnType<ReturnType<typeof createMcpTo
 const masterAuth = { scope: 'all' as const };
 
 describe('canonical MCP tool registry', () => {
-  it('is the sole 18-family, 102-tool discovery source with exact global tools', () => {
+  it('is the sole 19-family, 105-tool discovery source with exact global tools', () => {
     const definitions = listMcpToolDefinitions();
-    expect(definitions).toHaveLength(102);
-    expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(18);
+    expect(definitions).toHaveLength(105);
+    expect(new Set([...MCP_TOOL_REGISTRY.values()].map(entry => entry.family)).size).toBe(19);
     expect(
       [...MCP_TOOL_REGISTRY.values()]
         .filter(entry => entry.scope === 'global')
@@ -79,6 +79,7 @@ describe('canonical MCP tool registry', () => {
     ).toEqual([
       'create_workspace',
       'get_library_template',
+      'get_portfolio_brief',
       'instantiate_library_template',
       'list_library_templates',
       'list_workspaces',
@@ -99,7 +100,7 @@ describe('canonical MCP tool registry', () => {
     const entries = [...MCP_TOOL_REGISTRY.values()];
     expect(entries.length).toBeGreaterThan(0);
     expect(entries.filter(entry => entry.errorContract === 'legacy_text')).toHaveLength(0);
-    expect(entries.filter(entry => entry.errorContract === 'json_v1')).toHaveLength(102);
+    expect(entries.filter(entry => entry.errorContract === 'json_v1')).toHaveLength(105);
   });
 
   it('fails fast on duplicate names and missing handlers', () => {

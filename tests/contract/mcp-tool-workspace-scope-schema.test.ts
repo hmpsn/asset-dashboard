@@ -9,6 +9,7 @@ const ALL_TOOLS: Tool[] = listMcpToolDefinitions();
 
 const GLOBAL_TOOL_NAMES = [
   'create_workspace',
+  'get_portfolio_brief',
   'get_library_template',
   'instantiate_library_template',
   'list_library_templates',
@@ -30,7 +31,7 @@ describe('MCP tool workspace-scope schema census', () => {
     const names = ALL_TOOLS.map(tool => tool.name);
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
 
-    expect(ALL_TOOLS).toHaveLength(102);
+    expect(ALL_TOOLS).toHaveLength(105);
     expect(duplicates, `Duplicate MCP tool names: ${duplicates.join(', ')}`).toEqual([]);
   });
 
