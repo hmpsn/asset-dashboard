@@ -58,6 +58,17 @@ program plan, the allowlist census, and the discovery/invocation tests together.
 - Three bounded, deterministic operator read models with explicit root-object
   output schemas and legacy text JSON plus `structuredContent`.
 - Client view fails closed and reuses the public client-safe projection.
+- Structured content is validated against the same Zod contract that produces
+  its advertised output schema. Parsed legacy text equals `structuredContent.data`.
+- Workspace decision assembly requests exactly `insights`, `contentPipeline`,
+  `siteHealth`, `clientSignals`, and `operational` through the public intelligence
+  facade. Missing slices are reported as unavailable, never interpreted as clear.
+- The operational pending-decision projection is capped at 25 and contains only
+  durable IDs, bounded labels, normalized priority, and creation time. It omits
+  values, payloads, notes, prompts, evidence, and activity descriptions, and is
+  not added to prompt formatters.
+- Client-risk source refs use durable churn-signal IDs. No synthetic source ID is
+  invented for aggregate site-health or pipeline blockers.
 
 ### P3 → P4
 
@@ -93,3 +104,23 @@ program plan, the allowlist census, and the discovery/invocation tests together.
 - [x] Existing workspace keys and `/mcp` calls remain compatible.
 - [x] No UI, database, paid-call, generation, approval, send, or publication
       behavior changes.
+
+## P2 acceptance checklist
+
+- [ ] Portfolio defaults to 10, caps at 25, and has a total deterministic order
+      independent of database row order.
+- [ ] Portfolio reason codes and drill-down IDs reconcile to exact pending counts.
+- [ ] Workspace decision view requests exactly the five approved slices and caps
+      decisions, blockers, and risk signals at the caller limit (maximum 25).
+- [ ] Missing slices produce explicit `data_unavailable` state and never an unsafe
+      `no_action_required` hint.
+- [ ] Client view deep-equals the public tier-gated projection for free, trial,
+      growth, and premium workspaces, including fail-closed learnings.
+- [ ] Parsed text JSON deep-equals `structuredContent.data`, and all three wrapper
+      objects validate against their advertised root output schema.
+- [ ] Operator discovery exposes all 25 names and remains at or below 32 KiB.
+- [ ] Workspace keys cannot invoke the global portfolio tool or cross workspace;
+      `/mcp/operator` remains master-key-only in P2.
+- [ ] No raw prompt/evidence/payload fields, provider/AI calls, paid triggers,
+      jobs, mutations, broadcasts, sends, approvals, or publication paths.
+- [ ] No UI, migration, local/staging database sync, or staging-data replacement.

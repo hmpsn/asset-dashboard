@@ -162,6 +162,7 @@ export async function assembleClientSignals(
       return {
         churnFetchSucceeded: true,
         churnSignals: signals.map((s) => ({
+          id: s.id,
           type: s.type,
           severity: s.severity,
           detectedAt: s.detectedAt,

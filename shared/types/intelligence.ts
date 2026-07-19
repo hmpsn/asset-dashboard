@@ -590,6 +590,21 @@ export interface OperationalSlice {
   timeSaved?: { totalMinutes: number; byFeature: Record<string, number> } | null;
   approvalQueue?: { pending: number; oldestAge: number | null };
   clientActionQueue?: { pending: number; oldestAge: number | null };
+  /**
+   * Bounded, payload-free operator queue. This is the durable-ID authority for
+   * compact decision read models; it is intentionally omitted from prompt formatters.
+   */
+  pendingDecisions?: {
+    total: number;
+    items: Array<{
+      sourceType: 'approval_item' | 'client_request' | 'client_action';
+      sourceId: string;
+      parentId: string | null;
+      label: string;
+      priority: 'urgent' | 'high' | 'medium' | 'low';
+      createdAt: string;
+    }>;
+  };
   recommendationQueue?: { fixNow: number; fixSoon: number; fixLater: number };
   actionBacklog?: { pendingMeasurement: number; oldestAge: number | null };
   detectedPlaybooks?: string[];
@@ -965,6 +980,7 @@ export interface CompositeHealthScore {
 }
 
 export interface ChurnSignalSummary {
+  id: string;
   type: string;
   severity: string;
   detectedAt: string;
