@@ -18,9 +18,8 @@ and read models exposed through it.
 - One canonical operator allowlist controls both discovery and invocation.
   Invoking a registered but hidden tool returns the same generic `not_found`
   envelope as a nonexistent tool and never reaches its handler.
-- P1 reserves 25 names. The three P2 read models are intentionally absent from
-  discovery until their registry entries exist; no placeholder handler or stub
-  response is allowed.
+- The canonical profile contains 25 registered names. P1 initially exposed 22;
+  P2 activated the three real read models without placeholder handlers or stubs.
 - Compact discovery may replace top-level prose and remove nested JSON-Schema
   `description` metadata. It must preserve names, schema types, properties,
   required fields, enums, bounds, patterns, unions, defaults, and every other
@@ -31,8 +30,8 @@ and read models exposed through it.
 
 ## P1 operator tool-name contract
 
-The canonical list lives in `server/mcp/profiles.ts`. P1 discovers the 22 names
-already registered. P2 activates the three reserved read models:
+The canonical list lives in `server/mcp/profiles.ts`. P2 exposes all 25 names,
+including these three deterministic read models:
 
 - `get_portfolio_brief`
 - `get_workspace_decision_brief`
@@ -64,6 +63,8 @@ program plan, the allowlist census, and the discovery/invocation tests together.
   `siteHealth`, `clientSignals`, and `operational` through the public intelligence
   facade. This is a narrow five-of-fifteen read model, not the full Insights Engine
   inventory. Missing slices are reported as unavailable, never interpreted as clear.
+- Client-risk and pending-decision subreads carry their own availability state;
+  an internally failed subread cannot be interpreted as an empty queue.
 - The operational pending-decision projection is capped at 25 and contains only
   durable IDs, bounded labels, normalized priority, and creation time. It omits
   values, payloads, notes, prompts, evidence, and activity descriptions, and is
@@ -108,20 +109,21 @@ program plan, the allowlist census, and the discovery/invocation tests together.
 
 ## P2 acceptance checklist
 
-- [ ] Portfolio defaults to 10, caps at 25, and has a total deterministic order
+- [x] Portfolio defaults to 10, caps at 25, and has a total deterministic order
       independent of database row order.
-- [ ] Portfolio reason codes and drill-down IDs reconcile to exact pending counts.
-- [ ] Workspace decision view requests exactly the five approved slices and caps
+- [x] Portfolio reason codes and drill-down IDs reconcile to exact pending counts.
+- [x] Workspace decision view requests exactly the five purpose-selected slices and caps
       decisions, blockers, and risk signals at the caller limit (maximum 25).
-- [ ] Missing slices produce explicit `data_unavailable` state and never an unsafe
+- [x] Missing slices or failed queue/risk subreads produce explicit `data_unavailable` state and never an unsafe
       `no_action_required` hint.
-- [ ] Client view deep-equals the public tier-gated projection for free, trial,
+- [x] Client view deep-equals the public tier-gated projection for free, trial,
       growth, and premium workspaces, including fail-closed learnings.
-- [ ] Parsed text JSON deep-equals `structuredContent.data`, and all three wrapper
+- [x] Parsed text JSON deep-equals `structuredContent.data`, and all three wrapper
       objects validate against their advertised root output schema.
-- [ ] Operator discovery exposes all 25 names and remains at or below 32 KiB.
-- [ ] Workspace keys cannot invoke the global portfolio tool or cross workspace;
+- [x] Operator discovery exposes all 25 names and remains at or below 32 KiB
+      (32,222 bytes including instructions).
+- [x] Workspace keys cannot invoke the global portfolio tool or cross workspace;
       `/mcp/operator` remains master-key-only in P2.
-- [ ] No raw prompt/evidence/payload fields, provider/AI calls, paid triggers,
+- [x] No raw prompt/evidence/payload fields, provider/AI calls, paid triggers,
       jobs, mutations, broadcasts, sends, approvals, or publication paths.
-- [ ] No UI, migration, local/staging database sync, or staging-data replacement.
+- [x] No UI, migration, local/staging database sync, or staging-data replacement.

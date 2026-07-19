@@ -1,8 +1,22 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 717** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 718** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 718. Insights-backed MCP operator briefs and exact client view 2026-07-19
+
+**What it does:** Activates all 25 tools on the compact `/mcp/operator` desktop surface by adding three deterministic read models: a master-only portfolio priority brief, a workspace decision brief, and an exact client-safe view. Portfolio assembly uses skinny workspace identities, exact aggregate queue counts, and one bounded detail query only for the selected top workspaces. The decision brief purpose-selects five of the Insights Engine's 15 registered slices—Insights, Content Pipeline, Site Health, Client Signals, and Operational—and returns bounded blockers, durable source IDs, client risks, and deterministic next-safe-action codes. The client view reuses the same tier selector and scrubbed projection as the public client endpoint for Free, active trial, Growth, and Premium.
+
+**Reliability and safety:** Intelligence approval reads normalize legacy missing statuses in memory without writing. Request, approval, churn, and production client-action mutation seams keep caches fresh. Slice and subread failures remain explicit `data_unavailable` states and cannot become `no_action_required`. Queue/risk ordering is deterministic, outputs are strict Zod-validated structured content plus backward-compatible text JSON, and advertised draft-07 schemas are losslessly deduplicated. The operator catalog plus instructions is 32,222 bytes. No read model invokes AI/providers, paid work, jobs, sends, approvals, or publication.
+
+**Why it matters:** Desktop administration can start with a compact portfolio triage call, drill into one workspace, and inspect exactly what a client can see without downloading the full intelligence object or paying for model/provider work. This reduces orientation tokens and repeated database loading while preserving the Insights Engine as the authoritative storage and client-view layer.
+
+**Boundaries and verification:** `/mcp` remains backward compatible; `/mcp/operator` remains master-key-only until capability credentials ship in P5. There is no UI, migration, feature flag, staging/local database sync, or production-data mutation. Two independent release reviews approved runtime/spec/security and quality/backward-compatibility/performance. Focused unit, contract, and real MCP HTTP integration coverage includes read-only legacy rows, bounded SQL, failure states, schema equivalence, auth scope, and all four effective client tiers.
+
+**Files:** MCP operator brief contracts, registry/schema/profile/tool modules; analytics-intelligence operator read models; Operational and Client Signals slice availability/read boundaries; workspace/request/churn supporting reads; focused unit/contract/integration tests; MCP docs, roadmap, and this audit.
 
 ---
 

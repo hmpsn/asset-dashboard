@@ -2,10 +2,7 @@ import type { McpServerProfile } from '../../shared/types/mcp-runtime.js';
 import { MCP_SERVER_PROFILES } from '../../shared/types/mcp-runtime.js';
 import { STUDIO_NAME } from '../constants.js';
 
-/**
- * Canonical desktop-operator surface. Three read-model names are reserved here
- * for P2 and become discoverable only after they are registered.
- */
+/** Canonical 25-tool desktop-operator surface. */
 export const MCP_OPERATOR_TOOL_NAMES = Object.freeze([
   'list_workspaces',
   'get_portfolio_brief',

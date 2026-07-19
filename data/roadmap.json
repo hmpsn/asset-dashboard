@@ -7,17 +7,6 @@
       "rationale": "Make desktop administration compact, deterministic, and safer while the Insights Engine remains the authoritative database and client-view layer. Preserve the full MCP surface for advanced work and avoid the active UI rebuild.",
       "items": [
         {
-          "id": "mcp-operator-briefs",
-          "title": "P2 — Deterministic decision and client views",
-          "source": "2026-07-17 MCP Operator Control Plane program",
-          "est": "M",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-17",
-          "owner": "analytics-intelligence",
-          "notes": "Add bounded DB-only portfolio and workspace decision briefs plus an exact fail-closed client-safe projection. No AI or provider calls."
-        },
-        {
           "id": "mcp-structured-operator-contracts",
           "title": "P3 — Structured outputs and tool annotations",
           "source": "2026-07-17 MCP Operator Control Plane program",
