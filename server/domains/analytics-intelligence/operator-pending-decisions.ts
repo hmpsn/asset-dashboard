@@ -57,7 +57,7 @@ function comparePendingDecisions(
  * Builds the payload-free operational queue consumed by compact MCP read models.
  * The result contains only durable references and bounded display metadata.
  */
-export function buildOperatorPendingDecisions(
+export function readOperatorPendingDecisions(
   workspaceId: string,
 ): NonNullable<OperationalSlice['pendingDecisions']> {
   const approvalItems: PendingDecision[] = listBatches(workspaceId).flatMap(

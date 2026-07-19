@@ -214,9 +214,9 @@ export async function assembleOperational(
       items: [],
     },
     async () => {
-      const { buildOperatorPendingDecisions } =
+      const { readOperatorPendingDecisions } =
         await import('../domains/analytics-intelligence/operator-pending-decisions.js'); // dynamic-import-ok - intelligence slices lazy-load optional subsystems for graceful degradation
-      return buildOperatorPendingDecisions(workspaceId);
+      return readOperatorPendingDecisions(workspaceId);
     },
     { logger: log },
   );
