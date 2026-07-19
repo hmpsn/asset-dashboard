@@ -283,16 +283,22 @@ export function addNote(workspaceId: string, requestId: string, author: 'client'
   const existing = getRequest(requestId);
   if (!existing || existing.workspaceId !== workspaceId) return null;
 
+  // One event, one timestamp: the note's creation IS the request's update.
+  // Two separate `new Date()` calls here can straddle a millisecond boundary,
+  // making pending-replies `newestAt` (note.createdAt) diverge from the
+  // request's updatedAt by 1ms — a real consumer-visible inconsistency that
+  // also flaked the unit test.
+  const now = new Date().toISOString();
   const note: RequestNote = {
     id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     author,
     content: sanitizePlainText(content).trim(),
     attachments: attachments && attachments.length > 0 ? attachments : undefined,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   };
 
   existing.notes.push(note);
-  existing.updatedAt = new Date().toISOString();
+  existing.updatedAt = now;
 
   stmts().update.run({
     id: existing.id,
