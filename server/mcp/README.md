@@ -160,7 +160,7 @@ dispatch, workspace scope, and error compatibility. It composes **19 categories*
 **105 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
-name with inert invalid input, asserts the exact 18 family-array→handler identities, and pins the
+name with inert invalid input, asserts the exact 19 family-array→handler identities, and pins the
 handled-name manifests for families that validate workspace input before dispatch. Discovery
 therefore cannot silently outgrow or be paired with the wrong family switch.
 
