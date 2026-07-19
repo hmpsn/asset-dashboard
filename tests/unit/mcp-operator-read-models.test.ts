@@ -57,6 +57,51 @@ function row(
   };
 }
 
+function completeDecisionIntel(
+  churnSignalsAvailability: 'available' | 'unavailable',
+  churnSignals: NonNullable<WorkspaceIntelligence['clientSignals']>['churnSignals'] = [],
+): WorkspaceIntelligence {
+  return {
+    version: 1,
+    workspaceId: 'ws-1',
+    assembledAt: '2026-07-19T00:00:00.000Z',
+    insights: {
+      all: [], byType: {}, countsByType: {}, countsByTypeBySeverity: {},
+      bySeverity: {}, topByImpact: [],
+    },
+    contentPipeline: {
+      briefs: { total: 0, byStatus: {} },
+      posts: { total: 0, byStatus: {} },
+      matrices: { total: 0, cellsPlanned: 0, cellsPublished: 0 },
+      requests: { pending: 0, inProgress: 0, delivered: 0 },
+      workOrders: { active: 0 },
+      coverageGaps: [],
+      seoEdits: { pending: 0, applied: 0, inReview: 0 },
+    },
+    siteHealth: {
+      auditScore: null, auditScoreDelta: null, deadLinks: 0, redirectChains: 0,
+      schemaErrors: 0, orphanPages: 0, cwvPassRate: { mobile: null, desktop: null },
+    },
+    clientSignals: {
+      keywordFeedback: {
+        approved: [], rejected: [], patterns: { approveRate: 0, topRejectionReasons: [] },
+      },
+      contentGapVotes: [], businessPriorities: [], effectiveBusinessPriorities: [],
+      approvalPatterns: { approvalRate: 0, avgResponseTime: null },
+      recentChatTopics: [], churnRisk: null, churnSignalsAvailability, churnSignals,
+    },
+    operational: {
+      recentActivity: [], annotations: [], pendingJobs: 0,
+      pendingDecisions: {
+        availability: 'available',
+        total: 0,
+        counts: { approvals: 0, requests: 0, clientActions: 0 },
+        items: [],
+      },
+    },
+  };
+}
+
 describe('P2 operator portfolio projection', () => {
   it('has a deterministic total order independent of source row order', () => {
     const rows = [
@@ -180,43 +225,13 @@ describe('P2 workspace decision projection', () => {
   });
 
   it('reports a pending-decision subread failure even when all five slices assembled', () => {
-    const intel = {
-      version: 1,
-      workspaceId: 'ws-1',
-      assembledAt: '2026-07-19T00:00:00.000Z',
-      insights: {
-        all: [], byType: {}, countsByType: {}, countsByTypeBySeverity: {},
-        bySeverity: {}, topByImpact: [],
-      },
-      contentPipeline: {
-        briefs: { total: 0, byStatus: {} },
-        posts: { total: 0, byStatus: {} },
-        matrices: { total: 0, cellsPlanned: 0, cellsPublished: 0 },
-        requests: { pending: 0, inProgress: 0, delivered: 0 },
-        workOrders: { active: 0 },
-        coverageGaps: [],
-        seoEdits: { pending: 0, applied: 0, inReview: 0 },
-      },
-      siteHealth: {
-        auditScore: null, auditScoreDelta: null, deadLinks: 0, redirectChains: 0,
-        schemaErrors: 0, orphanPages: 0, cwvPassRate: { mobile: null, desktop: null },
-      },
-      clientSignals: {
-        keywordFeedback: { approved: [], rejected: [], patterns: { approveRate: 0, topRejectionReasons: [] } },
-        contentGapVotes: [], businessPriorities: [], effectiveBusinessPriorities: [],
-        approvalPatterns: { approvalRate: 0, avgResponseTime: null },
-        recentChatTopics: [], churnRisk: null,
-      },
-      operational: {
-        recentActivity: [], annotations: [], pendingJobs: 0,
-        pendingDecisions: {
-          availability: 'unavailable',
-          total: 0,
-          counts: { approvals: 0, requests: 0, clientActions: 0 },
-          items: [],
-        },
-      },
-    } satisfies WorkspaceIntelligence;
+    const intel = completeDecisionIntel('available');
+    intel.operational!.pendingDecisions = {
+      availability: 'unavailable',
+      total: 0,
+      counts: { approvals: 0, requests: 0, clientActions: 0 },
+      items: [],
+    };
     const brief = projectOperatorWorkspaceDecisionBrief(
       { workspaceId: 'ws-1', name: 'Workspace One', effectiveTier: 'growth' },
       intel,
@@ -227,5 +242,81 @@ describe('P2 workspace decision projection', () => {
     expect(brief.pending_decisions.available).toBe(false);
     expect(brief.blockers).toContainEqual(expect.objectContaining({ reason_code: 'data_unavailable' }));
     expect(brief.next_safe_actions[0]?.action_code).toBe('inspect_data_availability');
+  });
+
+  it('fails closed when the churn-risk subread is unavailable, but preserves available-empty', () => {
+    const unavailable = projectOperatorWorkspaceDecisionBrief(
+      { workspaceId: 'ws-1', name: 'Workspace One', effectiveTier: 'growth' },
+      completeDecisionIntel('unavailable'),
+      10,
+    );
+    const availableEmpty = projectOperatorWorkspaceDecisionBrief(
+      { workspaceId: 'ws-1', name: 'Workspace One', effectiveTier: 'growth' },
+      completeDecisionIntel('available'),
+      10,
+    );
+
+    expect(unavailable.slice_availability.unavailable).toEqual([]);
+    expect(unavailable.blockers).toContainEqual(expect.objectContaining({
+      reason_code: 'data_unavailable',
+      count: 1,
+    }));
+    expect(unavailable.next_safe_actions[0]?.action_code).toBe('inspect_data_availability');
+    expect(unavailable.next_safe_actions.map((item) => item.action_code))
+      .not.toContain('no_action_required');
+
+    expect(availableEmpty.blockers).not.toContainEqual(expect.objectContaining({
+      reason_code: 'data_unavailable',
+    }));
+    expect(availableEmpty.next_safe_actions).toEqual([{
+      action_code: 'no_action_required',
+      reason_code: 'queues_clear',
+      source_refs: [],
+    }]);
+  });
+
+  it('uses one severity-date-id churn order for blocker refs and detailed risks', () => {
+    const signals = [
+      {
+        id: 'warning-newest', type: 'no_login_14d', severity: 'warning',
+        detectedAt: '2026-07-30T00:00:00.000Z', title: 'Warning', description: 'Warning',
+      },
+      {
+        id: 'critical-b', type: 'payment_failed', severity: 'critical',
+        detectedAt: '2026-07-20T00:00:00.000Z', title: 'Critical B', description: 'Critical B',
+      },
+      {
+        id: 'critical-old', type: 'health_score_drop', severity: 'critical',
+        detectedAt: '2026-07-10T00:00:00.000Z', title: 'Critical old', description: 'Critical old',
+      },
+      {
+        id: 'critical-a', type: 'trial_ending', severity: 'critical',
+        detectedAt: '2026-07-20T00:00:00.000Z', title: 'Critical A', description: 'Critical A',
+      },
+    ];
+    const first = projectOperatorWorkspaceDecisionBrief(
+      { workspaceId: 'ws-1', name: 'Workspace One', effectiveTier: 'growth' },
+      completeDecisionIntel('available', signals),
+      10,
+    );
+    const second = projectOperatorWorkspaceDecisionBrief(
+      { workspaceId: 'ws-1', name: 'Workspace One', effectiveTier: 'growth' },
+      completeDecisionIntel('available', [signals[2]!, signals[0]!, signals[3]!, signals[1]!]),
+      10,
+    );
+
+    expect(second).toEqual(first);
+    expect(first.client_risk_signals.items.map((item) => item.source.source_id)).toEqual([
+      'critical-a',
+      'critical-b',
+      'critical-old',
+      'warning-newest',
+    ]);
+    expect(first.blockers.find((blocker) => blocker.reason_code === 'client_risk_critical')
+      ?.source_refs.map((ref) => ref.source_id)).toEqual([
+        'critical-a',
+        'critical-b',
+        'critical-old',
+      ]);
   });
 });

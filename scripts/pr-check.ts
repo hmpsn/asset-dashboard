@@ -843,6 +843,10 @@ const KNOWN_UNRENDERED_FIELDS = new Set([
   // superset) is rendered by formatClientSignalsSection. The raw field remains in the type
   // for the assembler + public-portal write boundary; it is never a prompt target.
   'businessPriorities',
+  // churnSignalsAvailability is operator control-plane metadata. It tells bounded
+  // decision projections whether an empty churn queue is authoritative; prompt
+  // formatters must not turn an internal read-status bit into client prose.
+  'churnSignalsAvailability',
   // OperationalSlice
   // none
   // PageElementSlice top-level fields (`pagePath`, `catalog`) are both

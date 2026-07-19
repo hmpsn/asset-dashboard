@@ -133,8 +133,10 @@ const allActiveCountSql = pendingCountUnionSql(
   '',
   'JOIN workspaces AS active_workspace ON active_workspace.id = {source}.workspace_id AND active_workspace.archived_at IS NULL',
 );
-const allActiveItemSql = pendingItemUnionSql(
-  '',
+const selectedActiveItemSql = pendingItemUnionSql(
+  `AND {source}.workspace_id IN (
+    SELECT CAST(value AS TEXT) FROM json_each(@workspace_ids_json)
+  )`,
   'JOIN workspaces AS active_workspace ON active_workspace.id = {source}.workspace_id AND active_workspace.archived_at IS NULL',
 );
 
@@ -168,8 +170,8 @@ const stmts = createStmtCache(() => ({
     WHERE active_workspace.archived_at IS NULL
     GROUP BY active_workspace.id
   `),
-  itemsForAllActiveWorkspaces: db.prepare(`
-    WITH pending AS (${allActiveItemSql}),
+  itemsForSelectedActiveWorkspaces: db.prepare(`
+    WITH pending AS (${selectedActiveItemSql}),
     ranked AS (
       SELECT pending.*,
         ROW_NUMBER() OVER (
@@ -244,10 +246,39 @@ export function readOperatorPendingDecisions(workspaceId: string): PendingDecisi
   return buildSummary(counts, rows);
 }
 
-/** Read exact active-workspace counts plus a SQL-capped decision projection for portfolio assembly. */
-export function readAllOperatorPendingDecisions(): ReadonlyMap<string, PendingDecisionSummary> {
+export interface ReadAllOperatorPendingDecisionsOptions {
+  /**
+   * Select the already-ranked workspaces that need drill-down details. The
+   * callback receives exact counts for every active workspace, with empty item
+   * arrays. At most 25 selected IDs are read in one parameterized query.
+   */
+  selectDetailWorkspaceIds?: (
+    countsByWorkspace: ReadonlyMap<string, PendingDecisionSummary>,
+  ) => readonly string[];
+}
+
+/**
+ * Read exact counts for every active workspace, then load detail rows only for
+ * the caller-selected portfolio page in one bounded query.
+ */
+export function readAllOperatorPendingDecisions(
+  options: ReadAllOperatorPendingDecisionsOptions = {},
+): ReadonlyMap<string, PendingDecisionSummary> {
   const countRows = stmts().countsForAllActiveWorkspaces.all() as PendingCountRow[];
-  const itemRows = stmts().itemsForAllActiveWorkspaces.all({
+  const countsByWorkspace = new Map(countRows.map((counts) => [
+    counts.workspace_id,
+    buildSummary(counts, []),
+  ]));
+  const selectedWorkspaceIds = [...new Set(
+    options.selectDetailWorkspaceIds?.(countsByWorkspace) ?? [],
+  )]
+    .filter((workspaceId) => countsByWorkspace.has(workspaceId))
+    .slice(0, MCP_OPERATOR_BRIEF_LIMITS.maxListLimit);
+
+  if (selectedWorkspaceIds.length === 0) return countsByWorkspace;
+
+  const itemRows = stmts().itemsForSelectedActiveWorkspaces.all({
+    workspace_ids_json: JSON.stringify(selectedWorkspaceIds),
     limit: MCP_OPERATOR_BRIEF_LIMITS.maxDrillDownIdsPerWorkspace,
   }) as PendingProjectionRow[];
   const itemsByWorkspace = new Map<string, PendingProjectionRow[]>();
@@ -257,8 +288,15 @@ export function readAllOperatorPendingDecisions(): ReadonlyMap<string, PendingDe
     itemsByWorkspace.set(row.workspace_id, workspaceRows);
   }
 
-  return new Map(countRows.map((counts) => [
-    counts.workspace_id,
-    buildSummary(counts, itemsByWorkspace.get(counts.workspace_id) ?? []),
-  ]));
+  const summariesWithDetails = new Map(countsByWorkspace);
+  for (const workspaceId of selectedWorkspaceIds) {
+    const summary = summariesWithDetails.get(workspaceId);
+    if (!summary) continue;
+    summariesWithDetails.set(workspaceId, {
+      ...summary,
+      items: projectRows(itemsByWorkspace.get(workspaceId) ?? []),
+    });
+  }
+
+  return summariesWithDetails;
 }

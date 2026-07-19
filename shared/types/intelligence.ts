@@ -534,6 +534,13 @@ export interface ClientSignalsSlice {
   approvalPatterns: { approvalRate: number; avgResponseTime: number | null };
   recentChatTopics: string[];
   churnRisk: 'low' | 'medium' | 'high' | null;
+  /**
+   * Whether the churn-risk subsystem was read successfully. An empty
+   * `churnSignals` array is authoritative only when this is `available`.
+   * Optional for compatibility with older stored/test projections; consumers
+   * that make safety decisions must treat an absent value as unavailable.
+   */
+  churnSignalsAvailability?: 'available' | 'unavailable';
   // New in 3A
   churnSignals?: ChurnSignalSummary[];
   roi?: { organicValue: number; growth: number; period: string } | null;

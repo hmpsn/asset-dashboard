@@ -141,8 +141,10 @@ export function projectOperatorPortfolioBrief(
 }
 
 export function buildOperatorPortfolioBrief(limit: number): PortfolioBriefData {
-  const pendingByWorkspace = readAllOperatorPendingDecisions();
-  const rows: OperatorPortfolioWorkspaceRow[] = listWorkspaceIdentities().map((workspace) => ({
+  const workspaces = listWorkspaceIdentities();
+  const rowsFor = (
+    pendingByWorkspace: ReadonlyMap<string, NonNullable<OperationalSlice['pendingDecisions']>>,
+  ): OperatorPortfolioWorkspaceRow[] => workspaces.map((workspace) => ({
     workspaceId: workspace.id,
     name: workspace.name,
     effectiveTier: computeEffectiveTier(workspace),
@@ -154,6 +156,13 @@ export function buildOperatorPortfolioBrief(limit: number): PortfolioBriefData {
       items: [],
     },
   }));
+  const pendingByWorkspace = readAllOperatorPendingDecisions({
+    selectDetailWorkspaceIds: (countsByWorkspace) => projectOperatorPortfolioBrief(
+      rowsFor(countsByWorkspace),
+      limit,
+    ).workspaces.map((workspace) => workspace.workspace_id),
+  });
+  const rows = rowsFor(pendingByWorkspace);
   return projectOperatorPortfolioBrief(rows, limit);
 }
 
@@ -170,6 +179,19 @@ function unresolvedInsights(
     .sort((a, b) => (b.impactScore ?? 0) - (a.impactScore ?? 0) || a.id.localeCompare(b.id));
 }
 
+const CHURN_SEVERITY_ORDER: Readonly<Record<string, number>> = {
+  critical: 0,
+  warning: 1,
+};
+
+/** Canonical order for every operator-facing churn-risk projection. */
+function compareChurnSignals(a: ChurnSignalSummary, b: ChurnSignalSummary): number {
+  return (CHURN_SEVERITY_ORDER[a.severity] ?? 2)
+    - (CHURN_SEVERITY_ORDER[b.severity] ?? 2)
+    || b.detectedAt.localeCompare(a.detectedAt)
+    || a.id.localeCompare(b.id);
+}
+
 function insightSourceRefs(
   insights: NonNullable<WorkspaceIntelligence['insights']>['all'],
   limit: number,
@@ -183,6 +205,7 @@ function blockerProjection(
   intel: WorkspaceIntelligence,
   unavailable: readonly OperatorDecisionSlice[],
   pendingDecisionsAvailable: boolean,
+  churnSignalsAvailable: boolean,
   limit: number,
 ): DecisionBlocker[] {
   const blockers: DecisionBlocker[] = [];
@@ -242,7 +265,8 @@ function blockerProjection(
     reason_code: 'content_pending_review', severity: 'medium', count: pipeline.seoEdits.inReview, source_refs: [],
   } : null);
 
-  const churnSignals = intel.clientSignals?.churnSignals ?? [];
+  const churnSignals = [...(intel.clientSignals?.churnSignals ?? [])]
+    .sort(compareChurnSignals);
   const criticalRisk = churnSignals.filter((signal) => signal.severity === 'critical');
   add(criticalRisk.length > 0 ? {
     reason_code: 'client_risk_critical', severity: 'critical', count: criticalRisk.length,
@@ -256,7 +280,11 @@ function blockerProjection(
 
   const pendingSubreadUnavailable = !pendingDecisionsAvailable
     && !unavailable.includes('operational');
-  const unavailableCount = unavailable.length + (pendingSubreadUnavailable ? 1 : 0);
+  const churnSubreadUnavailable = !churnSignalsAvailable
+    && !unavailable.includes('clientSignals');
+  const unavailableCount = unavailable.length
+    + (pendingSubreadUnavailable ? 1 : 0)
+    + (churnSubreadUnavailable ? 1 : 0);
   add(unavailableCount > 0 ? {
     reason_code: 'data_unavailable', severity: 'high', count: unavailableCount, source_refs: [],
   } : null);
@@ -280,10 +308,7 @@ function clientRiskProjection(intel: WorkspaceIntelligence, limit: number): {
 } {
   const all = (intel.clientSignals?.churnSignals ?? [])
     .filter((signal) => signal.severity === 'critical' || signal.severity === 'warning')
-    .sort((a, b) => {
-      const severityOrder = Number(b.severity === 'critical') - Number(a.severity === 'critical');
-      return severityOrder || b.detectedAt.localeCompare(a.detectedAt) || a.id.localeCompare(b.id);
-    });
+    .sort(compareChurnSignals);
   const items: ClientRiskSignal[] = all.slice(0, limit).map((signal) => ({
     source: churnSourceRef(signal),
     signal_type: signal.type,
@@ -425,7 +450,14 @@ export function projectOperatorWorkspaceDecisionBrief(
     (slice) => !available.includes(slice),
   );
   const pendingDecisionsAvailable = intel.operational?.pendingDecisions?.availability === 'available';
-  const blockers = blockerProjection(intel, unavailable, pendingDecisionsAvailable, queueLimit);
+  const churnSignalsAvailable = intel.clientSignals?.churnSignalsAvailability === 'available';
+  const blockers = blockerProjection(
+    intel,
+    unavailable,
+    pendingDecisionsAvailable,
+    churnSignalsAvailable,
+    queueLimit,
+  );
   const pendingDecisions = pendingDecisionProjection(intel.operational?.pendingDecisions, queueLimit);
   const clientRiskSignals = clientRiskProjection(intel, queueLimit);
 

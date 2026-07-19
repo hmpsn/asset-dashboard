@@ -158,7 +158,13 @@ describe('operator pending-decision read boundary', () => {
       .run(tiedAt, archivedWorkspace.workspaceId);
 
     const workspaceProjection = readOperatorPendingDecisions(workspace.workspaceId);
-    const portfolioProjection = readAllOperatorPendingDecisions();
+    let countsSeenBySelector: ReadonlyMap<string, { total: number; items: unknown[] }> | undefined;
+    const portfolioProjection = readAllOperatorPendingDecisions({
+      selectDetailWorkspaceIds: (countsByWorkspace) => {
+        countsSeenBySelector = countsByWorkspace;
+        return [workspace!.workspaceId];
+      },
+    });
     const requestPortfolio = portfolioProjection.get(workspace.workspaceId);
     const actionPortfolio = portfolioProjection.get(actionWorkspace.workspaceId);
 
@@ -187,15 +193,15 @@ describe('operator pending-decision read boundary', () => {
       total: 29,
       counts: { approvals: 0, requests: 0, clientActions: 29 },
     });
-    expect(actionPortfolio?.items).toHaveLength(
-      MCP_OPERATOR_BRIEF_LIMITS.maxDrillDownIdsPerWorkspace,
-    );
-    expect(actionPortfolio?.items.map((item) => item.sourceId)).toEqual(
-      Array.from(
-        { length: MCP_OPERATOR_BRIEF_LIMITS.maxDrillDownIdsPerWorkspace },
-        (_, index) => `bounded-action-${String(index).padStart(2, '0')}`,
-      ),
-    );
+    expect(actionPortfolio?.items).toEqual([]);
+    expect(countsSeenBySelector?.get(workspace.workspaceId)).toMatchObject({
+      total: 32,
+      items: [],
+    });
+    expect(countsSeenBySelector?.get(actionWorkspace.workspaceId)).toMatchObject({
+      total: 29,
+      items: [],
+    });
     expect(portfolioProjection.has(archivedWorkspace.workspaceId)).toBe(false);
   });
 });

@@ -43,7 +43,7 @@ vi.mock('../../server/page-edit-states.js', () => ({
 }));
 
 vi.mock('../../server/approvals.js', () => ({
-  listBatches: vi.fn(() => []),
+  readApprovalBatchesForIntelligence: vi.fn(() => []),
 }));
 
 vi.mock('../../server/client-actions.js', () => ({
@@ -92,7 +92,7 @@ import { getAnnotations } from '../../server/analytics-annotations.js';
 import { listAnnotations } from '../../server/annotations.js';
 import { listJobs } from '../../server/jobs.js';
 import { getUsageSummary } from '../../server/usage-tracking.js';
-import { listBatches } from '../../server/approvals.js';
+import { readApprovalBatchesForIntelligence } from '../../server/approvals.js';
 import { getClientActionQueueStats } from '../../server/client-actions.js';
 import { loadRecommendations } from '../../server/recommendations.js';
 import { getPendingActions } from '../../server/outcome-tracking.js';
@@ -109,7 +109,7 @@ function applyZeroDefaults() {
   vi.mocked(listAnnotations).mockReturnValue([]);
   vi.mocked(listJobs).mockReturnValue([]);
   vi.mocked(getUsageSummary).mockReturnValue({});
-  vi.mocked(listBatches).mockReturnValue([]);
+  vi.mocked(readApprovalBatchesForIntelligence).mockReturnValue([]);
   vi.mocked(getClientActionQueueStats).mockReturnValue({ pending: 0, oldestAge: null });
   vi.mocked(loadRecommendations).mockReturnValue(null);
   vi.mocked(getPendingActions).mockReturnValue([]);
@@ -147,7 +147,7 @@ describe('assembleOperational — zero baseline', () => {
 describe('assembleOperational — approvalQueue', () => {
   it('counts pending items and reports oldestAge in hours', async () => {
     const now = Date.now();
-    vi.mocked(listBatches).mockReturnValue([
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValue([
       {
         id: 'batch-1',
         workspaceId: WORKSPACE_ID,
@@ -206,7 +206,7 @@ describe('assembleOperational — approvalQueue', () => {
   });
 
   it('returns oldestAge = null when there are no pending items', async () => {
-    vi.mocked(listBatches).mockReturnValue([
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValue([
       {
         id: 'batch-2',
         workspaceId: WORKSPACE_ID,
@@ -506,8 +506,8 @@ describe('assembleOperational — pendingJobs', () => {
 // ── 8. Graceful degradation ─────────────────────────────────────────────────
 
 describe('assembleOperational — graceful degradation', () => {
-  it('approvalQueue stays at safe zero when listBatches throws; rest of slice assembles', async () => {
-    vi.mocked(listBatches).mockImplementation(() => { throw new Error('db error'); });
+  it('approvalQueue stays at safe zero when the intelligence approval reader throws; rest of slice assembles', async () => {
+    vi.mocked(readApprovalBatchesForIntelligence).mockImplementation(() => { throw new Error('db error'); });
     // Give pendingJobs something to verify rest of slice is populated
     vi.mocked(listJobs).mockReturnValue([
       { id: 'j1', status: 'running', type: 'audit', workspaceId: WORKSPACE_ID, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
@@ -561,7 +561,7 @@ describe('assembleOperational — graceful degradation', () => {
     vi.mocked(listAnnotations).mockImplementation(() => { throw new Error('fail'); });
     vi.mocked(listJobs).mockImplementation(() => { throw new Error('fail'); });
     vi.mocked(getUsageSummary).mockImplementation(() => { throw new Error('fail'); });
-    vi.mocked(listBatches).mockImplementation(() => { throw new Error('fail'); });
+    vi.mocked(readApprovalBatchesForIntelligence).mockImplementation(() => { throw new Error('fail'); });
     vi.mocked(getClientActionQueueStats).mockImplementation(() => { throw new Error('fail'); });
     vi.mocked(loadRecommendations).mockImplementation(() => { throw new Error('fail'); });
     vi.mocked(getPendingActions).mockImplementation(() => { throw new Error('fail'); });

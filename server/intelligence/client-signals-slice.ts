@@ -189,6 +189,9 @@ export async function assembleClientSignals(
   churnSignals = churnData.churnSignals;
   churnRisk = churnData.churnRisk;
   churnFetchSucceeded = churnData.churnFetchSucceeded;
+  const churnSignalsAvailability: NonNullable<
+    ClientSignalsSlice['churnSignalsAvailability']
+  > = churnFetchSucceeded ? 'available' : 'unavailable';
 
   // Approval patterns
   const approvalPatterns = await readOptionalSlicePart(
@@ -584,6 +587,7 @@ export async function assembleClientSignals(
     approvalPatterns,
     recentChatTopics,
     churnRisk,
+    churnSignalsAvailability,
     churnSignals,
     roi,
     engagement,
