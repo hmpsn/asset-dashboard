@@ -39,7 +39,7 @@ export const MCP_DECISION_BLOCKER_REASON_CODES = [
 
 export const MCP_NEXT_SAFE_ACTION_CODES = [
   'review_pending_decision',
-  'inspect_critical_insight',
+  'inspect_priority_insight',
   'inspect_client_risk',
   'inspect_site_health',
   'review_content_queue',
