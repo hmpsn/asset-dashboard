@@ -18,6 +18,8 @@ export interface ModelCurrencyResult {
   model: string;
   status: 'ok' | 'deprecated' | 'retired' | 'inconclusive';
   detail?: string;
+  /** HTTP status of a non-OK provider response (absent on network errors). */
+  httpStatus?: number;
 }
 
 /** Keys in a provider model payload that signal scheduled removal. */
@@ -56,7 +58,13 @@ async function checkOneModel(
     }
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      return { provider, model, status: 'inconclusive', detail: `HTTP ${res.status}: ${text.slice(0, 120)}` };
+      return {
+        provider,
+        model,
+        status: 'inconclusive',
+        detail: `HTTP ${res.status}: ${text.slice(0, 120)}`,
+        httpStatus: res.status,
+      };
     }
     const payload = await res.json().catch(() => undefined);
     const deprecation = findDeprecationMetadata(payload);

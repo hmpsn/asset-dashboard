@@ -10,6 +10,7 @@
 // buildSystemPrompt() supplies calibrated DNA + guardrails. The authority
 // helper deliberately omits calibrated DNA/guardrails, so this stays single-copy.
 import { callAI } from './ai.js';
+import { MODEL_ROLES } from './model-manifest.js';
 import { createLogger } from './logger.js';
 import { buildEffectiveBrandVoiceBlock } from './intelligence/seo-context-source.js';
 import { buildSystemPrompt } from './prompt-assembly.js';
@@ -148,10 +149,14 @@ export async function punchHeroHeadline(
 
     const result = await callAI({
       provider: 'anthropic',
+      // Explicit uniform-Opus creative routing (headline punch-up is creative
+      // work). Opus at high effort can outrun the helper's 90s default; a
+      // timeout here silently discards paid thinking tokens (fail-soft path).
+      model: MODEL_ROLES.creativeWriter,
       system: systemMsg,
       messages: [{ role: 'user', content: userMsg }],
       maxTokens: 60,
-      temperature: 0.7,
+      timeoutMs: 240_000,
       feature: 'briefing-hero-punch',
       workspaceId,
     });
@@ -235,10 +240,12 @@ export async function writeWeeklyOpener(
 
     const result = await callAI({
       provider: 'anthropic',
+      // Explicit uniform-Opus creative routing — see punchHeroHeadline note.
+      model: MODEL_ROLES.creativeWriter,
       system: systemMsg,
       messages: [{ role: 'user', content: userMsg }],
       maxTokens: 80,
-      temperature: 0.7,
+      timeoutMs: 240_000,
       feature: 'briefing-weekly-opener',
       workspaceId: ctx.workspaceId,
     });

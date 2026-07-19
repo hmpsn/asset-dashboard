@@ -296,11 +296,16 @@ export async function callAnthropicWithTools(opts: {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
+  // Headroom via the same manifest policy as the chat path: zero for the
+  // Haiku default, but the documented `claude-sonnet-5` escape hatch runs
+  // adaptive thinking (Sonnet 5's omitted-field default), which would
+  // otherwise share the caller's maxTokens and starve the tool-use output.
+  const toolPolicy = getAnthropicRequestPolicy(model);
   const bodyObj: Record<string, unknown> = {
     model,
     messages: [{ role: 'user', content: userMessage }],
     tools,
-    max_tokens: maxTokens,
+    max_tokens: maxTokens + toolPolicy.thinkingHeadroomTokens,
   };
   if (system) bodyObj.system = system;
   if (forceTool) bodyObj.tool_choice = { type: 'tool', name: forceTool };

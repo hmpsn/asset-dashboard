@@ -21,9 +21,12 @@
  *   npm run verify:model-currency -- --require-keys   # fail if a key is absent
  *
  * Without a provider's API key that provider's models are SKIPPED gracefully
- * (exit 0) — local/dev and CI without provider creds are not blocked. The
- * nightly workflow passes real keys so the tripwire actually fires there; the
- * server also runs a non-blocking variant at boot (server/model-currency.ts).
+ * (exit 0) — local/dev without provider creds are not blocked. The nightly
+ * workflow runs ARMED (`--require-keys`): missing keys fail the run, and so do
+ * 401/403 auth rejections — otherwise a rotated-out secret would turn every
+ * nightly into a silent false pass, recreating the exact blind spot this
+ * tripwire exists to close. The server also runs a non-blocking variant at
+ * boot (server/model-currency.ts).
  */
 import { ACTIVE_MODEL_IDS } from '../server/model-manifest.js';
 import { checkModelCurrency } from '../server/model-currency.js';
@@ -65,6 +68,12 @@ async function main(): Promise<void> {
     } else if (result.status === 'retired') {
       failed += 1;
       console.error(`❌ ${result.provider}/${result.model}: RETIRED or unknown (404) — a live call path would fail. Update server/model-manifest.ts.`);
+    } else if (requireKeys && (result.httpStatus === 401 || result.httpStatus === 403)) {
+      // Armed mode: a revoked/expired key would otherwise make every run a
+      // silent false pass — exactly the blind spot this tripwire exists to
+      // close. Auth failures fail loudly when keys are required.
+      failed += 1;
+      console.error(`❌ ${result.provider}/${result.model}: provider rejected the API key (${result.detail}) — the tripwire is DISARMED. Fix the key.`);
     } else {
       // Transient provider/network trouble is not a currency verdict — surface
       // it without failing the run so flaky networks don't cry wolf.

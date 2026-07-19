@@ -138,6 +138,10 @@ const MODEL_PRICING_TABLE: ModelPricingRow[] = [
   { matches: m => m.startsWith('gpt-4.1-nano'), inputPerMTok: 0.1, outputPerMTok: 0.4, status: 'historical' },
   { matches: m => m.startsWith('gpt-4.1-mini'), inputPerMTok: 0.4, outputPerMTok: 1.6, status: 'historical' },
   { matches: m => m.startsWith('gpt-4.1'), inputPerMTok: 2, outputPerMTok: 8, status: 'historical' },
+  // Historical — gpt-4o family (was in the old callOpenAI union, so old usage
+  // logs can carry these; they previously priced at the fallback rate)
+  { matches: m => m.startsWith('gpt-4o-mini'), inputPerMTok: 0.15, outputPerMTok: 0.6, status: 'historical' },
+  { matches: m => m.startsWith('gpt-4o'), inputPerMTok: 2.5, outputPerMTok: 10, status: 'historical' },
   // Historical — Anthropic Sonnet 4.x + Claude 3.5 generation
   { matches: m => m.includes('claude-sonnet-4'), inputPerMTok: 3, outputPerMTok: 15, status: 'historical' },
   { matches: m => m.includes('claude-3-5-sonnet'), inputPerMTok: 3, outputPerMTok: 15, status: 'historical' },
