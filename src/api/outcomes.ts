@@ -11,6 +11,7 @@ import type {
   WorkspaceLearnings,
   WorkspaceOutcomeOverview,
   OutcomeWinEntry,
+  OutcomePortfolioRollup,
 } from '../../shared/types/outcome-tracking';
 
 export interface ActionWithOutcomes extends TrackedAction {
@@ -56,6 +57,9 @@ export const outcomesApi = {
 
   getOverview: (signal?: AbortSignal) =>
     getSafe<WorkspaceOutcomeOverview[]>(`/api/outcomes/overview`, [], signal),
+
+  getPortfolioRollup: (signal?: AbortSignal) =>
+    getSafe<OutcomePortfolioRollup | null>('/api/outcomes/portfolio-rollup', null, signal),
 
   recordAction: (
     wsId: string,

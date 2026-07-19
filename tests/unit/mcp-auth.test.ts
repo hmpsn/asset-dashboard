@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mcpAuthMiddleware } from '../../server/mcp/auth.js';
+import {
+  mcpAuthMiddleware,
+  mcpMasterKeyOnlyMiddleware,
+} from '../../server/mcp/auth.js';
 
 function createRes() {
   const res = {
@@ -60,5 +63,29 @@ describe('mcp auth middleware', () => {
     mcpAuthMiddleware(goodReq as never, goodRes as never, goodNext as never);
     expect(goodRes.status).not.toHaveBeenCalled();
     expect(goodNext).toHaveBeenCalledOnce();
+  });
+});
+
+describe('MCP operator master-key boundary', () => {
+  it('accepts only an already-authenticated all-workspace identity', () => {
+    const masterReq = { mcpAuth: { scope: 'all' } };
+    const masterRes = createRes();
+    const masterNext = vi.fn();
+    mcpMasterKeyOnlyMiddleware(masterReq as never, masterRes as never, masterNext as never);
+    expect(masterNext).toHaveBeenCalledOnce();
+    expect(masterRes.status).not.toHaveBeenCalled();
+
+    for (const req of [
+      {},
+      { mcpAuth: { scope: 'ws-operator-denied', keyId: 'key-1', label: 'Workspace' } },
+      { mcpAuth: { scope: 'all', keyId: 'key-all', label: 'Workspace named all' } },
+    ]) {
+      const res = createRes();
+      const next = vi.fn();
+      mcpMasterKeyOnlyMiddleware(req as never, res as never, next as never);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Unauthorized' });
+      expect(next).not.toHaveBeenCalled();
+    }
   });
 });

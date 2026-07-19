@@ -52,6 +52,10 @@ vi.mock('../../src/components/page-rewriter-rebuilt/PageRewriterSurface', () => 
   },
 }));
 
+vi.mock('../../src/components/command-center-rebuilt/CommandCenterSurface', () => ({
+  CommandCenterSurface: () => <div data-testid="command-center-rebuilt-surface" />,
+}));
+
 vi.mock('../../src/components/content-pipeline-rebuilt/ContentPipelineSurface', async () => {
   const { useLocation } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {
@@ -400,6 +404,11 @@ function WorkspaceRouteSwitcher() {
   return <button type="button" onClick={() => navigate('/ws/ws-2/rewrite')}>Switch to workspace B</button>;
 }
 
+function GlobalSettingsRouteSwitcher() {
+  const navigate = useNavigate();
+  return <button type="button" onClick={() => navigate('/settings')}>Open global settings</button>;
+}
+
 /**
  * Render App with a MemoryRouter at a given initial path.
  * This imports App directly (which uses BrowserRouter internally), so we
@@ -427,6 +436,7 @@ async function renderAdminAtPath(path: string) {
 // Reset module state between tests so mockAuthState mutations don't bleed.
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   mockAuthState.checking = false;
   mockAuthState.required = false;
   mockAuthState.authenticated = true;
@@ -623,7 +633,7 @@ describe('Dashboard content rendering', () => {
     await waitFor(() => expect(screen.getByTestId('settings-panel')).toBeInTheDocument());
   });
 
-  it('mounts rebuilt global Settings with the first workspace as chrome context', async () => {
+  it('mounts rebuilt global Settings with honest no-workspace chrome when no visit history exists', async () => {
     rebuildShellMock.enabled = true;
     const { Dashboard } = await import('../../src/App');
     const qc = makeQueryClient();
@@ -637,14 +647,55 @@ describe('Dashboard content rendering', () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'ws-1'));
+    await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'none'));
     await waitFor(() => expect(screen.getByTestId('global-settings-rebuilt')).toBeInTheDocument());
-    expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-1');
+    expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', '');
+    expect(screen.queryByTestId('admin-chat')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-panel')).not.toBeInTheDocument();
     expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-connected', 'true');
     expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-openai', 'true');
     expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-webflow', 'true');
     expect(screen.getByTestId('rebuilt-connection-health-props')).toHaveAttribute('data-workspace-count', '1');
+  });
+
+  it('keeps the last-visited workspace as global chrome context', async () => {
+    rebuildShellMock.enabled = true;
+    mockWorkspaces.push({
+      ...defaultMockWorkspace,
+      id: 'ws-expero',
+      name: 'Expero',
+      folder: 'expero',
+      webflowSiteId: 'site-expero',
+      webflowSiteName: 'expero.com',
+    });
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/ws/ws-expero/rewrite']}>
+          <Routes>
+            <Route
+              path="/*"
+              element={(
+                <>
+                  <GlobalSettingsRouteSwitcher />
+                  <Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />
+                </>
+              )}
+            />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'ws-expero'));
+    await waitFor(() => expect(localStorage.getItem('admin-last-visited-workspace')).toBe('ws-expero'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open global settings' }));
+
+    await waitFor(() => expect(screen.getByTestId('global-settings-rebuilt')).toHaveAttribute('data-workspace-id', 'ws-expero'));
+    expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'ws-expero');
+    expect(screen.getByTestId('admin-chat')).toHaveAttribute('data-workspace-id', 'ws-expero');
   });
 
   it('mounts rebuilt global Settings when no workspace exists', async () => {
@@ -841,6 +892,25 @@ describe('Dashboard content rendering', () => {
   it('renders WorkspaceOverview when no workspace selected', async () => {
     await renderDashboardAtPath('/');
     await waitFor(() => expect(screen.getByTestId('workspace-overview')).toBeInTheDocument());
+  });
+
+  it('mounts the rebuilt book Command Center at flag-ON root without selecting a workspace', async () => {
+    rebuildShellMock.enabled = true;
+    const { Dashboard } = await import('../../src/App');
+    const qc = makeQueryClient();
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/*" element={<Dashboard onLogout={vi.fn()} theme="dark" toggleTheme={vi.fn()} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('command-center-rebuilt-surface')).toBeInTheDocument());
+    expect(screen.getByTestId('rebuilt-app-chrome')).toHaveAttribute('data-selected-workspace', 'none');
+    expect(screen.queryByTestId('workspace-overview')).not.toBeInTheDocument();
   });
 
   it('renders WorkspaceHome at /ws/:id', async () => {

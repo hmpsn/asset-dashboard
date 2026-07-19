@@ -10,7 +10,7 @@
  * Mocks the whole dependency surface (workspaces, webflow-forms, store, broadcast, activity, flags) so
  * this is a fast deterministic logic test — the live API + DB are exercised in the integration suite.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
   workspaces: [] as Array<Record<string, unknown>>,
@@ -66,6 +66,8 @@ const SUB = {
 };
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-06-20T12:00:00.000Z'));
   vi.clearAllMocks();
   state.flagEnabled = true;
   state.workspaces = [{
@@ -74,6 +76,10 @@ beforeEach(() => {
   }];
   state.listSubmissions.mockResolvedValue([SUB]);
   state.saveFormSubmission.mockReturnValue({ inserted: true, id: 'row-1' });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('runWebflowFormPoll', () => {

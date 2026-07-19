@@ -167,7 +167,7 @@ export const STATUS_BADGE_REGISTRY: Record<StatusBadgeDomain, Record<string, Sta
     in_strategy: { label: 'In Strategy', tone: 'teal' },
     tracked: { label: 'Tracked', tone: 'blue' },
     needs_review: { label: 'Needs Review', tone: 'amber' },
-    raw_evidence: { label: 'Raw Evidence', tone: 'zinc' },
+    raw_evidence: { label: 'Seen in search', tone: 'zinc' },
     declined: { label: 'Declined', tone: 'red' },
     retired: { label: 'Retired', tone: 'zinc' },
     selected: { label: 'Selected', tone: 'teal' },

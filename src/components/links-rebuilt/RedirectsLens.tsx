@@ -31,6 +31,7 @@ import type { RedirectStatusFilter } from './useLinksSurfaceState';
 import { dateTimeOrDash, downloadCsv, numberOrDash, truncateMiddle } from './linksFormatters';
 import { mutationErrorMessage } from './linksMutationFeedback';
 import { useToast } from '../Toast';
+import { useSnapshotSendLatch } from './InternalLinksLens';
 
 interface RedirectRule {
   from: string;
@@ -137,6 +138,7 @@ function RedirectRecommendations({
 }) {
   const { toast } = useToast();
   const sendToClient = useSendRedirectProposal(workspaceId);
+  const sendLatch = useSnapshotSendLatch(data.scannedAt);
   const [editingRule, setEditingRule] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [note, setNote] = useState('');
@@ -189,7 +191,10 @@ function RedirectRecommendations({
         summary: data.summary,
       },
     }, {
-      onSuccess: () => toast('Redirect proposal sent to client', 'success'),
+      onSuccess: () => {
+        sendLatch.markSent();
+        toast('Redirect proposal sent to client', 'success');
+      },
       onError: (error) => toast(mutationErrorMessage(error, 'Redirect proposal send failed'), 'error'),
     });
   };
@@ -320,9 +325,9 @@ function RedirectRecommendations({
                 Copy accepted
               </Button>
               <ToolbarSpacer />
-              <Button size="sm" variant="primary" disabled={sendToClient.isPending} onClick={sendAccepted}>
-                <Icon name="send" size="sm" />
-                Send to client
+              <Button size="sm" variant="primary" disabled={sendToClient.isPending || sendLatch.sent} onClick={sendAccepted}>
+                <Icon name={sendLatch.sent ? 'check' : 'send'} size="sm" />
+                {sendLatch.sent ? 'Sent' : 'Send to client'}
               </Button>
             </Toolbar>
           </div>

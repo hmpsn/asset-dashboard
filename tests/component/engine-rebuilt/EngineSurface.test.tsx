@@ -310,12 +310,12 @@ const workspaceId = 'ws-engine';
 const SPINE_SECTION_TEST_IDS = [
   'engine-section-orientation',
   'engine-section-value-frame',
-  'engine-section-pov',
-  'engine-section-stance',
-  'engine-section-strategy-evidence',
   'engine-section-backing-moves',
   'engine-section-projections',
+  'engine-section-pov',
   'engine-trust-spine-preview',
+  'engine-section-strategy-evidence',
+  'engine-section-stance',
   'engine-section-operations',
 ] as const;
 
@@ -697,14 +697,64 @@ describe('EngineSurface rebuilt', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('renders one ordered strategy spine without a top-level Engine lens switcher', async () => {
+  it('renders the owner-approved actions-forward section order with a compact Engine jump navigation', async () => {
     renderSurface();
 
     await screen.findByTestId('engine-section-operations');
     expectSpineOrder(SPINE_SECTION_TEST_IDS);
-    expect(screen.queryByRole('radio', { name: 'Spine' })).not.toBeInTheDocument();
+    const jumpNav = screen.getByRole('navigation', { name: 'Engine sections' });
+    expect(within(jumpNav).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Changes',
+      'Signals',
+      'POV',
+      'Moves',
+      'Operations',
+    ]);
+    expect(within(jumpNav).queryByRole('button', { name: 'Spine' })).not.toBeInTheDocument();
     expect(screen.getByText('Average position')).toBeInTheDocument();
     expect(screen.getByText('#9.2')).toBeInTheDocument();
+  });
+
+  it('pairs the POV and client preview in one compose band with exact-once send ownership', async () => {
+    renderSurface();
+
+    const composeBand = await screen.findByTestId('engine-compose-issue');
+    expect(composeBand).toHaveClass('lg:grid-cols-2');
+    expect(within(composeBand).getAllByTestId('drafted-pov-editor')).toHaveLength(1);
+    expect(within(composeBand).getAllByTestId('engine-trust-spine-preview')).toHaveLength(1);
+    expect(screen.getAllByTestId('drafted-pov-editor')).toHaveLength(1);
+    expect(screen.getAllByTestId('engine-trust-spine-preview')).toHaveLength(1);
+    expect(screen.getAllByTestId('engine-topbar-send-btn')).toHaveLength(1);
+  });
+
+  it('keeps issue evidence collapsed by default and auto-opens it for the signals lens', async () => {
+    const defaultView = renderSurface();
+
+    const defaultEvidence = await screen.findByTestId('engine-section-strategy-evidence');
+    expect(within(defaultEvidence).getByText('Evidence behind this issue')).toBeInTheDocument();
+    expect(defaultEvidence.querySelector('details')).not.toHaveAttribute('open');
+
+    defaultView.unmount();
+    renderSurface('/ws/ws-engine/seo-strategy?lens=signals');
+
+    const linkedEvidence = await screen.findByTestId('engine-section-strategy-evidence');
+    expect(linkedEvidence.querySelector('details')).toHaveAttribute('open');
+    await waitFor(() => expect(linkedEvidence).toHaveFocus());
+  });
+
+  it('keeps jump navigation sticky at the top and sends clicks through the existing focus receiver', async () => {
+    renderSurface();
+
+    const controls = await screen.findByRole('toolbar', { name: 'Insights Engine controls' });
+    expect(controls).toHaveClass('sticky', 'top-0', 'z-[var(--z-sticky)]');
+
+    const jumpNav = within(controls).getByRole('navigation', { name: 'Engine sections' });
+    fireEvent.click(within(jumpNav).getByRole('button', { name: 'Moves' }));
+
+    const moves = screen.getByTestId('engine-section-backing-moves');
+    await waitFor(() => expect(moves).toHaveFocus());
+    expect(scrollIntoViewMock).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-engine/seo-strategy?lens=moves');
   });
 
   it('uses the prototype opening order, hierarchy, labels, and calm queue density', async () => {
@@ -1575,7 +1625,8 @@ describe('EngineSurface rebuilt', () => {
     expectScopedTextWithClass(preview, '$18,450', 't-stat');
     expectScopedTextWithClass(preview, 'Recovered so far', 't-caption');
     expectScopedTextWithClass(preview, '$2,760', 't-stat');
-    expectScopedTextWithClass(preview, 'Backing moves live', 't-caption');
+    expectScopedTextWithClass(preview, 'Moves in progress', 't-caption');
+    expect(within(preview).queryByText('Backing moves live')).not.toBeInTheDocument();
     expectScopedTextWithClass(preview, '0 / 1', 't-stat');
     expect(within(preview).queryByText(/The client sees the verdict, value frame, and proof/)).not.toBeInTheDocument();
   });
@@ -1644,28 +1695,37 @@ describe('EngineSurface rebuilt', () => {
     expect(within(projections).getByTestId('keyword-targets-lens')).toHaveAttribute('data-included-rec-ids', '');
   });
 
-  it('keeps the staged-set send action exact-once in the topbar action host fallback', async () => {
+  it('keeps the client-update action exact-once and explains the disabled empty state', async () => {
     const first = renderSurface();
 
     expect(await screen.findByTestId('engine-rebuilt-surface')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Send issue' })).not.toBeInTheDocument();
+    const restingFallback = screen.getByTestId('engine-topbar-actions-fallback');
+    const restingSend = within(restingFallback).getByRole('button', { name: 'Send client update (0)' });
+    expect(restingSend).toBeDisabled();
+    expect(restingSend).toHaveAccessibleDescription('No moves added — add moves below before sending');
+    expect(within(restingFallback).getByText('No moves added — add moves below before sending')).toBeVisible();
+    expect(screen.getAllByTestId('engine-topbar-send-btn')).toHaveLength(1);
+    fireEvent.click(restingSend);
+    expect(mocks.sendIssue).not.toHaveBeenCalled();
     expect(screen.queryByTestId('engine-backing-send-bar')).not.toBeInTheDocument();
 
     first.unmount();
     mocks.engineState = makeEngineState({
-      stagedRecIds: new Set(['rec-1']),
-      stagedSendableIds: ['rec-1'],
-      stagedCount: 1,
+      stagedRecIds: new Set(['rec-1', 'rec-2']),
+      stagedSendableIds: ['rec-1', 'rec-2'],
+      stagedCount: 2,
     });
     renderSurface();
 
     await screen.findByTestId('engine-section-backing-moves');
     const fallback = screen.getByTestId('engine-topbar-actions-fallback');
     expect(screen.queryByTestId('engine-backing-send-bar')).not.toBeInTheDocument();
-    expect(within(fallback).getByRole('button', { name: 'Send 1 staged' })).toBeEnabled();
-    expect(screen.getAllByRole('button', { name: /Send(?: 1 staged| issue)/ })).toHaveLength(1);
-    fireEvent.click(within(fallback).getByRole('button', { name: 'Send 1 staged' }));
+    const stagedSend = within(fallback).getByRole('button', { name: 'Send client update (2)' });
+    expect(stagedSend).toBeEnabled();
+    expect(screen.getAllByTestId('engine-topbar-send-btn')).toHaveLength(1);
+    fireEvent.click(stagedSend);
     expect(mocks.sendIssue).toHaveBeenCalledTimes(1);
+    expect(mocks.sendIssue).toHaveBeenCalledWith(expect.objectContaining({ type: 'click' }));
   });
 
   it('opens the Local SEO setup drawer exactly once from operational disclosures', async () => {

@@ -1,11 +1,38 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { mcpAuthMiddleware } from './auth.js';
+import { MCP_SERVER_PROFILES } from '../../shared/types/mcp-runtime.js';
+import {
+  mcpAuthMiddleware,
+  mcpMasterKeyOnlyMiddleware,
+} from './auth.js';
 import { handleMcpRequest } from './server.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('mcp');
 const router = Router();
+
+router.post(
+  '/operator',
+  mcpAuthMiddleware,
+  mcpMasterKeyOnlyMiddleware,
+  async (req, res) => {
+    try {
+      await handleMcpRequest(req, res, MCP_SERVER_PROFILES.OPERATOR);
+    } catch (err) {
+      log.error(
+        {
+          failureClass: err instanceof Error
+            ? 'unhandled_operator_request_error'
+            : 'unhandled_operator_request_non_error',
+        },
+        'Unhandled MCP operator request error',
+      );
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+  },
+);
 
 router.post('/', mcpAuthMiddleware, async (req, res) => {
   try {
@@ -18,10 +45,11 @@ router.post('/', mcpAuthMiddleware, async (req, res) => {
   }
 });
 
-// Streamable HTTP clients open `GET /mcp` to establish the OPTIONAL server→client
-// SSE notification stream, and send `DELETE /mcp` to tear a session down. This
-// server runs stateless JSON mode (enableJsonResponse, no sessionIdGenerator) and
-// offers neither, so per the MCP Streamable HTTP spec it MUST answer 405.
+// Streamable HTTP clients open GET on `/mcp` or `/mcp/operator` to establish the
+// OPTIONAL server→client SSE notification stream, and send DELETE to tear a
+// session down. This server runs stateless JSON mode (enableJsonResponse, no
+// sessionIdGenerator) and offers neither, so per the MCP Streamable HTTP spec it
+// MUST answer 405.
 //
 // Without these handlers, GET/DELETE fall through to the SPA catch-all
 // (`app.get('*')`) and return 200 + index.html. A client reads that non-SSE 200 as
@@ -39,5 +67,7 @@ function methodNotAllowed(_req: Request, res: Response): void {
 }
 router.get('/', methodNotAllowed);
 router.delete('/', methodNotAllowed);
+router.get('/operator', methodNotAllowed);
+router.delete('/operator', methodNotAllowed);
 
 export default router;

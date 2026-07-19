@@ -3,6 +3,7 @@ import { Bell, Gauge, Trophy, Zap, type LucideIcon } from 'lucide-react';
 import type { WorkQueueClassification, WorkQueueItem, WorkQueueSourceType, WorkQueueStream } from '../../../shared/types/work-queue';
 import {
   Button,
+  ClickableRow,
   EmptyState,
   FilterChip,
   Icon,
@@ -23,6 +24,8 @@ interface CockpitWorkQueueProps {
   onClearSourceTypes: () => void;
   clientName: string;
   clientInitials: string;
+  anomalyCount: number;
+  onOpenAnomalies: () => void;
   onOpenItem: (item: WorkQueueItem) => void;
 }
 
@@ -55,19 +58,19 @@ export const STREAM_META: Record<WorkQueueStream, {
     color: 'var(--teal)',
   },
   money: {
-    label: 'Monetization',
-    unit: 'to pitch',
-    description: 'Grow the account',
-    groupTitle: 'Money queue',
+    label: 'Growth',
+    unit: 'to propose',
+    description: 'Upsell and value-proof work backed by measured results.',
+    groupTitle: 'Growth queue',
     icon: Trophy,
     iconName: 'trophy',
     color: 'var(--amber)',
   },
   unclassified: {
-    label: 'Risk',
+    label: 'Needs triage',
     unit: 'to triage',
-    description: 'Client signals and unclassified attention.',
-    groupTitle: 'Risk and unclassified',
+    description: 'Client signals and anything not yet sorted',
+    groupTitle: 'Needs triage',
     icon: Bell,
     iconName: 'bell',
     color: 'var(--brand-text-muted)',
@@ -106,13 +109,17 @@ function visibleItems(
   });
 }
 
-function groupItems(items: WorkQueueItem[], stream: CockpitStreamFilter): Array<[WorkQueueStream, WorkQueueItem[]]> {
+function groupItems(
+  items: WorkQueueItem[],
+  stream: CockpitStreamFilter,
+  includeAnomalyPointer: boolean,
+): Array<[WorkQueueStream, WorkQueueItem[]]> {
   const streams: WorkQueueStream[] = stream === 'all'
     ? ['opt', 'send', 'money', 'unclassified']
     : [stream];
   return streams
     .map((streamId) => [streamId, items.filter((item) => item.stream === streamId)] as [WorkQueueStream, WorkQueueItem[]])
-    .filter(([, rows]) => rows.length > 0);
+    .filter(([streamId, rows]) => rows.length > 0 || (streamId === 'unclassified' && includeAnomalyPointer));
 }
 
 export function CockpitWorkQueue({
@@ -125,16 +132,22 @@ export function CockpitWorkQueue({
   onClearSourceTypes,
   clientName,
   clientInitials,
+  anomalyCount,
+  onOpenAnomalies,
   onOpenItem,
 }: CockpitWorkQueueProps) {
   const filteredItems = visibleItems(workQueue.items, stream, activeSourceTypes);
-  const grouped = groupItems(filteredItems, stream);
+  const showAnomalyPointer = anomalyCount > 0
+    && (stream === 'all' || stream === 'unclassified')
+    && activeSourceTypes.size === 0;
+  const anomalyLabel = `${anomalyCount} ${anomalyCount === 1 ? 'anomaly' : 'anomalies'}`;
+  const grouped = groupItems(filteredItems, stream, showAnomalyPointer);
   const sourceTypes = SOURCE_ORDER.filter((sourceType) => (sourceTypeCounts[sourceType] ?? 0) > 0);
 
   const filterControls = (
     <div className="flex min-w-max items-center gap-2" aria-label="Queue filters">
       <FilterChip label="All" active={stream === 'all'} count={workQueue.items.length} onClick={() => onStreamChange('all')} />
-      <FilterChip label="Risk" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
+      <FilterChip label="Needs triage" active={stream === 'unclassified'} count={workQueue.streams.unclassified} onClick={() => onStreamChange('unclassified')} />
       {sourceTypes.map((sourceType) => (
         <FilterChip
           key={sourceType}
@@ -154,7 +167,7 @@ export function CockpitWorkQueue({
 
   return (
     <div className="flex flex-col gap-3" data-testid="cockpit-work-queue">
-      {grouped.some(([, rows]) => rows.length > 0) ? (
+      {grouped.length > 0 ? (
         <SectionCard
           title={`${clientName}'s work queue`}
           titleIcon={<Icon name="bell" size="sm" className="text-[var(--teal)]" />}
@@ -169,7 +182,6 @@ export function CockpitWorkQueue({
         >
           <div className="flex flex-col">
             {grouped.map(([streamId, rows]) => {
-              if (rows.length === 0) return null;
               const meta = STREAM_META[streamId];
               return (
                 <div key={streamId} className="border-t border-[var(--brand-border)] first:border-t-0">
@@ -177,19 +189,39 @@ export function CockpitWorkQueue({
                   <div className="flex items-center gap-2 px-4 pb-1.5 pt-3 t-label" style={{ color: meta.color }}>
                     <Icon name={meta.iconName} size="sm" />
                     <span>{meta.label}</span>
-                    <span
-                      className="rounded-[var(--radius-pill)] px-1.5 t-caption-sm font-semibold tabular-nums"
-                      style={{ color: meta.color, backgroundColor: `color-mix(in srgb, ${meta.color} 14%, transparent)` }}
-                    >
-                      {rows.length}
-                    </span>
+                    {rows.length > 0 && (
+                      <span
+                        className="rounded-[var(--radius-pill)] px-1.5 t-caption-sm font-semibold tabular-nums"
+                        style={{ color: meta.color, backgroundColor: `color-mix(in srgb, ${meta.color} 14%, transparent)` }}
+                      >
+                        {rows.length}
+                      </span>
+                    )}
                   </div>
+                  {streamId === 'unclassified' && showAnomalyPointer && (
+                    <ClickableRow
+                      aria-label={`Review ${anomalyLabel} in Search & Traffic`}
+                      onClick={onOpenAnomalies}
+                      className="flex items-center gap-3 border-t border-[var(--brand-border)] px-4 py-3"
+                    >
+                      <Icon name="bell" size="sm" className="flex-none text-[var(--blue)]" aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block t-ui font-semibold text-[var(--brand-text-bright)] tabular-nums">
+                          {anomalyLabel}
+                        </span>
+                        <span className="block t-caption-sm text-[var(--brand-text-muted)]">
+                          Review alert detail in Search &amp; Traffic
+                        </span>
+                      </span>
+                      <Icon name="arrowRight" size="sm" className="flex-none text-[var(--teal)]" aria-hidden="true" />
+                    </ClickableRow>
+                  )}
                   {rows.map((item) => (
                     <WorkQueueRow
                       key={`${item.stream}-${item.id}`}
                       item={item}
                       clientInitials={clientInitials}
-                      actionLabel={item.sourceType === 'work_order' ? 'Open panel' : undefined}
+                      actionLabel={item.stream === 'send' ? 'Review' : 'Open'}
                       onAction={() => onOpenItem(item)}
                     />
                   ))}

@@ -125,6 +125,7 @@ export const queryKeys = {
     keywordCommandCenterInitialGuard: (wsId: string) => ['admin-keyword-command-center', wsId, 'initial-guard'] as const,
     keywordCommandCenterSummary: (wsId: string) => ['admin-keyword-command-center', wsId, 'summary'] as const,
     keywordCommandCenterRows: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'rows', query] as const,
+    keywordCommandCenterGrouped: (wsId: string, query: unknown) => ['admin-keyword-command-center', wsId, 'grouped', query] as const,
     keywordCommandCenterDetail: (wsId: string, keyword: string) => ['admin-keyword-command-center', wsId, 'detail', keyword] as const,
     localSeo: (wsId: string) => ['admin-local-seo', wsId] as const,
     localSeoVariant: (wsId: string, includeSnapshots: boolean) =>
@@ -144,6 +145,8 @@ export const queryKeys = {
     rankTrackingHistory: (wsId: string) => ['admin-rank-tracking-history', wsId] as const,
     rankTrackingHistoryQueries: (wsId: string, queries: string[]) =>
       ['admin-rank-tracking-history', wsId, 'queries', ...[...queries].sort()] as const,
+    rankTrackingRowHistory: (wsId: string, queries: string[]) =>
+      ['admin-rank-tracking-history', wsId, 'rows', ...[...queries].sort()] as const,
     internalLinksSnapshot: (siteId: string, wsId?: string) =>
       wsId ? ['admin-internal-links-snapshot', siteId, wsId] as const : ['admin-internal-links-snapshot', siteId] as const,
     anomalyAlerts: (wsId: string) => ['anomaly-alerts', wsId] as const,
@@ -226,6 +229,8 @@ export const queryKeys = {
     workspaceBadges: (wsId: string) => ['admin-workspace-badges', wsId] as const,
     workspaceHome: (wsId: string) => ['admin-workspace-home', wsId] as const,
     workspaceOverview: () => ['admin-workspace-overview'] as const,
+    cockpitPortfolio: () => ['admin-cockpit-portfolio'] as const,
+    presence: () => ['admin-presence'] as const,
     globalOpsGoogleStatus: () => ['admin-global-ops-google-status'] as const,
     globalOpsGscSites: () => ['admin-global-ops-gsc-sites'] as const,
     globalOpsStorage: () => ['admin-global-ops-storage'] as const,
@@ -245,6 +250,7 @@ export const queryKeys = {
     outcomePlaybooks: (wsId: string) => ['admin-outcome-playbooks', wsId] as const,
     outcomeTopWins: (wsId: string) => ['admin-outcome-top-wins', wsId] as const,
     outcomeOverview: () => ['admin-outcome-overview'] as const,
+    outcomePortfolioRollup: () => ['admin-outcome-portfolio-rollup'] as const,
 
     // Intelligence
     intelligence: (wsId: string, slices?: readonly string[], pagePath?: string, learningsDomain?: string) =>

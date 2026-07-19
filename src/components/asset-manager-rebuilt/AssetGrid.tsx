@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import type { ReactElement } from 'react';
-import { Image, Minimize2, Sparkles, Wand2 } from 'lucide-react';
+import { Image, Sparkles } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -19,12 +19,10 @@ interface AssetGridProps {
   selected: Set<string>;
   quotaLocked: boolean;
   quotaReason: string;
-  actionBusy: (assetId: string, action: 'alt' | 'compress' | 'rename') => boolean;
+  actionBusy: (assetId: string, action: 'alt') => boolean;
   onToggleSelect: (assetId: string) => void;
   onOpenAsset: (assetId: string) => void;
   onGenerateAlt: (asset: BrowseAsset) => void;
-  onCompress: (asset: BrowseAsset) => void;
-  onSmartRename: (asset: BrowseAsset) => void;
   onClearFilters: () => void;
 }
 
@@ -73,8 +71,6 @@ export function AssetGrid({
   onToggleSelect,
   onOpenAsset,
   onGenerateAlt,
-  onCompress,
-  onSmartRename,
   onClearFilters,
 }: AssetGridProps) {
   if (assets.length === 0) {
@@ -101,7 +97,6 @@ export function AssetGrid({
         const isSvg = asset.contentType.includes('svg');
         const isOversized = asset.size > 500 * 1024 && !isSvg;
         const isMissingAlt = !asset.altText?.trim();
-        const canCompress = Boolean(url) && !isSvg && !asset.richTextOnly;
         const selectedAsset = selected.has(asset.id);
 
         return (
@@ -142,12 +137,7 @@ export function AssetGrid({
 
             <div className="flex flex-col gap-2 px-3 pb-3 pt-2.5">
               <div className="min-w-0">
-                <ClickableRow
-                  className="block max-w-full bg-transparent p-0 t-ui font-semibold text-[var(--brand-text-bright)] hover:bg-transparent"
-                  onClick={() => onOpenAsset(asset.id)}
-                >
-                  <span className="block truncate">{name}</span>
-                </ClickableRow>
+                <span className="block truncate t-ui font-semibold text-[var(--brand-text-bright)]">{name}</span>
                 <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 t-micro text-[var(--brand-text-muted)]">
                   <span>{formatBytes(asset.size || 0)}</span>
                   {dims && <span>{dims}</span>}
@@ -158,48 +148,21 @@ export function AssetGrid({
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <Button
-                  aria-label={asset.richTextOnly ? 'Compression unavailable for RichText-only CMS image' : 'Compress image'}
-                  size="sm"
-                  variant="secondary"
-                  className="flex-1 justify-center"
-                  disabled={actionBusy(asset.id, 'compress') || !canCompress}
-                  onClick={() => onCompress(asset)}
-                >
-                  <Icon as={Minimize2} size="sm" aria-hidden="true" />
-                  Compress
-                </Button>
-                {isMissingAlt ? (
-                  <QuotaTooltip locked={quotaLocked} reason={quotaReason}>
-                    <Button
-                      aria-label="Generate alt text"
-                      size="sm"
-                      variant="primary"
-                      className="flex-1 justify-center"
-                      disabled={quotaLocked || actionBusy(asset.id, 'alt') || !url}
-                      onClick={() => onGenerateAlt(asset)}
-                    >
-                      <Icon as={Sparkles} size="sm" aria-hidden="true" />
-                      Alt text
-                    </Button>
-                  </QuotaTooltip>
-                ) : (
-                  <QuotaTooltip locked={quotaLocked} reason={quotaReason}>
-                    <Button
-                      aria-label="Draft smart name"
-                      size="sm"
-                      variant="secondary"
-                      className="flex-1 justify-center"
-                      disabled={quotaLocked || actionBusy(asset.id, 'rename') || !url}
-                      onClick={() => onSmartRename(asset)}
-                    >
-                      <Icon as={Wand2} size="sm" aria-hidden="true" />
-                      Rename
-                    </Button>
-                  </QuotaTooltip>
-                )}
-              </div>
+              {isMissingAlt && (
+                <QuotaTooltip locked={quotaLocked} reason={quotaReason}>
+                  <Button
+                    aria-label="Generate alt text"
+                    size="sm"
+                    variant="primary"
+                    className="w-full justify-center"
+                    disabled={quotaLocked || actionBusy(asset.id, 'alt') || !url}
+                    onClick={() => onGenerateAlt(asset)}
+                  >
+                    <Icon as={Sparkles} size="sm" aria-hidden="true" />
+                    Alt text
+                  </Button>
+                </QuotaTooltip>
+              )}
             </div>
           </article>
         );

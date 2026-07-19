@@ -3,6 +3,27 @@ import { classifyWorkQueue } from '../../server/domains/work-queue.js';
 import { WORK_QUEUE_STREAMS } from '../../shared/types/work-queue.js';
 
 describe('classifyWorkQueue', () => {
+  it('excludes positive-severity churn signals from the Risk stream', () => {
+    const result = classifyWorkQueue({
+      churnSignals: [
+        { id: 'risk-warning', title: 'Client engagement declined', severity: 'warning' },
+        { id: 'healthy-positive', title: 'Client engagement recovered', severity: 'positive' },
+      ],
+    });
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: 'churn-risk-warning',
+        sourceType: 'churn_signal',
+        stream: 'unclassified',
+      }),
+    ]);
+    expect(result.items).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'churn-healthy-positive' }),
+    ]));
+    expect(result.streams.unclassified).toBe(1);
+  });
+
   it('buckets raw workspace-home inputs deterministically and keeps stream counts in parity', () => {
     const result = classifyWorkQueue({
       clientId: 'ws-queue',
@@ -52,6 +73,10 @@ describe('classifyWorkQueue', () => {
       money: 1,
       unclassified: 2,
     });
+    expect(result.items.find(item => item.id === 'monetization-content')).toEqual(expect.objectContaining({
+      stream: 'money',
+      title: '1 growth play to propose',
+    }));
 
     for (const stream of WORK_QUEUE_STREAMS) {
       expect(result.streams[stream]).toBe(result.items.filter(item => item.stream === stream).length);

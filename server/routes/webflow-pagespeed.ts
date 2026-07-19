@@ -37,6 +37,9 @@ router.get('/api/webflow/pagespeed/:siteId', requireWorkspaceSiteAccessFromQuery
     const maxPages = requestedMaxPages;
     const psWs = getWorkspaceBySiteId(req.params.siteId);
     const result = await runSiteSpeed(req.params.siteId, strategy, maxPages, psWs?.id);
+    if (result.pages.length === 0) {
+      return res.status(502).json({ error: 'No pages could be tested' });
+    }
     savePageSpeed(req.params.siteId, strategy, result);
     if (psWs?.id) invalidateIntelligenceCache(psWs.id);
     res.json(result);

@@ -115,6 +115,15 @@ const desktopSiteSpeed = {
   testedAt: '2026-07-06T16:00:00.000Z',
 };
 
+const emptyMobileSiteSpeed = {
+  siteId: 'site-1',
+  strategy: 'mobile',
+  pages: [],
+  averageScore: 0,
+  averageVitals: { LCP: null, FID: null, CLS: null, FCP: null, INP: null, SI: null, TBT: null, TTI: null },
+  testedAt: '2026-07-16T12:00:00.000Z',
+};
+
 beforeAll(() => {
   class ResizeObserverMock {
     observe() {}
@@ -322,6 +331,44 @@ describe('PerformanceSurface rebuilt admin surface', () => {
     await waitFor(() => expect(pagespeedBulkMock).toHaveBeenCalledWith('site-1', 'desktop', 3, 'ws-1'));
     expect(await screen.findByText('Desktop average')).toBeInTheDocument();
     expect(screen.getByText('Home')).toBeInTheDocument();
+  });
+
+  it('renders a persisted empty PageSpeed snapshot as retryable unavailable data, never a zero score', async () => {
+    pagespeedSnapshotMock.mockImplementation((_siteId: string, _workspaceId: string, strategy: 'mobile' | 'desktop') => Promise.resolve({
+      siteId: 'site-1',
+      createdAt: '2026-07-16T12:00:00.000Z',
+      result: strategy === 'mobile' ? emptyMobileSiteSpeed : desktopSiteSpeed,
+    }));
+
+    renderSurface('/ws/ws-1/performance?tab=speed');
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Bulk Top Pages/i }));
+    expect(await screen.findByText(/No pages could be tested/i)).toBeInTheDocument();
+    expect(screen.getByText(/rate-limited/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument();
+    expect(screen.queryByText('Mobile average')).not.toBeInTheDocument();
+  });
+
+  it('reports an empty bulk PageSpeed run as an error and preserves the prior snapshot cache', async () => {
+    const queryClient = createQueryClient();
+    pagespeedBulkMock.mockResolvedValue(emptyMobileSiteSpeed);
+    renderSurface('/ws/ws-1/performance?tab=speed', queryClient);
+
+    fireEvent.click(await screen.findByRole('radio', { name: /Bulk Top Pages/i }));
+    await screen.findByText('Mobile average');
+    fireEvent.click(screen.getByRole('button', { name: 'Test Mobile' }));
+
+    const rateLimitMessages = await screen.findAllByText(/rate-limited/i);
+    expect(rateLimitMessages.length).toBeGreaterThan(0);
+    expect(rateLimitMessages.some((message) => message.parentElement?.classList.contains('border-accent-danger-soft'))).toBe(true);
+    expect(screen.queryByText(/bulk test complete/i)).not.toBeInTheDocument();
+    expect(queryClient.getQueryData([
+      'admin-performance',
+      'ws-1',
+      'pagespeed-snapshot',
+      'site-1',
+      'mobile',
+    ])).toMatchObject({ result: mobileSiteSpeed });
   });
 
   it('shows truthful mobile and desktop results together before their evidence sections', async () => {

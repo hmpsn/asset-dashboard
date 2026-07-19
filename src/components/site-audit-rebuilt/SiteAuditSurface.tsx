@@ -1,11 +1,14 @@
 // @ds-rebuilt
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
+import { issueToTaskKey } from '../../lib/audit-batch';
+import { resolvePagePath } from '../../lib/pathUtils';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { adminPath } from '../../routes';
 import {
   useSiteAuditRebuilt,
+  type AuditIssueApplyOutcome,
   type AuditIssueGroup,
   type SiteAuditPage,
   type SiteAuditResult,
@@ -26,6 +29,7 @@ import {
   Button,
   CharacterCounter,
   ClickableRow,
+  ConfirmDialog,
   DataTable,
   Disclosure,
   Drawer,
@@ -46,6 +50,7 @@ import {
   Toggle,
   Toolbar,
   ToolbarSpacer,
+  WorkbenchFrame,
   scoreColor,
   cn,
   type IconName,
@@ -288,7 +293,7 @@ function CategoryCards({
   const scoreByCategory = new Map(data.map((score) => [score.category, score]));
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="site-audit-categories">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6" data-testid="site-audit-categories">
       {PROTOTYPE_CATEGORY_ORDER.map((category) => scoreByCategory.get(category)).filter((score) => !!score).map((score) => {
         const active = activeCategories.has(score.category);
         const issueCount = score.errors + score.warnings + score.infos;
@@ -305,26 +310,25 @@ function CategoryCards({
               active={active}
               onClick={() => onToggleCategory(score.category)}
               aria-label={`Filter issues by ${label}`}
-              className="px-4 py-[14px]"
+              className="px-3 py-2.5"
             >
               <div>
-                <div className="mb-3 flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                   <span
-                    className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-[var(--radius-md)]"
+                    className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-[var(--radius-md)]"
                     style={{ color: accent, background: `color-mix(in srgb, ${accent} 12%, transparent)` }}
                   >
                     <Icon name={CATEGORY_ICON[score.category]} size="sm" />
                   </span>
-                  <span className="t-ui font-semibold text-[var(--brand-text-bright)]">{label}</span>
+                  <span className="t-caption-sm truncate font-semibold text-[var(--brand-text-bright)]">{label}</span>
                   {/* stat-primitive-ok: compact score is the trailing value within a category filter card, not a standalone KPI */}
                   <span className="ml-auto t-stat-sm" style={{ color: accent }}>{formatScore(score.score)}</span>
                 </div>
-                <Meter value={score.score} color={accent} ariaLabel={`${label} score`} height={5} />
-                <div className="mt-2.5 flex items-center justify-between gap-3 t-caption-sm text-[var(--brand-text-muted)]">
+                <div className="mt-1.5 flex items-center justify-between gap-2 t-micro text-[var(--brand-text-muted)]">
                   <span className={cn(issueCount === 0 && 'text-[var(--emerald)]')}>
                     {issueCount === 0 ? 'Clean' : `${issueCount} issue${issueCount === 1 ? '' : 's'}`}
                   </span>
-                  <span>{score.affectedPages} affected {score.affectedPages === 1 ? 'page' : 'pages'}</span>
+                  <span>{score.affectedPages} {score.affectedPages === 1 ? 'page' : 'pages'}</span>
                 </div>
               </div>
             </ClickableRow>
@@ -343,16 +347,17 @@ function scoreVerdict(score: number): string {
 
 function AuditHero({ data, siteName }: { data: SiteAuditResult; siteName: string }) {
   const indexedPages = data.pages.filter((page) => !page.noindex).length;
-  const remaining = data.warnings + data.infos;
+  const warningCount = `${data.warnings} ${data.warnings === 1 ? 'warning' : 'warnings'}`;
+  const noticeCount = `${data.infos} ${data.infos === 1 ? 'notice' : 'notices'}`;
   const redirects = data.deadLinkSummary?.redirects;
 
   return (
     <div data-testid="site-audit-hero">
       <SectionCard noPadding>
-        <div className="grid items-center gap-[26px] px-5 py-[22px] sm:grid-cols-[132px_minmax(0,1fr)] sm:px-[26px]">
-          <div className="relative mx-auto h-[132px] w-[132px]">
-            <MetricRing score={data.siteScore} size={132} strokeWidth={10} noAnimation />
-            <span className="absolute inset-x-0 top-[91px] text-center t-micro uppercase tracking-[0.08em] text-[var(--brand-text-dim)]">
+        <div className="grid items-center gap-4 px-4 py-3 sm:grid-cols-[72px_minmax(0,1fr)]">
+          <div className="relative mx-auto h-[72px] w-[72px]">
+            <MetricRing score={data.siteScore} size={72} strokeWidth={7} noAnimation />
+            <span className="absolute inset-x-0 top-[48px] text-center t-micro uppercase tracking-[0.08em] text-[var(--brand-text-dim)]">
               Health
             </span>
           </div>
@@ -360,17 +365,17 @@ function AuditHero({ data, siteName }: { data: SiteAuditResult; siteName: string
             <h1 className="t-h2 text-[var(--brand-text-bright)]">
               {siteName} is {scoreVerdict(data.siteScore)}.
             </h1>
-            <p className="mt-2 max-w-[68ch] t-ui text-[var(--brand-text-muted)]">
+            <p className="mt-1 max-w-[78ch] t-ui text-[var(--brand-text-muted)]">
               {data.errors > 0
-                ? `${data.errors} critical ${data.errors === 1 ? 'issue needs' : 'issues need'} attention first. ${remaining} more warnings and notices are ordered below by severity and demand.`
-                : `No critical issues. ${remaining} warnings and notices remain, and the site is in good technical shape.`}
+                ? `${data.errors} critical ${data.errors === 1 ? 'issue needs' : 'issues need'} attention first. ${warningCount} and ${noticeCount} are ordered below by severity and demand.`
+                : `No critical issues. ${warningCount} and ${noticeCount} remain, and the site is in good technical shape.`}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge label={`${data.errors} critical`} tone={data.errors > 0 ? 'red' : 'emerald'} variant="outline" size="md" />
-              <Badge label={`${data.warnings} warnings`} tone="amber" variant="outline" size="md" />
-              <Badge label={`${formatInteger(indexedPages)} indexable`} tone="emerald" variant="outline" size="md" />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge label={`${data.errors} critical`} tone={data.errors > 0 ? 'red' : 'emerald'} variant="outline" />
+              <Badge label={`${data.warnings} warnings`} tone="amber" variant="outline" />
+              <Badge label={`${formatInteger(indexedPages)} indexable`} tone="emerald" variant="outline" />
               {redirects != null && (
-                <Badge label={`${formatInteger(redirects)} redirects`} tone={redirects > 10 ? 'amber' : 'emerald'} variant="outline" size="md" />
+                <Badge label={`${formatInteger(redirects)} redirects`} tone={redirects > 10 ? 'amber' : 'emerald'} variant="outline" />
               )}
             </div>
           </div>
@@ -411,43 +416,52 @@ function IssueDetailDrawer({
   onSuppressIssue: (check: string, slug: string) => Promise<void>;
   onSuppressPattern: (check: string, slug: string) => Promise<void>;
 }) {
-  const [note, setNote] = useState('');
-  const firstPageInstance = group?.instances.find((instance) => instance.page) ?? null;
-  const firstPage = firstPageInstance?.page ?? null;
-  const firstIssue = firstPageInstance?.issue ?? null;
-  const taskKey = firstPage && firstIssue ? `${firstPage.pageId}-${firstIssue.check}-${firstIssue.message.slice(0, 30)}` : '';
-  const fixKey = firstPage && firstIssue ? `${firstPage.pageId}-${firstIssue.check}` : '';
-  const editedSuggestion = firstIssue?.suggestedFix
-    ? audit.editedSuggestions[fixKey] ?? firstIssue.suggestedFix
-    : '';
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [applyAllPreviewOpen, setApplyAllPreviewOpen] = useState(false);
+  const [applyAllRunning, setApplyAllRunning] = useState(false);
+  const [applyOutcomes, setApplyOutcomes] = useState<AuditIssueApplyOutcome[]>([]);
+  const pageInstances = (group?.instances ?? []).filter(
+    (instance): instance is typeof instance & { page: SiteAuditPage } => !!instance.page,
+  );
+  const fixableInstances = pageInstances.filter((instance) => !!instance.issue.suggestedFix);
+  const actionableInstances = fixableInstances.filter((instance) => (
+    !audit.appliedFixes.has(`${instance.page.pageId}-${instance.issue.check}`)
+  ));
+  const outcomeByInstance = useMemo(
+    () => new Map(applyOutcomes.map((outcome) => [outcome.instanceId, outcome])),
+    [applyOutcomes],
+  );
+
+  useEffect(() => {
+    setNotes({});
+    setApplyAllPreviewOpen(false);
+    setApplyAllRunning(false);
+    setApplyOutcomes([]);
+  }, [group?.id]);
+
+  const handleApplyAll = async () => {
+    setApplyAllRunning(true);
+    try {
+      const outcomes = await audit.acceptIssueGroupSuggestions(actionableInstances);
+      setApplyOutcomes(outcomes);
+      setApplyAllPreviewOpen(false);
+    } finally {
+      setApplyAllRunning(false);
+    }
+  };
 
   return (
-    <Drawer
-      open={open}
-      onClose={onClose}
-      title={group?.check ?? 'Audit issue'}
-      eyebrow={group?.categoryLabel}
-      subtitle={group?.message}
-      width={520}
-      footer={firstPage && firstIssue ? (
-        <>
-          <Button variant="secondary" size="sm" onClick={() => onQuickFix(firstPage, firstIssue)}>
-            <Icon name="arrowRight" size="sm" />
-            Open fix
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => onCreateTask(firstPage, firstIssue)}
-            disabled={createdTasks.has(taskKey)}
-          >
-            <Icon name={createdTasks.has(taskKey) ? 'check' : 'plus'} size="sm" />
-            {createdTasks.has(taskKey) ? 'Task added' : 'Add task'}
-          </Button>
-        </>
-      ) : undefined}
-    >
-      {group && (
-        <div className="space-y-5">
+    <>
+      <Drawer
+        open={open}
+        onClose={onClose}
+        title={group?.check ?? 'Audit issue'}
+        eyebrow={group?.categoryLabel}
+        subtitle={group?.message}
+        width={560}
+      >
+        {group && (
+          <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge label={group.severity} tone={SEVERITY_TONE[group.severity]} variant="soft" />
             <Badge label={group.categoryLabel} tone="teal" variant="outline" />
@@ -458,105 +472,163 @@ function IssueDetailDrawer({
           <div className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-4">
             <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Recommendation</div>
             <p className="t-body text-[var(--brand-text-muted)] mt-1">{group.recommendation}</p>
-            {firstPage && firstIssue?.suggestedFix && (
-              <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--brand-mint-dim)] bg-[var(--brand-mint-dim)] p-3">
-                <div className="t-micro text-[var(--teal)]">AI suggestion</div>
-                <FormTextarea
-                  value={editedSuggestion}
-                  onChange={(value) => {
-                    audit.setEditedSuggestions((current) => ({
-                      ...current,
-                      [fixKey]: value,
-                    }));
-                  }}
-                  rows={3}
-                  className="mt-2"
-                />
-                <CharacterCounter current={editedSuggestion.length} max={320} className="mt-1 justify-end" />
-              </div>
-            )}
           </div>
 
-          {firstPage && firstIssue && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Send to client</div>
-                {flaggedIssues.has(taskKey) && <Badge label="Sent" tone="emerald" variant="soft" />}
+          <div data-testid="site-audit-issue-actions">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="t-ui font-semibold text-[var(--brand-text-bright)]">Affected pages</div>
+                <div className="mt-1 t-caption text-[var(--brand-text-muted)]">
+                  {fixableInstances.length > 1
+                    ? `Choose actions page by page, or preview the same suggestion across all ${fixableInstances.length} affected pages.`
+                    : 'Choose actions for the affected page below.'}
+                </div>
               </div>
-              <FormTextarea
-                value={note}
-                onChange={setNote}
-                placeholder="Optional note for the client"
-                rows={3}
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                {firstIssue.suggestedFix && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onAcceptSuggestion(firstPage, firstIssue)}
-                    loading={applyingFix === fixKey}
-                  >
-                    <Icon name="check" size="sm" />
-                    Accept suggestion
-                  </Button>
-                )}
+              {actionableInstances.length > 1 && (
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => onFlagForClient(firstPage, firstIssue, note)}
-                  loading={flagSending}
-                  disabled={flaggedIssues.has(taskKey)}
+                  onClick={() => setApplyAllPreviewOpen(true)}
                 >
-                  <Icon name="send" size="sm" />
-                  {flaggedIssues.has(taskKey) ? 'Sent to client' : 'Send to client'}
+                  <Icon name="sparkle" size="sm" />
+                  Apply to all {actionableInstances.length} pages
                 </Button>
-              </div>
+              )}
             </div>
-          )}
-
-          <div>
-            <div className="t-ui font-semibold text-[var(--brand-text-bright)] mb-2">Affected pages</div>
             <div className="space-y-2">
-              {group.instances.slice(0, 12).map((instance) => (
-                <div key={instance.id} className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3">
+              {group.instances.map((instance) => {
+                const page = instance.page;
+                if (!page) {
+                  return (
+                    <SectionCard key={instance.id} noPadding variant="subtle">
+                      <div className="p-3">
+                        <div className="t-ui text-[var(--brand-text-bright)]">Site-wide issue</div>
+                        <div className="t-caption-sm text-[var(--brand-text-muted)]">{instance.issue.value ?? instance.issue.check}</div>
+                      </div>
+                    </SectionCard>
+                  );
+                }
+                const pagePath = resolvePagePath(page);
+                const taskKey = issueToTaskKey(page, instance.issue);
+                const fixKey = `${page.pageId}-${instance.issue.check}`;
+                const editedSuggestion = instance.issue.suggestedFix
+                  ? audit.editedSuggestions[fixKey] ?? instance.issue.suggestedFix
+                  : '';
+                const outcome = outcomeByInstance.get(instance.id);
+                const applied = audit.appliedFixes.has(fixKey) || outcome?.status === 'applied';
+                const taskCreated = createdTasks.has(taskKey);
+                const sent = flaggedIssues.has(taskKey);
+
+                return (
+                <div
+                  key={instance.id}
+                  data-testid={`site-audit-instance-${page.pageId}`}
+                  className="rounded-[var(--radius-lg)] border border-[var(--brand-border)] bg-[var(--surface-1)] p-3"
+                >
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="t-ui text-[var(--brand-text-bright)] truncate">
-                          {instance.page?.page ?? 'Site-wide issue'}
+                          {page.page}
                         </span>
-                        {instance.page?.noindex && <Badge label="noindex excluded" tone="zinc" variant="outline" />}
-                        {instance.page && audit.pageStates.getState?.(instance.page.pageId) && (
+                        {page.noindex && <Badge label="noindex excluded" tone="zinc" variant="outline" />}
+                        {audit.pageStates.getState?.(page.pageId) && (
                           <Badge
-                            label={audit.pageStates.getState(instance.page.pageId)!.status.replace(/-/g, ' ')}
+                            label={audit.pageStates.getState(page.pageId)!.status.replace(/-/g, ' ')}
                             tone="blue"
                             variant="soft"
                           />
                         )}
+                        {applied && <Badge label="Applied" tone="emerald" variant="soft" />}
+                        {outcome?.status === 'failed' && <Badge label="Failed" tone="red" variant="soft" />}
+                        {sent && <Badge label="Sent" tone="emerald" variant="soft" />}
+                        {taskCreated && <Badge label="Task added" tone="emerald" variant="soft" />}
                       </div>
                       <div className="t-caption-sm text-[var(--brand-text-muted)] truncate">
-                        {instance.page?.slug ?? instance.issue.value ?? instance.issue.check}
+                        {pagePath}
                       </div>
                     </div>
-                    {instance.page && (
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => onSuppressIssue(instance.issue.check, instance.page!.slug)}>
-                          Hide
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => onSuppressPattern(instance.issue.check, instance.page!.slug)}>
-                          Hide pattern
-                        </Button>
-                      </div>
-                    )}
                   </div>
+                  {instance.issue.suggestedFix && (
+                    <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--brand-mint-dim)] bg-[var(--brand-mint-dim)] p-3">
+                      <div className="t-micro text-[var(--teal)]">AI suggestion for {pagePath}</div>
+                      <FormTextarea
+                        aria-label={`AI suggestion for ${pagePath}`}
+                        value={editedSuggestion}
+                        onChange={(value) => {
+                          audit.setEditedSuggestions((current) => ({ ...current, [fixKey]: value }));
+                        }}
+                        rows={2}
+                        className="mt-2"
+                      />
+                      <CharacterCounter current={editedSuggestion.length} max={320} className="mt-1 justify-end" />
+                    </div>
+                  )}
+                  <div className="mt-3 t-ui font-semibold text-[var(--brand-text-bright)]">Send to client</div>
+                  <FormTextarea
+                    aria-label={`Client note for ${pagePath}`}
+                    value={notes[instance.id] ?? ''}
+                    onChange={(value) => setNotes((current) => ({ ...current, [instance.id]: value }))}
+                    placeholder={`Optional client note for ${pagePath}`}
+                    rows={2}
+                    className="mt-3"
+                  />
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    {instance.issue.suggestedFix && (
+                      <Button
+                        aria-label={`Accept suggestion for ${pagePath}`}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => onAcceptSuggestion(page, instance.issue)}
+                        loading={applyingFix === fixKey}
+                        disabled={applied}
+                      >
+                        <Icon name="check" size="sm" />
+                        {applied ? 'Accepted' : 'Accept'}
+                      </Button>
+                    )}
+                    <Button
+                      aria-label={`Send to client for ${pagePath}`}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onFlagForClient(page, instance.issue, notes[instance.id] ?? '')}
+                      loading={flagSending && !sent}
+                      disabled={sent}
+                    >
+                      <Icon name="send" size="sm" />
+                      {sent ? 'Sent' : 'Send to client'}
+                    </Button>
+                    <Button
+                      aria-label={`Add task for ${pagePath}`}
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onCreateTask(page, instance.issue)}
+                      loading={audit.creatingTask === taskKey}
+                      disabled={taskCreated}
+                    >
+                      <Icon name={taskCreated ? 'check' : 'plus'} size="sm" />
+                      {taskCreated ? 'Task added' : 'Add task'}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => onQuickFix(page, instance.issue)}>
+                      <Icon name="arrowRight" size="sm" />
+                      Open fix
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => onSuppressIssue(instance.issue.check, page.slug)}>
+                      Hide
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => onSuppressPattern(instance.issue.check, page.slug)}>
+                      Hide pattern
+                    </Button>
+                  </div>
+                  {outcome?.status === 'failed' && outcome.error && (
+                    <div className="mt-2 t-caption-sm text-[var(--red)]">{outcome.error}</div>
+                  )}
                 </div>
-              ))}
-              {group.instances.length > 12 && (
-                <div className="t-caption text-[var(--brand-text-muted)]">
-                  {group.instances.length - 12} more affected pages are included in batch actions.
-                </div>
-              )}
+                );
+              })}
+              <div className="t-caption text-[var(--brand-text-muted)]">
+                Add visible tasks uses the current table filters. Add error tasks, Add all tasks, and Accept all use the full audit.
+              </div>
             </div>
           </div>
 
@@ -570,9 +642,51 @@ function IssueDetailDrawer({
               </div>
             </div>
           )}
+          </div>
+        )}
+      </Drawer>
+
+      <Drawer
+        open={applyAllPreviewOpen}
+        onClose={() => setApplyAllPreviewOpen(false)}
+        title={`Apply suggestion to all ${actionableInstances.length} affected pages?`}
+        eyebrow="Review live-site changes"
+        subtitle={group?.message}
+        width={460}
+        footer={(
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setApplyAllPreviewOpen(false)} disabled={applyAllRunning}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => void handleApplyAll()} loading={applyAllRunning}>
+              Apply to {actionableInstances.length} pages
+            </Button>
+          </>
+        )}
+      >
+        <div className="space-y-4">
+          <p className="t-body text-[var(--brand-text-muted)]">
+            Each page is updated separately on the live Webflow site. Successful pages stay applied if another page fails, and these changes cannot be bulk-undone.
+          </p>
+          <SectionCard noPadding variant="subtle">
+            <div className="divide-y divide-[var(--brand-border)]">
+              {actionableInstances.map((instance) => {
+                const pagePath = resolvePagePath(instance.page);
+                const fixKey = `${instance.page.pageId}-${instance.issue.check}`;
+                return (
+                  <div key={instance.id} className="px-4 py-3">
+                    <div className="t-ui font-semibold text-[var(--brand-text-bright)]">{pagePath}</div>
+                    <div className="mt-1 t-caption-sm text-[var(--brand-text-muted)]">
+                      {audit.editedSuggestions[fixKey] ?? instance.issue.suggestedFix}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
         </div>
-      )}
-    </Drawer>
+      </Drawer>
+    </>
   );
 }
 
@@ -587,6 +701,10 @@ function AuditEvidence({
 
   const openAssetFilter = (filter: 'oversized' | 'missing-alt') => {
     navigate(`${adminPath(workspaceId, 'media')}?filter=${filter}`);
+  };
+
+  const openContentHealth = () => {
+    navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=content-health`);
   };
 
   return (
@@ -614,13 +732,16 @@ function AuditEvidence({
           </Disclosure>
 
           <Disclosure
-            summary="Content Health"
+            summary="Decaying pages"
             badges={[{ label: 'Content evidence', tone: 'blue' }]}
             defaultOpen={activeEvidence === 'content-decay'}
           >
             <p className="mb-3 t-body text-[var(--brand-text-muted)]">
               Review pages whose freshness or performance needs attention alongside technical findings.
             </p>
+            <Button variant="link" size="sm" className="mb-3" onClick={openContentHealth}>
+              View in Content Pipeline
+            </Button>
             <Suspense fallback={<Skeleton className="h-[320px] w-full" />}>
               <ContentDecay workspaceId={workspaceId} />
             </Suspense>
@@ -674,6 +795,7 @@ function AuditLens({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportView, setReportView] = useState<'html' | 'csv' | null>(null);
+  const [acceptAllConfirmOpen, setAcceptAllConfirmOpen] = useState(false);
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [, setBulkError] = useState<string | null>(null);
@@ -782,6 +904,11 @@ function AuditLens({
     }
   };
 
+  const handleConfirmAcceptAll = () => {
+    setAcceptAllConfirmOpen(false);
+    void handleAcceptAll();
+  };
+
   const handleClearSuppressions = async () => {
     try {
       await audit.unsuppressAll();
@@ -847,98 +974,116 @@ function AuditLens({
   }
 
   return (
-    <div className="space-y-[14px]" data-testid="site-audit-rebuilt-audit">
-      <AuditHero data={data} siteName={audit.siteName || 'Connected site'} />
+    <div data-testid="site-audit-rebuilt-audit">
+      <WorkbenchFrame
+        collectionLabel="Site Audit issues and supporting evidence"
+        pinnedClassName="pb-3"
+        pinned={(
+          <div className="space-y-2.5">
+            <AuditHero data={data} siteName={audit.siteName || 'Connected site'} />
 
-      <CategoryCards
-        data={audit.categoryScores}
-        activeCategories={categoryFilters}
-        onToggleCategory={toggleCategory}
-      />
+            <CategoryCards
+              data={audit.categoryScores}
+              activeCategories={categoryFilters}
+              onToggleCategory={toggleCategory}
+            />
 
-      <CwvStrip data={data} />
+            <CwvStrip data={data} />
 
-      <Toolbar label="Site Audit actions" className="w-full">
-        <Segmented
-          value={sortMode}
-          onChange={(value) => setSortMode(value as SiteAuditSortMode)}
-          options={[
-            { value: 'severity', label: 'Severity' },
-            { value: 'traffic', label: 'Traffic' },
-          ]}
-        />
-        <ToolbarSpacer />
-        <Toggle
-          checked={!audit.workflow.skipLinkCheck}
-          onChange={(checked) => audit.workflow.setSkipLinkCheck(!checked)}
-          label="Dead-link scan"
-        />
-        <Button size="sm" variant="secondary" onClick={() => setScheduleOpen(true)}>
-          <Icon name="clock" size="sm" />
-          Schedule
-        </Button>
-        <Button size="sm" variant="secondary" onClick={handleSaveAndShare} loading={audit.savingReport}>
-          <Icon name="send" size="sm" />
-          Save &amp; share
-        </Button>
-        <Button size="sm" variant="secondary" onClick={() => setReportModalOpen(true)}>
-          <Icon name="download" size="sm" />
-          Export
-        </Button>
-        <Button size="sm" variant="secondary" onClick={handleRunAudit} disabled={!audit.siteId || audit.workflow.loading}>
-          <Icon name="refresh" size="sm" />
-          Re-run audit
-        </Button>
-      </Toolbar>
+            <Toolbar label="Site Audit actions" className="w-full">
+              <Segmented
+                value={sortMode}
+                onChange={(value) => setSortMode(value as SiteAuditSortMode)}
+                options={[
+                  { value: 'severity', label: 'Severity' },
+                  { value: 'traffic', label: 'Traffic' },
+                ]}
+              />
+              <ToolbarSpacer />
+              <Toggle
+                checked={!audit.workflow.skipLinkCheck}
+                onChange={(checked) => audit.workflow.setSkipLinkCheck(!checked)}
+                label="Dead-link scan"
+              />
+              <Button size="sm" variant="secondary" onClick={() => setScheduleOpen(true)}>
+                <Icon name="clock" size="sm" />
+                Schedule
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handleSaveAndShare} loading={audit.savingReport}>
+                <Icon name="send" size="sm" />
+                Save &amp; share
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setReportModalOpen(true)}>
+                <Icon name="download" size="sm" />
+                Export
+              </Button>
+              <Button size="sm" variant="secondary" onClick={handleRunAudit} disabled={!audit.siteId || audit.workflow.loading}>
+                <Icon name="refresh" size="sm" />
+                Re-run audit
+              </Button>
+            </Toolbar>
 
-      {activeEvidence !== null && (
-        <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
-      )}
-
-      <div data-testid="site-audit-bulk-actions">
-        <SectionCard noPadding variant="subtle">
-          <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-mint-dim)] text-[var(--teal)]">
-              <Icon name="sparkle" size="sm" />
-            </span>
-            <div className="min-w-[210px] flex-1">
-              <div className="t-ui font-semibold text-[var(--brand-text-bright)]">
-                {pendingFixes} AI-fixable {pendingFixes === 1 ? 'suggestion' : 'suggestions'} across titles, meta &amp; page fields
-              </div>
-              <div className="t-caption-sm text-[var(--brand-text-muted)]">
-                Apply supported edits in bulk or turn the current issue set into operator tasks.
-              </div>
+            <div data-testid="site-audit-bulk-actions">
+              <SectionCard noPadding variant="subtle">
+                <div className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                  <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-[var(--radius-md)] bg-[var(--brand-mint-dim)] text-[var(--teal)]">
+                    <Icon name="sparkle" size="sm" />
+                  </span>
+                  <div className="min-w-[210px] flex-1">
+                    <div className="t-ui font-semibold text-[var(--brand-text-bright)]">
+                      {pendingFixes} AI-fixable {pendingFixes === 1 ? 'suggestion' : 'suggestions'} across titles, meta &amp; page fields
+                    </div>
+                    <div className="t-caption-sm text-[var(--brand-text-muted)]">
+                      Apply supported edits in bulk or turn the current issue set into operator tasks.
+                    </div>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('errors')} loading={audit.batchCreating}>
+                    Add error tasks
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('filtered')} loading={audit.batchCreating}>
+                    Add visible tasks
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('all')} loading={audit.batchCreating}>
+                    Add all tasks
+                  </Button>
+                  <Button size="sm" onClick={() => setAcceptAllConfirmOpen(true)} disabled={bulkApplying || pendingFixes === 0}>
+                    <Icon name="sparkle" size="sm" />
+                    {bulkApplying
+                      ? (bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting…')
+                      : `Accept all ${pendingFixes}`}
+                  </Button>
+                </div>
+              </SectionCard>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('errors')} loading={audit.batchCreating}>
-              Add error tasks
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('filtered')} loading={audit.batchCreating}>
-              Add visible tasks
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleBatchTasks('all')} loading={audit.batchCreating}>
-              Add all tasks
-            </Button>
-            <Button size="sm" onClick={handleAcceptAll} disabled={bulkApplying || pendingFixes === 0}>
-              <Icon name="sparkle" size="sm" />
-              {bulkApplying
-                ? (bulkProgress ? `${bulkProgress.done}/${bulkProgress.total}` : 'Starting…')
-                : `Accept all ${pendingFixes}`}
-            </Button>
-          </div>
-        </SectionCard>
-      </div>
 
-      <BulkAcceptPanel
-        workspaceId={audit.workspace?.id ?? ''}
-        siteId={audit.siteId}
-        data={data as SeoAuditResult}
-        appliedFixes={audit.appliedFixes}
-        setAppliedFixes={audit.setAppliedFixes}
-        editedSuggestions={audit.editedSuggestions}
-        onBulkApplyingChange={setBulkApplying}
-        onBulkProgressChange={setBulkProgress}
-        onBulkError={setBulkError}
-        onRegisterHandlers={(handlers) => { bulkHandlersRef.current = handlers; }}
+            <BulkAcceptPanel
+              workspaceId={audit.workspace?.id ?? ''}
+              siteId={audit.siteId}
+              data={data as SeoAuditResult}
+              appliedFixes={audit.appliedFixes}
+              setAppliedFixes={audit.setAppliedFixes}
+              editedSuggestions={audit.editedSuggestions}
+              onBulkApplyingChange={setBulkApplying}
+              onBulkProgressChange={setBulkProgress}
+              onBulkError={setBulkError}
+              onRegisterHandlers={(handlers) => { bulkHandlersRef.current = handlers; }}
+            />
+          </div>
+        )}
+      >
+        <div className="space-y-3 pr-1">
+          {activeEvidence !== null && (
+            <AuditEvidence workspaceId={audit.workspace?.id ?? ''} activeEvidence={activeEvidence} />
+          )}
+
+      <ConfirmDialog
+        open={acceptAllConfirmOpen}
+        title="Apply AI fixes to the live Webflow site?"
+        message={`This immediately applies up to ${pendingFixes} AI-suggested ${pendingFixes === 1 ? 'fix' : 'fixes'} — titles, meta descriptions, and page fields — directly to the live Webflow site and marks those pages live. Unrecognized checks are skipped, so fewer than ${pendingFixes} may change. These changes cannot be bulk-undone.`}
+        confirmLabel="Apply to live site"
+        onConfirm={handleConfirmAcceptAll}
+        onCancel={() => setAcceptAllConfirmOpen(false)}
+        variant="destructive"
       />
 
       {data.deadLinkDetails && data.deadLinkDetails.length > 0 && (
@@ -1029,6 +1174,8 @@ function AuditLens({
       {(data as SiteAuditResult & { snapshotId?: string }).snapshotId && (
         <ActionItemsPanel snapshotId={(data as SiteAuditResult & { snapshotId: string }).snapshotId} />
       )}
+        </div>
+      </WorkbenchFrame>
 
       <IssueDetailDrawer
         group={selectedGroup}
@@ -1132,6 +1279,7 @@ function LensBody({
 }
 
 export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
+  const navigate = useNavigate();
   const state = useSiteAuditSurfaceState();
   const audit = useSiteAuditRebuilt(workspaceId);
 
@@ -1190,6 +1338,12 @@ export function SiteAuditSurface({ workspaceId }: SiteAuditSurfaceProps) {
           icon={SurfaceIcon}
           title="Connect a Webflow site first"
           description="Site Audit reads the workspace Webflow site before it can scan technical health and content readiness."
+          action={(
+            <Button size="sm" variant="primary" onClick={() => navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`)}>
+              <Icon name="settings" size="sm" />
+              Open Workspace Settings
+            </Button>
+          )}
         />
       </div>
     );

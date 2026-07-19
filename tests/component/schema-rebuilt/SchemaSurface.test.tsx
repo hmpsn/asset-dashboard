@@ -316,7 +316,7 @@ function LocationProbe() {
 
 function renderSchema(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const result = render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
         <ToastProvider>
@@ -324,9 +324,10 @@ function renderSchema(path: string) {
           <LocationProbe />
         </ToastProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { ...result, queryClient };
+  const result = render(tree());
+  return { ...result, queryClient, rerenderSchema: () => result.rerender(tree()) };
 }
 
 function FlaggedSchemaHarness() {
@@ -346,6 +347,7 @@ describe('SchemaSurface rebuilt admin surface', () => {
     expect(screen.getByText('Client review handoff')).toBeInTheDocument();
 
     renderSchema('/ws/ws-1/seo-schema?tab=unknown');
+    fireEvent.click(screen.getByRole('button', { name: /Production setup and evidence/ }));
     fireEvent.click(screen.getByRole('button', { name: /Schema site plan/ }));
     expect(screen.getByText('Schema Site Plan bridge')).toBeInTheDocument();
     expect(screen.getByText('Dental Implants')).toBeInTheDocument();
@@ -382,8 +384,9 @@ describe('SchemaSurface rebuilt admin surface', () => {
     expect(hero.compareDocumentPosition(workflow) & sourceOrder).toBeTruthy();
     expect(workflow.compareDocumentPosition(summary) & sourceOrder).toBeTruthy();
     expect(summary.compareDocumentPosition(bulk) & sourceOrder).toBeTruthy();
-    expect(bulk.compareDocumentPosition(pageList) & sourceOrder).toBeTruthy();
-    expect(pageList.compareDocumentPosition(support) & sourceOrder).toBeTruthy();
+    expect(bulk.compareDocumentPosition(support) & sourceOrder).toBeTruthy();
+    expect(support.compareDocumentPosition(pageList) & sourceOrder).toBeTruthy();
+    expect(within(support).getByRole('button', { name: /Production setup and evidence/ })).toHaveAttribute('aria-expanded', 'false');
 
     expect(within(summary).getAllByTestId('schema-summary-tile')).toHaveLength(4);
     expect(within(summary).getByText('2')).toBeInTheDocument();
@@ -395,6 +398,79 @@ describe('SchemaSurface rebuilt admin surface', () => {
 
     const headers = within(pageList).getAllByRole('columnheader').map((header) => header.textContent);
     expect(headers).toEqual(['Page', 'Type', 'Validation', 'Publish']);
+  });
+
+  it('contains generated pages in one workbench and caps the searchable table at 100 rows', () => {
+    const generation = generationMock();
+    const loadedPages = Array.from({ length: 125 }, (_, index) => ({
+      ...servicePage,
+      pageId: `schema-page-${index}`,
+      pageTitle: `Schema Page ${index}`,
+      slug: `schema-page-${index}`,
+      publishedPath: `/schema-page-${index}`,
+      url: `https://acme.com/schema-page-${index}`,
+      lastPublishedAt: index === 2 ? '2025-01-01T00:00:00.000Z' : null,
+      generationDiagnostics: {
+        ...servicePage.generationDiagnostics,
+        validationStatus: index === 1 ? ('errors' as const) : ('valid' as const),
+      },
+    }));
+    generationMock.mockReturnValue({
+      ...generation,
+      data: loadedPages,
+      pageTypes: Object.fromEntries(loadedPages.map((page) => [page.pageId, 'service'])),
+    });
+
+    renderSchema('/ws/ws-1/seo-schema?tab=generator');
+
+    const frame = screen.getByTestId('workbench-frame');
+    const pinned = screen.getByTestId('workbench-pinned');
+    const collection = frame.querySelector('[data-workbench-collection]') as HTMLElement;
+    expect(frame.querySelectorAll('[data-workbench-collection]')).toHaveLength(1);
+    expect(within(pinned).getByTestId('schema-generator-hero')).toBeInTheDocument();
+    expect(within(pinned).getByTestId('schema-workflow-strip')).toBeInTheDocument();
+    expect(within(pinned).getByTestId('schema-bulk-band')).toBeInTheDocument();
+    expect(within(collection).getByTestId('schema-page-list')).toBeInTheDocument();
+
+    expect(screen.getByText('Schema Page 99')).toBeInTheDocument();
+    expect(screen.queryByText('Schema Page 100')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 100 of 125 pages')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show all 125' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Page type for Schema Page 0')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search generated pages…'), { target: { value: 'Schema Page 124' } });
+    expect(screen.getByText('Schema Page 124')).toBeInTheDocument();
+    expect(screen.queryByText('Schema Page 0')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search generated pages…'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 125' }));
+    expect(screen.getByText('Schema Page 124')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show first 100' })).toBeInTheDocument();
+  });
+
+  it('renders a retryable add-page fetch failure without opening the picker', () => {
+    const generation = generationMock();
+    let fetchPagesError: string | null = null;
+    const fetchPages = vi.fn(() => {
+      fetchPagesError = 'Webflow pages could not be loaded. Please try again.';
+      return Promise.resolve();
+    });
+    generationMock.mockImplementation(() => ({
+      ...generation,
+      fetchPagesError,
+      fetchPages,
+      showPagePicker: false,
+    }));
+    const view = renderSchema('/ws/ws-1/seo-schema?tab=generator');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a page' }));
+    view.rerenderSchema();
+
+    expect(screen.getByText('Webflow pages could not be loaded. Please try again.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /Add a page/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a page' }));
+    expect(fetchPages).toHaveBeenCalledTimes(2);
   });
 
   it('writes the validated tab state when switching lenses', () => {

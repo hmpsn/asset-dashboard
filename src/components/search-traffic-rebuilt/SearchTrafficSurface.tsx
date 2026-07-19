@@ -1,6 +1,7 @@
 // @ds-rebuilt
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { useWorkspaces } from '../../hooks/admin';
 import { queryKeys } from '../../lib/queryKeys';
 import {
@@ -15,6 +16,7 @@ import {
   Toolbar,
 } from '../ui';
 import { useAnalyticsAnnotations } from '../../hooks/admin/useAnalyticsAnnotations';
+import { ANALYTICS_HUB_SECTION_PARAM, ANALYTICS_HUB_SECTIONS } from '../../routes';
 import { useSearchTrafficSurfaceState, SEARCH_TRAFFIC_LENSES } from './useSearchTrafficSurfaceState';
 import { useSearchTrafficGa4Data, useSearchTrafficSearchData } from './useSearchTrafficData';
 import { OverviewLens } from './OverviewLens';
@@ -134,16 +136,48 @@ function reportNarrative(
 
 export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps) {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const workspaces = useWorkspaces();
   const state = useSearchTrafficSurfaceState();
+  const surfaceRef = useRef<HTMLDivElement>(null);
   const [drawerLens, setDrawerLens] = useState<'search' | 'traffic' | null>(null);
   const workspace = workspaces.data?.find((item) => item.id === workspaceId);
   const siteId = workspace?.webflowSiteId;
   const gscPropertyUrl = workspace?.gscPropertyUrl;
   const ga4PropertyId = workspace?.ga4PropertyId;
+  const anomaliesFocusRequested = searchParams.get(ANALYTICS_HUB_SECTION_PARAM) === ANALYTICS_HUB_SECTIONS.anomalies;
   const searchData = useSearchTrafficSearchData(workspaceId, siteId, gscPropertyUrl, state.days, state.lens);
   const ga4Data = useSearchTrafficGa4Data(workspaceId, state.days, ga4PropertyId, state.lens);
   const annotations = useAnalyticsAnnotations(workspaceId);
+
+  useEffect(() => {
+    if (!anomaliesFocusRequested || (state.lens !== 'search' && state.lens !== 'traffic')) return;
+
+    const root = surfaceRef.current;
+    if (!root) return;
+
+    const focusAnomalies = () => {
+      // Both lenses intentionally keep their exact shared AnomalyAlerts mount. The receiver waits
+      // for that existing async section instead of adding a second copy or a lens-specific fork.
+      const anomalyButton = Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
+        .find((button) => button.textContent?.includes('Anomaly Alerts'));
+      if (!anomalyButton) return false;
+
+      const disclosure = anomalyButton.closest('details');
+      if (disclosure) disclosure.open = true;
+      anomalyButton.focus({ preventScroll: true });
+      anomalyButton.scrollIntoView?.({ block: 'center' });
+      return true;
+    };
+
+    if (focusAnomalies()) return;
+
+    const observer = new MutationObserver(() => {
+      if (focusAnomalies()) observer.disconnect();
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [anomaliesFocusRequested, state.lens, workspace?.id, workspaceId]);
 
   const rescanAnalytics = useCallback(() => {
     if (siteId) queryClient.invalidateQueries({ queryKey: queryKeys.admin.gscAll(`${workspaceId}:${siteId}`) });
@@ -219,7 +253,7 @@ export function SearchTrafficSurface({ workspaceId }: SearchTrafficSurfaceProps)
   }
 
   return (
-    <div className={SURFACE_WRAP_CLASS}>
+    <div ref={surfaceRef} className={SURFACE_WRAP_CLASS}>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-[var(--radius-pill)] bg-[var(--blue)]" aria-hidden="true" />

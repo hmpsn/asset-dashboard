@@ -68,6 +68,30 @@ describe('Rank Tracking — history', () => {
     const body = await res.json();
     expect(body).toHaveProperty('error');
   });
+
+  // Regression: Express's `qs` parser converts a repeated `query` param with more
+  // than its arrayLimit (default 20) values into a numeric-keyed OBJECT, not an
+  // array. A full keyword page batches up to 100 rows, so /history/rows must parse
+  // >20 queries instead of silently collapsing to zero and 400-ing. (W4.2a smoke
+  // caught this: 20 queries → 200, 21 → 400.)
+  it('GET /api/rank-tracking/:workspaceId/history/rows accepts a batch above the qs arrayLimit (25 queries → 200)', async () => {
+    const queries = Array.from({ length: 25 }, (_, i) => `query=k${i}`).join('&');
+    const res = await api(`/api/rank-tracking/${wsId}/history/rows?${queries}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // getRankHistoryRows returns { windowDays, series: [...] } — the batch parsed,
+    // so the request did not collapse to zero queries (which would 400).
+    expect(Array.isArray(body.series)).toBe(true);
+    expect(typeof body.windowDays).toBe('number');
+  });
+
+  it('GET /api/rank-tracking/:workspaceId/history/rows rejects more than the max batch size (101 queries → 400)', async () => {
+    const queries = Array.from({ length: 101 }, (_, i) => `query=k${i}`).join('&');
+    const res = await api(`/api/rank-tracking/${wsId}/history/rows?${queries}`);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+  });
 });
 
 describe('Rank Tracking — latest', () => {

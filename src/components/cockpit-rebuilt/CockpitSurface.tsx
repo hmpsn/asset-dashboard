@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Clock, RefreshCw, Settings } from 'lucide-react';
 import type { WorkQueueItem } from '../../../shared/types/work-queue';
-import { adminPath } from '../../routes';
+import { adminAnalyticsHubPath, adminPath, ANALYTICS_HUB_SECTIONS } from '../../routes';
+import { useAnomalyAlerts } from '../../hooks/admin';
 import { useCockpitRebuilt, countWorkQueueSourceTypes, workQueueWithVisibleItems } from '../../hooks/admin/useCockpitRebuilt';
 import { queryKeys } from '../../lib/queryKeys';
 import { useToast } from '../Toast';
@@ -23,7 +24,6 @@ import { WeeklyAccomplishments } from '../workspace-home';
 import { CockpitActivityDrawer } from './CockpitActivityDrawer';
 import { CockpitDecisionBand } from './CockpitDecisionBand';
 import { CockpitEvidenceRail } from './CockpitEvidenceRail';
-import { CockpitWorkOrderDrawer } from './CockpitWorkOrderDrawer';
 import { CockpitWorkQueue, STREAM_META, toSelectableWorkStream } from './CockpitWorkQueue';
 import { formatDate } from './cockpitFormatters';
 import { mutationErrorMessage } from './cockpitMutationFeedback';
@@ -55,9 +55,9 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
   const { toast } = useToast();
   const state = useCockpitSurfaceState();
   const cockpit = useCockpitRebuilt(workspaceId);
+  const { data: anomalies = [] } = useAnomalyAlerts(workspaceId, true);
   const [now, setNow] = useState(() => new Date());
   const [activityOpen, setActivityOpen] = useState(false);
-  const [workOrdersOpen, setWorkOrdersOpen] = useState(false);
   const storageKey = `onboarding_checklist_dismissed_${workspaceId}`;
   const [checklistVisible, setChecklistVisible] = useState(() => !localStorage.getItem(storageKey));
 
@@ -73,7 +73,8 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
   const workspaceName = cockpit.workspace?.webflowSiteName || cockpit.workspace?.name || 'Workspace';
   const workspaceInitials = initialsFor(workspaceName);
   const routes = useMemo(() => ({
-    analytics: adminPath(workspaceId, 'analytics-hub'),
+    analytics: adminAnalyticsHubPath(workspaceId),
+    anomalies: adminAnalyticsHubPath(workspaceId, ANALYTICS_HUB_SECTIONS.anomalies),
     contentHealth: `${adminPath(workspaceId, 'content-pipeline')}?tab=content-health`,
     contentBriefs: `${adminPath(workspaceId, 'content-pipeline')}?tab=briefs`,
     contentPublished: `${adminPath(workspaceId, 'content-pipeline')}?tab=published`,
@@ -155,29 +156,31 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
   const handleOpenQueueItem = (item: WorkQueueItem) => {
     switch (item.sourceType) {
       case 'request':
-      case 'churn_signal':
-        navigate(routes.requests);
+        navigate(`${adminPath(workspaceId, 'requests')}?tab=requests`); // inbox-legacy-filter-literal-ok -- admin Requests page deep-link, not client inbox
         return;
       case 'work_order':
-        setWorkOrdersOpen(true);
+        navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=intake`);
         return;
       case 'content_decay':
-        navigate(routes.contentHealth);
+        navigate(`${adminPath(workspaceId, 'seo-audit')}?sub=content-decay`);
         return;
       case 'content_request':
-        navigate(routes.contentBriefs);
+        navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=briefs`);
         return;
       case 'content_pipeline':
-        navigate(routes.contentBriefs);
+        navigate(`${adminPath(workspaceId, 'content-pipeline')}?tab=planner`);
         return;
       case 'rank_drop':
-        navigate(routes.keywords);
+        navigate(`${adminPath(workspaceId, 'seo-keywords')}?lens=rankings`);
         return;
       case 'audit_error':
-        navigate(routes.siteAudit);
+        navigate(adminPath(workspaceId, 'seo-audit'));
         return;
       case 'setup_gap':
-        navigate(routes.settings);
+        navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`);
+        return;
+      case 'churn_signal':
+        navigate(`${adminPath(workspaceId, 'requests')}?tab=signals`);
         return;
     }
   };
@@ -377,6 +380,8 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
             onClearSourceTypes={state.clearSourceTypes}
             clientName={workspaceName}
             clientInitials={workspaceInitials}
+            anomalyCount={anomalies.length}
+            onOpenAnomalies={() => navigate(routes.anomalies)}
             onOpenItem={handleOpenQueueItem}
           />
         </div>
@@ -387,6 +392,7 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
             workspaceInitials={workspaceInitials}
             workQueue={workQueue}
             requests={cockpit.requests}
+            pendingReplies={cockpit.pendingReplies}
             ranks={cockpit.ranks}
             kpis={cockpit.kpis}
             onOpenRoute={openRoute}
@@ -405,11 +411,6 @@ export function CockpitSurface({ workspaceId }: CockpitSurfaceProps) {
         open={activityOpen}
         onClose={() => setActivityOpen(false)}
         activity={cockpit.activity}
-      />
-      <CockpitWorkOrderDrawer
-        open={workOrdersOpen}
-        workspaceId={workspaceId}
-        onClose={() => setWorkOrdersOpen(false)}
       />
       </div>
     </PageContainer>

@@ -12,29 +12,61 @@ update this file in the same commit.
 
 ## Overview
 
-- **Endpoint:** `POST /mcp` (mounted in `server/app.ts` via `server/mcp/index.ts`). It is **not**
-  behind the admin `APP_PASSWORD` gate — it carries its own Bearer-token auth (see [Auth](#auth)).
+- **Endpoints:** `POST /mcp` exposes the backward-compatible full profile; `POST /mcp/operator`
+  exposes the compact desktop-operator profile. Both are mounted in `server/app.ts` via
+  `server/mcp/index.ts` and carry their own Bearer-token auth rather than the admin `APP_PASSWORD`
+  gate (see [Auth](#auth)).
 - **Transport:** MCP over **stateless Streamable HTTP**. `handleMcpRequest` (`server/mcp/server.ts`)
   builds a **fresh `Server` + `StreamableHTTPServerTransport` per request** (`sessionIdGenerator:
   undefined`, `enableJsonResponse: true`) — the SDK's stateless transport cannot be reused across
   requests (message-ID collisions), so tool definitions are declared once in the canonical
   `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) and applied to each new `Server` instance.
   Responses are returned as JSON-RPC objects, not SSE streams.
-- **Handshake instructions:** every `initialize` response carries `MCP_SERVER_INSTRUCTIONS`
-  (`server/mcp/instructions.ts`) — the agent-facing orientation string (workspace-id requirement,
-  the casing split, content-authoring, immutable brand-intake, operator-authorized brand-voice,
-  and gated brand-to-content onboarding workflows, paid-API and destructive-tool warnings).
-  Its concrete claims are asserted by `tests/unit/mcp-instructions.test.ts`; keep it in sync with
-  the tool schemas.
+- **Handshake instructions:** the full profile carries the unchanged `MCP_SERVER_INSTRUCTIONS`
+  (`server/mcp/instructions.ts`). The operator profile carries the compact
+  `MCP_OPERATOR_PROFILE_INSTRUCTIONS` (`server/mcp/profiles.ts`) with explicit paid-generation,
+  review, and client-send confirmation gates.
 - **Clients:** Claude.ai (remote MCP connector) and Claude Code connect over this endpoint with a
   Bearer token.
 - **Server identity:** `{ name: 'hmpsn-studio', version: '1.0.0' }`.
 
+### Server profiles
+
+| Endpoint | P1 credential | Discovery | Intended use |
+|----------|---------------|-----------|--------------|
+| `POST /mcp` | Master key or per-workspace key, subject to existing scope rules | All 102 canonical tools and the unchanged full instructions | Advanced and backward-compatible access |
+| `POST /mcp/operator` | Master key only | Compact registered intersection of the canonical 25-name operator allowlist | Normal desktop studio administration |
+
+P1 exposes 22 already-registered operator tools: `list_workspaces`, `get_brand_identity`,
+`create_brand_deliverable`, `update_brand_deliverable`, `get_brand_voice`,
+`list_content_templates`, `get_content_template`, `create_content_template`,
+`update_content_template`, `create_content_matrix`, `update_content_matrix_cell`,
+`list_content_matrices`, `get_content_matrix`, `resolve_content_matrix_cells`,
+`accept_content_template_generation_upgrade`, `preview_content_matrix_generation`,
+`resolve_content_matrix_evidence`, `start_content_matrix_generation`,
+`get_content_matrix_generation`, `retry_content_matrix_generation`, `get_job_status`, and
+`send_to_client`. The canonical allowlist also reserves `get_portfolio_brief`,
+`get_workspace_decision_brief`, and `get_client_view` for P2; they are not discoverable or
+callable until their handlers are registered.
+
+Operator discovery replaces top-level prose with explicit compact descriptions and removes only
+nested JSON-schema `description` metadata. All schema validation constraints remain intact, and
+the serialized tool catalog plus operator instructions is contract-tested at no more than 32 KiB
+UTF-8. Discovery and invocation use the same allowlist: calling any hidden or unregistered tool
+returns the generic `json_v1` `not_found` envelope without reflecting the supplied name.
+
+The operator profile changes neither tool semantics nor authorization inside allowed handlers.
+Preview remains side-effect free; paid generation still requires an exact accepted preview and
+explicit human confirmation; generated work still stops for human review; and no tool gains an
+automatic approval, client-send, or publication path.
+
 ### Workspace scope and parameter casing (gotcha)
 
-Most tools operate on **one** client workspace. Two tools are explicitly global and therefore
-master-key only: `list_workspaces` and `create_workspace`. `get_pending_work` has a declared,
-optional `workspaceId`; omitting it requests a cross-workspace summary and is also master-key only.
+Most tools operate on **one** client workspace. Six tools are explicitly global and therefore
+master-key only: `list_workspaces`, `create_workspace`, `list_library_templates`,
+`get_library_template`, `promote_template_to_library`, and `instantiate_library_template`.
+`get_pending_work` has a declared, optional `workspaceId`; omitting it requests a cross-workspace
+summary and is also master-key only.
 
 For workspace-scoped tools, the parameter name is **not** uniform:
 
@@ -64,19 +96,29 @@ Send the key as a Bearer token: `Authorization: Bearer <key>`.
 | **Master key** | env `MCP_API_KEY` | `all` (every workspace) | Constant-time compared. Backward-compatible; no per-key label. If `MCP_API_KEY` is unset it never matches an empty/absent token. |
 | **Per-workspace key** | `mcp_api_keys` table (sha256-hashed) | exactly **one** workspace | Plaintext shown **once** at creation (`mcp_` prefix, 32 bytes base64url). Only the hash is stored. Revocable via `revoked_at` (idempotent) — this is how rotation works. `last_used_at` is touched on each authenticated call. |
 
+The P1 `/mcp/operator` boundary adds `mcpMasterKeyOnlyMiddleware` after normal authentication.
+It accepts only the canonical master identity (`scope: 'all'` with no workspace-key ID or label)
+and returns the same generic 401 for workspace keys; it never re-reads or re-compares bearer
+material. Capability-scoped operator credentials are intentionally deferred to P5. `/mcp` retains
+both key types unchanged.
+
 ### Scope enforcement (security-critical)
 
-For a per-workspace key (`auth.scope !== 'all'`), `executeMcpTool` checks the workspace field
+For a per-workspace key (`!isMcpMasterKeyAuth(auth)`), `executeMcpTool` checks the workspace field
 declared by the registered tool **after** parsing, because the workspace id lives in the JSON body,
 not a header/URL. Fail-closed:
 
 - **Cross-workspace** id (`argWorkspaceId !== auth.scope`) → rejected.
-- **Explicit global tools** (`list_workspaces`, `create_workspace`) → rejected for scoped keys.
+- **Explicit global tools** (`list_workspaces`, `create_workspace`, `list_library_templates`,
+  `get_library_template`, `promote_template_to_library`, and `instantiate_library_template`) →
+  rejected for scoped keys.
 - **Optional workspace field omitted** (`get_pending_work`) → rejected for scoped keys, since a
   workspace key must not enumerate across all workspaces.
 - **Conflicting `workspaceId` / `workspace_id` aliases** → rejected for every caller.
 
-The master key (`scope: 'all'`) bypasses both checks.
+Only the canonical master identity bypasses both checks. A workspace-key row whose durable
+workspace ID happens to equal the reserved `all` sentinel remains workspace-scoped because its
+key ID and label distinguish it from the environment master key.
 
 > The `mcp_api_keys` table is created by migration `163-mcp-api-keys.sql`. The store API
 > (`createMcpApiKey`, `listMcpApiKeys`, `findActiveKeyByHash`, `revokeMcpApiKey`, `touchLastUsed`,

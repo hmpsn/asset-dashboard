@@ -99,8 +99,7 @@ export function RoadmapLens() {
   const inProgress = allRows.filter((row) => row.status === 'in_progress').length;
   const pending = allRows.filter((row) => row.status === 'pending').length;
   const deferred = allRows.filter((row) => row.status === 'deferred').length;
-  const executableTotal = done + inProgress + pending;
-  const completion = executableTotal > 0 ? Math.round((done / executableTotal) * 100) : 0;
+  const completion = total > 0 ? Math.round((done / total) * 100) : 0;
 
   const priorityParam = searchParams.get('priority');
   const statusParam = searchParams.get('status');

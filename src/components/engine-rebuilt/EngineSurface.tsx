@@ -25,6 +25,7 @@ import {
   PageHeader,
   ProgressIndicator,
   SectionCard,
+  SectionLabel,
   Skeleton,
   StatCard,
   Toolbar,
@@ -52,7 +53,7 @@ import { LocalSeoMarketSetupDrawer } from '../local-seo/LocalSeoMarketSetupDrawe
 import { EngineWorkQueue } from './EngineWorkQueue';
 import { EngineMoveDrawer } from './EngineMoveDrawer';
 import { EngineOperations } from './EngineOperations';
-import { type EngineLens, useEngineSurfaceState } from './useEngineSurfaceState';
+import { ENGINE_LENSES, type EngineLens, useEngineSurfaceState } from './useEngineSurfaceState';
 import { formatDate, formatMoney, provenanceBasis } from './engineFormatters';
 import { mutationErrorMessage } from './engineMutationFeedback';
 
@@ -246,7 +247,7 @@ function ClientTrustSpinePreview({
         : 'The client preview will combine the verdict, value frame, and proof once a point of view is drafted.');
   const moveCount = recommendationsReady ? `${curatedCount} / ${totalMoves}` : '—';
   const moveSummary = recommendationsReady
-    ? `${stagedCount} staged · ${curatedCount} with client`
+    ? `${stagedCount} added · ${curatedCount} with client`
     : recommendationsSummary;
 
   return (
@@ -270,7 +271,7 @@ function ClientTrustSpinePreview({
               Client portal preview · {workspaceName}
             </span>
             <span className="ml-auto flex-none">
-              {basis ? <ProvenanceChip basis={basis} /> : <Badge label="proof pending" tone="zinc" variant="soft" size="sm" />}
+              {basis ? <ProvenanceChip basis={basis} /> : <Badge label="measuring" tone="zinc" variant="soft" size="sm" />}
             </span>
           </div>
           <div className="p-5">
@@ -305,7 +306,7 @@ function ClientTrustSpinePreview({
                 accent="var(--brand-text-bright)"
               />
               <MetricTile
-                label="Backing moves live"
+                label="Moves in progress"
                 value={moveCount}
                 sub={moveSummary}
                 accent="var(--blue)"
@@ -353,7 +354,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
     ? 'Loading recommendation queue'
     : recommendationsUnavailable
       ? 'Recommendation queue unavailable'
-      : `${engine.stagedCount} staged · ${engine.curatedCount} with client`;
+      : `${engine.stagedCount} added · ${engine.curatedCount} with client`;
   const selectedMove = useMemo(
     () => engine.cockpitRecs.find((rec) => rec.id === selectedMoveId) ?? null,
     [engine.cockpitRecs, selectedMoveId],
@@ -379,6 +380,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
     />
   );
   const canSendIssue = engine.stagedCount > 0;
+  const sendHelperId = `engine-topbar-send-helper-${workspaceId}`;
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.admin.workspaceHome(workspaceId) });
@@ -404,19 +406,24 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
         <Icon name="refresh" size="sm" />
         Refresh
       </Button>
-      {canSendIssue && (
-        <Button
-          variant="primary"
-          size="sm"
-          loading={engine.issueBulkSend.isPending}
-          disabled={engine.issueBulkSend.isPending}
-          onClick={engine.sendIssue}
-          data-testid="engine-topbar-send-btn"
-        >
-          <Icon name="send" size="sm" />
-          Send {engine.stagedCount} staged
-        </Button>
+      {!canSendIssue && (
+        <span id={sendHelperId} className="whitespace-nowrap t-caption-sm text-[var(--brand-text-muted)]">
+          No moves added — add moves below before sending
+        </span>
       )}
+      <Button
+        variant="primary"
+        size="sm"
+        loading={engine.issueBulkSend.isPending}
+        disabled={engine.issueBulkSend.isPending || !canSendIssue}
+        onClick={engine.sendIssue}
+        data-testid="engine-topbar-send-btn"
+        aria-describedby={!canSendIssue ? sendHelperId : undefined}
+        title={!canSendIssue ? 'No moves added — add moves below before sending' : undefined}
+      >
+        <Icon name="send" size="sm" />
+        Send client update ({engine.stagedCount})
+      </Button>
     </>
   );
 
@@ -585,7 +592,11 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
         )}
 
         <div data-testid="engine-opening-cluster" className="flex flex-col gap-0">
-          <Toolbar label="Insights Engine controls" className="w-full" align="center">
+          <Toolbar
+            label="Insights Engine controls"
+            className="sticky top-0 z-[var(--z-sticky)] w-full bg-[var(--surface-1)] py-2"
+            align="center"
+          >
             <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-3">
               <h1 className="t-label m-0 flex-none text-[var(--teal)]">
                 Insights Engine · {workspaceName}
@@ -598,6 +609,23 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                   : 'Freshness unavailable'}
               </p>
             </div>
+            <nav
+              aria-label="Engine sections"
+              className="flex w-full gap-1 overflow-x-auto border-t border-[var(--brand-border)] pt-2"
+            >
+              {ENGINE_LENSES.filter((lens) => lens.id !== 'spine').map((lens) => (
+                <Button
+                  key={lens.id}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => state.setLens(lens.id)}
+                  aria-current={state.lens === lens.id ? 'location' : undefined}
+                  className="flex-none"
+                >
+                  {lens.label}
+                </Button>
+              ))}
+            </nav>
           </Toolbar>
 
           <section
@@ -678,7 +706,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               icon={Target}
               trailing={basis
                 ? <ProvenanceChip basis={basis} />
-                : <Badge label="proof pending" tone="zinc" variant="soft" size="sm" />}
+                : <Badge label="measuring" tone="zinc" variant="soft" size="sm" />}
             />
             <MetricTile
               label="Recovered so far"
@@ -688,7 +716,7 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               icon={BarChart3}
             />
             <MetricTile
-              label="Backing moves live"
+              label="Moves in progress"
               value={backingMovesValue}
               sub={backingMovesSummary}
               accent="var(--blue)"
@@ -743,138 +771,6 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
           </div>
         ) : (
           <>
-            <section
-              id={ENGINE_SECTION_IDS.pov}
-              data-testid="engine-section-pov"
-              tabIndex={-1}
-              className="space-y-4 outline-none"
-              style={{ outline: 'none' }}
-            >
-              {povInitialLoading ? (
-                <SectionCard
-                  title={`The point of view we send ${workspaceName}`}
-                  subtitle="Loading the saved client narrative"
-                  titleIcon={<Icon name="file" size="md" className="text-[var(--teal)]" />}
-                  iconChip
-                >
-                  <div data-testid="engine-pov-loading" className="space-y-3">
-                    <Skeleton className="h-5 w-2/3" />
-                    <Skeleton className="h-16 w-full" />
-                  </div>
-                </SectionCard>
-              ) : povReadUnavailable ? (
-                <ErrorState
-                  type="data"
-                  title="Point of view did not load"
-                  message="Retry the saved POV read. Generate and regenerate remain separate actions."
-                  action={{ label: 'Retry', onClick: engine.strategyPov.retry }}
-                />
-              ) : (
-                <DraftedPovEditor
-                  pov={engine.strategyPov.pov}
-                  title={`The point of view we send ${workspaceName}`}
-                  subtitle="The plain-language read the client opens with"
-                  onEdit={engine.strategyPov.edit}
-                  struckRecIds={engine.struckRecIds}
-                  onRegenerate={engine.strategyPov.regenerate}
-                  isGenerating={engine.strategyPov.isGenerating}
-                  presentation="engine-summary"
-                  stagedCount={recommendationsHaveData ? engine.stagedCount : undefined}
-                  onOpenEditor={() => setPovEditorOpen(true)}
-                />
-              )}
-              {engine.strategyPov.isError && engine.strategyPov.pov && (
-                <InlineBanner
-                  tone="warning"
-                  title="Point of view may be stale"
-                  message="The latest POV read failed, so the last saved narrative remains visible."
-                >
-                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span>The latest POV read failed, so the last saved narrative remains visible.</span>
-                    <Button variant="secondary" size="sm" onClick={engine.strategyPov.retry}>Retry</Button>
-                  </div>
-                </InlineBanner>
-              )}
-              {!povReadUnavailable && engine.strategyPov.refreshAvailable && (
-                <InlineBanner
-                  tone="warning"
-                  title="Point of view refresh available"
-                >
-                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span>
-                      {engine.strategyPov.pov?.editedAt
-                        ? 'Evidence or brand voice changed after your edits. Your saved wording was preserved; regenerate only when you are ready to replace it.'
-                        : 'Evidence or brand voice changed since this point of view was generated. Regenerate when you are ready to replace it with a current draft.'}
-                    </span>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => engine.strategyPov.regenerate()}
-                      loading={engine.strategyPov.isGenerating}
-                      disabled={engine.strategyPov.isGenerating}
-                      className="flex-shrink-0"
-                    >
-                      Regenerate
-                    </Button>
-                  </div>
-                </InlineBanner>
-              )}
-              {!povReadUnavailable && engine.strategyPov.generateError != null && (
-                <InlineBanner
-                  tone="error"
-                  title="Point of view update failed"
-                  message={mutationErrorMessage(
-                    engine.strategyPov.generateError,
-                    'The current point of view is still safe. Try regenerating again in a moment.',
-                  )}
-                />
-              )}
-            </section>
-
-            <section
-              id="engine-stance"
-              data-testid="engine-section-stance"
-              tabIndex={-1}
-              className="outline-none"
-              style={{ outline: 'none' }}
-            >
-              <SectionCard
-                title="How we are spending the effort"
-                subtitle="Where this quarter's work is allocated"
-                titleIcon={<Icon name="filter" size="md" className="text-[var(--teal)]" />}
-                iconChip
-              >
-                {recommendationsInitialPending ? (
-                  <Skeleton className="h-14 w-full" />
-                ) : recommendationsUnavailable ? (
-                  <InlineBanner
-                    tone="warning"
-                    title="Effort allocation unavailable"
-                    message="The recommendation queue must load before Engine can show its allocation."
-                  />
-                ) : (
-                  <StanceBar recs={engine.activeRecs} />
-                )}
-              </SectionCard>
-            </section>
-
-            <section
-              id={ENGINE_SECTION_IDS.signals}
-              data-testid="engine-section-strategy-evidence"
-              tabIndex={-1}
-              className="space-y-4 outline-none"
-              style={{ outline: 'none' }}
-            >
-              <IntelligenceSignals
-                workspaceId={workspaceId}
-                title="Signals the Engine is watching"
-                subtitle="Strategy-relevant patterns detected across rankings, content, and intent"
-                initialLimit={4}
-                presentation="engine-spine"
-              />
-              <LostQueryRecoveryCard workspaceId={workspaceId} />
-            </section>
-
             <section
               id={ENGINE_SECTION_IDS.moves}
               data-testid="engine-section-backing-moves"
@@ -950,7 +846,6 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
                   presentation="engine-spine"
                 />
               )}
-
             </section>
 
             <EngineProjectionLenses
@@ -962,21 +857,178 @@ export function EngineSurface({ workspaceId }: EngineSurfaceProps) {
               onRetry={() => { void engine.recommendations.refetch(); }}
             />
 
-            <ClientTrustSpinePreview
-              workspaceName={workspaceName}
-              verdict={verdictTitle}
-              explanation={verdictExplanation}
-              valueAtStake={formatMoney(moneyFrame?.valueAtStake)}
-              recoveredSoFar={formatMoney(moneyFrame?.recoveredSoFar)}
-              basis={basis}
-              stagedCount={engine.stagedCount}
-              curatedCount={engine.curatedCount}
-              totalMoves={engine.cockpitRecs.length}
-              recommendationsReady={recommendationsHaveData}
-              recommendationsSummary={backingMovesSummary}
-              povLoading={povInitialLoading}
-              povReadUnavailable={povReadUnavailable}
-            />
+            <section
+              id={ENGINE_SECTION_IDS.pov}
+              data-testid="engine-section-pov"
+              tabIndex={-1}
+              className="space-y-4 outline-none"
+              style={{ outline: 'none' }}
+            >
+              <div>
+                <SectionLabel>Compose the issue</SectionLabel>
+                <p className="mt-1 t-body text-[var(--brand-text-muted)]">
+                  Refine the client narrative beside the exact update they will receive.
+                </p>
+              </div>
+              <div data-testid="engine-compose-issue" className="grid items-start gap-4 lg:grid-cols-2">
+                <div className="space-y-4">
+                  {povInitialLoading ? (
+                    <SectionCard
+                      title={`The point of view we send ${workspaceName}`}
+                      subtitle="Loading the saved client narrative"
+                      titleIcon={<Icon name="file" size="md" className="text-[var(--teal)]" />}
+                      iconChip
+                    >
+                      <div data-testid="engine-pov-loading" className="space-y-3">
+                        <Skeleton className="h-5 w-2/3" />
+                        <Skeleton className="h-16 w-full" />
+                      </div>
+                    </SectionCard>
+                  ) : povReadUnavailable ? (
+                    <ErrorState
+                      type="data"
+                      title="Point of view did not load"
+                      message="Retry the saved POV read. Generate and regenerate remain separate actions."
+                      action={{ label: 'Retry', onClick: engine.strategyPov.retry }}
+                    />
+                  ) : (
+                    <DraftedPovEditor
+                      pov={engine.strategyPov.pov}
+                      title={`The point of view we send ${workspaceName}`}
+                      subtitle="The plain-language read the client opens with"
+                      onEdit={engine.strategyPov.edit}
+                      struckRecIds={engine.struckRecIds}
+                      onRegenerate={engine.strategyPov.regenerate}
+                      isGenerating={engine.strategyPov.isGenerating}
+                      presentation="engine-summary"
+                      stagedCount={recommendationsHaveData ? engine.stagedCount : undefined}
+                      onOpenEditor={() => setPovEditorOpen(true)}
+                    />
+                  )}
+                  {engine.strategyPov.isError && engine.strategyPov.pov && (
+                    <InlineBanner
+                      tone="warning"
+                      title="Point of view may be stale"
+                      message="The latest POV read failed, so the last saved narrative remains visible."
+                    >
+                      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <span>The latest POV read failed, so the last saved narrative remains visible.</span>
+                        <Button variant="secondary" size="sm" onClick={engine.strategyPov.retry}>Retry</Button>
+                      </div>
+                    </InlineBanner>
+                  )}
+                  {!povReadUnavailable && engine.strategyPov.refreshAvailable && (
+                    <InlineBanner
+                      tone="warning"
+                      title="Point of view refresh available"
+                    >
+                      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <span>
+                          {engine.strategyPov.pov?.editedAt
+                            ? 'Evidence or brand voice changed after your edits. Your saved wording was preserved; regenerate only when you are ready to replace it.'
+                            : 'Evidence or brand voice changed since this point of view was generated. Regenerate when you are ready to replace it with a current draft.'}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => engine.strategyPov.regenerate()}
+                          loading={engine.strategyPov.isGenerating}
+                          disabled={engine.strategyPov.isGenerating}
+                          className="flex-shrink-0"
+                        >
+                          Regenerate
+                        </Button>
+                      </div>
+                    </InlineBanner>
+                  )}
+                  {!povReadUnavailable && engine.strategyPov.generateError != null && (
+                    <InlineBanner
+                      tone="error"
+                      title="Point of view update failed"
+                      message={mutationErrorMessage(
+                        engine.strategyPov.generateError,
+                        'The current point of view is still safe. Try regenerating again in a moment.',
+                      )}
+                    />
+                  )}
+                </div>
+                <ClientTrustSpinePreview
+                  workspaceName={workspaceName}
+                  verdict={verdictTitle}
+                  explanation={verdictExplanation}
+                  valueAtStake={formatMoney(moneyFrame?.valueAtStake)}
+                  recoveredSoFar={formatMoney(moneyFrame?.recoveredSoFar)}
+                  basis={basis}
+                  stagedCount={engine.stagedCount}
+                  curatedCount={engine.curatedCount}
+                  totalMoves={engine.cockpitRecs.length}
+                  recommendationsReady={recommendationsHaveData}
+                  recommendationsSummary={backingMovesSummary}
+                  povLoading={povInitialLoading}
+                  povReadUnavailable={povReadUnavailable}
+                />
+              </div>
+            </section>
+
+            <section
+              id={ENGINE_SECTION_IDS.signals}
+              data-testid="engine-section-strategy-evidence"
+              tabIndex={-1}
+              className="outline-none"
+              style={{ outline: 'none' }}
+            >
+              <Disclosure
+                key={state.lens === 'signals' && state.rawLens ? 'signals-open' : 'signals-closed'}
+                defaultOpen={state.lens === 'signals' && !!state.rawLens}
+                summary={(
+                  <div className="min-w-0">
+                    <h2 className="t-ui font-semibold text-[var(--brand-text-bright)]">
+                      Evidence behind this issue
+                    </h2>
+                    <p className="mt-1 t-body font-normal text-[var(--brand-text-muted)]">
+                      Effort allocation, intelligence signals, and lost-query recovery detail.
+                    </p>
+                  </div>
+                )}
+              >
+                <div className="space-y-4 pt-2">
+                  <section
+                    id="engine-stance"
+                    data-testid="engine-section-stance"
+                    tabIndex={-1}
+                    className="outline-none"
+                    style={{ outline: 'none' }}
+                  >
+                    <SectionCard
+                      title="How we are spending the effort"
+                      subtitle="Where this quarter's work is allocated"
+                      titleIcon={<Icon name="filter" size="md" className="text-[var(--teal)]" />}
+                      iconChip
+                    >
+                      {recommendationsInitialPending ? (
+                        <Skeleton className="h-14 w-full" />
+                      ) : recommendationsUnavailable ? (
+                        <InlineBanner
+                          tone="warning"
+                          title="Effort allocation unavailable"
+                          message="The recommendation queue must load before Engine can show its allocation."
+                        />
+                      ) : (
+                        <StanceBar recs={engine.activeRecs} />
+                      )}
+                    </SectionCard>
+                  </section>
+                  <IntelligenceSignals
+                    workspaceId={workspaceId}
+                    title="Signals the Engine is watching"
+                    subtitle="Strategy-relevant patterns detected across rankings, content, and intent"
+                    initialLimit={4}
+                    presentation="engine-spine"
+                  />
+                  <LostQueryRecoveryCard workspaceId={workspaceId} />
+                </div>
+              </Disclosure>
+            </section>
 
           </>
         )}

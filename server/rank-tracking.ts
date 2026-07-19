@@ -7,6 +7,8 @@ import {
   TRACKED_KEYWORD_SOURCE,
   TRACKED_KEYWORD_STATUS,
   type LatestRank,
+  type RankHistoryRowsResponse,
+  type RankHistorySeries,
   type TrackedKeyword,
   type TrackedKeywordSource,
   type TrackedKeywordStatus,
@@ -467,6 +469,66 @@ export function getRankHistory(
     }
     return { date: snap.date, positions };
   });
+}
+
+const ROW_HISTORY_SNAPSHOT_LIMIT = 30;
+const ROW_HISTORY_DELTA_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function isoDateDaysBefore(date: string, days: number): string | null {
+  const timestamp = Date.parse(`${date}T00:00:00.000Z`);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Date(timestamp - days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Page-batched skinny read model for Keywords table trend cells.
+ *
+ * This reads the existing source snapshots once, projects only the requested
+ * visible keyword keys, and never resolves the full keyword-universe model.
+ */
+export function getRankHistoryRows(
+  workspaceId: string,
+  queryFilter: string[],
+): RankHistoryRowsResponse {
+  const requestedByKey = new Map<string, string>();
+  for (const query of queryFilter) {
+    const output = query.trim();
+    const key = normalizeQuery(output);
+    if (key && output && !requestedByKey.has(key)) requestedByKey.set(key, output);
+  }
+
+  if (requestedByKey.size === 0) {
+    return { windowDays: ROW_HISTORY_DELTA_DAYS, series: [] };
+  }
+
+  const seriesByKey = new Map<string, RankHistorySeries>(
+    [...requestedByKey].map(([key, query]) => [key, { query, points: [] }]),
+  );
+  const snapshots = readRecentSnapshots(workspaceId, ROW_HISTORY_SNAPSHOT_LIMIT);
+
+  for (const snapshot of snapshots) {
+    for (const entry of snapshot.queries) {
+      const series = seriesByKey.get(normalizeQuery(entry.query));
+      if (series) series.points.push({ date: snapshot.date, position: entry.position });
+    }
+  }
+
+  const series = [...seriesByKey.values()].map((item) => {
+    const latest = item.points.at(-1);
+    if (!latest) return item;
+    const cutoff = isoDateDaysBefore(latest.date, ROW_HISTORY_DELTA_DAYS);
+    if (!cutoff) return item;
+    const windowPoints = item.points.filter(point => point.date >= cutoff && point.date <= latest.date);
+    if (windowPoints.length < 2) return item;
+    const earliest = windowPoints[0];
+    return {
+      ...item,
+      delta7d: +(earliest.position - latest.position).toFixed(1),
+    };
+  });
+
+  return { windowDays: ROW_HISTORY_DELTA_DAYS, series };
 }
 
 export type RankEntry = LatestRank;

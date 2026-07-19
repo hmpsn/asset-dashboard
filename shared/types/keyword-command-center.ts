@@ -335,6 +335,36 @@ export interface KeywordCommandCenterResponse {
 
 export type KeywordCommandCenterSort = 'priority' | 'keyword' | 'demand' | 'rank' | 'clicks' | 'difficulty' | 'opportunity';
 
+export interface KeywordRankKpiPeriod {
+  /** Inclusive ISO date window over stored rank-snapshot observation dates. */
+  startDate: string | null;
+  /** Inclusive ISO date window over stored rank-snapshot observation dates. */
+  endDate: string | null;
+  /** Latest stored snapshot selected inside this period; null when the period has no observation. */
+  snapshotDate: string | null;
+  /** Impression-weighted average rank position; null when the selected snapshot has no rank rows. */
+  averagePosition: number | null;
+  /** Rolling-window GSC clicks from the selected snapshot; null when no usable snapshot exists. */
+  clicks: number | null;
+  /** Rolling-window GSC impressions from the selected snapshot; null when no usable snapshot exists. */
+  impressions: number | null;
+}
+
+export interface KeywordRankKpis {
+  /** Equal current/comparison window length. Current includes the latest snapshot date. */
+  windowDays: number;
+  currentPeriod: KeywordRankKpiPeriod;
+  comparisonPeriod: KeywordRankKpiPeriod;
+  deltas: {
+    /** Positive means rank improved because position numbers became smaller. */
+    averagePosition: number | null;
+    /** Already a percentage (e.g. 6.3 for 6.3%). Do NOT multiply by 100. */
+    clicksPercent: number | null;
+    /** Already a percentage (e.g. 6.3 for 6.3%). Do NOT multiply by 100. */
+    impressionsPercent: number | null;
+  };
+}
+
 export interface KeywordCommandCenterSummaryResponse {
   counts: KeywordCommandCenterCounts;
   filters: KeywordCommandCenterFilterMeta[];
@@ -343,11 +373,10 @@ export interface KeywordCommandCenterSummaryResponse {
   generatedAt?: string | null;
   summarizedAt: string;
   geoLabel?: string;
-  /**
-   * Monthly organic traffic value from the ROI page-keyword read path.
-   * Display-only; null when no page-keyword or legacy page-map source exists.
-   */
-  trafficValueMonthly?: number | null;
+  /** null = no provider value evidence for this workspace — render as unavailable, never as $0 */
+  trafficValueMonthly: number | null;
+  /** Server-owned rank KPI rollups. Optional for additive compatibility; the KCC server always serves it. */
+  rankKpis?: KeywordRankKpis;
   /** Topic cluster rows from the normalized topic_clusters table for rebuilt grouping lenses. */
   topicClusters?: TopicCluster[];
   /** Cannibalization rows from the normalized cannibalization_issues table for rebuilt grouping flags. */
@@ -378,6 +407,49 @@ export interface KeywordCommandCenterRowsResponse {
   rows: KeywordCommandCenterRow[];
   pageInfo: KeywordCommandCenterPageInfo;
   generatedAt?: string | null;
+  rankFreshness: KeywordRankFreshness;
+}
+
+export const KEYWORD_COMMAND_CENTER_GROUP_BY = {
+  PAGE: 'page',
+  CLUSTER: 'cluster',
+  LIFECYCLE_STAGE: 'lifecycleStage',
+} as const;
+
+export type KeywordCommandCenterGroupBy =
+  typeof KEYWORD_COMMAND_CENTER_GROUP_BY[keyof typeof KEYWORD_COMMAND_CENTER_GROUP_BY];
+
+export interface KeywordCommandCenterGroupedViewQuery {
+  groupBy: KeywordCommandCenterGroupBy;
+  filter?: KeywordCommandCenterFilter;
+  search?: string;
+  sort?: KeywordCommandCenterSort;
+  direction?: 'asc' | 'desc';
+}
+
+export interface KeywordCommandCenterGroupRollup {
+  keywordCount: number;
+  clicks: number | null;
+  impressions: number | null;
+  /** Impression-weighted average rank; null when no group row has a current position. */
+  averagePosition: number | null;
+}
+
+export interface KeywordCommandCenterGroup {
+  id: string;
+  title: string;
+  meta?: string;
+  flag?: string;
+  rollup: KeywordCommandCenterGroupRollup;
+  rows: KeywordCommandCenterRow[];
+}
+
+export interface KeywordCommandCenterGroupedViewResponse {
+  groupBy: KeywordCommandCenterGroupBy;
+  groups: KeywordCommandCenterGroup[];
+  /** Complete filter/search-scoped row count represented across groups. */
+  totalRows: number;
+  groupedAt: string;
   rankFreshness: KeywordRankFreshness;
 }
 

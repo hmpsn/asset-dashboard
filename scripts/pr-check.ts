@@ -1576,7 +1576,180 @@ export const ACTIVITY_TYPE_LEXICON_BASELINE = new Set<string>([
  *  tests/pr-check.test.ts reuses the exact same extraction the rule does. */
 export const ACTIVITY_TYPE_MEMBER_LINE_RE = /\|\s*'([^']+)'/g;
 
+type EmptyStateActionAllowance = {
+  file: string;
+  marker: string;
+  reason: string;
+};
+
+/**
+ * D3/W0.2 ratchet baseline for rebuilt EmptyState mounts that intentionally
+ * have no button today. Entries are fingerprinted by file + stable tag text,
+ * not line number, so ordinary edits do not silently move an exception onto a
+ * different EmptyState. W1.3 TODOs must be deleted as that sweep adds actions.
+ */
+const ACTIONLESS_EMPTY_STATE_ALLOWLIST: readonly EmptyStateActionAllowance[] = [
+  { file: 'src/components/asset-manager-rebuilt/AuditLens.tsx', marker: "title={activeFilter || search ? 'No matching issues' : 'All clear'}", reason: 'Terminal all-clear state; filtered branch names its clear-filter recovery.' },
+  { file: 'src/components/competitors-rebuilt/BacklinkProfileCard.tsx', marker: 'title="No backlink data returned"', reason: 'Terminal provider result that explains the population condition.' },
+  { file: 'src/components/competitors-rebuilt/CompetitorAlerts.tsx', marker: "title={competitorCount > 0 ? 'No competitor movement detected' : 'No competitor set configured'}", reason: 'Terminal monitoring result; the parent surface owns competitor setup.' },
+  { file: 'src/components/competitors-rebuilt/HeadToHeadTable.tsx', marker: 'title="No competitive metrics returned"', reason: 'Terminal provider result for the configured comparison set.' },
+  { file: 'src/components/competitors-rebuilt/KeywordGapsCard.tsx', marker: 'title="No competitor gaps returned"', reason: 'Terminal provider result for the configured comparison set.' },
+  { file: 'src/components/content-pipeline-rebuilt/ContentPipelineIntake.tsx', marker: 'title="Nothing waiting in intake"', reason: 'Healthy terminal queue state that names what will populate it.' },
+  { file: 'src/components/content-pipeline-rebuilt/ContentPipelineLenses.tsx', marker: 'title="No content health signals"', reason: 'Healthy terminal intelligence state that names its population condition.' },
+  { file: 'src/components/engine-rebuilt/EngineRecommendationHistory.tsx', marker: 'title="No recommendation history yet"', reason: 'Healthy terminal history state that names its population condition.' },
+  { file: 'src/components/engine-rebuilt/EngineSurface.tsx', marker: 'title="Strategy generation is running"', reason: 'Transient job state; no user action is valid while generation runs.' },
+  { file: 'src/components/global-ops-rebuilt/DiagnosticsLens.tsx', marker: 'title="Choose a workspace"', reason: 'Global-shell selection prerequisite; WorkspaceSelector is persistent chrome.' },
+  { file: 'src/components/global-ops-rebuilt/OutcomeWorkspaceLens.tsx', marker: 'title="Choose a workspace"', reason: 'Global-shell selection prerequisite; WorkspaceSelector is persistent chrome.' },
+  { file: 'src/components/global-ops-rebuilt/RequestsLens.tsx', marker: 'title="Choose a workspace"', reason: 'Global-shell selection prerequisite; WorkspaceSelector is persistent chrome.' },
+  { file: 'src/components/global-ops-rebuilt/WorkspaceSettingsLens.tsx', marker: 'title="Choose a workspace"', reason: 'Global-shell selection prerequisite; WorkspaceSelector is persistent chrome.' },
+  { file: 'src/components/global-ops-rebuilt/wave-a/RoadmapBacklog.tsx', marker: 'title="No roadmap items match"', reason: 'Existing filter-empty state; description names the clear-filter recovery.' },
+  { file: 'src/components/global-ops-rebuilt/wave-a/RoadmapSprintGroups.tsx', marker: 'title="No roadmap items match"', reason: 'Existing filter-empty state; description names the clear-filter recovery.' },
+  { file: 'src/components/global-ops-rebuilt/wave-b/diagnostics/DiagnosticsReportView.tsx', marker: 'title="Diagnostic failed"', reason: 'Terminal failed report whose description names retry at the source insight.' },
+  { file: 'src/components/global-ops-rebuilt/wave-c/outcomes/OutcomeRecentWins.tsx', marker: 'title="No graduated wins yet"', reason: 'Terminal readback that names the scored-checkpoint population condition.' },
+  { file: 'src/components/global-ops-rebuilt/wave-c/outcomes/OutcomesBookTable.tsx', marker: 'title="No workspace outcome evidence yet"', reason: 'Terminal readback that names the measurement-checkpoint population condition.' },
+  { file: 'src/components/local-presence-rebuilt/LocalPresenceReviewsPipeline.tsx', marker: "title={!connected ? 'Connect Google Business Profile first' : 'Map a GBP location first'}", reason: 'Setup prerequisite; adjacent settings controls own connection and mapping.' },
+  { file: 'src/components/local-presence-rebuilt/LocalPresenceReviewsPipeline.tsx', marker: 'title="Connect Google Business Profile first"', reason: 'Setup prerequisite; adjacent settings controls own connection.' },
+  { file: 'src/components/local-presence-rebuilt/LocalPresenceReviewsPipeline.tsx', marker: 'title="No review responses match this desk"', reason: 'Filter-empty state whose description names sync, draft, and clear-filter recovery.' },
+  { file: 'src/components/local-presence-rebuilt/LocalPresenceVisibility.tsx', marker: 'title="No repeat competitors match this view"', reason: 'Terminal readback that names the two-snapshot population condition.' },
+  { file: 'src/components/page-intelligence-rebuilt/PageIntelligenceSurface.tsx', marker: 'title="No matching pages"', reason: 'Search-empty state whose description names valid search dimensions.' },
+  { file: 'src/components/performance-rebuilt/PageSpeedLens.tsx', marker: 'title="No PageSpeed pages returned"', reason: 'Nested table terminal result; the parent lens owns run/retry controls.' },
+  { file: 'src/components/performance-rebuilt/PageWeightLens.tsx', marker: 'title="No assets on this page"', reason: 'Nested table terminal result for the selected page.' },
+  { file: 'src/components/schema-rebuilt/SchemaPageTable.tsx', marker: 'title="No generated schema yet"', reason: 'Table terminal state; the parent Generator lens owns generate actions.' },
+  { file: 'src/components/search-traffic-rebuilt/AnnotationsLens.tsx', marker: 'title="No performance trend to annotate"', reason: 'Readback absence; annotation entry remains available directly below.' },
+  { file: 'src/components/search-traffic-rebuilt/AnnotationsLens.tsx', marker: 'title="No annotations in this filter"', reason: 'Existing filter-empty state whose description names creation but lacks a clear action.' },
+  { file: 'src/components/search-traffic-rebuilt/BreakdownsDrawer.tsx', marker: 'description="Search Console did not return device rows for this window."', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/BreakdownsDrawer.tsx', marker: 'description="Search Console did not return country rows for this window."', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/BreakdownsDrawer.tsx', marker: 'title="No search type breakdown"', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/BreakdownsDrawer.tsx', marker: 'title="No top pages"', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/BreakdownsDrawer.tsx', marker: 'title="No traffic sources"', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/BreakdownsDrawer.tsx', marker: 'description="GA4 did not return country rows for this window."', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/BreakdownsDrawer.tsx', marker: 'title="No traffic breakdowns"', reason: 'Drawer-level setup prerequisite; the surface connection state owns setup.' },
+  { file: 'src/components/search-traffic-rebuilt/OverviewLens.tsx', marker: 'title="No analytics connected"', reason: 'Setup prerequisite naming the exact fix location; sibling lenses own direct setup actions.' },
+  { file: 'src/components/search-traffic-rebuilt/OverviewLens.tsx', marker: 'title="No trend points yet"', reason: 'Terminal provider result for the selected window.' },
+  { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: "title={positive ? 'No recorded ranking gains' : 'No ranking risks need attention'}", reason: 'Healthy terminal insight result that names its population condition.' },
+  { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: "title={data.error ? 'Search data unavailable' : 'No search data'}", reason: 'Terminal provider result; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: 'title="No daily trend rows"', reason: 'Terminal provider result for the selected window.' },
+  { file: 'src/components/search-traffic-rebuilt/SearchLens.tsx', marker: "title={tableMode === 'queries' ? 'No queries' : 'No pages'}", reason: 'Nested table terminal result for the selected window and mode.' },
+  { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No GA4 data"', reason: 'Terminal provider result; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No daily traffic rows"', reason: 'Terminal provider result for the selected window.' },
+  { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No sources"', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No device split"', reason: 'Nested provider-result panel; wording quality remains a manual budget-4 check.' },
+  { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No landing pages"', reason: 'Nested provider-result table for the selected window.' },
+  { file: 'src/components/search-traffic-rebuilt/TrafficLens.tsx', marker: 'title="No conversions"', reason: 'Nested provider-result table for the selected window.' },
+  { file: 'src/components/site-audit-rebuilt/SiteAuditSurface.tsx', marker: 'title="No issues match the current filters"', reason: 'Existing filter-empty state whose description names clear/re-run recovery.' },
+];
+
+function normalizedRepoPath(file: string): string {
+  const normalized = file.replaceAll('\\', '/');
+  const srcIndex = normalized.lastIndexOf('/src/');
+  return srcIndex >= 0 ? normalized.slice(srcIndex + 1) : normalized.replace(/^\.\//, '');
+}
+
+function findEmptyStateOpeningTags(content: string): Array<{ lineIndex: number; text: string }> {
+  const tags: Array<{ lineIndex: number; text: string }> = [];
+  let cursor = 0;
+  while ((cursor = content.indexOf('<EmptyState', cursor)) >= 0) {
+    const lineIndex = content.slice(0, cursor).split('\n').length - 1;
+    let braceDepth = 0;
+    let quote: string | null = null;
+    let escaped = false;
+    let end = cursor + '<EmptyState'.length;
+    for (; end < content.length; end++) {
+      const char = content[end];
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (char === '\\') escaped = true;
+        else if (char === quote) quote = null;
+        continue;
+      }
+      if (char === '"' || char === "'" || char === '`') { quote = char; continue; }
+      if (char === '{') { braceDepth++; continue; }
+      if (char === '}') { braceDepth = Math.max(0, braceDepth - 1); continue; }
+      if (braceDepth === 0 && char === '/' && content[end + 1] === '>') {
+        end += 2;
+        break;
+      }
+    }
+    tags.push({ lineIndex, text: content.slice(cursor, end) });
+    cursor = Math.max(end, cursor + '<EmptyState'.length);
+  }
+  return tags;
+}
+
 export const CHECKS: Check[] = [
+  {
+    name: 'Actionless EmptyState in rebuilt surface',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/',
+    displayScope: 'src/components/*-rebuilt/**/*.tsx',
+    message:
+      'Every rebuilt <EmptyState> needs an action prop unless its exact audited allowlist fingerprint ' +
+      'documents a terminal or parent-owned recovery. Add // empty-state-action-ok: <reason> on the ' +
+      'opening line or immediately above only for a reviewed exception; W1.3 TODO entries must be removed ' +
+      'as their actions land.',
+    severity: 'error',
+    excludeLines: ['empty-state-action-ok'],
+    rationale:
+      'Prevents new dead-end rebuilt states while ratcheting the audited 54 actionless states down without forcing buttons into terminal readbacks.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      for (const file of files) {
+        const repoPath = normalizedRepoPath(file);
+        if (!repoPath.startsWith('src/components/') || !repoPath.includes('-rebuilt/') || !repoPath.endsWith('.tsx')) continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const fileLines = content.split('\n');
+        for (const tag of findEmptyStateOpeningTags(content)) {
+          if (/\baction\s*=/.test(tag.text)) continue;
+          if (hasHatch(fileLines, tag.lineIndex, 'empty-state-action-ok')) continue;
+          const normalizedTag = tag.text.replace(/\s+/g, ' ');
+          const isAllowlisted = ACTIONLESS_EMPTY_STATE_ALLOWLIST.some(
+            (entry) => entry.file === repoPath && normalizedTag.includes(entry.marker),
+          );
+          if (isAllowlisted) continue;
+          hits.push({ file, line: tag.lineIndex + 1, text: fileLines[tag.lineIndex]?.trim() ?? '<EmptyState' });
+        }
+      }
+      return hits;
+    },
+  },
+  {
+    name: 'RebuiltSidebar hardcoded nav label override',
+    fileGlobs: ['*.tsx'],
+    pathFilter: 'src/components/layout/',
+    displayScope: 'src/components/layout/RebuiltSidebar.tsx GROUP_PRESENTATION items',
+    message:
+      'RebuiltSidebar item labels must come from navRegistry. All item label overrides are banned. ' +
+      'Add // rebuilt-nav-label-ok: <reason> inline or immediately above only for an owner-approved exception.',
+    severity: 'error',
+    excludeLines: ['rebuilt-nav-label-ok'],
+    rationale:
+      'Prevents new sidebar-only destination names from drifting away from breadcrumbs, the command palette, and document titles.',
+    claudeMdRef: '#uiux-rules-mandatory',
+    customCheck: (files) => {
+      const hits: CustomCheckMatch[] = [];
+      const itemOverrideRe = /\{\s*id\s*:\s*(['"])([^'"]+)\1\s*,\s*label\s*:\s*(['"])([^'"]+)\3\s*,?\s*\}/g;
+      for (const file of files) {
+        const repoPath = normalizedRepoPath(file);
+        if (repoPath !== 'src/components/layout/RebuiltSidebar.tsx') continue;
+        const content = readFileOrEmpty(file);
+        if (!content) continue;
+        const groupStart = content.indexOf('const GROUP_PRESENTATION');
+        if (groupStart < 0) continue;
+        const groupEnd = content.indexOf('\n];', groupStart);
+        const groupSource = content.slice(groupStart, groupEnd >= 0 ? groupEnd + 3 : content.length);
+        const fileLines = content.split('\n');
+        for (const match of groupSource.matchAll(itemOverrideRe)) {
+          const absoluteIndex = groupStart + (match.index ?? 0);
+          const lineIndex = content.slice(0, absoluteIndex).split('\n').length - 1;
+          if (hasHatch(fileLines, lineIndex, 'rebuilt-nav-label-ok')) continue;
+          hits.push({ file, line: lineIndex + 1, text: fileLines[lineIndex]?.trim() ?? match[0].trim() });
+        }
+      }
+      return hits;
+    },
+  },
   {
     name: 'Purple in client components',
     pattern: 'purple-',
@@ -9972,6 +10145,7 @@ const manualChecks = [
   'New 1:1-per-workspace tables (e.g. one row per workspace+type): UNIQUE index on (workspace_id, natural_key) in migration; app code catches SQLITE_CONSTRAINT_UNIQUE and retries as update',
   'Batch save endpoints (delete-all + reinsert): Map<id, preserved> built before delete to restore created_at, sort_order, and approval state',
   'Field semantics changed (not just renamed): grep every reader of `result.X` / `slice.X` / `intel.X`, every Zod schema, every test, and every JSDoc comment for the field. Update them in the same commit. The compiler will not catch a meaning change when the type stays `string` (see seo-context.brandVoiceBlock as the canonical example).',
+  'Usability budget 5 — every displayed aggregate/rate states its time window and source/basis, and its numerator, denominator, rate, and total all come from that same windowed source. See docs/rules/usability-budgets.md.',
   'useEffect external-sync: when copying a prop into local state on update, the dirty check must compare local state to a `useRef` of the last-synced prop, never to the live prop. Comparing against the live prop guarantees the sync never fires after an external update (see BrandscriptTab.SectionEditorCard).',
   'In-place sort on shared arrays: any `.sort(` on a React Query result, a function parameter, or a prop must use `[...arr].sort(...)` to avoid mutating cached/shared state. Only safe to omit the spread when the array was just constructed locally (e.g. result of `.filter()` on a local variable that is not a prop/parameter). See docs/rules/analytics-insights.md §8.',
 ];
@@ -9984,7 +10158,9 @@ for (const item of manualChecks) {
 console.log('\n' + '─'.repeat(50));
 if (errors > 0) {
   console.log(`\n  ✗ ${errors} error(s), ${warnings} warning(s). Fix errors before merging.\n`);
-  process.exit(1);
+  // Set the code instead of exiting synchronously so piped/subprocess callers
+  // receive the complete status table and can diagnose which rules failed.
+  process.exitCode = 1;
 } else if (warnings > 0) {
   console.log(`\n  ⚠ 0 errors, ${warnings} warning(s). Review warnings before merging.\n`);
 } else {

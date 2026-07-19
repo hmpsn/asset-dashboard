@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Database, FolderOpen, Grid3X3, Image, List, Minimize2, RefreshCw, Sparkles, Upload, Wand2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ApiError, del, get, patch, post } from '../../api/client';
 import { bulkGenerateAltText, type BulkAltTextNdjsonEvent } from '../../api/seo';
 import { workspaces } from '../../api/workspaces';
@@ -10,6 +11,7 @@ import { useQueue } from '../../hooks/admin/useQueue';
 import { useBackgroundTasks } from '../../hooks/useBackgroundTasks';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
 import { queryKeys } from '../../lib/queryKeys';
+import { adminPath } from '../../routes';
 import { useToast } from '../Toast';
 import { buildDefaultSelectedFields, CmsFieldSelector } from '../assets/CmsFieldSelector';
 import type { CmsImageScanResult } from '../../../shared/types/cms-images';
@@ -31,6 +33,7 @@ import {
   Toolbar,
   ToolbarSpacer,
   Tooltip,
+  WorkbenchFrame,
 } from '../ui';
 import { formatBytes } from '../../utils/formatNumbers';
 import { AssetDrawer } from './AssetDrawer';
@@ -68,6 +71,7 @@ const PRIMARY_BROWSE_FILTERS = BROWSE_FILTERS
   .filter((filter) => PRIMARY_BROWSE_FILTER_IDS.has(filter.id))
   .sort((a, b) => PRIMARY_BROWSE_FILTER_ORDER.indexOf(a.id) - PRIMARY_BROWSE_FILTER_ORDER.indexOf(b.id));
 const SECONDARY_BROWSE_FILTERS = BROWSE_FILTERS.filter((filter) => !PRIMARY_BROWSE_FILTER_IDS.has(filter.id));
+const ASSET_BATCH_SIZE = 100;
 
 interface WorkspaceData {
   id: string;
@@ -164,6 +168,7 @@ function LockedIcon({ className }: { className?: string }) {
 }
 
 export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const state = useAssetManagerSurfaceState();
@@ -193,6 +198,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
   const [organizeResult, setOrganizeResult] = useState<BulkResult | null>(null);
   const [selectedCmsFields, setSelectedCmsFields] = useState<Set<string>>(new Set());
   const [browseControlsOpen, setBrowseControlsOpen] = useState(false);
+  const [loadedAssetCount, setLoadedAssetCount] = useState(ASSET_BATCH_SIZE);
 
   const workspaceQuery = useQuery({
     queryKey: queryKeys.admin.workspaceDetail(workspaceId),
@@ -281,6 +287,16 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
       return (b.createdOn || '').localeCompare(a.createdOn || '');
     });
   }, [isCmsFilter, selectedCmsFields, sourceAssets, state.assetSort, state.browseFilters, state.search, unusedQuery.data]);
+  const visibleAssets = useMemo(
+    () => filteredAssets.slice(0, loadedAssetCount),
+    [filteredAssets, loadedAssetCount],
+  );
+  const remainingAssetCount = Math.max(0, filteredAssets.length - visibleAssets.length);
+  const browseFilterKey = [...state.browseFilters].sort().join(',');
+
+  useEffect(() => {
+    setLoadedAssetCount(ASSET_BATCH_SIZE);
+  }, [browseFilterKey, isCmsFilter, state.assetSort, state.search]);
 
   const selectedAsset = filteredAssets.find((asset) => asset.id === state.selectedAssetId)
     ?? webflowAssets.find((asset) => asset.id === state.selectedAssetId)
@@ -318,7 +334,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
     return [...byId.values()];
   }, [cmsAssets, webflowAssets]);
   const selectedAssets = selectableAssets.filter((asset) => selectedIds.has(asset.id));
-  const allShownSelected = filteredAssets.length > 0 && filteredAssets.every((asset) => selectedIds.has(asset.id));
+  const allShownSelected = visibleAssets.length > 0 && visibleAssets.every((asset) => selectedIds.has(asset.id));
   const hasSecondaryFilter = [...state.browseFilters].some((filter) => !PRIMARY_BROWSE_FILTER_IDS.has(filter));
   const quotaReason = 'Monthly AI generation limit reached. AI alt text and smart rename actions are disabled for this session.';
 
@@ -732,8 +748,8 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
   const selectAllShown = () => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      const clearShown = filteredAssets.length > 0 && filteredAssets.every((asset) => prev.has(asset.id));
-      for (const asset of filteredAssets) {
+      const clearShown = visibleAssets.length > 0 && visibleAssets.every((asset) => prev.has(asset.id));
+      for (const asset of visibleAssets) {
         if (clearShown) next.delete(asset.id);
         else next.add(asset.id);
       }
@@ -782,6 +798,12 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
           icon={LockedIcon}
           title="Link a Webflow site"
           description="Asset Manager needs a connected Webflow site before it can list, audit, or upload media."
+          action={(
+            <Button size="sm" variant="primary" onClick={() => navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`)}>
+              <Icon name="settings" size="sm" />
+              Open Workspace Settings
+            </Button>
+          )}
         />
       </div>
     );
@@ -902,6 +924,17 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
         </section>
       )}
 
+      <InlineBanner tone="success" title="From media fix to proof">
+        <p className="t-body">
+          A compression pass that improves Core Web Vitals or page speed can graduate into Insights Engine once the measured lift lands.
+        </p>
+      </InlineBanner>
+
+      <WorkbenchFrame
+        collectionLabel="Asset library"
+        pinnedClassName="pb-3"
+        pinned={(
+          <div className="flex flex-col gap-2">
       <Toolbar label="Browse asset controls" gap={8} align="flex-start" className="w-full">
         <div className="flex w-full flex-wrap items-center gap-2">
           <div className="flex min-w-0 flex-wrap gap-1.5" role="group" aria-label="Browse asset filters">
@@ -932,7 +965,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
             </Button>
           </div>
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            <Button size="sm" variant="secondary" onClick={selectAllShown} disabled={filteredAssets.length === 0}>
+            <Button size="sm" variant="secondary" onClick={selectAllShown} disabled={visibleAssets.length === 0}>
               <Icon as={state.view === 'grid' ? Grid3X3 : List} size="sm" aria-hidden="true" />
               {allShownSelected ? 'Clear shown' : 'Select all shown'}
             </Button>
@@ -1038,6 +1071,10 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
           </InlineBanner>
         </div>
       )}
+          </div>
+        )}
+      >
+        <div className="flex min-h-0 flex-col gap-3 pr-1">
 
       {assetsQuery.isLoading ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(216px,1fr))] gap-[14px]">
@@ -1045,7 +1082,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
         </div>
       ) : state.view === 'table' ? (
         <AssetTable
-          assets={filteredAssets}
+          assets={visibleAssets}
           selected={selectedIds}
           quotaLocked={quotaLocked}
           quotaReason={quotaReason}
@@ -1058,7 +1095,7 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
         />
       ) : (
         <AssetGrid
-          assets={filteredAssets}
+          assets={visibleAssets}
           selected={selectedIds}
           quotaLocked={quotaLocked}
           quotaReason={quotaReason}
@@ -1066,17 +1103,28 @@ export function AssetManagerSurface({ workspaceId }: AssetManagerSurfaceProps) {
           onToggleSelect={toggleSelected}
           onOpenAsset={state.openAsset}
           onGenerateAlt={(asset) => { void handleGenerateAlt(asset); }}
-          onCompress={(asset) => { void handleCompress(asset); }}
-          onSmartRename={(asset) => { void handleSmartRename(asset); }}
           onClearFilters={state.clearAll}
         />
       )}
 
-      <InlineBanner tone="success" title="From media fix to proof">
-        <p className="t-body">
-          A compression pass that improves Core Web Vitals or page speed can graduate into Insights Engine once the measured lift lands.
-        </p>
-      </InlineBanner>
+          {!assetsQuery.isLoading && filteredAssets.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-3 py-3">
+              <span className="t-caption-sm text-[var(--brand-text-muted)]">
+                Showing {visibleAssets.length} of {filteredAssets.length} assets
+              </span>
+              {remainingAssetCount > 0 && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setLoadedAssetCount((current) => Math.min(current + ASSET_BATCH_SIZE, filteredAssets.length))}
+                >
+                  Load more ({remainingAssetCount} remaining)
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </WorkbenchFrame>
 
       <Drawer
         open={state.lens === 'upload' && !assetDetailOpen}

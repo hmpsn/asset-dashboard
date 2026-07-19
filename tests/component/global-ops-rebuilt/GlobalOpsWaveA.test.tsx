@@ -219,6 +219,33 @@ describe('Global Ops Wave A composition contracts', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('uses the adjacent Total items count as the completion denominator', async () => {
+    mocks.roadmapGet.mockResolvedValue({
+      sprints: [{
+        id: 'completion-contract',
+        name: 'Completion Contract',
+        items: [
+          ...Array.from({ length: 148 }, (_, index) => ({ id: `done-${index}`, title: `Done ${index}`, status: 'done' })),
+          ...Array.from({ length: 52 }, (_, index) => ({ id: `pending-${index}`, title: `Pending ${index}`, status: 'pending' })),
+          ...Array.from({ length: 25 }, (_, index) => ({ id: `deferred-${index}`, title: `Deferred ${index}`, status: 'deferred' })),
+          ...Array.from({ length: 25 }, (_, index) => ({ id: `closed-${index}`, title: `Closed ${index}`, status: 'closed' })),
+        ],
+      }],
+    });
+
+    renderWithProviders(<RoadmapLens />, '/roadmap?view=sprint');
+
+    const surface = await screen.findByTestId('roadmap-rebuilt');
+    const totalTile = within(surface).getByText('Total items').closest('.flex-1');
+    const completionTile = within(surface).getByText('Completion').closest('.flex-1');
+    expect(totalTile).not.toBeNull();
+    expect(completionTile).not.toBeNull();
+    await waitFor(() => {
+      expect(within(totalTile as HTMLElement).getByText('250')).toBeInTheDocument();
+    });
+    expect(within(completionTile as HTMLElement).getByText('59%')).toBeInTheDocument();
+  });
+
   it('keeps backlog priority, estimate, and status in a six-column scan', async () => {
     renderWithProviders(<RoadmapLens />, '/roadmap?view=backlog');
 

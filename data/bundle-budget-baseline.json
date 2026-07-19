@@ -2,7 +2,7 @@
   "version": 1,
   "updatedAt": "2026-07-16T05:27:59.000Z",
   "tolerance": 0.05,
-  "total": 1828017,
+  "total": 1832274,
   "entries": {
     "css:assets/index.css": 37315,
     "css:vendor/fontawesome/fontawesome-sharp-regular-subset.min.css": 1203,
@@ -202,7 +202,7 @@
     "js:src/components/global-ops-rebuilt/index.ts": 22581,
     "js:src/components/KeywordHub.tsx": 14273,
     "js:src/components/keywords-rebuilt/KeywordDrawer.tsx": 4413,
-    "js:src/components/keywords-rebuilt/KeywordsSurface.tsx": 10258,
+    "js:src/components/keywords-rebuilt/KeywordsSurface.tsx": 11114,
     "js:src/components/KeywordStrategy.tsx": 8637,
     "js:src/components/LandingPage.tsx": 5667,
     "js:src/components/LinkChecker.tsx": 2781,
@@ -229,9 +229,9 @@
     "js:src/components/SeoAudit.tsx": 15566,
     "js:src/components/SeoEditorWrapper.tsx": 13470,
     "js:src/components/SettingsPanel.tsx": 4277,
-    "js:src/components/site-audit-rebuilt/SiteAuditSurface.tsx": 10686,
+    "js:src/components/site-audit-rebuilt/SiteAuditSurface.tsx": 11627,
     "js:src/components/SiteArchitecture.tsx": 3735,
-    "js:src/components/WorkspaceHome.tsx": 5554,
+    "js:src/components/WorkspaceHome.tsx": 7680,
     "js:src/components/WorkspaceOverview.tsx": 4605,
     "js:star": 282,
     "js:strategy": 23982,
@@ -277,6 +277,7 @@
     "js:workspace-home": 4479,
     "js:WorkspaceSettings": 21147,
     "js:wrench": 231,
-    "js:wsEvents": 2214
+    "js:wsEvents": 2214,
+    "js:keywordVocabulary": 334
   }
 }

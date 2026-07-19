@@ -4,13 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RebuiltSidebar } from '../../../src/components/layout/RebuiltSidebar';
-import { NAV_REGISTRY_BY_ID } from '../../../src/lib/navRegistry';
+import { NAV_REGISTRY_BY_ID, resolveNavLabel } from '../../../src/lib/navRegistry';
 import { queryKeys } from '../../../src/lib/queryKeys';
 import type { Workspace } from '../../../src/components/WorkspaceSelector';
 import type { FeatureFlagKey } from '../../../shared/types/feature-flags';
 import { expectNoA11yViolations } from '../a11y';
 
 const mockNavigate = vi.fn();
+let pendingReplies = 0;
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return { ...actual, useNavigate: () => mockNavigate };
@@ -20,7 +21,17 @@ vi.mock('../../../src/hooks/admin/useNotifications', () => ({
   useNotifications: () => ({ data: [] }),
 }));
 
-let featureFlagResponse: Partial<Record<FeatureFlagKey, boolean>> = {};
+vi.mock('../../../src/hooks/admin/useWorkspaceBadges', () => ({
+  useWorkspaceBadges: () => ({
+    data: {
+      pendingRequests: 0,
+      hasContent: false,
+      pendingReplies: { count: pendingReplies, requestIds: [], newestAt: null },
+    },
+  }),
+}));
+
+let featureFlagResponse: Partial<Record<FeatureFlagKey, boolean>> = { 'ui-rebuild-shell': true };
 vi.mock('../../../src/api/misc', async () => {
   const actual = await vi.importActual<typeof import('../../../src/api/misc')>('../../../src/api/misc');
   return {
@@ -50,18 +61,17 @@ const defaultProps = {
   onLogout: vi.fn(),
 };
 
-function renderSidebar(overrides: Partial<typeof defaultProps> = {}) {
+function renderSidebar(overrides: Partial<typeof defaultProps> = {}, initialEntry = '/ws/ws-1') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // Pre-seed the feature-flag query so RebuiltSidebar's `useQuery` (staleTime: Infinity)
   // reads the flags SYNCHRONOUSLY from render 1 — no loading→loaded transition to race.
   // The old test waited on that async resolution with waitFor's default 1000ms timeout,
   // which flaked under CI's resource-constrained component shard. Seeding matches the
-  // resolved-flag state each test declares via `featureFlagResponse` (empty = the same
-  // FEATURE_FLAGS defaults the loading fallback used, so unrelated tests are unaffected).
+  // resolved-flag state each test declares via `featureFlagResponse`.
   queryClient.setQueryData(queryKeys.shared.featureFlags(), featureFlagResponse);
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <RebuiltSidebar {...defaultProps} {...overrides} />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -76,7 +86,8 @@ describe('RebuiltSidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    featureFlagResponse = {};
+    featureFlagResponse = { 'ui-rebuild-shell': true };
+    pendingReplies = 0;
   });
 
   afterEach(() => {
@@ -101,12 +112,35 @@ describe('RebuiltSidebar', () => {
     expectBefore(optimization, clientFacing);
     expectBefore(clientFacing, admin);
 
-    for (const label of ['Keywords', 'Competitors', 'Content Pipeline', 'Local Presence', 'Asset Manager', 'Action Results']) {
+    for (const label of ['Keywords', 'Competitors', 'Content Pipeline', 'Local Presence', 'Asset Manager', 'AI Visibility', 'Action Results', 'Requests']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+    }
+    const flagOn = (flag: FeatureFlagKey) => flag === 'ui-rebuild-shell';
+    for (const [id, label] of [
+      ['seo-strategy', 'Insights Engine'],
+      ['seo-keywords', 'Keywords'],
+      ['content-pipeline', 'Content Pipeline'],
+      ['media', 'Asset Manager'],
+    ] as const) {
+      expect(resolveNavLabel(NAV_REGISTRY_BY_ID[id], flagOn)).toBe(label);
     }
     expect(screen.queryByRole('button', { name: 'Content Perf' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'MONITORING' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'CONTENT' })).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  }, 15_000);
+
+  it('renders the book Command Center as the active all-workspaces home at /', async () => {
+    const user = userEvent.setup();
+    const { container } = renderSidebar({ selected: null, tab: 'home' }, '/');
+
+    expect(screen.getByRole('button', { name: 'ALL WORKSPACES' })).toBeInTheDocument();
+    const commandCenter = screen.getByRole('button', { name: 'Command Center' });
+    expect(commandCenter).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Cockpit' })).not.toHaveAttribute('aria-current');
+
+    await user.click(commandCenter);
+    expect(mockNavigate).toHaveBeenCalledWith('/');
     await expectNoA11yViolations(container);
   }, 15_000);
 
@@ -229,6 +263,20 @@ describe('RebuiltSidebar', () => {
     });
     const header = screen.getByRole('button', { name: /STRATEGY & CONTENT/ });
     expect(header).toHaveTextContent('4');
+  });
+
+  it('shows the server pending-reply count on Requests and preserves it on the collapsed client-facing group', async () => {
+    pendingReplies = 3;
+    const user = userEvent.setup();
+    renderSidebar();
+
+    expect(screen.getByRole('button', { name: /^Requests/ })).toHaveTextContent('3');
+    await user.click(screen.getByRole('button', { name: 'CLIENT-FACING' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^Requests/ })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /CLIENT-FACING/ })).toHaveTextContent('3');
   });
 
   it('keyboard-walk skips disabled needsSite rows for no-site workspaces', async () => {

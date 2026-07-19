@@ -6,6 +6,7 @@ export type Page =
   | 'seo-strategy' | 'seo-keywords' | 'page-intelligence' | 'local-seo' | 'seo-schema' | 'seo-briefs' | 'competitors'
   | 'content' | 'calendar' | 'brand' | 'subscriptions' | 'content-pipeline'
   | 'analytics-hub'
+  | 'ai-visibility'
   | 'performance'
   | 'content-perf'
   | 'rewrite'
@@ -25,6 +26,12 @@ export type ClientTab = 'overview' | 'performance' | 'search' | 'health' | 'stra
 export type ClientInboxFilter = 'decisions' | 'reviews' | 'conversations';
 export type ClientInboxRouteAlias = 'approvals' | 'requests' | 'content' | 'schema-review';
 
+export const ANALYTICS_HUB_SECTION_PARAM = 'section';
+export const ANALYTICS_HUB_SECTIONS = {
+  anomalies: 'anomalies',
+} as const;
+export type AnalyticsHubSection = (typeof ANALYTICS_HUB_SECTIONS)[keyof typeof ANALYTICS_HUB_SECTIONS];
+
 const CLIENT_INBOX_ROUTE_ALIASES: Record<ClientInboxRouteAlias, ClientInboxFilter> = {
   approvals: 'decisions',
   requests: 'conversations',
@@ -40,6 +47,11 @@ export function adminPath(workspaceId: string, tab: Page = 'home'): string {
   if (GLOBAL_TABS.has(tab)) return `/${tab}`;
   if (tab === 'home') return `/ws/${workspaceId}`;
   return `/ws/${workspaceId}/${tab}`;
+}
+
+export function adminAnalyticsHubPath(workspaceId: string, section?: AnalyticsHubSection): string {
+  const path = adminPath(workspaceId, 'analytics-hub');
+  return section ? `${path}?${ANALYTICS_HUB_SECTION_PARAM}=${section}` : path;
 }
 
 /** Build a client dashboard path */

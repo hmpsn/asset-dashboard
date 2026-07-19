@@ -66,6 +66,21 @@ const ga4Overview = {
   dateRange: { start: '2026-06-01', end: '2026-06-28' },
 };
 let currentGa4Overview: typeof ga4Overview | null = ga4Overview;
+let currentAnomalies: Array<{
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  type: 'traffic_drop';
+  severity: 'critical' | 'warning' | 'positive';
+  title: string;
+  description: string;
+  metric: string;
+  currentValue: number;
+  previousValue: number;
+  changePct: number;
+  detectedAt: string;
+  source: 'gsc';
+}> = [];
 const featureFlagResponse: Partial<Record<FeatureFlagKey, boolean>> = {
   'ui-rebuild-shell': true,
 };
@@ -87,7 +102,7 @@ vi.mock('../../../src/hooks/admin', () => ({
     refetch: vi.fn(),
   }),
   useAnomalyAlerts: () => ({
-    data: [],
+    data: currentAnomalies,
     isLoading: false,
   }),
 }));
@@ -192,7 +207,7 @@ vi.mock('../../../src/hooks/admin/useInsightFeed', () => ({
 }));
 
 vi.mock('../../../src/hooks/admin/useAnomalyAlerts', () => ({
-  useAnomalyAlerts: () => ({ data: [], isLoading: false }),
+  useAnomalyAlerts: () => ({ data: currentAnomalies, isLoading: false }),
 }));
 
 vi.mock('../../../src/hooks/useWorkspaceEvents', () => ({
@@ -295,6 +310,7 @@ beforeEach(() => {
   currentSearchOverview = searchOverview;
   currentSearchError = null;
   currentGa4Overview = ga4Overview;
+  currentAnomalies = [];
   adminSearchCallMock.mockClear();
   adminGa4CallMock.mockClear();
   getMock.mockResolvedValue([
@@ -443,9 +459,82 @@ describe('SearchTrafficSurface', () => {
 
     expect(await screen.findByRole('radio', { name: /Search performance/i })).toHaveAttribute('aria-checked', 'true');
     await waitFor(() => expect(getMock).toHaveBeenCalled());
-    expect(screen.getByText('1 row')).toHaveClass('t-caption-sm');
+    expect(screen.getByText('Showing 1 of 1 rows')).toHaveClass('t-caption-sm');
     expect(screen.getByText('Open Keyword Hub')).toHaveClass('t-ui');
     expect(screen.getByText('/cosmetic-dentistry')).toBeInTheDocument();
+  });
+
+  it('reads the anomalies section deep link, opens monitoring, and focuses the existing alert section', async () => {
+    currentAnomalies = [{
+      id: 'anomaly-1',
+      workspaceId: 'ws-1',
+      workspaceName: 'Acme Dental',
+      type: 'traffic_drop',
+      severity: 'critical',
+      title: 'Organic traffic dropped',
+      description: 'Clicks fell outside the expected range.',
+      metric: 'clicks',
+      currentValue: 75,
+      previousValue: 100,
+      changePct: -25,
+      detectedAt: '2026-07-16T12:00:00.000Z',
+      source: 'gsc',
+    }];
+
+    renderSurface('/ws/ws-1/analytics-hub?section=anomalies');
+
+    const anomalySection = await screen.findByRole('button', { name: /Anomaly Alerts/i });
+    await waitFor(() => expect(anomalySection).toHaveFocus());
+    expect(anomalySection.closest('details')).toHaveAttribute('open');
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/analytics-hub?section=anomalies');
+  });
+
+  it('caps Search detail at 25 rows and expands or filters against the truthful row count', async () => {
+    currentSearchOverview = {
+      ...searchOverview,
+      topQueries: Array.from({ length: 32 }, (_, index) => ({
+        query: `detail query ${String(index + 1).padStart(2, '0')}`,
+        clicks: 320 - index,
+        impressions: 3_200 - index,
+        ctr: 10 - (index / 10),
+        position: 1 + index,
+      })),
+      topPages: Array.from({ length: 28 }, (_, index) => ({
+        page: `https://acme.com/detail-page-${String(index + 1).padStart(2, '0')}`,
+        clicks: 280 - index,
+        impressions: 2_800 - index,
+        ctr: 9 - (index / 10),
+        position: 2 + index,
+      })),
+    };
+    renderSurface('/ws/ws-1/analytics-hub?lens=search');
+
+    const grid = await screen.findByRole('grid');
+    expect(within(grid).getAllByRole('row')).toHaveLength(26);
+    expect(screen.getByText('detail query 25')).toBeInTheDocument();
+    expect(screen.queryByText('detail query 26')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 25 of 32 rows')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 32' }));
+
+    expect(await screen.findByText('detail query 32')).toBeInTheDocument();
+    expect(screen.getByTestId('search-detail-table-region')).toHaveClass('max-h-[60vh]', 'overflow-auto');
+    expect(screen.getByText('Showing 32 of 32 rows')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search queries…'), {
+      target: { value: 'query 30' },
+    });
+
+    expect(await screen.findByText('detail query 30')).toBeInTheDocument();
+    expect(screen.queryByText('detail query 29')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 1 of 1 matching rows (32 total)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Pages' }));
+
+    expect(await screen.findByText('/detail-page-25')).toBeInTheDocument();
+    expect(screen.queryByText('/detail-page-26')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 25 of 28 rows')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show all 28' })).toBeInTheDocument();
   });
 
   it('returns to Search with canonical URL state while preserving days and view', async () => {
@@ -551,6 +640,26 @@ describe('SearchTrafficSurface', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /Annotations/i }));
     expect(screen.getAllByRole('button', { name: 'Add annotation' })).toHaveLength(1);
+  });
+
+  it('opens Workspace Settings Connections from the Search Console setup state', async () => {
+    currentWorkspace = { ...workspace, gscPropertyUrl: undefined };
+    renderSurface();
+
+    expect(await screen.findByText('Search Console not configured')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/workspace-settings?tab=connections');
+  });
+
+  it('opens Workspace Settings Connections from the GA4 setup state', async () => {
+    currentWorkspace = { ...workspace, ga4PropertyId: undefined };
+    renderSurface('/ws/ws-1/analytics-hub?lens=traffic');
+
+    expect(await screen.findByText('GA4 not configured')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/ws/ws-1/workspace-settings?tab=connections');
   });
 
   it('keeps the lower Search home mounted once when GSC returns no overview', async () => {

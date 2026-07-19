@@ -327,6 +327,53 @@ export interface OutcomeCoverage {
   reconciled: number;
 }
 
+/** Server-owned outcome totals for one measurement window. */
+export interface OutcomePortfolioMetrics {
+  wins: number;
+  /** Monthly attributed value carried by wins measured inside the window. */
+  valuePerMonth: number;
+  /** Positive click deltas carried by wins measured inside the window. */
+  clicksGained: number;
+  /** Wins with a non-null attributed value. */
+  withValue: number;
+}
+
+/** Attribution-specific metrics. `not_acted_on` is deliberately impossible here. */
+export interface OutcomePortfolioAttributionMetrics {
+  wins: number;
+  valuePerMonth: number;
+  clicksGained: number;
+}
+
+export interface OutcomePortfolioWorkspaceRollup {
+  workspaceId: string;
+  workspaceName: string;
+  hasMeasuredWins: boolean;
+  totals: OutcomePortfolioMetrics;
+  attribution: {
+    /** The only bucket that may be framed as agency-executed work. */
+    platformExecuted: OutcomePortfolioAttributionMetrics;
+    /** Work the agency called but the client implemented on their side. */
+    externallyExecuted: OutcomePortfolioAttributionMetrics;
+  };
+  /** Confirms this read path independently applies the C4 unexecuted-proposal exclusion. */
+  notActedOnExcluded: true;
+}
+
+export interface OutcomePortfolioRollup {
+  window: {
+    days: 90;
+    label: 'Last 90 days';
+    /** Inclusive ISO timestamp. */
+    start: string;
+    /** Exclusive ISO timestamp. */
+    endExclusive: string;
+  };
+  totals: OutcomePortfolioMetrics;
+  attribution: OutcomePortfolioWorkspaceRollup['attribution'];
+  workspaces: OutcomePortfolioWorkspaceRollup[];
+}
+
 export interface PlaybookStep {
   actionType: ActionType;
   timing?: string;

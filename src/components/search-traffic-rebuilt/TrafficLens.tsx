@@ -1,6 +1,8 @@
 // @ds-rebuilt
 import { Activity, ArrowRight, BarChart3, Users, Zap } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { adminPath } from '../../routes';
 import { AnnotatedTrendChart, type TrendLine } from '../charts/AnnotatedTrendChart';
 import { InsightFeed } from '../insights';
 import { AnomalyAlerts } from '../AnomalyAlerts';
@@ -64,6 +66,7 @@ const conversionColumns: DataColumn[] = [
 ];
 
 export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBreakdowns }: TrafficLensProps) {
+  const navigate = useNavigate();
   const [activeLines, toggleLine] = useToggleSet(['users', 'sessions']);
   const [eventsOpen, setEventsOpen] = useState(true);
   const overviewData = useAnalyticsOverviewFromData(workspaceId, null, data, {
@@ -78,6 +81,12 @@ export function TrafficLens({ workspaceId, ga4PropertyId, days, data, onOpenBrea
         icon={BarChart3}
         title="GA4 not configured"
         description="Connect Google Analytics in Workspace Settings before reviewing site traffic."
+        action={(
+          <Button size="sm" variant="primary" onClick={() => navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`)}>
+            <Icon name="settings" size="sm" />
+            Open Workspace Settings
+          </Button>
+        )}
       />
     );
   }

@@ -4,6 +4,7 @@ import type { WorkQueueClassification } from '../../../shared/types/work-queue';
 import { Button, ClickableRow, ClientThreadRow, Icon, SectionCard } from '../ui';
 import type { IconName } from '../ui/iconNames';
 import type { CockpitKpiModel, CockpitRankRow, CockpitRequestRow } from '../../hooks/admin/useCockpitRebuilt';
+import type { PendingRepliesSummary } from '../../../shared/types/requests';
 import { formatPercent } from './cockpitFormatters';
 
 interface CockpitEvidenceRailProps {
@@ -11,6 +12,7 @@ interface CockpitEvidenceRailProps {
   workspaceInitials: string;
   workQueue: WorkQueueClassification;
   requests: CockpitRequestRow[];
+  pendingReplies: PendingRepliesSummary;
   ranks: CockpitRankRow[];
   kpis: CockpitKpiModel;
   onOpenRoute: (route: string) => void;
@@ -142,15 +144,14 @@ export function CockpitEvidenceRail({
   workspaceInitials,
   workQueue,
   requests,
+  pendingReplies,
   ranks,
   kpis,
   onOpenRoute,
   route,
 }: CockpitEvidenceRailProps) {
   const workspaceFirstName = workspaceName.trim().split(/\s+/)[0] || workspaceName;
-  // Exclude terminal admin request states. NB: the admin RequestStatus union has no 'resolved'
-  // ('resolved' is a client-projection value) — the terminal "done" state is 'completed'.
-  const openRequests = requests.filter((r) => r.status !== 'closed' && r.status !== 'completed').slice(0, 4);
+  const openRequests = requests.slice(0, 4);
   const rankRows = ranks.slice(0, 5);
 
   // Technical hand-offs synthesised from KPI slices → compact severity rows.
@@ -206,6 +207,15 @@ export function CockpitEvidenceRail({
         titleIcon={<Icon name="message" size="sm" className="text-[var(--blue)]" />}
         iconChip
         subtitle="Replies from their portal — a human is waiting"
+        titleExtra={pendingReplies.count > 0 ? (
+          <span
+            data-testid="pending-replies-count"
+            className="rounded-[var(--radius-pill)] bg-[color-mix(in_srgb,var(--blue)_12%,transparent)] px-2 py-0.5 t-caption-sm font-semibold text-[var(--blue)] tabular-nums"
+            aria-label={`${pendingReplies.count} pending client ${pendingReplies.count === 1 ? 'reply' : 'replies'}`}
+          >
+            {pendingReplies.count}
+          </span>
+        ) : undefined}
         action={<LinkOut label="Inbox" onClick={() => onOpenRoute(route.requests)} />}
         noPadding
       >

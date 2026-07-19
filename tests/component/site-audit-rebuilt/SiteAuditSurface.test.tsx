@@ -13,6 +13,7 @@ const mockSetSkipLinkCheck = vi.fn();
 const mockRefreshAuditHistory = vi.fn();
 const mockSaveSchedule = vi.fn();
 const mockUseSiteAuditRebuilt = vi.fn();
+const mockAcceptAll = vi.fn(async () => undefined);
 
 vi.mock('../../../src/hooks/admin/useSiteAuditRebuilt', async () => {
   const actual = await vi.importActual<typeof import('../../../src/hooks/admin/useSiteAuditRebuilt')>(
@@ -34,14 +35,14 @@ vi.mock('../../../src/components/AeoReview', () => ({
   default: () => <div data-testid="site-audit-aeo-view">AI Search Ready</div>,
 }));
 vi.mock('../../../src/components/ContentDecay', () => ({
-  default: () => <div data-testid="site-audit-content-decay-view">Content Health diagnostic</div>,
+  default: () => <div data-testid="site-audit-content-decay-view">Decaying pages diagnostic</div>,
 }));
 vi.mock('../../../src/components/audit/ActionItemsPanel', () => ({
   ActionItemsPanel: () => <div data-testid="site-audit-actions-panel" />,
 }));
 vi.mock('../../../src/components/audit/BulkAcceptPanel', () => ({
   BulkAcceptPanel: ({ onRegisterHandlers }: { onRegisterHandlers: (handlers: { acceptAll: () => Promise<void>; cancel: () => void }) => void }) => {
-    onRegisterHandlers({ acceptAll: async () => undefined, cancel: () => undefined });
+    onRegisterHandlers({ acceptAll: mockAcceptAll, cancel: () => undefined });
     return <div data-testid="site-audit-bulk-panel" />;
   },
 }));
@@ -168,6 +169,27 @@ const issueGroups: AuditIssueGroup[] = [
   },
 ];
 
+function makeThreePageTitleGroup(): AuditIssueGroup {
+  const titleGroup = issueGroups[0];
+  const additionalPages = [
+    { ...sampleAudit.pages[0], pageId: 'page-about', page: 'About', slug: 'about', url: '/about' },
+    { ...sampleAudit.pages[0], pageId: 'page-contact', page: 'Contact', slug: 'contact', url: '/contact' },
+  ];
+
+  return {
+    ...titleGroup,
+    affectedPages: 3,
+    instances: [
+      titleGroup.instances[0],
+      ...additionalPages.map((page) => ({
+        id: `${page.pageId}-title-Missing title`,
+        page,
+        issue: page.issues[0],
+      })),
+    ],
+  };
+}
+
 function makeAuditState() {
   return {
     workspace: { id: 'ws-1', name: 'Acme', webflowSiteId: 'site-1', webflowSiteName: 'Acme Site' },
@@ -226,6 +248,7 @@ function makeAuditState() {
     suppressPattern: vi.fn(),
     unsuppressAll: vi.fn(),
     acceptSuggestion: vi.fn(),
+    acceptIssueGroupSuggestions: vi.fn(async () => []),
     openQuickFix: vi.fn(),
     openDeadLinks: vi.fn(),
     createTaskFromIssue: vi.fn(),
@@ -290,7 +313,7 @@ describe('SiteAuditSurface rebuilt', () => {
 
   it.each([
     ['/ws/ws-1/seo-audit?sub=aeo-review', 'AI Search Ready', 'site-audit-aeo-view'],
-    ['/ws/ws-1/seo-audit?sub=content-decay', 'Content Health', 'site-audit-content-decay-view'],
+    ['/ws/ws-1/seo-audit?sub=content-decay', 'Decaying pages', 'site-audit-content-decay-view'],
     ['/ws/ws-1/seo-audit?sub=guide', 'Audit Guide', 'site-audit-guide-view'],
   ])('opens the in-flow %s receiver for compatibility deep link %s', async (entry, summary, testId) => {
     renderSurface(entry);
@@ -350,7 +373,7 @@ describe('SiteAuditSurface rebuilt', () => {
     expect(screen.getByTestId('location-search')).toHaveTextContent('');
     expect(auditModeSwitcher().getAllByRole('radio')).toHaveLength(2);
     expect(auditModeSwitcher().getByRole('radio', { name: /Site Audit/ })).toHaveAttribute('aria-checked', 'true');
-    expect(auditModeSwitcher().queryByRole('radio', { name: /AI Search Ready|Content Health|Guide/ })).not.toBeInTheDocument();
+    expect(auditModeSwitcher().queryByRole('radio', { name: /AI Search Ready|Decaying pages|Guide/ })).not.toBeInTheDocument();
 
     fireEvent.click(auditModeSwitcher().getByRole('radio', { name: /History/ }));
     expect(screen.getByTestId('location-search')).toHaveTextContent('?sub=history');
@@ -394,6 +417,30 @@ describe('SiteAuditSurface rebuilt', () => {
     ]);
   });
 
+  it('bounds the loaded audit to one workbench collection with decision controls pinned', async () => {
+    renderSurface('/ws/ws-1/seo-audit?sub=audit');
+
+    await screen.findByTestId('site-audit-rebuilt-audit');
+    const frame = screen.getByTestId('workbench-frame');
+    expect(frame).toHaveStyle({
+      display: 'flex',
+      flex: '0 0 auto',
+      height: 'calc(100vh - var(--shell-topbar) - var(--page-pad-y) - var(--page-pad-bottom))',
+      maxHeight: 'calc(100vh - var(--shell-topbar) - var(--page-pad-y) - var(--page-pad-bottom))',
+    });
+
+    const pinned = screen.getByTestId('workbench-pinned');
+    expect(within(pinned).getByTestId('site-audit-hero')).toBeInTheDocument();
+    expect(within(pinned).getByTestId('site-audit-categories')).toBeInTheDocument();
+    expect(within(pinned).getByTestId('site-audit-bulk-actions')).toBeInTheDocument();
+
+    const collections = frame.querySelectorAll('[data-workbench-collection]');
+    expect(collections).toHaveLength(1);
+    expect(collections[0]).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
+    expect(collections[0]).toHaveStyle({ flex: '1 1 0%', minHeight: 0, overflow: 'auto' });
+    expect(within(collections[0] as HTMLElement).getByTestId('site-audit-issues')).toBeInTheDocument();
+  });
+
   it('uses the compact local history composition instead of the legacy shared view', async () => {
     renderSurface('/ws/ws-1/seo-audit?sub=history');
 
@@ -429,6 +476,116 @@ describe('SiteAuditSurface rebuilt', () => {
     expectTextWithClass('Home', 't-ui');
   });
 
+  it('accepts a suggestion for the selected affected page id', async () => {
+    const audit = makeAuditState();
+    const threePageGroup = makeThreePageTitleGroup();
+    const acceptSuggestion = vi.fn(async () => true);
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      issueGroups: [threePageGroup, issueGroups[1]],
+      acceptSuggestion,
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+    fireEvent.click(await screen.findByText('Missing title'));
+
+    const drawer = screen.getByRole('dialog', { name: 'title' });
+    const aboutRow = within(drawer).getByTestId('site-audit-instance-page-about');
+    fireEvent.click(within(aboutRow).getByRole('button', { name: 'Accept suggestion for /about' }));
+
+    await waitFor(() => expect(acceptSuggestion).toHaveBeenCalledTimes(1));
+    expect(acceptSuggestion.mock.calls[0]?.[0].pageId).toBe('page-about');
+  });
+
+  it('previews every affected page before apply-to-all and reports each page outcome', async () => {
+    const audit = makeAuditState();
+    const threePageGroup = makeThreePageTitleGroup();
+    const acceptIssueGroupSuggestions = vi.fn(async () => [
+      { instanceId: threePageGroup.instances[0].id, pageId: 'page-home', pagePath: '/home', status: 'applied' as const },
+      { instanceId: threePageGroup.instances[1].id, pageId: 'page-about', pagePath: '/about', status: 'failed' as const, error: 'Webflow rejected this update' },
+      { instanceId: threePageGroup.instances[2].id, pageId: 'page-contact', pagePath: '/contact', status: 'applied' as const },
+    ]);
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      issueGroups: [threePageGroup, issueGroups[1]],
+      acceptIssueGroupSuggestions,
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+    fireEvent.click(await screen.findByText('Missing title'));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to all 3 pages' }));
+
+    const preview = screen.getByRole('dialog', { name: 'Apply suggestion to all 3 affected pages?' });
+    expect(within(preview).getByText('/home')).toBeVisible();
+    expect(within(preview).getByText('/about')).toBeVisible();
+    expect(within(preview).getByText('/contact')).toBeVisible();
+    expect(within(preview).getByText(/Each page is updated separately/i)).toBeVisible();
+    expect(acceptIssueGroupSuggestions).not.toHaveBeenCalled();
+
+    fireEvent.click(within(preview).getByRole('button', { name: 'Apply to 3 pages' }));
+
+    await waitFor(() => expect(acceptIssueGroupSuggestions).toHaveBeenCalledTimes(1));
+    expect(acceptIssueGroupSuggestions).toHaveBeenCalledWith(threePageGroup.instances);
+    expect(within(screen.getByTestId('site-audit-instance-page-home')).getByText('Applied')).toBeVisible();
+    expect(within(screen.getByTestId('site-audit-instance-page-about')).getByText('Failed')).toBeVisible();
+    expect(within(screen.getByTestId('site-audit-instance-page-about')).getByText('Webflow rejected this update')).toBeVisible();
+    expect(within(screen.getByTestId('site-audit-instance-page-contact')).getByText('Applied')).toBeVisible();
+  });
+
+  it('matches drawer scope copy to per-page actions while preserving filter-truthful batch copy', async () => {
+    const audit = makeAuditState();
+    const threePageGroup = makeThreePageTitleGroup();
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      issueGroups: [threePageGroup, issueGroups[1]],
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+    fireEvent.click(await screen.findByText('Missing title'));
+
+    const drawer = screen.getByRole('dialog', { name: 'title' });
+    expect(within(drawer).getByText(
+      'Choose actions page by page, or preview the same suggestion across all 3 affected pages.',
+    )).toBeVisible();
+    expect(within(drawer).queryByText(/Applies to \/home only/i)).not.toBeInTheDocument();
+    expect(within(drawer).getAllByRole('button', { name: /Accept suggestion for \/(?:home|about|contact)/ })).toHaveLength(3);
+    expect(within(drawer).getAllByRole('button', { name: /Send to client for \/(?:home|about|contact)/ })).toHaveLength(3);
+    expect(within(drawer).getAllByRole('button', { name: /Add task for \/(?:home|about|contact)/ })).toHaveLength(3);
+    expect(within(drawer).getByText(
+      'Add visible tasks uses the current table filters. Add error tasks, Add all tasks, and Accept all use the full audit.',
+    )).toBeVisible();
+  });
+
+  it('confirms the real live-site consequences before accepting all fixes', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept all 1' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Apply AI fixes to the live Webflow site?' });
+    expect(within(dialog).getByText(/up to 1 AI-suggested fix/i)).toBeVisible();
+    expect(within(dialog).getByText(/titles, meta descriptions, and page fields/i)).toBeVisible();
+    expect(within(dialog).getByText(/marks those pages live/i)).toBeVisible();
+    expect(within(dialog).getByText(/fewer than 1 may change/i)).toBeVisible();
+    expect(within(dialog).getByText(/cannot be bulk-undone/i)).toBeVisible();
+    expect(mockAcceptAll).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply to live site' }));
+
+    await waitFor(() => expect(mockAcceptAll).toHaveBeenCalledTimes(1));
+    expect(mockAcceptAll).toHaveBeenCalledWith();
+  });
+
+  it('cancels Accept all without applying any fixes', async () => {
+    renderSurface('/ws/ws-1/seo-audit');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept all 1' }));
+    const dialog = screen.getByRole('dialog', { name: 'Apply AI fixes to the live Webflow site?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Apply AI fixes to the live Webflow site?' })).not.toBeInTheDocument();
+    expect(mockAcceptAll).not.toHaveBeenCalled();
+  });
+
   it('uses styleguide roles for the audit decision console', async () => {
     renderSurface('/ws/ws-1/seo-audit');
 
@@ -439,6 +596,24 @@ describe('SiteAuditSurface rebuilt', () => {
     expectTextWithClass('Showing 2 of 2 groups', 't-caption-sm');
     expectTextWithClass('From fix to proof', 't-ui');
     expectTextWithClass(/Technical fixes stay in Site Audit and Cockpit until traffic, crawlability, or Core Web Vitals recovery is measurable./i, 't-body');
+  });
+
+  it('reports warnings and notices separately from their shared source counts', async () => {
+    const audit = makeAuditState();
+    const auditWithNotices = { ...sampleAudit, warnings: 4, infos: 3 };
+    mockUseSiteAuditRebuilt.mockReturnValue({
+      ...audit,
+      data: auditWithNotices,
+      rawData: auditWithNotices,
+      workflow: { ...audit.workflow, data: auditWithNotices },
+    });
+
+    renderSurface('/ws/ws-1/seo-audit');
+
+    const hero = await screen.findByTestId('site-audit-hero');
+    expect(hero).toHaveTextContent('4 warnings');
+    expect(hero).toHaveTextContent('3 notices');
+    expect(hero).not.toHaveTextContent(/7 (?:more )?warnings/i);
   });
 
   it('hands source image repair to Asset Manager with canonical filter URLs', async () => {
@@ -454,6 +629,28 @@ describe('SiteAuditSurface rebuilt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review missing alt text' }));
     expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/media');
     expect(screen.getByTestId('location-search')).toHaveTextContent('?filter=missing-alt');
+  });
+
+  it('hands decaying pages to the canonical Content Health tab', async () => {
+    renderSurface('/ws/ws-1/seo-audit?sub=content-decay');
+
+    expect(await screen.findByText('Decaying pages')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View in Content Pipeline' }));
+
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/content-pipeline');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=content-health');
+  });
+
+  it('opens Workspace Settings Connections from the no-site setup state', async () => {
+    const audit = makeAuditState();
+    mockUseSiteAuditRebuilt.mockReturnValue({ ...audit, siteId: '' });
+    renderSurface();
+
+    expect(await screen.findByText('Connect a Webflow site first')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/workspace-settings');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=connections');
   });
 
   it('keeps internal rebuild and migration language out of the visible audit shell', async () => {

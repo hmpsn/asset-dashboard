@@ -1,7 +1,7 @@
 # Admin Rebuilt Route Coverage Audit
 
-Audit state: route, nav, interior-state, and layout accounting complete; 27 direct rebuilt mounts plus the folded Content Performance receiving home are owner-approved; post-parity closure decisions are owner-approved, implemented, and P5-verified locally
-Last updated: 2026-07-12
+Audit state: route, nav, interior-state, and layout accounting complete; 27 direct rebuilt mounts plus the folded Content Performance receiving home are owner-approved, the 28th direct mount (AI Visibility) awaits owner review, and the separately registered book root awaits W4.1b owner visual review
+Last updated: 2026-07-17
 Source of truth files: `src/routes.ts`, `src/lib/navRegistry.tsx`, `src/components/layout/rebuiltSurfaces.ts`, and `hmpsn studio Design System/mockup/nav.js`
 
 This audit answers four questions that the per-surface contracts do not answer by themselves:
@@ -15,23 +15,26 @@ This audit answers four questions that the per-surface contracts do not answer b
 
 | Category | Count | Meaning |
 |---|---:|---|
-| Admin `Page` union values | 32 | Every admin route id in `src/routes.ts`. |
-| `NAV_REGISTRY` entries | 26 | Standalone nav/palette/breadcrumb destinations. |
+| Admin `Page` union values | 33 | Every admin route id in `src/routes.ts`. |
+| `NAV_REGISTRY` entries | 27 | Standalone nav/palette/breadcrumb destinations. |
 | `NON_REGISTRY_PAGES` | 6 | Redirect-only, folded, or non-global-nav route ids. |
-| `REBUILT_SURFACES` entries | 27 | Routes that mount directly inside `RebuiltAppChrome` when `ui-rebuild-shell` is on. |
-| Parity contract files | 17 | One contract per directly mounted surface family; Global Ops covers multiple route ids. |
+| `REBUILT_SURFACES` entries | 28 | Routes that mount directly inside `RebuiltAppChrome` when `ui-rebuild-shell` is on. |
+| Parity contract files | 19 | One contract per mounted surface family; Global Ops covers multiple route ids and the book root is separate from `Page`. |
+| Book root mounts | 1 | `BOOK_REBUILT_SURFACE` mounts at `/` only while `ui-rebuild-shell` is ON. |
 
 Current census result:
 
 - Every `Page` value is either registered in `NAV_REGISTRY` or intentionally listed in `NON_REGISTRY_PAGES`.
 - Every `NAV_REGISTRY` entry maps to a real `Page` value.
 - Every currently mounted rebuilt route family has an initial behavior-first parity contract.
+- The book-level `/` surface is registered and counted separately so the workspace-scoped `home` identity remains unchanged.
 - Not every admin page is currently rebuilt.
 
 ## Rebuilt Versus Non-Rebuilt
 
 | Route id | Nav status | Rebuilt status | Current parity status |
 |---|---|---|---|
+| `ai-visibility` | Rebuilt-only main nav entry | Rebuilt | `awaiting owner approval`: W3.1's embedded default gives the existing aggregate LLM-mention panel a dedicated lightweight Search & Site Health home; flag-off Keyword Hub remains byte-identical. |
 | `page-intelligence` | Main nav entry | Rebuilt | `owner-approved` under final `ODP-012 B`: a standalone master/detail Research workbench preserves the broader analysis, job, keyword-edit, rank, local, queue, guide, and handoff contracts while flag-off keeps the legacy receiver. |
 | `content-perf` | Main nav compatibility entry | Flag-on folded receiver; flag-off legacy | `owner-approved` under final `ODP-012 B`: Pipeline Published owns the rebuilt four-stat/result-card/readback composition, stable `?item=` initialization, typed trend availability, and bounded refetch. `/content-perf` and its nav identity remain for flag-off compatibility. |
 | `competitors` | `NON_REGISTRY_PAGES` | Rebuilt | Still intentionally absent from the global registry, but now surfaced in the rebuilt sidebar's prototype `Strategy & Content` presentation because the rebuilt shell is flag-gated. Contract exists. |
@@ -41,7 +44,7 @@ Current census result:
 | `calendar` | `NON_REGISTRY_PAGES` | Not rebuilt | Redirects to `content-pipeline?tab=calendar`. |
 | `subscriptions` | `NON_REGISTRY_PAGES` | Not rebuilt | Preserved standalone legacy `ContentSubscriptions` receiver. Separately, `content-pipeline?tab=subscriptions` aliases to the rebuilt pipeline's publish/capacity state. |
 
-Practical answer: 27 routes mount directly through the rebuilt registry. Page Intelligence is one of them. Content Performance is the only main-nav route without a direct entry, by deliberate compatibility design: it folds into the already-mounted Pipeline Published receiver only while the rebuilt flag is on. SEO Briefs, Content, and Calendar remain redirect/fold aliases, and Subscriptions remains a flag-off legacy receiver with a Pipeline query alias.
+Practical answer: 28 `Page` routes mount directly through `REBUILT_SURFACES`, plus one separately registered book-level root mounts through `BOOK_REBUILT_SURFACE`. The first 27 route mounts are owner-approved; AI Visibility is the 28th and awaits review of the embedded dedicated-home decision; the book root awaits W4.1b owner visual review. Content Performance remains a main-nav compatibility route without a direct entry, by deliberate compatibility design: it folds into the already-mounted Pipeline Published receiver only while the rebuilt flag is on. SEO Briefs, Content, and Calendar remain redirect/fold aliases, and Subscriptions remains a flag-off legacy receiver with a Pipeline query alias.
 
 ## Nav Bar Audit
 
@@ -63,6 +66,7 @@ Current rebuilt nav model:
 - Sidebar presentation groups are local to `RebuiltSidebar` and now mirror the prototype zones: top Cockpit/Insights, Strategy & Content, Search & Site Health, Optimization, Client-facing, and Admin.
 - Prototype-facing label overrides are local to the rebuilt sidebar: `home` renders as Cockpit, `seo-strategy` as Insights Engine, `seo-keywords` as Keywords, `content-pipeline` as Content Pipeline, and `media` as Asset Manager.
 - `competitors` is added as a rebuilt-sidebar-only presentation item without adding it back to `NAV_REGISTRY`.
+- `ai-visibility` is a registry-backed Search & Site Health destination hidden flag-OFF and visible flag-ON, so legacy navigation remains unchanged.
 - Typography is styleguide-aligned: `NavGroup` headers use `.t-label`, `NavItem` labels use `.t-ui`, nav badges/meta use `.t-mono`, and breadcrumbs use `.t-ui`.
 - Current group accents are DS token values: top Cockpit/Insights `var(--teal)`, Strategy & Content `var(--blue)`, Search & Site Health `var(--cyan)`, Optimization `var(--teal)`, Client-facing `var(--brand-yellow)`, Admin `var(--brand-text)`.
 
@@ -105,18 +109,19 @@ Interior state has been checked in contracts, component tests, and smoke for the
 | Assets | `media` | Dense Browse workshop, compact Repair results, Upload/asset/organize overlays, bulk and repair handoffs, overlay-aware shared Tooltip | `owner-approved`; production Drawers and DS color semantics remain explicit exceptions; `AUD-D7` is committed and P5-verified |
 | Page Rewriter | `rewrite` | Two-pane workspace, shell focus mode, page picker, export menu, `?pageUrl=` | `owner-approved`; export-only v1 and retained 62px Focus rail approved, while draft/publish remains separate backend scope |
 | Local Presence | `local-seo` | Rank/profile, Reviews/replies, setup Drawer, legacy visibility receiver | `owner-approved`; geo-grid/GBP Performance remain explicit backend exceptions |
+| AI Visibility | `ai-visibility` | Share of voice, mention volume/trend, competitors, cited source domains, manual Refresh | `awaiting owner approval`; W3.1 composes the established aggregate panel exactly once and preserves the flag-off Keyword Hub home |
 | Page Intelligence | `page-intelligence` | Pages master/detail Research workbench, Architecture, Guide, single/bulk analysis, keyword edit/tracking, local/rank context, SEO copy, `?tab=`/`?page=` | `owner-approved`; standalone receiving-home decision preserves the flag-off legacy route and every established capability |
 | Content Performance | `content-perf` / `content-pipeline?tab=published` | Four-stat summary, result cards, filters/sort, paired trend Drawer, coverage/joinback, `?item=`, flag-aware redirect | `owner-approved`; flag-on folds into Published while flag-off preserves the legacy route/nav |
 | Global Ops | `settings`, `workspace-settings`, `roadmap`, `revenue`, `ai-usage`, `features`, `prospect`, `outcomes-overview`, `outcomes`, `diagnostics`, `requests` | Global settings, workspace settings tabs, roadmap views, business tabs, outcomes, diagnostics, requests tabs | `owner-approved`; all 11 route homes approved with explicit `GO-*` exceptions retained |
 
 ## Layout Coverage
 
-The behavior checkpoint accounted for layout and route state across the original rebuilt families but did not itself establish visual parity. The later visual pass owner-approved the original 26 routes, then added and owner-approved the standalone Page Intelligence mount plus the folded Content Performance receiving home.
+The behavior checkpoint accounted for layout and route state across the original rebuilt families but did not itself establish visual parity. The later visual pass owner-approved the original 26 routes, then added and owner-approved the standalone Page Intelligence mount plus the folded Content Performance receiving home. W3.1 later added the lightweight AI Visibility mount under an embedded decision that awaits owner review.
 
 Current layout buckets:
 
-- `owner-approved`: all 27 directly mounted rebuilt route homes, including Page Intelligence, plus the folded Content Performance receiving home. The original 26-route approval remains the historical batch; Joshua separately approved the later receiving-home bundle.
-- `awaiting owner approval`: none among the mounted/folded visual comparisons or post-parity circle-backs. The circle-backs were separately owner-approved, implemented, and P5-verified; they are not silently accepted exceptions. See `post-parity-functionality-wiring-ai-audit.md`.
+- `owner-approved`: the first 27 directly mounted rebuilt route homes, including Page Intelligence, plus the folded Content Performance receiving home. The original 26-route approval remains the historical batch; Joshua separately approved the later receiving-home bundle.
+- `awaiting owner approval`: AI Visibility's dedicated lightweight home, the W3.1 embedded default. The owner may veto it at PR review in favor of a temporary Keywords mount.
 - `behavior-safe / visual-unverified`: none among the currently mounted or folded receiving homes.
 - Consolidated owner-review packet and measured registry-closeout evidence: `docs/ui-rebuild/parity/registry-final-owner-review.md` and `/tmp/asset-dashboard-codex-visual-parity/registry-final/`.
 - Receiving-home proof and owner review complete: Page Intelligence stays standalone under `ODP-012 B`; Content Pipeline Published is the flag-on Content Performance receiver. Both route ids remain intact, and both follow-ons are owner-approved.

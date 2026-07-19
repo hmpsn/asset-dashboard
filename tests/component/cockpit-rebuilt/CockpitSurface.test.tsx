@@ -13,7 +13,18 @@ import type { WorkQueueClassification, WorkQueueItem, WorkQueueSourceType } from
 const mocks = vi.hoisted(() => ({
   featureFlagsList: vi.fn(),
   cockpitState: null as UseCockpitRebuiltResult | null,
+  navigate: vi.fn(),
+  anomalies: [] as Array<{ id: string }>,
+  anomalyAlerts: vi.fn(),
 }));
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mocks.navigate,
+  };
+});
 
 vi.mock('../../../src/api/misc', async () => {
   const actual = await vi.importActual<typeof import('../../../src/api/misc')>('../../../src/api/misc');
@@ -57,6 +68,10 @@ vi.mock('../../../src/hooks/admin/useCockpitRebuilt', () => {
     ),
   };
 });
+
+vi.mock('../../../src/hooks/admin', () => ({
+  useAnomalyAlerts: (...args: unknown[]) => mocks.anomalyAlerts(...args),
+}));
 
 vi.mock('../../../src/components/workspace-home', () => ({
   ActivityFeed: ({ activity }: { activity: Array<{ title: string }> }) => (
@@ -192,6 +207,11 @@ function makeCockpitState(overrides: Partial<UseCockpitRebuiltResult> = {}): Use
     requests: [
       { id: 'req-1', title: 'Can we review July posts?', status: 'open', category: 'content', createdAt: '2026-07-04T12:00:00.000Z' },
     ],
+    pendingReplies: {
+      count: 1,
+      requestIds: ['req-1'],
+      newestAt: '2026-07-04T12:00:00.000Z',
+    },
     activity: [
       { id: 'activity-1', type: 'content_published', title: 'Published July article', createdAt: '2026-07-06T12:00:00.000Z' },
     ],
@@ -252,6 +272,12 @@ describe('CockpitSurface rebuilt', () => {
     window.localStorage.setItem(`onboarding_checklist_dismissed_${workspaceId}`, '1');
     mocks.featureFlagsList.mockResolvedValue({ 'ui-rebuild-shell': true });
     mocks.cockpitState = makeCockpitState();
+    mocks.anomalies = [
+      { id: 'anomaly-1' },
+      { id: 'anomaly-2' },
+      { id: 'anomaly-3' },
+    ];
+    mocks.anomalyAlerts.mockReturnValue({ data: mocks.anomalies, isLoading: false });
   });
 
   it('mounts after the real feature-flag hook transitions from loading fallback to ON', async () => {
@@ -296,16 +322,39 @@ describe('CockpitSurface rebuilt', () => {
     expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
   });
 
-  it('keeps the Risk deep link truthful without selecting Optimizations', async () => {
+  it('keeps the Needs triage deep link truthful without selecting Optimizations', async () => {
     renderSurface(`/ws/${workspaceId}?stream=unclassified`);
 
     expect(await screen.findByText('Client has not viewed the portal')).toBeInTheDocument();
     expect(screen.queryByText('Close Core Web Vitals cleanup')).not.toBeInTheDocument();
-    expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /^Risk/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /^Needs triage/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByLabelText('Queue filters')).getByRole('button', { name: /Client risk/ })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('radio', { name: /Optimizations/ })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: /To send/ })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByRole('radio', { name: /Monetization/ })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('radio', { name: /Growth/ })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('shows the shared Search & Traffic anomaly source count and links to its focused section', async () => {
+    renderSurface();
+
+    const pointer = await screen.findByRole('button', { name: 'Review 3 anomalies in Search & Traffic' });
+    expect(pointer).toHaveTextContent(`${mocks.anomalies.length} anomalies`);
+    expect(mocks.anomalyAlerts).toHaveBeenCalledWith(workspaceId, true);
+
+    fireEvent.click(pointer);
+
+    expect(mocks.navigate).toHaveBeenCalledWith(`/ws/${workspaceId}/analytics-hub?section=anomalies`);
+  });
+
+  it('uses the canonical Growth and Needs triage vocabulary across the stream tiles and queue', async () => {
+    renderSurface();
+
+    expect(await screen.findByRole('radio', { name: /Growth/ })).toBeInTheDocument();
+    expect(screen.getByText('to propose')).toBeInTheDocument();
+    expect(screen.getByText('Upsell and value-proof work backed by measured results.')).toBeInTheDocument();
+    expect(screen.getAllByText('Needs triage').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Monetization')).not.toBeInTheDocument();
+    expect(screen.queryByText('Risk and unclassified')).not.toBeInTheDocument();
   });
 
   it('keeps internal rebuild and migration language out of the visible Cockpit UI', async () => {
@@ -408,6 +457,39 @@ describe('CockpitSurface rebuilt', () => {
     expect(within(filters).getByRole('button', { name: /^Decay/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('labels navigating queue actions as Review or Open while preserving their routes', async () => {
+    renderSurface();
+
+    const queue = await screen.findByTestId('cockpit-work-queue');
+    const actionFor = (title: string) => {
+      const titleNode = within(queue).getByText(title);
+      const row = titleNode.parentElement?.parentElement;
+      expect(row).not.toBeNull();
+      return within(row as HTMLElement).getByRole('button');
+    };
+
+    const sendAction = actionFor('Approve July content plan');
+    const optimizationAction = actionFor('Refresh decaying service page');
+    const moneyAction = actionFor('Review measured value frame');
+    const riskAction = actionFor('Client has not viewed the portal');
+
+    fireEvent.click(sendAction);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/requests?tab=requests`);
+    fireEvent.click(optimizationAction);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/seo-audit?sub=content-decay`);
+    fireEvent.click(moneyAction);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/content-pipeline?tab=planner`);
+    fireEvent.click(riskAction);
+    expect(mocks.navigate).toHaveBeenLastCalledWith(`/ws/${workspaceId}/requests?tab=signals`);
+
+    expect(within(queue).queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
+    expect(within(queue).queryByRole('button', { name: 'Propose' })).not.toBeInTheDocument();
+    expect(sendAction).toHaveAccessibleName('Review');
+    expect(optimizationAction).toHaveAccessibleName('Open');
+    expect(moneyAction).toHaveAccessibleName('Open');
+    expect(riskAction).toHaveAccessibleName('Open');
+  });
+
   it('keeps weekly accomplishments as supporting evidence after the core queue and rail', async () => {
     renderSurface();
 
@@ -417,14 +499,52 @@ describe('CockpitSurface rebuilt', () => {
     expect(coreGrid.compareDocumentPosition(weekly) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('opens the carried-over work-order panel from a work-order queue row', async () => {
+  it('uses the workspace-badges pending-reply authority for the From client rail count', async () => {
     renderSurface();
 
-    fireEvent.click(await screen.findByRole('button', { name: /Open panel/i }));
+    expect(await screen.findByTestId('pending-replies-count')).toHaveTextContent('1');
+    const rail = screen.getByTestId('cockpit-evidence-rail');
+    expect(within(rail).getByText('Can we review July posts?')).toBeInTheDocument();
+  });
 
-    expect(await screen.findByTestId('work-order-panel')).toHaveTextContent(`Work orders for ${workspaceId}`);
-    expect(screen.getAllByTestId('work-order-panel')).toHaveLength(1);
-    expect(screen.getAllByRole('dialog', { name: /Work orders/i })).toHaveLength(1);
+  it.each<[WorkQueueSourceType, string]>([
+    ['request', `/ws/${workspaceId}/requests?tab=requests`],
+    ['work_order', `/ws/${workspaceId}/content-pipeline?tab=intake`],
+    ['content_request', `/ws/${workspaceId}/content-pipeline?tab=briefs`],
+    ['content_pipeline', `/ws/${workspaceId}/content-pipeline?tab=planner`],
+    ['rank_drop', `/ws/${workspaceId}/seo-keywords?lens=rankings`],
+    ['content_decay', `/ws/${workspaceId}/seo-audit?sub=content-decay`],
+    ['audit_error', `/ws/${workspaceId}/seo-audit`],
+    ['setup_gap', `/ws/${workspaceId}/workspace-settings?tab=connections`],
+    ['churn_signal', `/ws/${workspaceId}/requests?tab=signals`],
+  ])('routes the %s queue row to its most specific existing receiver', async (sourceType, destination) => {
+    const item: WorkQueueItem = {
+      stream: sourceType === 'request' || sourceType === 'churn_signal' ? 'unclassified' : 'opt',
+      id: `route-${sourceType}`,
+      title: `Route ${sourceType}`,
+      meta: 'Display metadata must not become route identity',
+      sourceType,
+    };
+    const routedQueue: WorkQueueClassification = {
+      streams: {
+        opt: item.stream === 'opt' ? 1 : 0,
+        send: 0,
+        money: 0,
+        unclassified: item.stream === 'unclassified' ? 1 : 0,
+      },
+      items: [item],
+    };
+    mocks.cockpitState = makeCockpitState({ workQueue: routedQueue });
+    renderSurface();
+
+    const title = await screen.findByText(`Route ${sourceType}`);
+    const row = title.parentElement?.parentElement;
+    expect(row).not.toBeNull();
+    fireEvent.click(within(row as HTMLElement).getByRole('button'));
+
+    expect(mocks.navigate).toHaveBeenCalledTimes(1);
+    expect(mocks.navigate).toHaveBeenCalledWith(destination);
+    expect(mocks.navigate.mock.calls[0]?.[0]).not.toContain('Display metadata');
   });
 
   it('opens the activity drawer from the toolbar', async () => {

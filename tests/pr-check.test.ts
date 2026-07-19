@@ -5774,8 +5774,205 @@ describe('Rule: Background generation in high-churn routes must be allowlisted',
   });
 });
 
+describe('Rule: Actionless EmptyState in rebuilt surface', () => {
+  const RULE = 'Actionless EmptyState in rebuilt surface';
+
+  it('flags a new rebuilt EmptyState without an action prop', () => {
+    const file = write(
+      uniqPath('rule-actionless-empty-state', 'src/components/example-rebuilt/ExampleSurface.tsx'),
+      lines(
+        'export function ExampleSurface() {',
+        '  return <EmptyState',
+        '    title="Nothing here"',
+        '    description="Create an item to continue."',
+        '  />;',
+        '}',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('allows a rebuilt EmptyState with an action prop containing nested JSX', () => {
+    const file = write(
+      uniqPath('rule-actionless-empty-state', 'src/components/example-rebuilt/ExampleSurface.tsx'),
+      lines(
+        'export function ExampleSurface() {',
+        '  return <EmptyState',
+        '    title="Nothing here"',
+        '    action={<Button onClick={createItem}><Icon name="plus" />Create item</Button>}',
+        '  />;',
+        '}',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an inline // empty-state-action-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-actionless-empty-state', 'src/components/example-rebuilt/ExampleSurface.tsx'),
+      lines(
+        'export function ExampleSurface() {',
+        '  return <EmptyState // empty-state-action-ok: terminal readback',
+        '    title="Nothing here"',
+        '    description="Results appear after measurement."',
+        '  />;',
+        '}',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an above-line // empty-state-action-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-actionless-empty-state', 'src/components/example-rebuilt/ExampleSurface.tsx'),
+      lines(
+        'export function ExampleSurface() {',
+        '  // empty-state-action-ok: terminal readback',
+        '  return <EmptyState',
+        '    title="Nothing here"',
+        '    description="Results appear after measurement."',
+        '  />;',
+        '}',
+      ),
+    );
+
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('allows the audited terminal-state fingerprint and rejects an added sibling', () => {
+    const file = write(
+      uniqPath(
+        'rule-actionless-empty-state',
+        'src/components/global-ops-rebuilt/wave-c/outcomes/OutcomeRecentWins.tsx',
+      ),
+      lines(
+        'export function OutcomeRecentWins() {',
+        '  return <>',
+        '    <EmptyState',
+        '      icon={TrophyIcon}',
+        '      title="No graduated wins yet"',
+        '      description="Wins appear after a tracked action reaches a scored measurement checkpoint."',
+        '      className="!py-10"',
+        '    />',
+        '    <EmptyState title="A newly added dead end" description="No next action is available." />',
+        '  </>;',
+        '}',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(9);
+  });
+
+  it('documents D3 governance and the audited-allowlist lifecycle', () => {
+    const check = CHECKS.find((candidate) => candidate.name === RULE);
+    expect(check?.claudeMdRef).toBe('#uiux-rules-mandatory');
+    expect(check?.message).toContain('audited allowlist');
+    expect(check?.message).toContain('// empty-state-action-ok');
+
+    const governance = readFileSync(
+      path.resolve(process.cwd(), 'docs/rules/usability-budgets.md'),
+      'utf-8',
+    );
+    expect(governance).toContain('D3-ratified');
+    expect(governance).toContain('W1.3');
+    expect(governance).toContain('Actionless EmptyState in rebuilt surface');
+  });
+});
+
+describe('Rule: RebuiltSidebar hardcoded nav label override', () => {
+  const RULE = 'RebuiltSidebar hardcoded nav label override';
+
+  function writeSidebar(itemLine: string, precedingLine?: string): string {
+    return write(
+      uniqPath('rule-rebuilt-sidebar-label', 'src/components/layout/RebuiltSidebar.tsx'),
+      lines(
+        'const GROUP_PRESENTATION = [',
+        '  {',
+        "    key: 'top',",
+        '    items: [',
+        ...(precedingLine ? [precedingLine] : []),
+        itemLine,
+        '    ],',
+        '  },',
+        '];',
+      ),
+    );
+  }
+
+  it('flags a new hardcoded item label override in GROUP_PRESENTATION', () => {
+    const file = writeSidebar("      { id: 'analytics-hub', label: 'Analytics' },");
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(5);
+  });
+
+  it('allows registry-driven items without a label override', () => {
+    const file = writeSidebar("      { id: 'analytics-hub' },");
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an inline // rebuilt-nav-label-ok hatch', () => {
+    const file = writeSidebar(
+      "      { id: 'analytics-hub', label: 'Analytics' }, // rebuilt-nav-label-ok: approved exception",
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('respects an above-line // rebuilt-nav-label-ok hatch', () => {
+    const file = writeSidebar(
+      "      { id: 'analytics-hub', label: 'Analytics' },",
+      '      // rebuilt-nav-label-ok: approved exception',
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('flags every hardcoded override, including the five removed by W0.3', () => {
+    const file = write(
+      uniqPath('rule-rebuilt-sidebar-label', 'src/components/layout/RebuiltSidebar.tsx'),
+      lines(
+        'const GROUP_PRESENTATION = [',
+        "  { key: 'top', items: [",
+        "    { id: 'home', label: 'Cockpit' },",
+        "    { id: 'seo-strategy', label: 'Insights Engine' },",
+        "    { id: 'seo-keywords', label: 'Keywords' },",
+        "    { id: 'content-pipeline', label: 'Content Pipeline' },",
+        "    { id: 'media', label: 'Asset Manager' },",
+        "    { id: 'analytics-hub', label: 'Analytics' },",
+        '  ] },',
+        '];',
+      ),
+    );
+
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(6);
+    expect(hits.map((hit) => hit.line)).toEqual([3, 4, 5, 6, 7, 8]);
+  });
+
+  it('documents D3 governance and the all-override ban', () => {
+    const check = CHECKS.find((candidate) => candidate.name === RULE);
+    expect(check?.claudeMdRef).toBe('#uiux-rules-mandatory');
+    expect(check?.message).toContain('All item label overrides are banned');
+    expect(check?.message).toContain('// rebuilt-nav-label-ok');
+
+    const governance = readFileSync(
+      path.resolve(process.cwd(), 'docs/rules/usability-budgets.md'),
+      'utf-8',
+    );
+    expect(governance).toContain('RebuiltSidebar hardcoded nav label override');
+    expect(governance).toContain('deleted in W0.3');
+  });
+});
+
 describe('Meta: customCheck rule name registry', () => {
   const EXPECTED_CUSTOM_CHECK_RULES = [
+    'Actionless EmptyState in rebuilt surface',
     'Global keydown missing isContentEditable guard',
     'Multi-step DB writes outside db.transaction()',
     'New JSON-array TEXT column without normalization review',
@@ -6000,6 +6197,7 @@ describe('Meta: customCheck rule name registry', () => {
     'ds-icon-discipline',
     'ds-deep-import',
     'ds-motion-token',
+    'RebuiltSidebar hardcoded nav label override',
   ].sort();
 
   it('the set of customCheck rule names matches the harness exactly', () => {
@@ -6077,10 +6275,10 @@ describe('Meta: generated automated-rules docs', () => {
 //
 // How it works: spawn `npx tsx scripts/pr-check.ts --all` as a subprocess,
 // parse each status line (`  ✓ <name>`, `  ⚠ <name>`, `  ✗ <name>`), and
-// require that the SET of rules reporting `✓` exactly matches the rows
-// in `docs/rules/verified-clean-rules.md`. Any mismatch — a new rule
-// silently landing at ✓, or an existing rule dropping from ⚠ to ✓ after
-// an inadvertent break — fails the test with an explicit diff.
+// require that every rule reporting `✓` is either listed in
+// `docs/rules/verified-clean-rules.md` or is a customCheck with a fixture
+// describe block in this file. Any unproved clean rule — or an allowlist row
+// whose rule stops reporting ✓ — fails with an explicit diff.
 //
 // Why this matters: Round 2 discovered FIVE simultaneous silent-failure
 // rules (useGlobalAdminEvents, both broadcast* rules, getOrCreate*, and
@@ -6097,9 +6295,10 @@ describe('Meta: generated automated-rules docs', () => {
 describe('Meta: pr-check --all status parity with verified-clean allowlist', () => {
   it('every rule reporting ✓ is listed in docs/rules/verified-clean-rules.md', () => {
     // 1. Spawn pr-check --all as a subprocess and capture stdout.
-    //    We use execFileSync with the tsx binary directly to avoid
-    //    shell interpretation of stdout (which contains box-drawing
-    //    characters and ANSI status symbols).
+    //    Use Node's tsx import hook rather than the tsx CLI: the CLI creates
+    //    an IPC socket that managed/sandboxed environments may reject with
+    //    EPERM before pr-check produces any output. execFileSync still avoids
+    //    shell interpretation of box-drawing characters and status symbols.
     // vitest rewrites import.meta.url to a `file:///@fs/...` URL that
     // `new URL('..').pathname` cannot decode as a real filesystem path.
     // `fileURLToPath` handles both the native and vite-rewritten forms.
@@ -6115,21 +6314,9 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     } catch {
       repoRoot = process.cwd();
     }
-    // In worktree environments the node_modules is sparse; fall back to the
-    // parent project's node_modules (git worktrees share the main checkout's
-    // .git but have their own working tree without a full npm install).
-    let tsxBin = path.join(repoRoot, 'node_modules', '.bin', 'tsx');
-    if (!existsSync(tsxBin)) {
-      // Walk up to find node_modules — worktrees sit 3 levels deep under
-      // <main>/.claude/worktrees/<name>, so the main project is 3 dirs up.
-      const candidate = path.join(repoRoot, '..', '..', '..', 'node_modules', '.bin', 'tsx');
-      if (existsSync(candidate)) tsxBin = candidate;
-    }
     let out: string;
     try {
-      // Invoke tsx directly via node_modules/.bin — vitest's child
-      // environment does not always inherit a PATH that resolves `npx`.
-      out = execFileSync(tsxBin, ['scripts/pr-check.ts', '--all'], {
+      out = execFileSync(process.execPath, ['--import', 'tsx', 'scripts/pr-check.ts', '--all'], {
         cwd: repoRoot,
         encoding: 'utf-8',
         timeout: 600_000,
@@ -6238,8 +6425,20 @@ describe('Meta: pr-check --all status parity with verified-clean allowlist', () 
     //    if either side has extras.
     const cleanSet = new Set(cleanRules);
     const allowedSet = new Set(allowedRules);
+    const selfSource = readFileSync(fileURLToPath(import.meta.url), 'utf-8');
+    const fixtureCoveredCustomChecks = new Set(
+      CHECKS
+        .filter((check) => typeof check.customCheck === 'function')
+        .map((check) => check.name)
+        .filter((name) => (
+          selfSource.includes(`describe('Rule: ${name}'`)
+          || selfSource.includes(`describe("Rule: ${name}"`)
+        )),
+    );
 
-    const unlisted = cleanRules.filter(r => !allowedSet.has(r));
+    const unlisted = cleanRules.filter(
+      (rule) => !allowedSet.has(rule) && !fixtureCoveredCustomChecks.has(rule),
+    );
     const stale = allowedRules.filter(r => !cleanSet.has(r));
 
     const errors: string[] = [];

@@ -6,6 +6,7 @@ import { getWorkspace } from '../workspaces.js';
 import { listContentRequests } from '../content-requests.js';
 import { listBriefs } from '../content-brief.js';
 import { listPosts } from '../content-posts.js';
+import { getPendingRepliesSummary } from '../requests.js';
 
 import { requireWorkspaceAccess } from '../auth.js';
 const router = Router();
@@ -24,6 +25,7 @@ router.get('/api/workspace-badges/:id', requireWorkspaceAccess(), (req, res) => 
     const contentRequests = listContentRequests(req.params.id);
     const briefs = listBriefs(req.params.id);
     const posts = listPosts(req.params.id);
+    const pendingReplies = getPendingRepliesSummary(req.params.id);
 
     const pendingRequests = Array.isArray(contentRequests)
       ? contentRequests.filter((r: { status: string }) => r.status === 'requested').length
@@ -33,7 +35,7 @@ router.get('/api/workspace-badges/:id', requireWorkspaceAccess(), (req, res) => 
       (Array.isArray(briefs) && briefs.length > 0) ||
       (Array.isArray(posts) && posts.length > 0);
 
-    res.json({ pendingRequests, hasContent });
+    res.json({ pendingRequests, hasContent, pendingReplies });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to compute badges' });
   }

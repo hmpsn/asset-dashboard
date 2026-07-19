@@ -92,6 +92,7 @@ describe('useWsInvalidation registry parity (pure)', () => {
 
     expect(keys).toContainEqual(queryKeys.admin.outcomeActions(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.outcomeScorecard(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.outcomePortfolioRollup());
     expect(keys).toContainEqual(queryKeys.admin.outcomeTimeline(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.outcomeTopWins(WS_ID));
     expect(keys).toContainEqual(queryKeys.admin.outcomeLearnings(WS_ID));
@@ -134,6 +135,7 @@ describe('useWsInvalidation registry parity (pure)', () => {
     const keys = adminKeys(WS_EVENTS.OUTCOME_EXTERNAL_DETECTED);
 
     expect(keys).toContainEqual(queryKeys.admin.outcomeActions(WS_ID));
+    expect(keys).toContainEqual(queryKeys.admin.outcomePortfolioRollup());
     expect(keys).toContainEqual(queryKeys.client.outcomeWins(WS_ID));
     expect(keys).toContainEqual(queryKeys.client.monthlyDigest(WS_ID));
     expect(keys).not.toContainEqual(queryKeys.admin.outcomeScorecard(WS_ID));

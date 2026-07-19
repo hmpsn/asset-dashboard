@@ -181,7 +181,7 @@ describe('RebuiltAppChrome', () => {
     expect(screen.getByRole('navigation', { name: 'Admin' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Admin' })).toHaveTextContent('Keywords');
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Keyword Hub');
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Keywords');
 
     const health = screen.getByRole('region', { name: 'Connection health' });
     expect(health.closest('footer')).toBeInTheDocument();

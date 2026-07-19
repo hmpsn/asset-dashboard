@@ -1,5 +1,6 @@
 // @ds-rebuilt
 import { useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   KEYWORD_COMMAND_CENTER_ACTIONS,
@@ -10,8 +11,12 @@ import {
   type KeywordCommandCenterSummaryResponse,
 } from '../../../shared/types/keyword-command-center';
 import { GSC_METRIC_WINDOW_DAYS } from '../../../shared/keyword-window';
+import { keywordComparisonKey } from '../../../shared/keyword-normalization';
+import type { RankHistorySeries } from '../../../shared/types/rank-tracking';
+import { rankTracking } from '../../api/seo';
 import { useKeywordCommandCenterBulkAction, useKeywordCommandCenterRows } from '../../hooks/admin/useKeywordCommandCenter';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../hooks/useToggleSet';
+import { queryKeys } from '../../lib/queryKeys';
 import { adminPath } from '../../routes';
 import { useToast } from '../Toast';
 import { KeywordBulkConfirmDialog } from '../keyword-command-center/KeywordBulkConfirmDialog';
@@ -32,13 +37,15 @@ import {
   InlineBanner,
   IntentTag,
   Meter,
-  StatusBadge,
+  Skeleton,
+  Sparkline,
   Toolbar,
   ToolbarSpacer,
 } from '../ui';
 import type { DataColumn } from '../ui';
 import type { UseKeywordsSurfaceStateReturn } from './useKeywordsSurfaceState';
 import type { KeywordCommandCenterRowsResponse } from '../../../shared/types/keyword-command-center';
+import { KEYWORDS_SAY_IT_ALOUD, KeywordLifecycleBadge } from './keywordVocabulary';
 
 interface KeywordsTableProps {
   workspaceId: string;
@@ -156,6 +163,56 @@ function selectedRowsFrom(rows: KeywordCommandCenterRow[], selectedKeys: Set<str
   return rows.filter((row) => selectedKeys.has(row.normalizedKeyword));
 }
 
+function rankDeltaLabel(delta: number): string {
+  return `${delta > 0 ? '+' : ''}${delta} · 7d`;
+}
+
+function rankDeltaTone(delta: number): 'emerald' | 'red' | 'zinc' {
+  if (delta > 0) return 'emerald';
+  if (delta < 0) return 'red';
+  return 'zinc';
+}
+
+function RankTrendCell({
+  keyword,
+  series,
+  isLoading,
+  isError,
+}: {
+  keyword: string;
+  series?: RankHistorySeries;
+  isLoading: boolean;
+  isError: boolean;
+}) {
+  if (isLoading) return <Skeleton className="h-6 w-full" />;
+  if (isError) return <span className="t-caption-sm text-[var(--brand-text-muted)]">History unavailable</span>;
+  if (!series || series.points.length < 2) {
+    return <span className="t-caption-sm text-[var(--brand-text-muted)]">Not enough snapshots yet</span>;
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <Sparkline
+        data={series.points.map((point) => -point.position)}
+        width={64}
+        height={24}
+        label={`${keyword} rank trend`}
+      />
+      {series.delta7d != null ? (
+        <Badge
+          label={rankDeltaLabel(series.delta7d)}
+          tone={rankDeltaTone(series.delta7d)}
+          variant="soft"
+          size="sm"
+          shape="pill"
+        />
+      ) : (
+        <span className="t-caption-sm whitespace-nowrap text-[var(--brand-text-muted)]">7d unavailable</span>
+      )}
+    </div>
+  );
+}
+
 export function KeywordsTable({ workspaceId, state, summary, rowsResult: externalRowsResult }: KeywordsTableProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -165,6 +222,25 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
   const rowsResult = externalRowsResult ?? ownedRowsResult;
   const rows = rowsResult.data?.rows ?? [];
   const pageInfo = rowsResult.data?.pageInfo;
+  const visibleHistoryQueries = useMemo(() => {
+    const queriesByKey = new Map<string, string>();
+    for (const row of rows) {
+      const key = keywordComparisonKey(row.keyword);
+      if (key && !queriesByKey.has(key)) queriesByKey.set(key, row.keyword);
+    }
+    return [...queriesByKey]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, query]) => query);
+  }, [rows]);
+  const rowHistory = useQuery({
+    queryKey: queryKeys.admin.rankTrackingRowHistory(workspaceId, visibleHistoryQueries),
+    queryFn: () => rankTracking.rowHistory(workspaceId, visibleHistoryQueries),
+    enabled: !!workspaceId && visibleHistoryQueries.length > 0 && state.columns !== 'triage',
+    staleTime: 60_000,
+  });
+  const historyByKeyword = useMemo(() => new Map(
+    (rowHistory.data?.series ?? []).map((series) => [keywordComparisonKey(series.query), series]),
+  ), [rowHistory.data]);
   const bulkAction = useKeywordCommandCenterBulkAction(workspaceId);
   const [selectedKeys, toggleKey, setSelectedKeys] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const [pendingBulk, setPendingBulk] = useState<KeywordBulkActionSummary | null>(null);
@@ -302,6 +378,22 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
       },
     },
     {
+      key: 'rankTrend',
+      label: '7d trend',
+      width: 'minmax(156px, 0.9fr)',
+      render: (_value, record) => {
+        const row = (record as KeywordsTableRecord).source;
+        return (
+          <RankTrendCell
+            keyword={row.keyword}
+            series={historyByKeyword.get(keywordComparisonKey(row.keyword))}
+            isLoading={rowHistory.isLoading}
+            isError={rowHistory.isError}
+          />
+        );
+      },
+    },
+    {
       key: 'clicks',
       label: 'Clicks',
       width: '58px',
@@ -323,7 +415,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
     {
       key: 'opportunity',
-      label: 'Opp',
+      label: KEYWORDS_SAY_IT_ALOUD.opportunity,
       width: '108px',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
@@ -345,7 +437,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
     {
       key: 'currentMonthly',
-      label: '$',
+      label: KEYWORDS_SAY_IT_ALOUD.currentMonthly,
       width: '64px',
       align: 'right',
       render: (_value, record) => {
@@ -361,12 +453,11 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         const row = (record as KeywordsTableRecord).source;
         return (
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <StatusBadge status={row.lifecycleStatus} domain="keyword-command-center" variant="soft" />
+            <KeywordLifecycleBadge status={row.lifecycleStatus} />
             {row.tracking.sourceGapKey && <Badge label="From gap" tone="blue" variant="soft" size="sm" />}
             {row.tracking.strategyOwned === true && <Badge label="Auto-managed" tone="teal" variant="soft" size="sm" />}
-            {/* No separate "Raw evidence" badge — the StatusBadge above already renders the
-                raw-evidence lifecycle status; a second badge duplicated the term (with
-                inconsistent casing) in the same cell. */}
+            {/* The lifecycle badge owns the plain-language status label; a second evidence
+                badge would duplicate the same state in this cell. */}
           </div>
         );
       },
@@ -388,7 +479,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
         );
       },
     },
-  ], [selectedKeys, toggleKey]);
+  ], [historyByKeyword, rowHistory.isError, rowHistory.isLoading, selectedKeys, toggleKey]);
 
   // The Opportunities lens gets its own upside-focused shape (parity with the design
   // prototype's Opportunities view) instead of the wide Rankings grid re-sorted: the
@@ -441,7 +532,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
     {
       key: 'opportunity',
-      label: 'Opp',
+      label: KEYWORDS_SAY_IT_ALOUD.opportunity,
       width: 'minmax(135px, 1fr)',
       render: (_value, record) => {
         const row = (record as KeywordsTableRecord).source;
@@ -477,7 +568,7 @@ export function KeywordsTable({ workspaceId, state, summary, rowsResult: externa
     },
   ], [selectedKeys, toggleKey]);
 
-  const activeColumns = state.lens === 'opportunities' ? opportunityColumns : columns;
+  const activeColumns = state.columns === 'triage' ? opportunityColumns : columns;
 
   return (
     <div className="flex flex-col gap-2">

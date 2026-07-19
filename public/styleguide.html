@@ -2207,6 +2207,26 @@ SectionCard: var(--radius-signature-lg)</div>
       <div class="spec-note">Use to cap a page's content width and apply consistent horizontal padding (<span class="t-mono">--page-pad-x</span>) so text and cards never stretch edge-to-edge on wide viewports.</div>
     </div>
 
+    <!-- WorkbenchFrame -->
+    <div class="sub-section">
+      <div class="col-label">WorkbenchFrame · pinned decisions + one contained collection</div>
+      <div class="card" style="height:220px; display:flex; min-height:0; flex-direction:column; overflow:hidden;">
+        <div style="flex:none; border-bottom:1px solid var(--brand-border); padding:var(--space-3); background:var(--surface-2);">
+          <div class="row" style="gap:var(--space-2); align-items:center;">
+            <strong class="t-ui">Pinned decision context</strong>
+            <span class="badge b-blue">248 records</span>
+            <span style="flex:1;"></span>
+            <button class="btn btn-secondary">Filter</button>
+          </div>
+        </div>
+        <div style="min-height:0; flex:1; overflow:auto; padding:var(--space-3);">
+          <div class="t-caption" style="color:var(--brand-text-muted);">The collection is the frame's only scroll owner.</div>
+          <div style="height:120px; margin-top:var(--space-2); border:1px dashed var(--brand-border-hover); border-radius:var(--radius-md); background:var(--surface-3);"></div>
+        </div>
+      </div>
+      <div class="spec-note">Use for operational collections that must stay within the viewport. Put compact verdict, filters, and bulk controls in <span class="t-mono">pinned</span>; render exactly one table, grid, board, or list as the collection, with no page-flow content beneath it.</div>
+    </div>
+
     <!-- F3: Toolbar -->
     <div class="sub-section">
       <div class="col-label">Toolbar · search + filters + spacer + action</div>

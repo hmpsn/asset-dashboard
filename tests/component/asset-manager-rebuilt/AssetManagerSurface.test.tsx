@@ -161,7 +161,12 @@ function renderSurface(initialEntry = '/ws/ws-1/media') {
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="location-search" hidden>{location.search}</span>;
+  return (
+    <>
+      <span data-testid="location-pathname" hidden>{location.pathname}</span>
+      <span data-testid="location-search" hidden>{location.search}</span>
+    </>
+  );
 }
 
 function metricTile(label: string): HTMLElement {
@@ -327,6 +332,45 @@ describe('AssetManagerSurface', () => {
     const preview = within(screen.getAllByRole('article')[0]).getByTestId('asset-preview');
     expect(preview).toHaveClass('h-[132px]');
   });
+
+  it('contains the asset library and loads 100-asset batches with a bounded control count', async () => {
+    const loadedAssets = Array.from({ length: 250 }, (_, index) => ({
+      ...assets[0],
+      id: `asset-${index}`,
+      displayName: `asset-${index}.jpg`,
+      originalFileName: `asset-${index}.jpg`,
+      hostedUrl: `https://cdn.example.com/asset-${index}.jpg`,
+      createdOn: '2026-07-01T00:00:00.000Z',
+    }));
+    useWebflowAssetsMock.mockReturnValue({
+      data: loadedAssets,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      dataUpdatedAt: new Date('2026-07-07T12:00:00.000Z').getTime(),
+    });
+
+    const { container } = renderSurface('/ws/ws-1/media');
+
+    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument();
+    const frame = screen.getByTestId('workbench-frame');
+    const collection = frame.querySelector('[data-workbench-collection]') as HTMLElement;
+    expect(frame.querySelectorAll('[data-workbench-collection]')).toHaveLength(1);
+    expect(within(screen.getByTestId('workbench-pinned')).getByRole('toolbar', { name: 'Browse asset controls' })).toBeInTheDocument();
+    expect(within(collection).getByLabelText('Asset grid')).toBeInTheDocument();
+
+    expect(screen.getAllByRole('article')).toHaveLength(100);
+    expect(screen.getByText('Showing 100 of 250 assets')).toBeInTheDocument();
+    expect(screen.queryByText('asset-100.jpg')).not.toBeInTheDocument();
+    // Perf ratchet: the audit captured 1,583 mounted buttons on the unbounded
+    // page. This 250-asset loaded fixture now mounts 208 after batching + diet.
+    expect(container.querySelectorAll('button')).toHaveLength(208);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more (150 remaining)' }));
+    expect(screen.getAllByRole('article')).toHaveLength(200);
+    expect(screen.getByText('Showing 200 of 250 assets')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load more (50 remaining)' })).toBeInTheDocument();
+  }, 30_000);
 
   it('clears only the shown selection when Select all shown is toggled off', async () => {
     renderSurface('/ws/ws-1/media');
@@ -533,6 +577,9 @@ describe('AssetManagerSurface', () => {
     renderSurface('/ws/ws-1/media');
 
     expect(await screen.findByText('Link a Webflow site')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Workspace Settings' }));
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/ws/ws-1/workspace-settings');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?tab=connections');
   });
 
   it('passes the rebuilt a11y floor for the loaded browse view', async () => {

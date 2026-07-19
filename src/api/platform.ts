@@ -9,6 +9,7 @@ import type { WorkQueueClassification } from '../../shared/types/work-queue';
 import type { WorkspaceOverviewItem } from '../../shared/types/workspace-overview';
 import type { CockpitVerdict } from '../../shared/types/cockpit';
 import type { AdminMoneyFrame } from '../../shared/types/outcome-tracking';
+import type { PendingRepliesSummary } from '../../shared/types/requests';
 
 // ── Jobs ────────────────────────────────────────────────────────
 export const jobs = {
@@ -105,6 +106,7 @@ export const workspaceHome = {
 export interface WorkspaceBadges {
   pendingRequests: number;
   hasContent: boolean;
+  pendingReplies: PendingRepliesSummary;
 }
 
 export const workspaceBadges = {

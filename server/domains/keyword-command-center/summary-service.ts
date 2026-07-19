@@ -225,6 +225,7 @@ export async function buildKeywordCommandCenterSummary(
     summarizedAt: new Date().toISOString(),
     geoLabel: snapshot.geoLabel,
     trafficValueMonthly: snapshot.trafficValueMonthly ?? null,
+    rankKpis: snapshot.rankKpis,
     topicClusters: snapshot.topicClusters,
     cannibalization: snapshot.cannibalization,
     rankFreshness: snapshot.rankFreshness,

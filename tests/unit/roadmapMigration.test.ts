@@ -17,15 +17,19 @@ describe('roadmap data integrity', () => {
     expect(invalid).toEqual([]);
   });
 
-  it('records shipments only for done items', () => {
-    const { sprints } = loadRoadmap('data/roadmap.json');
+  it('records shipments only for done items across active and archived history', () => {
+    const active = loadRoadmap('data/roadmap.json');
+    const archived = loadRoadmap('data/roadmap.archive.json');
+    const sprints = [...active.sprints, ...archived.sprints];
     const falseShipments = sprints.flatMap(sprint => sprint.items)
       .filter(item => item.status !== 'done' && item.shippedAt);
     expect(falseShipments).toEqual([]);
   });
 
   it('closes merged, obsolete, and superseded audit dispositions without claiming shipment', () => {
-    const { sprints } = loadRoadmap('data/roadmap.json');
+    const active = loadRoadmap('data/roadmap.json');
+    const archived = loadRoadmap('data/roadmap.archive.json');
+    const sprints = [...active.sprints, ...archived.sprints];
     const auditedClosures = sprints.flatMap(sprint => sprint.items).filter(item =>
       item.status === 'closed' && (item.notes ?? '').includes('[ROADMAP VALUE AUDIT 2026-07-12]'),
     );
@@ -37,15 +41,11 @@ describe('roadmap data integrity', () => {
     expect(invalidClosures).toEqual([]);
   });
 
-  it('does not mark a sprint containing closed work as fully shipped', () => {
+  it('keeps done and closed terminal history out of the active roadmap', () => {
     const { sprints } = loadRoadmap('data/roadmap.json');
-    const mixedTerminalSprints = sprints.filter(sprint =>
-      sprint.items.some(item => item.status === 'closed')
-      && !sprint.items.some(item => item.status !== 'done' && item.status !== 'closed'),
-    );
-    expect(mixedTerminalSprints.length).toBeGreaterThan(0);
-    const falselyShippedSprints = mixedTerminalSprints.filter(sprint => sprint.name?.startsWith('✅') || sprint.shippedAt);
-    expect(falselyShippedSprints).toEqual([]);
+    const terminalItems = sprints.flatMap(sprint => sprint.items)
+      .filter(item => item.status === 'done' || item.status === 'closed');
+    expect(terminalItems).toEqual([]);
   });
 
   it('active roadmap does not carry monthly shipped archive buckets', () => {

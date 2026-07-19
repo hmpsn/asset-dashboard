@@ -16,6 +16,8 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, relative } from 'path';
 import { describe, it, expect } from 'vitest';
+import { NAV_REGISTRY_BY_ID, resolveNavLabel } from '../../src/lib/navRegistry';
+import { adminPath } from '../../src/routes';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -282,6 +284,10 @@ const senders = findTabSenders();
 // ---------------------------------------------------------------------------
 
 describe('?tab= deep-link wiring contract', () => {
+  it('builds the dedicated AI Visibility workspace route without a synthetic tab parameter', () => {
+    expect(adminPath('ws-1', 'ai-visibility')).toBe('/ws/ws-1/ai-visibility');
+  });
+
   it('route map is populated (sanity check)', () => {
     // App.tsx should map at least 15 page slugs to component files
     expect(routeMap.size).toBeGreaterThan(15);
@@ -396,6 +402,44 @@ describe('?tab= deep-link wiring contract', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Cockpit work-queue section/lens/sub handoffs (W1.2 amended contract)
+// ---------------------------------------------------------------------------
+
+describe('Cockpit work-queue section handoff two-halves contract', () => {
+  const senderFile = join(SRC_DIR, 'components/cockpit-rebuilt/CockpitSurface.tsx');
+  const senderSource = readFileSync(senderFile, 'utf8'); // readFile-ok — intentional static analysis
+  const cases = [
+    { sourceType: 'request', route: "'requests')}?tab=requests", receiver: 'components/global-ops-rebuilt/useGlobalOpsSurfaceState.ts', read: "params.get('tab')", value: 'requests' },
+    { sourceType: 'work_order', route: "'content-pipeline')}?tab=intake", receiver: 'components/content-pipeline-rebuilt/useContentPipelineSurfaceState.ts', read: 'searchParams.get(TAB_PARAM)', value: 'intake' },
+    { sourceType: 'content_request', route: "'content-pipeline')}?tab=briefs", receiver: 'components/content-pipeline-rebuilt/useContentPipelineSurfaceState.ts', read: 'searchParams.get(TAB_PARAM)', value: 'briefs' },
+    { sourceType: 'content_pipeline', route: "'content-pipeline')}?tab=planner", receiver: 'components/content-pipeline-rebuilt/useContentPipelineSurfaceState.ts', read: 'searchParams.get(TAB_PARAM)', value: 'planner' },
+    { sourceType: 'rank_drop', route: "'seo-keywords')}?lens=rankings", receiver: 'components/keywords-rebuilt/useKeywordsSurfaceState.ts', read: 'params.get(LENS_PARAM)', value: 'rankings' },
+    { sourceType: 'content_decay', route: "'seo-audit')}?sub=content-decay", receiver: 'components/site-audit-rebuilt/useSiteAuditSurfaceState.ts', read: 'searchParams.get(SUB_PARAM)', value: 'content-decay' },
+    { sourceType: 'audit_error', route: "'seo-audit')", receiver: 'components/site-audit-rebuilt/SiteAuditSurface.tsx', read: null, value: null },
+    { sourceType: 'setup_gap', route: "'workspace-settings')}?tab=connections", receiver: 'components/global-ops-rebuilt/useGlobalOpsSurfaceState.ts', read: "params.get('tab')", value: 'connections' },
+    { sourceType: 'churn_signal', route: "'requests')}?tab=signals", receiver: 'components/global-ops-rebuilt/useGlobalOpsSurfaceState.ts', read: "params.get('tab')", value: 'signals' },
+  ] as const;
+
+  it.each(cases)('$sourceType sender targets the declared receiver section without display-text identity', ({ sourceType, route }) => {
+    const start = senderSource.indexOf(`case '${sourceType}':`);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const block = senderSource.slice(start, start + 500);
+    expect(block).toContain(route);
+    expect(block).not.toContain('.meta');
+  });
+
+  it.each(cases)('$sourceType receiver consumes and recognizes the declared URL state', ({ receiver, read, value }) => {
+    const receiverSource = readFileSync(join(SRC_DIR, receiver), 'utf8'); // readFile-ok — intentional static analysis
+    if (read === null || value === null) {
+      expect(receiverSource.length).toBeGreaterThan(0);
+      return;
+    }
+    expect(receiverSource).toContain(read);
+    expect(receiverSource).toContain(`'${value}'`);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // ?post= deep-link wiring: ContentCalendar → ContentManager
 // ---------------------------------------------------------------------------
 
@@ -453,6 +497,14 @@ describe('?post= deep-link wiring (ContentCalendar → ContentManager)', () => {
 
 describe('?tab=/?filter= deep-link wiring (rebuilt Asset Manager `media`)', () => {
   const stateHookFile = join(SRC_DIR, 'components/asset-manager-rebuilt/useAssetManagerSurfaceState.ts');
+
+  it('resolves the rebuilt deep-link destination label from navRegistry', () => {
+    const label = resolveNavLabel(
+      NAV_REGISTRY_BY_ID.media,
+      (flag) => flag === 'ui-rebuild-shell',
+    );
+    expect(label).toBe('Asset Manager');
+  });
 
   it('asset-manager surface state hook file exists', () => {
     expect(existsSync(stateHookFile)).toBe(true);

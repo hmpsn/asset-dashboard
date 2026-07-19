@@ -216,7 +216,19 @@ export function PageIntelligenceSurface({ workspaceId }: PageIntelligenceSurface
 
   if (workspaces.isLoading) return <LoadingState message="Resolving this workspace..." className="py-20" />;
   if (!siteId) {
-    return <EmptyState icon={() => <Icon name="link" size="xl" />} title="Connect a Webflow site" description="Page Intelligence needs a linked site to assemble editable pages and strategy evidence." />;
+    return (
+      <EmptyState
+        icon={() => <Icon name="link" size="xl" />}
+        title="Connect a Webflow site"
+        description="Page Intelligence needs a linked site to assemble editable pages and strategy evidence."
+        action={(
+          <Button size="sm" variant="primary" onClick={() => navigate(`${adminPath(workspaceId, 'workspace-settings')}?tab=connections`)}>
+            <Icon name="settings" size="sm" />
+            Open Workspace Settings
+          </Button>
+        )}
+      />
+    );
   }
   if (pageJoin.isLoading) return <LoadingState message="Assembling page intelligence and strategy mappings..." className="py-20" />;
   if (pageJoin.error) {

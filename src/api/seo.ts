@@ -1,6 +1,6 @@
 // ── SEO API (audit, schema, keywords, webflow, etc.) ──────────────
 import { ApiError, get, post, put, patch, del, getSafe, getOptional } from './client';
-import type { LatestRank, RankHistoryEntry, TrackedKeyword } from '../../shared/types/rank-tracking';
+import type { LatestRank, RankHistoryEntry, RankHistoryRowsResponse, TrackedKeyword } from '../../shared/types/rank-tracking';
 import type { KeywordStrategyDiff as StrategyDiff } from '../../shared/types/keyword-strategy-ux';
 import type { AdminKeywordFeedbackListRow } from '../../shared/types/keyword-feedback';
 import type { ContentPerformanceResponse, ContentPerformanceTrendResponse } from '../../shared/types/content';
@@ -170,6 +170,16 @@ export const rankTracking = {
 
   history: (wsId: string) =>
     getSafe<RankHistoryEntry[]>(`/api/public/rank-tracking/${wsId}/history`, []),
+
+  /** One admin read for the rebuilt table's complete visible keyword set. */
+  rowHistory: (wsId: string, queries: string[]) => {
+    const params = new URLSearchParams();
+    for (const query of queries) {
+      const trimmed = query.trim();
+      if (trimmed) params.append('query', trimmed);
+    }
+    return get<RankHistoryRowsResponse>(`/api/rank-tracking/${wsId}/history/rows?${params.toString()}`);
+  },
 
   /** Filtered public rank history — repeated `query` params + explicit `limit`
    *  (A4: the client requested-keyword trend card reads 180 days). */

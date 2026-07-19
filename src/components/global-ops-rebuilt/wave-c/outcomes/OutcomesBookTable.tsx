@@ -1,6 +1,6 @@
 // @ds-rebuilt
 import { useMemo } from 'react';
-import type { WorkspaceOutcomeOverview } from '../../../../../shared/types/outcome-tracking';
+import type { OutcomePortfolioWorkspaceRollup, WorkspaceOutcomeOverview } from '../../../../../shared/types/outcome-tracking';
 import type { WorkspaceOverviewItem } from '../../../../../shared/types/workspace-overview';
 import { UNBOUNDED_TOGGLE_SET_OPTIONS, useToggleSet } from '../../../../hooks/useToggleSet';
 import {
@@ -20,11 +20,13 @@ import { formatMoney, formatNumber, percent } from '../../globalOpsFormatters';
 export interface OutcomeBookEntry {
   workspace: WorkspaceOverviewItem;
   outcome?: WorkspaceOutcomeOverview;
+  portfolio?: OutcomePortfolioWorkspaceRollup;
 }
 
 interface OutcomesBookTableProps {
   entries: OutcomeBookEntry[];
   loading: boolean;
+  windowLabel: string | null;
   onOpenWorkspace: (workspaceId: string) => void;
 }
 
@@ -61,20 +63,20 @@ function attentionBadge(outcome: WorkspaceOutcomeOverview | undefined) {
     : <Badge label="On track" tone="emerald" variant="soft" />;
 }
 
-export function OutcomesBookTable({ entries, loading, onOpenWorkspace }: OutcomesBookTableProps) {
+export function OutcomesBookTable({ entries, loading, windowLabel, onOpenWorkspace }: OutcomesBookTableProps) {
   const [expandedIds, toggleEvidence] = useToggleSet<string>([], UNBOUNDED_TOGGLE_SET_OPTIONS);
   const maxValue = useMemo(
-    () => Math.max(1, ...entries.map(({ workspace }) => workspace.outcomeValue?.valuePerMonth ?? 0)),
+    () => Math.max(1, ...entries.map(({ portfolio }) => portfolio?.totals.valuePerMonth ?? 0)),
     [entries],
   );
 
   return (
     <SectionCard
       title="By workspace"
-      subtitle="Ranked by delivered value, with search evidence and outcome coverage one step deeper"
+      subtitle={`Ranked by measured value${windowLabel ? ` in ${windowLabel.toLowerCase()}` : ''}, with supporting evidence one step deeper`}
       titleIcon={<Icon name="trophy" size="md" className="text-[var(--emerald)]" aria-hidden="true" />}
       iconChip
-      action={<span className="hidden t-caption-sm text-[var(--brand-text-muted)] sm:inline">Rolling 90 days</span>}
+      action={<span className="hidden t-caption-sm text-[var(--brand-text-muted)] sm:inline">{windowLabel ?? 'Outcome window unavailable'}</span>}
       noPadding
     >
       <div
@@ -88,7 +90,7 @@ export function OutcomesBookTable({ entries, loading, onOpenWorkspace }: Outcome
             className="sticky top-0 z-[var(--z-sticky)] grid items-center gap-2.5 border-b border-[var(--brand-border)] bg-[var(--surface-1)] px-[18px] py-[11px]"
             style={{ gridTemplateColumns: GRID_TEMPLATE }}
           >
-            {['Workspace', 'Value delivered / mo', 'Clicks', 'Wins', 'Trend', 'Open workspace'].map((label, index) => (
+            {['Workspace', 'Measured value / mo', 'Clicks gained', 'Measured wins', 'Trend', 'Open workspace'].map((label, index) => (
               <span
                 key={`${label}-${index}`}
                 role="columnheader"
@@ -124,11 +126,12 @@ export function OutcomesBookTable({ entries, loading, onOpenWorkspace }: Outcome
             </div>
           )}
 
-          {!loading && entries.map(({ workspace, outcome }) => {
+          {!loading && entries.map(({ workspace, outcome, portfolio }) => {
             const expanded = expandedIds.has(workspace.id);
-            const hasValueEvidence = Boolean(workspace.outcomeValue);
-            const value = workspace.outcomeValue?.valuePerMonth ?? 0;
-            const wins = workspace.outcomeValue?.wins;
+            const hasMeasuredWins = portfolio?.hasMeasuredWins === true;
+            const value = portfolio?.totals.valuePerMonth ?? 0;
+            const clicks = portfolio?.totals.clicksGained;
+            const wins = portfolio?.totals.wins;
             const trend = trendPresentation(outcome?.trend);
             const issues = workspace.siteHealthIssueMatrix?.issues ?? [];
             const siteLabel = workspace.webflowSiteName || (workspace.hasGsc ? 'Search Console connected' : 'Outcome tracking workspace');
@@ -178,21 +181,21 @@ export function OutcomesBookTable({ entries, loading, onOpenWorkspace }: Outcome
                     <Meter
                       value={value}
                       max={maxValue}
-                      color="var(--emerald)"
+                      color="var(--blue)"
                       height={7}
-                      ariaLabel={hasValueEvidence
-                        ? `${workspace.name} delivered value relative to the highest workspace`
-                        : `${workspace.name} has no delivered value rollup yet`}
+                      ariaLabel={hasMeasuredWins
+                        ? `${workspace.name} measured value relative to the highest workspace`
+                        : `${workspace.name} has no measured value in this window`}
                       className="flex-1"
                     />
-                    <span className="min-w-[54px] text-right t-body tabular-nums font-bold text-[var(--emerald)]">
-                      {formatMoney(hasValueEvidence ? value : null)}
+                    <span className="min-w-[54px] text-right t-body tabular-nums font-bold text-[var(--blue)]">
+                      {formatMoney(hasMeasuredWins ? value : null)}
                     </span>
                   </div>
                   <div role="gridcell" className="t-body tabular-nums font-semibold text-[var(--brand-text-bright)]">
-                    {formatNumber(workspace.gscRollup?.dataAvailable ? workspace.gscRollup.clicks : null)}
+                    {formatNumber(hasMeasuredWins ? clicks : null)}
                   </div>
-                  <div role="gridcell" className="t-body tabular-nums font-semibold text-[var(--brand-text-bright)]">{wins ?? '—'}</div>
+                  <div role="gridcell" className="t-body tabular-nums font-semibold text-[var(--brand-text-bright)]">{hasMeasuredWins ? wins : '—'}</div>
                   <div role="gridcell" className={`flex items-center gap-1.5 t-caption font-semibold ${trend.className}`}>
                     <Icon name={trend.icon} size="sm" aria-hidden="true" />
                     {trend.label}
@@ -216,13 +219,13 @@ export function OutcomesBookTable({ entries, loading, onOpenWorkspace }: Outcome
                         <DefinitionList items={[
                           {
                             label: 'Attribution',
-                            value: workspace.outcomeValue
-                              ? `${workspace.outcomeValue.platformExecuted} platform · ${workspace.outcomeValue.externallyExecuted} client-side`
+                            value: portfolio
+                              ? `${portfolio.attribution.platformExecuted.wins} agency-executed · ${portfolio.attribution.externallyExecuted.wins} client-side`
                               : '—',
                           },
-                          { label: 'Average search position', value: workspace.gscRollup?.dataAvailable ? workspace.gscRollup.avgPosition.toFixed(1) : '—' },
+                          { label: 'Average search position (28d)', value: workspace.gscRollup?.dataAvailable ? workspace.gscRollup.avgPosition.toFixed(1) : '—' },
                           { label: 'Open site issues', value: formatNumber(workspace.siteHealthIssueMatrix?.totalIssues) },
-                          { label: 'Win rate', value: outcome && outcome.scoredLast30d > 0 ? percent(outcome.winRate * 100) : '—' },
+                          { label: 'Win rate (all-time)', value: outcome && outcome.scoredLast30d > 0 ? percent(outcome.winRate * 100) : '—' },
                         ]} />
                         <DefinitionList items={[
                           { label: 'Active actions', value: formatNumber(outcome?.activeActions) },

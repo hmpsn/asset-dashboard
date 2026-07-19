@@ -20,7 +20,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { Sidebar } from './components/layout/Sidebar';
 import { Breadcrumbs } from './components/layout/Breadcrumbs';
 import { RebuiltAppChrome, useRebuildShellEnabled } from './components/layout/RebuiltAppChrome';
-import { REBUILT_SURFACES } from './components/layout/rebuiltSurfaces';
+import { BOOK_REBUILT_SURFACE, REBUILT_SURFACES } from './components/layout/rebuiltSurfaces';
 import { Icon } from './components/ui/Icon';
 import { ScannerReveal } from './components/ui/ScannerReveal';
 import { TabBar } from './components/ui/TabBar';
@@ -191,6 +191,16 @@ function AdminApp() {
   return <div className={theme === 'light' ? 'dashboard-light' : ''}><Dashboard onLogout={auth.logout} theme={theme} toggleTheme={toggleTheme} /></div>;
 }
 
+const LAST_VISITED_WORKSPACE_KEY = 'admin-last-visited-workspace';
+
+function readLastVisitedWorkspaceId(): string | null {
+  try {
+    return localStorage.getItem(LAST_VISITED_WORKSPACE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 // Exported for component tests that exercise the real admin routing logic.
 export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => void; theme: 'dark' | 'light'; toggleTheme: () => void }) {
   const location = useLocation();
@@ -219,9 +229,11 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
   const clearFixContext = useCallback(() => setFixContext(null), []);
   const [rewritePageUrl, setRewritePageUrl] = useState<string | null>(null);
   const [focusMode, setFocusMode] = useState(false);
+  const [lastVisitedWorkspaceId, setLastVisitedWorkspaceId] = useState<string | null>(readLastVisitedWorkspaceId);
   // Derived synchronously — prevents layout flash when navigating away (useEffect runs after paint)
   const effectiveFocusMode = focusMode && tab === 'rewrite';
-  const rebuiltSurfaceActive = rebuildShellEnabled && REBUILT_SURFACES[tab] !== undefined;
+  const bookRootActive = rebuildShellEnabled && location.pathname === '/';
+  const rebuiltSurfaceActive = bookRootActive || (rebuildShellEnabled && REBUILT_SURFACES[tab] !== undefined);
 
   // Reset backing state when navigating away so returning to rewrite starts fresh
   useEffect(() => {
@@ -277,11 +289,24 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     if (!urlWorkspaceId) return null;
     return workspaces.find(w => w.id === urlWorkspaceId) || null;
   }, [urlWorkspaceId, workspaces]);
+
+  useEffect(() => {
+    if (!selected || selected.id === lastVisitedWorkspaceId) return;
+    setLastVisitedWorkspaceId(selected.id);
+    try {
+      localStorage.setItem(LAST_VISITED_WORKSPACE_KEY, selected.id);
+    } catch {
+      /* localStorage unavailable — last-visited workspace stays in-memory only */
+    }
+  }, [lastVisitedWorkspaceId, selected]);
+
   const chromeWorkspace = useMemo(() => {
     if (selected) return selected;
-    if (GLOBAL_TABS.has(tab)) return workspaces[0] ?? null;
+    if (GLOBAL_TABS.has(tab) && lastVisitedWorkspaceId) {
+      return workspaces.find(workspace => workspace.id === lastVisitedWorkspaceId) ?? null;
+    }
     return null;
-  }, [selected, tab, workspaces]);
+  }, [lastVisitedWorkspaceId, selected, tab, workspaces]);
 
   // Rewrite tab is always a full-height two-pane layout (independent scroll per pane).
   // Focus mode additionally hides the sidebar, but height containment is needed in both modes.
@@ -486,9 +511,9 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
     return <Navigate to={adminPath(selected.id, 'home')} replace />;
   };
 
-  const canMountRebuiltSurface = chromeWorkspace !== null || GLOBAL_TABS.has(tab);
+  const canMountRebuiltSurface = bookRootActive || chromeWorkspace !== null || GLOBAL_TABS.has(tab);
   const RebuiltSurface = rebuildShellEnabled && canMountRebuiltSurface ? REBUILT_SURFACES[tab] : undefined;
-  if (RebuiltSurface && canMountRebuiltSurface) {
+  if ((bookRootActive || RebuiltSurface) && canMountRebuiltSurface) {
     const rebuiltWorkspaceId = selected?.id ?? chromeWorkspace?.id ?? '';
     return (
       <>
@@ -513,9 +538,11 @@ export function Dashboard({ onLogout, theme, toggleTheme }: { onLogout?: () => v
           focusMode={effectiveFocusMode}
           onFocusModeChange={setFocusMode}
         >
-          <ErrorBoundary label={tab}>
+          <ErrorBoundary label={bookRootActive ? 'command-center' : tab}>
             <Suspense fallback={<ChunkFallback />}>
-              <RebuiltSurface key={`${tab}:${rebuiltWorkspaceId}`} workspaceId={rebuiltWorkspaceId} />
+              {bookRootActive
+                ? <BOOK_REBUILT_SURFACE key="command-center:book" />
+                : RebuiltSurface && <RebuiltSurface key={`${tab}:${rebuiltWorkspaceId}`} workspaceId={rebuiltWorkspaceId} />}
             </Suspense>
           </ErrorBoundary>
         </RebuiltAppChrome>

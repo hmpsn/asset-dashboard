@@ -1,8 +1,102 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 687** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 717** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 717. Book-level Command Center navigation and morning-triage closure 2026-07-17
+
+**What it does:** Makes the flag-ON book Command Center at `/` a first-class navigation destination. The nav registry module now models the workspace-less root explicitly as `book-root` with `scope: 'book'`, a shared `/` path resolver, and an “All workspaces” rebuilt zone. `NAV_REGISTRY` remains the byte-identical Page-only source for legacy navigation; `NAV_DESTINATION_REGISTRY` composes that list with the single book entry for the rebuilt sidebar and Command Palette, while the rebuilt breadcrumb resolves the same entry by ID. The sidebar keeps workspace Cockpit separate, marks Command Center current only at `/`, and the rebuilt breadcrumb also uses Command Center for the root document title.
+
+**Why it matters:** Morning triage now starts from a server-ranked client book instead of an arbitrary workspace. The highest-attention workspace is visible at landing with zero clicks, its Cockpit is one click away, and its top triage handoff is two clicks from landing. The prior path had no bounded cross-book click count: the operator had to inspect/switch workspaces linearly before paying J1's local row-opening cost.
+
+**Boundaries:** The registry-only destination exists only while `ui-rebuild-shell` is ON. Workspace `home` remains the existing `/ws/:workspaceId` Cockpit identity, flag-OFF `/` remains legacy `WorkspaceOverview`, the `Page` union and rebuilt direct-mount census are unchanged, and no migration or new deep-link parameter was needed.
+
+**Tests:** Registry/non-Page destination census and path resolution; Command Palette flag transition plus `/` navigation; rebuilt sidebar presence/current state and axe coverage; rebuilt breadcrumb root-current behavior, title, and axe coverage.
+
+**Files:** navigation registry and shared consumers; focused contract/component tests; J1 measurement note; roadmap, brand language, and this audit.
+
+---
+
+### 716. Book-level rebuilt Command Center surface 2026-07-17
+
+**What it does:** Replaces the `ui-rebuild-shell` flag-ON root redirect/legacy seam with a real book-level Command Center inside the rebuilt shell. It reads W4.1a's `GET /api/cockpit/portfolio` rollup through a dedicated React Query hook, renders workspace verdict and work-stream cards in the server's attention order, adds snapshot plus live WebSocket presence indicators, and exposes every reconciled count family across workspaces, queue streams, and verdicts. The two money summaries preserve the server's explicit “Not yet reconcilable” status and reason without rendering a dollar aggregate.
+
+**Why it matters:** An operator can begin morning triage at `/` and see which client needs attention first without being bounced into one workspace or opening the legacy overview. The surface keeps ranking and money claims server-authoritative, so the portfolio view cannot drift into browser-calculated priority or misleading agency-wide value.
+
+**Boundaries:** This is a read-only cockpit surface over existing W4.1a and presence endpoints. It introduces no migration, mutation, money reconciliation, nav destination, command-palette action, or flag change. `/ws/:workspaceId` keeps the existing per-workspace Cockpit, and the flag-OFF `/` branch remains the legacy `WorkspaceOverview` path.
+
+**Tests:** Real feature-flag loading-to-ON mount, flag-ON root chrome wiring, flag-OFF legacy root preservation, server order, reconciled count families, unreconciled money/no-currency behavior, presence, and rebuilt registry census.
+
+**Files:** book-level Command Center component; portfolio/presence API and admin hooks; query keys; rebuilt root registry and `App.tsx` flag-ON seam; parity packet; component and contract tests; roadmap, brand language, and this audit.
+
+---
+
+### 714. Server-owned keyword summary rollups and complete grouped lenses 2026-07-17
+
+**What it does:** Closes `DEF-kw-002` and `DEF-kw-003` with two KCC-owned skinny read models over existing data. The summary now serves an impression-weighted average position and positive-is-improvement comparison delta from adjacent 28-day snapshot-observation windows anchored to the latest rank snapshot. The new grouped endpoint projects every filter/search-scoped keyword from one KCC source snapshot, then groups by page, topic cluster, or lifecycle stage with server-owned keyword counts, clicks, impressions, average position, coverage copy, and cannibalization flags. The rebuilt Keywords surface adds blue Avg. position and Position change `MetricTile`s and renders complete server groups directly; it no longer groups the current page or shows the temporary truncation warning.
+
+**Why it matters:** Operators can trust that a lifecycle column or page group represents the whole selected keyword set, not whichever 50–100 rows happened to be on screen. Rank KPIs make comparison evidence scannable without presenting missing history as zero or stable performance.
+
+**Boundaries:** Both paths stay inside the SEO-health/KCC skinny projection. They do not call the retired full keyword-universe model, mutate rank data, change W4.2a's row-history contract, or require a database migration. Missing current rank evidence yields unavailable average and deltas; missing prior evidence preserves the current average while comparison deltas remain unavailable.
+
+**Tests:** Adjacent-window boundary selection, impression weighting, zero-impression mean fallback, missing-current and missing-prior semantics; 105-row full-set grouping beyond the list cap; page/cluster/lifecycle membership and server rollups; grouped API serialization and route validation; component KPI, empty-state, complete-group, no-truncation, and accessibility coverage.
+
+**Files:** `shared/types/keyword-command-center.ts`; KCC summary/source/grouped/rows services and facade/route; KCC API, query keys, hook, state, and rebuilt Keywords lenses/surface; focused unit/integration/component tests; deferred ledger, roadmap, brand language, and this audit.
+
+---
+
+### 713. Batched visible-row keyword rank trends 2026-07-17
+
+**What it does:** Closes `DEF-kw-001` with an admin-only, page-batched rank-history read model over the existing `rank_snapshots` source. One SQL read projects up to 100 requested visible keywords into typed per-keyword point series and computes a positive-is-improvement seven-day delta only when two real points exist in that window. The rebuilt full Rankings DataTable makes one React Query keyed by the canonical visible keyword set, renders the existing `Sparkline` primitive and delta pill per row, and shows contextual loading, unavailable, or “Not enough snapshots yet” states without inventing a zero trend. The existing drawer endpoint and behavior are unchanged.
+
+**Why it matters:** Operators can scan momentum alongside current rank without opening every drawer or paying an N+1 request cost. Sparse tracking remains visibly sparse, so a newly tracked keyword cannot look stable merely because the platform lacks evidence.
+
+**Boundaries:** This is a skinny SEO-health read from existing snapshots. It does not call the retired full keyword-universe builder, mutate rank history or metadata, expose a new public endpoint, or require a database migration.
+
+**Tests:** One-statement service batching, requested-order/case matching, real seven-day delta and sparse-window omission, admin route response, repeated-query API serialization, stable visible-set query keys, and component coverage for one batch request, Sparkline rendering, delta display, and the establishing state.
+
+**Files:** `shared/types/rank-tracking.ts`; `server/rank-tracking.ts`; `server/routes/rank-tracking.ts`; `src/api/seo.ts`; `src/lib/queryKeys.ts`; `src/components/keywords-rebuilt/KeywordsTable.tsx`; focused unit, integration, and component tests; deferred ledger, roadmap, brand language, and this audit.
+
+---
+
+### 712. Dedicated rebuilt AI Visibility home 2026-07-17
+
+**What it does:** Adds a lightweight `/ws/:workspaceId/ai-visibility` admin surface to the rebuilt shell's Search & Site Health zone. It composes the established aggregate `AiVisibilityPanel` once, preserving the existing share-of-voice score, mention trend, competitors, cited source domains, empty/error states, and `LLM_MENTIONS_REFRESH` job wiring. The nav destination exists only while `ui-rebuild-shell` is ON; flag-OFF Keyword Hub remains byte-identical.
+
+**Why it matters:** Operators no longer lose the live LLM-citation measurement panel when using the rebuilt shell. The dedicated home closes the capability gap without inventing a second read model, job, score, or feature flag, and without beginning legacy retirement under D8.
+
+**Tests:** Real rebuilt-shell loading-to-ON transition, exact-once share-of-voice/mention-trend/source-domain/refresh assertions, existing refresh API invocation, direct-mount census, route construction, and flag-aware nav visibility.
+
+**Owner boundary:** The dedicated lightweight home is W3.1's embedded default and remains subject to owner veto at PR review.
+
+---
+
+### 711. Requests reply spine and Keywords lens diet 2026-07-17
+
+**What it does:** Makes unanswered client request threads a server-owned workspace badge summary, ordered by newest client message. The same summary drives the labeled Requests rail badge, its collapsed Client-Facing group count, the Cockpit “From client” count/list, and the Requests landing choice. Request broadcasts invalidate that authority. Keywords now exposes only Rankings and Lifecycle as destinations: Full/Triage selects the table columns, None/Page/Cluster groups the same row set, all retired lens URLs remain compatibility receivers, and client feedback appears before the working table.
+
+**Why it matters:** Operators can see and enter human-waiting work without opening every inbox, and the count cannot drift between navigation and Cockpit. Keyword work becomes one stable dataset with presentation controls instead of five destination-like choices, while existing bookmarks and handoffs keep working.
+
+**Tests:** Workspace badge route shape/last-author ordering, request-event invalidation, Requests default/deep-link behavior, sidebar badge survival, Cockpit source consistency, nav-registry census, two-lens visibility, all three legacy lens mappings, URL/filter preservation, grouped/table/lifecycle rendering, feedback reachability, and rebuilt accessibility coverage.
+
+**Files:** request summary/types and workspace-badges route; request invalidation, rebuilt Requests/sidebar/Cockpit consumers and focused tests; `keywords-rebuilt` state/lenses/table/surface and its component test; Keywords parity contract; roadmap records.
+
+---
+
+### 710. Admin bounded-workbench canyon containment 2026-07-17
+
+**What it does:** Adds `WorkbenchFrame`, the canonical viewport-bounded collection layout with one flex-none decision region and exactly one internally scrolling collection. Site Audit pins a compact health verdict, working category filters, utilities, and bulk actions above its issue queue. Schema pins readiness, workflow, summary, and publish/send controls; its generated-page table adds title/path/type search, status filters, a 100-row default cap, truthful expansion, and read-only row type labels while type editing remains in the detail Drawer. Asset Manager pins the existing Browse toolbar, mounts assets in 100-item batches, reports the exact remaining count, and trims grid cards to open/select plus the contextual missing-alt action while preserving Drawer and bulk repair actions.
+
+**Why it matters:** Operators can keep scope, filters, and high-trust actions visible while triaging hundreds of audit issues, schema pages, or media assets. Known items are findable without 27–47 folds of page scrolling, and the Media library avoids mounting the audit's 1,583-button interaction surface at once.
+
+**Safety and performance:** Site Audit drawer/deep-link/bulk behavior, Schema generate/review/publish/send flows, and Asset Manager Repair/Upload/detail overlay precedence are unchanged. The Media 250-asset component fixture now mounts 100 cards and 208 buttons initially, then loads at most 100 more per action with truthful remaining counts.
+
+**Tests:** `WorkbenchFrame` structure and axe coverage; loaded Site Audit pinned/collection containment; 125-page Schema search/cap/expansion and Drawer preservation; 250-asset Media batch, control-count ratchet, overlay/deep-link behavior, and rebuilt a11y coverage.
+
+**Files:** `src/components/ui/layout/WorkbenchFrame.tsx` and UI barrels/styleguide; rebuilt Site Audit, Schema, and Asset Manager surfaces and their focused component tests; `BRAND_DESIGN_LANGUAGE.md`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
 
 ---
 
@@ -814,7 +908,7 @@ A comprehensive value assessment of every feature in the platform — **feature 
 
 **Why it matters to clients:** Indirect but meaningful — operators keep the full keyword workflow and trust signals while getting a denser, more consistent surface for deciding which keywords to track, promote, retire, or turn into content. No client-facing money is fabricated; money remains display-only from server data.
 
-**Deferred decisions:** `DEF-kw-001` tracks inline row sparklines/7-day deltas pending a batched history read model; `DEF-kw-002` tracks avg-position and period-over-period KPI variants pending server-owned rollup/delta semantics.
+**Deferred decisions:** `DEF-kw-001` was resolved by feature 713's batched history read model. `DEF-kw-002` and the later `DEF-kw-003` current-page grouping follow-up are resolved by feature 714's server-owned summary and grouped read models.
 
 **Tests:** Contract/unit coverage for opportunity score, traffic value, lifecycle stage, deep-link/a11y coverage, query invalidation, and bundle budget; component tests for flag mount, lenses, table, drawer, states, WS invalidation, mutations, and a11y; Playwright Component Testing visual baselines for 5 states × 2 themes. Pre-commit changed-test run passed 2,003 files / 28,264 tests.
 
@@ -962,7 +1056,7 @@ A comprehensive value assessment of every feature in the platform — **feature 
 
 ### 533. AI-visibility / LLM citation tracking (SEO Decision Engine P8 — FINAL)
 
-**What it does:** Closes the AEO (Answer Engine Optimization) loop with **measurement** — it answers *"are we actually cited by LLMs?"*, the payoff metric for all the answer-first content + author/E-E-A-T work the platform already produces. Behind the `ai-visibility` flag (Growth + Premium). It queries DataForSEO's LLM-mentions database for the client's domain and computes an **AI-visibility KPI**: the headline **share-of-voice** (the client's brand vs the competitor brands LLM answers co-mention in their category — a like-to-like comparison, distinct from raw citation volume), the **mention volume** (how often the client's content is cited in AI answers), a **mentions-over-time trend** (the before/after proof of the AEO work), the **co-mentioned competitor** breakdown, and the **source domains** LLM answers pull from when citing the client (the off-site AEO targeting list). A `llm-mentions-refresh` background job (ported from the P6 national-SERP job — cancel-safe, observe-only budget) writes a dated `llm_mention_snapshots` row each run; the trend accrues over time. The data surfaces as an admin KPI panel (share-of-voice MetricRing + mention StatCard + trend sparkline + competitor/source breakdowns) on the Keyword Hub and into the workspace intelligence (`SeoContextSlice.aiVisibility`) so the AI advisor sees it. The deliverable is **measurement only** — no new recommendation/insight; the existing `aeo-*` recs remain the actions. Aggregates only — the platform never captures raw LLM answer text. Where the client's brand can't be identified among the co-mentioned set, share-of-voice reads **"not measured"** rather than a misleading 0%. The **eighth and final phase** of the SEO Decision Engine program; `ai-visibility` OFF is byte-identical.
+**What it does:** Closes the AEO (Answer Engine Optimization) loop with **measurement** — it answers *"are we actually cited by LLMs?"*, the payoff metric for all the answer-first content + author/E-E-A-T work the platform already produces. The retired `ai-visibility` product flag is no longer a runtime gate; Growth/Premium tier and provider gates remain. It queries DataForSEO's LLM-mentions database for the client's domain and computes an **AI-visibility KPI**: the headline **share-of-voice** (the client's brand vs the competitor brands LLM answers co-mention in their category — a like-to-like comparison, distinct from raw citation volume), the **mention volume** (how often the client's content is cited in AI answers), a **mentions-over-time trend** (the before/after proof of the AEO work), the **co-mentioned competitor** breakdown, and the **source domains** LLM answers pull from when citing the client (the off-site AEO targeting list). A `llm-mentions-refresh` background job (ported from the P6 national-SERP job — cancel-safe, observe-only budget) writes a dated `llm_mention_snapshots` row each run; the trend accrues over time. The data surfaces as an admin KPI panel (share-of-voice MetricRing + mention StatCard + trend sparkline + competitor/source breakdowns) on the Keyword Hub, in the rebuilt shell's dedicated AI Visibility home, and into the workspace intelligence (`SeoContextSlice.aiVisibility`) so the AI advisor sees it. The deliverable is **measurement only** — no new recommendation/insight; the existing `aeo-*` recs remain the actions. Aggregates only — the platform never captures raw LLM answer text. Where the client's brand can't be identified among the co-mentioned set, share-of-voice reads **"not measured"** rather than a misleading 0%. The **eighth and final phase** of the SEO Decision Engine program.
 
 **Why it matters to the agency:** Turns "we did AEO work" into a defensible, trending KPI — *"your AI share-of-voice went from 15% to 38% since we started, and here are the source sites getting you cited"* — which is the single most future-facing thing an SEO agency can show right now. It also makes the AEO recommendations the platform already generates provably worth doing.
 
@@ -9965,14 +10059,97 @@ The compatibility projection remains intentionally narrow: it preserves calibrat
 
 **Files:** brand-identity domain create transaction; brand MCP schema/handler/instructions/inventory; matrix budget conversion; focused brand-write, real-HTTP MCP plumbing, budget, registry, workspace-scope, dispatch, and instruction tests; MCP generation rule; roadmap and audit.
 
+### 706. Admin UX W0.3 naming and say-it-aloud vocabulary closure 2026-07-17
+
+**Status:** Complete across every conventions-judge replacement site while preserving flag-OFF compatibility and persisted identifiers.
+
+**What changed:** The rebuilt Cockpit now uses the same Growth, to propose, measured-results, and Needs triage wording as Insights Engine. The shared Keyword Command Center lifecycle badge renders `raw_evidence` as Seen in search without changing the stored status. Site Audit's decay disclosure is now Decaying pages and hands operators directly to Content Pipeline's canonical Content Health tab through the existing `?tab=content-health` receiver.
+
+**Compatibility:** Internal work-stream and lifecycle discriminators (`money`, `unclassified`, `raw_evidence`) are unchanged. Legacy flag-OFF Keyword Hub and Site Audit copy remains untouched under D8.
+
+**Files:** rebuilt Cockpit work queue and tests; rebuilt Site Audit surface and tests; shared status badge registry and test; roadmap completion note.
+
+### 707. Admin UX W1.1 flow quick wins 2026-07-17
+
+**Status:** Complete. Three rebuilt admin surfaces now remove avoidable navigation, collection-depth, and readback-order friction without changing their data or mutation contracts.
+
+**What changed:** Insights Engine renders Changes, Signals, POV, Moves, and Operations as a sticky jump row in its opening toolbar. The senders use the existing `ENGINE_LENSES` vocabulary and `setLens` receiver, including its URL persistence, focus, and smooth-scroll behavior. Search & Traffic caps the Detail table at 25 rows, adds a mode-aware in-table text search, states visible/filtered/source counts, and contains the expanded full set in a 60vh scroll region. Outcomes keeps the selected readback immediately below its TabBar and moves the occasional Record published work form beneath that readback.
+
+**Constraints preserved:** Engine navigation remains a navigation aid rather than a budget-1 fold fix; the fixed-bottom curation bulk bar and top sticky navigation do not overlap. Search & Traffic keeps its narrative report scroll and no component-test visual baseline was regenerated. Outcomes retains its existing tab state and form behavior; no EmptyState allowlist or deep-link contract changed.
+
+**Tests:** Engine sender labels, sticky positioning, URL update, focus, and existing scroll receiver; Search row cap, truthful expander, contained expansion, and full-set filter; Outcomes readback-before-form DOM order plus existing manual-record attribution behavior.
+
+**Files:** rebuilt Engine/Search surfaces and component tests; Outcome dashboard and record-work component test; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 708. Admin UX W1.2 command verbs and Cockpit section handoffs 2026-07-17
+
+**Status:** Complete under the amended section/lens routing contract; typed per-item identity remains deferred to `cockpit-handoff-per-item-deeplink`.
+
+**What changed:** The Command Palette now distinguishes navigation-only shortcuts with honest Open labels and exposes the journeys judge's ten operator verbs. Workspace actions remain visible with clear disabled reasons when workspace or linked-site context is absent. Site Audit and strategy refresh use the background-job platform; Webflow publish requires confirmation and reuses the shared publish API; PageSpeed reuses the existing bulk execution path. The workspace model has no fixture flag, so the palette documents and applies the narrow audited name predicate for `cascade-debug*`, `dbg*`, `Trigger Check WS`, and `Check Set WS`.
+
+Cockpit work-queue rows now route every classifier source type to its most specific existing receiver: Requests sections, Pipeline Intake/Briefs/Planner, Keywords Rankings, Site Audit Content Health, bare Site Audit, and Workspace Settings Connections. No identity is parsed from display metadata and no unsupported receiver parameter is invented.
+
+**Tests:** Command handlers are asserted exactly once with workspace/site payloads, disabled states, confirmation, and fixture filtering. Cockpit component coverage clicks a real row for all nine source types. The deep-link contract statically pins both sender and receiver halves for every `?tab=`, `?lens=`, and `?sub=` handoff.
+
+**Files:** `src/components/CommandPalette.tsx`; rebuilt Cockpit surface/work queue; focused Command Palette and Cockpit component tests; `tests/contract/tab-deep-link-wiring.test.ts`; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
+### 709. Admin UX W1.3 actionable setup states and honest global chrome context 2026-07-17
+
+**Status:** Complete. Wave 1 closes with direct recovery paths for six rebuilt setup states and truthful workspace context on global admin routes.
+
+**What changed:** Search Console, GA4, Links, Page Intelligence, Asset Manager, and Site Audit setup states now pair their explanation with an `Open Workspace Settings` action targeting the existing Connections receiver. Their six temporary actionless-`EmptyState` allowlist rows are removed, leaving the automated gate to protect these paths. Global tabs no longer borrow `workspaces[0]`: the shell persists the last URL-visited workspace using the same localStorage preference pattern as theme and rail state, validates it against current workspaces, and otherwise renders unbound chrome. Global breadcrumbs omit the workspace segment, and AdminChat mounts only when a real retained workspace exists.
+
+**Tests:** Six navigation tests pin `/ws/:workspaceId/workspace-settings?tab=connections`; App coverage pins both no-history and retained-last-visit global chrome; breadcrumb coverage pins global workspace-segment omission. Focused component suites, typecheck, hooks lint, build, and pr-check cover the closeout.
+
+**Files:** six rebuilt surface components and their focused tests; `scripts/pr-check.ts`; `src/App.tsx`; rebuilt breadcrumb and tests; Global Ops parity contract; `data/roadmap.json`; `FEATURE_AUDIT.md`.
+
 ### 710. MCP fully-ready matrix preview diagnostic and context-budget repair 2026-07-17
 
 **Status:** Complete. The isolated staging canary and exact durable Rinse production previews pass without invoking paid generation.
 
-**Leading diagnosis and repair:** A production-shaped synthetic fixture reproduces `ContentGenerationContextBudgetError` when finalized voice plus approved identity exceed the shared 2,400/1,400/600-token context defaults. Matrix preview now uses a dedicated bounded frozen-authority/context contract derived through the existing input-reservation estimator. Complete finalized voice and approved identity are preserved below the ceiling, apart from existing boundary-whitespace normalization; overflow fails closed with a typed field-addressed precondition instead of truncating authority. Shared context defaults are unchanged.
+**Leading diagnosis and repair:** A production-shaped synthetic fixture reproduced `ContentGenerationContextBudgetError` when finalized voice plus approved identity exceeded the shared 2,400/1,400/600-token context defaults. Matrix preview now uses a dedicated bounded frozen-authority/context contract derived through the existing input-reservation estimator. Complete finalized voice and approved identity are preserved below the ceiling, apart from existing boundary-whitespace normalization; overflow fails closed with a typed field-addressed precondition instead of truncating authority. Shared context defaults are unchanged.
 
 **Diagnostics and safety:** Context assembly, cell budgeting, evidence range, preview fingerprint, batch budgeting, and MCP projection have explicit stage boundaries. Expected authority-budget failures return stable `precondition_failed` details; unexpected failures remain generic `internal_error`. Logs retain request ID, tool, stage, and safe classification only—never prompts, evidence, exception text, stacks, or secrets. Preview remains deterministic and side-effect free: it performs no provider call, run/job/artifact mutation, approval, send, or publish, and never invokes paid generation.
 
-**Verification:** Production-shaped finalized voice plus approved `differentiators` and `objection_handling` reproduce the prior global-budget failure, then pass under the bounded matrix contract. Single-cell and two-cell previews are stable across retries, remain under batch ceilings, preserve the blocked path, and leave run/job/brief/post counts unchanged. A temporary synthetic staging workspace independently confirmed blocked → ready behavior, deterministic retry fingerprints and estimates, two ready targets, and a finite batch budget; no paid generation was invoked, and the temporary key/workspace were deleted. Production deployment `dep-d9d8qm58nd3s73dou9d0` reached `live` at main merge `973bb2a1d90934a300770d7bb0f200c9734422ad`; the exact durable Rinse workspace/matrix/cells then passed the same read-only ready, determinism, and finite-budget acceptance. No paid generation was started.
+**Verification:** Production-shaped finalized voice plus approved `differentiators` and `objection_handling` reproduce the prior global-budget failure, then pass under the bounded matrix contract. Single-cell and two-cell previews are stable across retries, remain under batch ceilings, preserve the blocked path, and leave run/job/brief/post counts unchanged. MCP contracts cover ready projection, serialization-stage classification, typed overflow, request correlation, and secret redaction. A temporary isolated staging canary independently passed blocked, single-ready, two-ready, deterministic-retry, and finite-budget checks, then revoked its key and deleted its workspace. Production deployment `dep-d9d8qm58nd3s73dou9d0` reached `live` at main merge `973bb2a1d90934a300770d7bb0f200c9734422ad`; the exact durable Rinse workspace/matrix/cells then passed the same read-only ready, determinism, and finite-budget acceptance. No paid generation was started.
 
 **Files:** matrix-generation preview and context-budget diagnostics; MCP content-matrix adapter; focused unit/contract tests; MCP generation rule; roadmap and audit.
+
+### 711. Admin UX W4.1a book-level Cockpit server rollup 2026-07-17
+
+**Status:** Complete for the server-rollup phase. W4.1b surface and W4.1c navigation/journey integration remain pending.
+
+**What changed:** Adds `GET /api/cockpit/portfolio`, a read-only cross-workspace Command Center model. For every visible active workspace, the server reads the same inputs used by Workspace Home, calls the canonical `classifyWorkQueue()` and `buildCockpitVerdict()` domain functions, and returns the complete classification/verdict pair in a summary row. Rows are ranked without an opaque score: cockpit verdict priority (`at_risk`, `watch`, `establishing`, `on_track`), then negative queue items, unclassified items, total queue items, workspace name, and workspace ID.
+
+**Honesty and scope:** Workspace, attention, queue-stream, queue-item, and verdict counts are exactly reconcilable from the returned rows and carry an explicit `reconciled` status. `valueAtStake` and `recoveredSoFar` remain `not_yet_reconcilable` with `null` values because workspace money frames may use different attribution bases and measurement windows; the rollup never sums verdict evidence or fabricates a book number. The route respects JWT workspace visibility, excludes archived workspaces through the canonical list read, and performs no writes, broadcasts, or cache mutation. No migration, new intelligence source/slice, or WS event was needed.
+
+**Tests:** Unit coverage pins deterministic attention ranking and exact-only aggregation, including proof that money evidence is ignored. Integration coverage invokes the real Express route over real workspace-backed inputs and verifies per-workspace classifier/verdict parity plus the honest totals contract.
+
+**Files:** shared Cockpit portfolio types; Cockpit portfolio domain and route; app route registration; focused unit/integration tests; roadmap and feature audit.
+
+### 715. Admin UX W4.2c GO-004 Outcomes Book portfolio rollup 2026-07-17
+
+**Status:** Complete. The rebuilt Outcomes Book now has one truthful server-owned portfolio window instead of a permanent unavailable banner and mixed all-time/28-day row metrics.
+
+**What changed:** Added `GET /api/outcomes/portfolio-rollup`, backed by a typed rolling 90-day read model over existing tracked actions and measured outcomes. It deduplicates multiple winning checkpoints to the highest checkpoint per action, sums measured monthly value and positive click gains, and returns both portfolio totals and per-workspace rows. The rebuilt page consumes those totals through a dedicated admin React Query hook, renders blue value/click tiles, an attribution-separated measured-win tile, and em dashes or an explicit no-wins message when the window has no proof.
+
+**Attribution honesty:** This read path reuses the canonical windowed win query that excludes `not_acted_on` and client-hidden outcome actions, then independently guards against `not_acted_on` again before aggregation. Overall measured totals may include `externally_executed`, but the response and UI keep those client-side wins separate from `platform_executed`; only the latter is labeled agency-executed.
+
+**Window rationale:** Rolling 90 days matches the Outcome engine's longest standard measurement checkpoint and provides enough portfolio evidence for slower-measuring work while keeping value, click gains, and wins on the same explicit ISO interval.
+
+**Tests:** Added route coverage for the 90-day interval, multi-checkpoint deduplication, out-of-window exclusion, `not_acted_on` exclusion, attribution buckets, and zero-evidence workspaces. Updated the rebuilt Outcomes Book component suite for server totals, unified headings, attribution copy, loading, and empty-window states. No migration or feature-flag change.
+
+**Files:** outcome portfolio shared types; canonical windowed outcome reader; portfolio service and route; outcomes API/query key/hook; rebuilt Outcomes Book lens/table; focused integration and component tests; GO-004 parity/owner docs; deferred ledger and roadmap.
+### 716. Compact desktop MCP operator profile 2026-07-17
+
+**Status:** Complete in P1. The additive desktop control-plane surface is ready for staging MCP handshake and read-only invocation smoke before P2 begins.
+
+**What it does:** Adds master-key `POST /mcp/operator` while retaining the existing `POST /mcp` endpoint unchanged for advanced work and legacy clients. Operator discovery is the registered intersection of one canonical 25-name allowlist: 22 existing tools ship in P1 and the three deterministic Insights-backed read models remain reserved for P2. Discovery and invocation share the same enforced boundary, so hidden, reserved, and unknown names return one generic `json_v1 not_found` response before alias validation, workspace authorization, or handler dispatch.
+
+**Efficiency and compatibility:** Explicit compact instructions and schema-aware projection reduce the combined operator orientation payload to 25,217 UTF-8 bytes, below the 32 KiB contract and about 84.5% below the 161,898-byte full orientation baseline. The projection removes only JSON Schema annotation prose; it preserves validation constraints, arbitrary default/example/const data, and legitimate input fields named `description`. Full-profile discovery and instructions retain their exact byte counts and SHA-256 hashes.
+
+**Security and gates:** P1 accepts only the canonical environment-master identity. Workspace keys are rejected generically at both router middleware and request-handler defense, including the sentinel-collision case where a workspace ID equals `all`; the full executor now also keeps that identity workspace-scoped. Tool semantics are unchanged: preview remains free and side-effect free, paid generation still requires an exact accepted preview plus explicit human confirmation, generated work stops for review, and no approval, client send, or publication authority was added.
+
+**Tests:** Focused unit and real spawned-server integration coverage pins the 25/22/3 census, exact full-profile hashes over HTTP, compact byte budget, deep immutability, schema-field preservation, hidden/reserved/unknown error indistinguishability, handler non-dispatch, master-only authentication, workspace-key compatibility on `/mcp`, and sentinel-collision fail-closed behavior.
+
+**Files:** MCP profile contracts, registry projection/dispatch, server/router/auth boundary, inventory documentation, control-plane rule and implementation plan, focused unit/integration tests, roadmap, and audit. No UI or database files changed.

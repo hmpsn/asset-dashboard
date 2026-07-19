@@ -12,7 +12,7 @@ import { type ReactNode } from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { REBUILT_SURFACES } from '../../src/components/layout/rebuiltSurfaces';
+import { BOOK_REBUILT_SURFACE, REBUILT_SURFACES } from '../../src/components/layout/rebuiltSurfaces';
 import { useAssetManagerSurfaceState } from '../../src/components/asset-manager-rebuilt/useAssetManagerSurfaceState';
 import { useBrandAiSurfaceState } from '../../src/components/brand-ai-rebuilt/useBrandAiSurfaceState';
 import { useCockpitSurfaceState } from '../../src/components/cockpit-rebuilt/useCockpitSurfaceState';
@@ -50,6 +50,7 @@ const DIRECT_REBUILT_MOUNTS = [
   'brand',
   'content-pipeline',
   'analytics-hub',
+  'ai-visibility',
   'performance',
   'rewrite',
   'workspace-settings',
@@ -108,6 +109,10 @@ function routerWrapper(initialEntry: string) {
 }
 
 describe('rebuilt surface registry contract', () => {
+  it('registers the book-level root separately from workspace-scoped Page mounts', () => {
+    expect(BOOK_REBUILT_SURFACE).toBeDefined();
+  });
+
   it('pins every intended direct mount exactly once', () => {
     expect(Object.keys(REBUILT_SURFACES).sort()).toEqual([...DIRECT_REBUILT_MOUNTS].sort());
     expect(new Set(DIRECT_REBUILT_MOUNTS).size).toBe(DIRECT_REBUILT_MOUNTS.length);

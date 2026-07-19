@@ -16,6 +16,11 @@ import { lazyWithRetry } from '../../lib/lazyWithRetry';
  */
 export type RebuiltSurfaceProps = { workspaceId: string };
 
+/** Book-level root mount; separate from the workspace-scoped `home` Page identity. */
+export const BOOK_REBUILT_SURFACE = lazyWithRetry(() =>
+  import('../command-center-rebuilt/CommandCenterSurface').then(m => ({ default: m.CommandCenterSurface })),
+);
+
 export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurfaceProps>>> = {
   'seo-keywords': lazyWithRetry(() =>
     import('../keywords-rebuilt/KeywordsSurface').then(m => ({ default: m.KeywordsSurface })),
@@ -28,6 +33,9 @@ export const REBUILT_SURFACES: Partial<Record<Page, ComponentType<RebuiltSurface
   ),
   'analytics-hub': lazyWithRetry(() =>
     import('../search-traffic-rebuilt/SearchTrafficSurface').then(m => ({ default: m.SearchTrafficSurface })),
+  ),
+  'ai-visibility': lazyWithRetry(() =>
+    import('../ai-visibility-rebuilt/AiVisibilitySurface').then(m => ({ default: m.AiVisibilitySurface })),
   ),
   'media': lazyWithRetry(() =>
     import('../asset-manager-rebuilt/AssetManagerSurface').then(m => ({ default: m.AssetManagerSurface })),
