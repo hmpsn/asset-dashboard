@@ -31,7 +31,7 @@ vi.mock('../../server/churn-signals.js', () => ({
 }));
 
 vi.mock('../../server/approvals.js', () => ({
-  listBatches: vi.fn(() => []),
+  readApprovalBatchesForIntelligence: vi.fn(() => []),
 }));
 
 vi.mock('../../server/client-users.js', () => ({
@@ -805,13 +805,13 @@ describe('assembleClientSignals — graceful degradation', () => {
 
   it('all dynamic imports throw → returns complete slice with empty defaults', async () => {
     const { listChurnSignals } = await import('../../server/churn-signals.js');
-    const { listBatches } = await import('../../server/approvals.js');
+    const { readApprovalBatchesForIntelligence } = await import('../../server/approvals.js');
     const { listClientUsers } = await import('../../server/client-users.js');
     const { computeROI } = await import('../../server/roi.js');
     const { listRequests } = await import('../../server/requests.js');
 
     vi.mocked(listChurnSignals).mockImplementationOnce(() => { throw new Error('down'); });
-    vi.mocked(listBatches).mockImplementationOnce(() => { throw new Error('down'); });
+    vi.mocked(readApprovalBatchesForIntelligence).mockImplementationOnce(() => { throw new Error('down'); });
     vi.mocked(listClientUsers).mockImplementationOnce(() => { throw new Error('down'); });
     vi.mocked(computeROI).mockImplementationOnce(() => { throw new Error('down'); });
     vi.mocked(listRequests).mockImplementationOnce(() => { throw new Error('down'); });
@@ -858,12 +858,12 @@ describe('assembleClientSignals — graceful degradation', () => {
   });
 });
 
-// ── 9. approvalPatterns from listBatches ────────────────────────────────────
+// ── 9. approvalPatterns from the intelligence approval reader ──────────
 
 describe('assembleClientSignals — approvalPatterns', () => {
   it('computes approvalRate as approved-items / total-items across all batches', async () => {
-    const { listBatches } = await import('../../server/approvals.js');
-    vi.mocked(listBatches).mockReturnValueOnce([
+    const { readApprovalBatchesForIntelligence } = await import('../../server/approvals.js');
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValueOnce([
       {
         id: 'b1',
         createdAt: null,
@@ -881,8 +881,8 @@ describe('assembleClientSignals — approvalPatterns', () => {
   });
 
   it('counts applied approval items as accepted in approvalRate', async () => {
-    const { listBatches } = await import('../../server/approvals.js');
-    vi.mocked(listBatches).mockReturnValueOnce([
+    const { readApprovalBatchesForIntelligence } = await import('../../server/approvals.js');
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValueOnce([
       {
         id: 'b1-applied',
         createdAt: null,
@@ -900,11 +900,11 @@ describe('assembleClientSignals — approvalPatterns', () => {
   });
 
   it('computes avgResponseTime for fully resolved batches', async () => {
-    const { listBatches } = await import('../../server/approvals.js');
+    const { readApprovalBatchesForIntelligence } = await import('../../server/approvals.js');
     const createdAt = '2026-01-01T00:00:00.000Z';
     const updatedAt = '2026-01-01T01:00:00.000Z'; // 1 hour later = 3600000 ms
 
-    vi.mocked(listBatches).mockReturnValueOnce([
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValueOnce([
       {
         id: 'b2',
         createdAt,
@@ -918,8 +918,8 @@ describe('assembleClientSignals — approvalPatterns', () => {
   });
 
   it('returns avgResponseTime = null when no batches are fully resolved', async () => {
-    const { listBatches } = await import('../../server/approvals.js');
-    vi.mocked(listBatches).mockReturnValueOnce([
+    const { readApprovalBatchesForIntelligence } = await import('../../server/approvals.js');
+    vi.mocked(readApprovalBatchesForIntelligence).mockReturnValueOnce([
       {
         id: 'b3',
         createdAt: '2026-01-01T00:00:00.000Z',

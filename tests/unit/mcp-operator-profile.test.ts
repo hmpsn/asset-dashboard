@@ -23,15 +23,10 @@ const registryModule = await import('../../server/mcp/tool-registry.js') as unkn
   listMcpToolDefinitionsForProfile?: (profile: McpServerProfile) => Tool[];
 };
 
-const FULL_DISCOVERY_BYTES = 150_036;
-const FULL_DISCOVERY_SHA256 = 'd09ca70b54fa0e92e391f4dbfd3ccde951244aaca653cc6afe08434565460596';
+const FULL_DISCOVERY_BYTES = 161_047;
+const FULL_DISCOVERY_SHA256 = '90411aa165a7d3f69f3dda99673ce90074f47e12d2c87b849a2f9eeeb223b13c';
 const FULL_INSTRUCTIONS_BYTES = 11_862;
 const FULL_INSTRUCTIONS_SHA256 = '442536613942c966472445b3d5519c4629d63bbebfed78e5b90295c1c68c67fd';
-const RESERVED_P2_NAMES = [
-  'get_portfolio_brief',
-  'get_workspace_decision_brief',
-  'get_client_view',
-] as const;
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -104,6 +99,41 @@ function stripSchemaDescriptions(value: unknown): unknown {
   );
 }
 
+function expandLocalSchemaRefs(schema: unknown): unknown {
+  const definitions = new Map<string, Record<string, unknown>>();
+  const indexDefinitions = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(indexDefinitions);
+      return;
+    }
+    if (value === null || typeof value !== 'object') return;
+    const node = value as Record<string, unknown>;
+    if (typeof node.$id === 'string') definitions.set(node.$id, node);
+    Object.values(node).forEach(indexDefinitions);
+  };
+  indexDefinitions(schema);
+
+  const expand = (value: unknown, resolving = new Set<string>()): unknown => {
+    if (Array.isArray(value)) return value.map(child => expand(child, resolving));
+    if (value === null || typeof value !== 'object') return value;
+    const node = value as Record<string, unknown>;
+    if (typeof node.$ref === 'string') {
+      const definitionId = node.$ref;
+      const target = definitions.get(definitionId);
+      if (!target || resolving.has(definitionId)) {
+        throw new Error(`Invalid compact schema ref: ${node.$ref}`);
+      }
+      return expand(target, new Set([...resolving, definitionId]));
+    }
+    return Object.fromEntries(
+      Object.entries(node)
+        .filter(([key]) => key !== 'definitions' && key !== '$id')
+        .map(([key, child]) => [key, expand(child, resolving)]),
+    );
+  };
+  return expand(schema);
+}
+
 function objectRecord(value: unknown): Record<string, unknown> {
   expect(value).not.toBeNull();
   expect(typeof value).toBe('object');
@@ -132,7 +162,7 @@ function parseJsonV1(result: CallToolResult): Record<string, unknown> {
 }
 
 describe('MCP compact operator profile contract', () => {
-  it('reserves exactly 25 unique names with 22 currently registered tools and three P2 names', () => {
+  it('activates all 25 unique operator names after P2', () => {
     expect(MCP_OPERATOR_TOOL_NAMES).toHaveLength(25);
     expect(new Set(MCP_OPERATOR_TOOL_NAMES).size).toBe(25);
 
@@ -140,9 +170,9 @@ describe('MCP compact operator profile contract', () => {
     const activeNames = MCP_OPERATOR_TOOL_NAMES.filter(name => registered.has(name));
     const reservedNames = MCP_OPERATOR_TOOL_NAMES.filter(name => !registered.has(name));
 
-    expect(activeNames).toHaveLength(22);
-    expect(new Set(activeNames).size).toBe(22);
-    expect(reservedNames).toEqual(RESERVED_P2_NAMES);
+    expect(activeNames).toHaveLength(25);
+    expect(new Set(activeNames).size).toBe(25);
+    expect(reservedNames).toEqual([]);
   });
 
   it('preserves the exact full discovery and instruction byte baselines', () => {
@@ -161,8 +191,8 @@ describe('MCP compact operator profile contract', () => {
       .filter(name => (MCP_OPERATOR_TOOL_NAMES as readonly string[]).includes(name));
     const projected = operatorDefinitions();
 
-    expect(projected).toHaveLength(22);
-    expect(new Set(projected.map(definition => definition.name)).size).toBe(22);
+    expect(projected).toHaveLength(25);
+    expect(new Set(projected.map(definition => definition.name)).size).toBe(25);
     expect(projected.map(definition => definition.name)).toEqual(expectedNames);
     expect(listMcpToolDefinitions()).toEqual(canonicalFull);
   });
@@ -184,9 +214,14 @@ describe('MCP compact operator profile contract', () => {
           definition.name as keyof typeof MCP_OPERATOR_TOOL_DESCRIPTIONS
         ],
       );
-      expect(definition.inputSchema).toEqual(
+      expect(expandLocalSchemaRefs(definition.inputSchema)).toEqual(
         stripSchemaDescriptions(canonicalDefinition!.inputSchema),
       );
+      if (canonicalDefinition!.outputSchema) {
+        expect(definition.outputSchema).toEqual(
+          stripSchemaDescriptions(canonicalDefinition!.outputSchema),
+        );
+      }
     }
 
     const createTemplate = projected.find(
@@ -209,7 +244,7 @@ describe('MCP compact operator profile contract', () => {
     const bytes = Buffer.byteLength(JSON.stringify(projected), 'utf8')
       + Buffer.byteLength(MCP_OPERATOR_PROFILE_INSTRUCTIONS, 'utf8');
 
-    expect(projected).toHaveLength(22);
+    expect(projected).toHaveLength(25);
     expect(bytes).toBeLessThanOrEqual(32 * 1024);
   });
 

@@ -1,8 +1,9 @@
 /** Minimal transport-neutral shape shared by MCP registry consumers. */
-export interface McpToolDefinition<TInputSchema = unknown> {
+export interface McpToolDefinition<TInputSchema = unknown, TOutputSchema = unknown> {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: TInputSchema;
+  readonly outputSchema?: TOutputSchema;
 }
 
 export const MCP_SERVER_PROFILES = {

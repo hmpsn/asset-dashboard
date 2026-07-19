@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
     state,
     parseJsonSafeArray: vi.fn(),
     listChurnSignals: vi.fn(),
-    listBatches: vi.fn(),
+    readApprovalBatchesForIntelligence: vi.fn(),
     listClientUsers: vi.fn(),
     getMonthlyConversationCount: vi.fn(),
     listSessions: vi.fn(),
@@ -64,7 +64,7 @@ vi.mock('../../server/churn-signals.js', () => ({
 }));
 
 vi.mock('../../server/approvals.js', () => ({
-  listBatches: mocks.listBatches,
+  readApprovalBatchesForIntelligence: mocks.readApprovalBatchesForIntelligence,
 }));
 
 vi.mock('../../server/client-users.js', () => ({
@@ -109,7 +109,7 @@ beforeEach(() => {
 
   mocks.parseJsonSafeArray.mockReturnValue([]);
   mocks.listChurnSignals.mockReturnValue([]);
-  mocks.listBatches.mockReturnValue([]);
+  mocks.readApprovalBatchesForIntelligence.mockReturnValue([]);
   mocks.listClientUsers.mockReturnValue([]);
   mocks.getMonthlyConversationCount.mockReturnValue(0);
   mocks.listSessions.mockReturnValue([]);

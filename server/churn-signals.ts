@@ -123,7 +123,9 @@ export function listChurnSignals(workspaceId?: string): ChurnSignal[] {
 
 export function dismissSignal(workspaceId: string, signalId: string): boolean {
   const info = stmts().dismiss.run(new Date().toISOString(), signalId, workspaceId);
-  return info.changes > 0;
+  const dismissed = info.changes > 0;
+  if (dismissed) invalidateIntelligenceCache(workspaceId);
+  return dismissed;
 }
 
 /**

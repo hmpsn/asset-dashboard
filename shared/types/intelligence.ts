@@ -534,6 +534,13 @@ export interface ClientSignalsSlice {
   approvalPatterns: { approvalRate: number; avgResponseTime: number | null };
   recentChatTopics: string[];
   churnRisk: 'low' | 'medium' | 'high' | null;
+  /**
+   * Whether the churn-risk subsystem was read successfully. An empty
+   * `churnSignals` array is authoritative only when this is `available`.
+   * Optional for compatibility with older stored/test projections; consumers
+   * that make safety decisions must treat an absent value as unavailable.
+   */
+  churnSignalsAvailability?: 'available' | 'unavailable';
   // New in 3A
   churnSignals?: ChurnSignalSummary[];
   roi?: { organicValue: number; growth: number; period: string } | null;
@@ -590,6 +597,27 @@ export interface OperationalSlice {
   timeSaved?: { totalMinutes: number; byFeature: Record<string, number> } | null;
   approvalQueue?: { pending: number; oldestAge: number | null };
   clientActionQueue?: { pending: number; oldestAge: number | null };
+  /**
+   * Bounded, payload-free operator queue. This is the durable-ID authority for
+   * compact decision read models; it is intentionally omitted from prompt formatters.
+   */
+  pendingDecisions?: {
+    availability: 'available' | 'unavailable';
+    total: number;
+    counts: {
+      approvals: number;
+      requests: number;
+      clientActions: number;
+    };
+    items: Array<{
+      sourceType: 'approval_item' | 'client_request' | 'client_action';
+      sourceId: string;
+      parentId: string | null;
+      label: string;
+      priority: 'urgent' | 'high' | 'medium' | 'low';
+      createdAt: string;
+    }>;
+  };
   recommendationQueue?: { fixNow: number; fixSoon: number; fixLater: number };
   actionBacklog?: { pendingMeasurement: number; oldestAge: number | null };
   detectedPlaybooks?: string[];
@@ -965,6 +993,7 @@ export interface CompositeHealthScore {
 }
 
 export interface ChurnSignalSummary {
+  id: string;
   type: string;
   severity: string;
   detectedAt: string;
