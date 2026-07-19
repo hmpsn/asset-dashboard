@@ -58,8 +58,10 @@ typed brief/output schemas + slice ID guardrails commit
 ```
 
 P2 keeps the Insights Engine facade authoritative. The workspace decision brief
-requests exactly `insights`, `contentPipeline`, `siteHealth`, `clientSignals`, and
-`operational`; the client view uses the exact tier selector and public projection.
+requests a purpose-specific five-of-fifteen projection: exactly `insights`,
+`contentPipeline`, `siteHealth`, `clientSignals`, and `operational`. The other ten
+registered slices remain available to their existing consumers and the full MCP
+surface. The client view uses the exact tier selector and public projection.
 Portfolio assembly reads existing persistence stores only. No builder may call AI,
 a provider, a job starter, a mutation, or a paid-operation counter.
 

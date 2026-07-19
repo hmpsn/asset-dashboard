@@ -62,7 +62,8 @@ program plan, the allowlist census, and the discovery/invocation tests together.
   its advertised output schema. Parsed legacy text equals `structuredContent.data`.
 - Workspace decision assembly requests exactly `insights`, `contentPipeline`,
   `siteHealth`, `clientSignals`, and `operational` through the public intelligence
-  facade. Missing slices are reported as unavailable, never interpreted as clear.
+  facade. This is a narrow five-of-fifteen read model, not the full Insights Engine
+  inventory. Missing slices are reported as unavailable, never interpreted as clear.
 - The operational pending-decision projection is capped at 25 and contains only
   durable IDs, bounded labels, normalized priority, and creation time. It omits
   values, payloads, notes, prompts, evidence, and activity descriptions, and is

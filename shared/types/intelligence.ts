@@ -596,6 +596,11 @@ export interface OperationalSlice {
    */
   pendingDecisions?: {
     total: number;
+    counts: {
+      approvals: number;
+      requests: number;
+      clientActions: number;
+    };
     items: Array<{
       sourceType: 'approval_item' | 'client_request' | 'client_action';
       sourceId: string;
