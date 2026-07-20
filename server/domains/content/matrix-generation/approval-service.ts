@@ -14,6 +14,7 @@ import {
   projectMatrixGenerationRun,
   recordMatrixPageApprovalEvidence,
 } from './repository.js';
+import { isMatrixGenerationSetAuditRequired } from './set-audit.js';
 
 export class MatrixPageApprovalPreconditionError extends Error {
   readonly code = 'matrix_page_approval_precondition';
@@ -34,6 +35,7 @@ export function approveMatrixPageForPublishReadiness(
     if (!run || run.revision !== request.expectedRunRevision) {
       throw new MatrixPageApprovalPreconditionError('The matrix generation run changed since review');
     }
+    const setAuditRequired = isMatrixGenerationSetAuditRequired(run.selections.length);
     if (
       !item
       || item.runId !== run.id
@@ -44,11 +46,11 @@ export function approveMatrixPageForPublishReadiness(
       || item.approvalEvidence !== null
       || !item.previewTarget
       || !item.postId
-      || !run.setAuditReport
-      || run.setAuditReport.findings.some(finding => (
+      || (setAuditRequired && !run.setAuditReport)
+      || run.setAuditReport?.findings.some(finding => (
         isBlockingMatrixGenerationSetAuditFinding(finding)
         && finding.affectedItemIds.includes(item.id)
-      ))
+      )) === true
     ) {
       throw new MatrixPageApprovalPreconditionError('This page is not ready for human approval');
     }

@@ -10198,3 +10198,15 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Verification:** Focused contract, manifest, sanitizer, preview, evidence, generation-audit, revision-provenance, budget, MCP profile, and compatibility suites cover the new contracts and legacy absence behavior. Independent review found and closed headingless post-spend failure, silent duplicate-destination acceptance, forked pricing-table, and Anthropic thinking-headroom under-reservation risks. Full repository gates and two final independent approvals are required before release.
 
 **Files:** shared matrix/evidence contracts; template schemas and persistence; block manifest; workspace census sidecar; evidence/preview/start preparation; generation stages and audits; AI operation/budget policy; rich-text sanitizer; MCP contracts/instructions; focused tests; runtime rules, design/implementation records, feature catalog, roadmap, and feature audit.
+
+### 719. Single-cell matrix set-audit consistency 2026-07-20
+
+**Status:** Complete locally. Staging smoke is required before the next MCP closure phase begins; no paid generation was invoked.
+
+**What changed:** One shared cardinality policy now defines cross-page set review as required only when the original run selection contains at least two candidates. Preview estimation uses that policy for its zero-or-two provider-call reservation, the worker skips both set-audit dispatch and missing-report demotion for one-cell runs, restart recovery preserves a review-ready one-cell result without a report, and human approval no longer requires an impossible report for that same run shape. Multi-page estimation, dispatch, restart demotion, blocking findings, and approval requirements remain unchanged.
+
+**Safety correction:** Restart recovery keys the decision to the durable original selection census rather than the currently visible item list, so a partial multi-page run cannot masquerade as a one-page run. Any blocking set report that is present still blocks the affected page. The HTTP-only human approval path continues to record review readiness only and creates no send or publication job.
+
+**Verification:** Focused policy, budget, real worker, recovery, and item-approval suites cover one- and two-candidate behavior. The worker test proves a one-cell run neither dispatches nor persists a set audit and still terminalizes truthfully, while the two-cell control continues to dispatch and persist one. All focused tests and project typecheck pass without provider access or database synchronization.
+
+**Files:** matrix-generation set-audit policy, preview estimator, worker, restart recovery, human-approval readiness, focused unit tests, runtime/control-plane guardrails, roadmap, and feature audit.

@@ -3,7 +3,7 @@
     {
       "id": "sprint-mcp-operator-control-plane-2026-07-17",
       "name": "MCP Operator Control Plane",
-      "hours": "Seven staging-first backend phases; one PR at a time",
+      "hours": "Sequential staging-first backend phases; one PR at a time",
       "rationale": "Make desktop administration compact, deterministic, and safer while the Insights Engine remains the authoritative database and client-view layer. Preserve the full MCP surface for advanced work and avoid the active UI rebuild.",
       "items": [
         {
@@ -15,7 +15,7 @@
           "status": "pending",
           "createdAt": "2026-07-17",
           "owner": "platform-foundation",
-          "notes": "Add validated structuredContent, explicit output schemas, and policy-derived annotations for every active operator tool while preserving text JSON compatibility."
+          "notes": "Add validated structuredContent, explicit output schemas, and policy-derived annotations for every active operator tool while preserving text JSON compatibility. The complete self-contained operator contract has a 64 KiB hard ceiling and 48 KiB optimization target; the prior 32 KiB P1/P2 ceiling is superseded rather than met with lossy schemas."
         },
         {
           "id": "mcp-workspace-aliases",

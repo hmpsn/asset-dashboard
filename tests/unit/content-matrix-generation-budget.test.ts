@@ -535,11 +535,18 @@ describe('content matrix preview budget', () => {
     const cellEstimate = estimateMatrixGenerationCellBudget(target, context, []);
     target.estimatedPaidBudget = cellEstimate;
     const accepted = estimateMatrixGenerationBatchBudget([target]);
+    const twoCellEstimate = estimateMatrixGenerationBatchBudget([target, target]);
     const tenCellEstimate = estimateMatrixGenerationBatchBudget(
       Array.from({ length: 10 }, () => target),
     );
 
     expect(accepted).toEqual(cellEstimate);
+    expect(twoCellEstimate.providerCalls).toBe((cellEstimate.providerCalls * 2) + 2);
+    expect(twoCellEstimate.inputTokens).toBe(
+      (cellEstimate.inputTokens * 2)
+        + (estimateMatrixGenerationSetAuditInputReservation([target, target]) * 2),
+    );
+    expect(twoCellEstimate.outputTokens).toBe((cellEstimate.outputTokens * 2) + 10_000);
     expect(tenCellEstimate.providerCalls).toBe((cellEstimate.providerCalls * 10) + 2);
     expect(accepted.inputTokens).toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxInputTokens);
     expect(accepted.outputTokens).toBeLessThanOrEqual(MATRIX_GENERATION_BATCH_LIMITS.maxOutputTokens);
@@ -654,25 +661,9 @@ describe('content matrix preview budget', () => {
     await reviseMatrixGenerationCandidate({ ...operationBase, auditReport: report });
     await auditMatrixGenerationCandidate({ ...operationBase, deterministicReport: report });
 
-    const candidate = {
-      item: { id: 'item-budget', previewTarget: target } as MatrixGenerationItem,
-      post,
-    };
-    await auditMatrixGenerationSet({
-      workspaceId: WORKSPACE_ID,
-      candidates: [candidate],
-      expectedCandidateCount: 1,
-      passCount: 1,
-      beforeBoundedProviderDispatch: reserve,
-    });
-    await auditMatrixGenerationSet({
-      workspaceId: WORKSPACE_ID,
-      candidates: [candidate],
-      expectedCandidateCount: 1,
-      passCount: 2,
-      beforeBoundedProviderDispatch: reserve,
-    });
-
+    expect(callAIMock).not.toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'content-matrix-set-audit',
+    }));
     expect(usage.providerCalls).toBe(accepted.providerCalls);
   });
 });
