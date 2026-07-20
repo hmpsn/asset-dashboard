@@ -1446,6 +1446,7 @@ export async function generateBrief(
       name: string;
       headingTemplate: string;
       headingLocked?: boolean;
+      headingPresent?: boolean;
       guidance: string;
       wordCountTarget: number;
     }[];
@@ -1749,7 +1750,10 @@ The outline sections MUST match the following template sections in order. You ma
       const headingPolicy = s.headingLocked === false
         ? `write a distinctive, brand-voice H2; use "${s.headingTemplate}" only as a literal fallback when no stronger on-voice heading is possible`
         : `use the exact literal H2 "${s.headingTemplate}"`;
-      templateBlock += `\n- Section "${s.name}": ${headingPolicy} — ${s.guidance} (target ~${s.wordCountTarget} words)`;
+      const renderedHeadingPolicy = s.headingPresent === false
+        ? 'plan the section without a visible H2; any outline heading is generation scaffolding only and must not appear in final copy'
+        : headingPolicy;
+      templateBlock += `\n- Section "${s.name}": ${renderedHeadingPolicy} — ${s.guidance} (target ~${s.wordCountTarget} words)`;
     }
     if (context.templateToneOverride) {
       templateBlock += `\n\nTONE OVERRIDE: Use this specific tone and style instead of your default: ${context.templateToneOverride}`;

@@ -456,6 +456,50 @@ describe('content matrix generation deterministic audit', () => {
       .toBe('failed');
   });
 
+  it('accepts exact heading absence for headingless blocks and preserves it through revision', () => {
+    const targetValue = target();
+    const templateBlocks = targetValue.blockManifest.blocks.filter(block => block.source === 'template');
+    for (const block of templateBlocks) {
+      block.heading = { level: null, renderedText: null, locked: true };
+    }
+    const candidate = post(targetValue);
+    candidate.sections = candidate.sections.map(section => ({
+      ...section,
+      heading: '',
+      content: section.content.replace(/<h2>.*?<\/h2>/, ''),
+    }));
+    const headinglessReport = audit({ target: targetValue, post: candidate });
+    expect(headinglessReport.verdict).toBe('ready_for_human_review');
+    expect(checkResult(headinglessReport, 'template-block-census')).toBe('passed');
+    expect(checkResult(headinglessReport, 'keyword-heading-coverage')).toBe('not_applicable');
+
+    const revised = applyMatrixGenerationRevision(targetValue, candidate as never, {
+      blocks: targetValue.blockManifest.blocks.map((block, index) => ({
+        targetId: block.id,
+        html: block.source === 'template'
+          ? `<p>SEO consulting in Austin remains grounded and direct in block ${index + 1}.</p>`
+          : `<p>Revised grounded block ${index + 1}.</p>`,
+      })),
+    });
+    expect(revised.sections[0].heading).toBe('');
+    expect(revised.sections[0].content).not.toContain('<h2');
+
+    candidate.sections[0].heading = 'answer';
+    candidate.sections[0].content = '<h2>answer</h2><p>SEO consulting in Austin remains grounded and direct.</p>';
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'template-block-census'))
+      .toBe('failed');
+    expect(() => applyMatrixGenerationRevision(targetValue, candidate as never, {
+      blocks: targetValue.blockManifest.blocks.map((block, index) => ({
+        targetId: block.id,
+        html: block.id === 'template:answer'
+          ? '<h2>answer</h2><p>Leaked internal heading.</p>'
+          : block.source === 'template'
+            ? `<h2>${block.heading.renderedText}</h2><p>Revised grounded block ${index + 1}.</p>`
+            : `<p>Revised grounded block ${index + 1}.</p>`,
+      })),
+    })).toThrow(/changed or omitted a frozen section heading/i);
+  });
+
   it('requires frozen block-scoped internal anchors and rejects absolute self-links', () => {
     const targetValue = target();
     const cta = targetValue.blockManifest.blocks.find(block => block.id === 'template:cta');

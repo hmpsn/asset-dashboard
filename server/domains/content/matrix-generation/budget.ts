@@ -1,9 +1,10 @@
 import type { MatrixGenerationBudgetUsage } from '../../../../shared/types/matrix-generation.js';
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
+import { estimateModelCostUsd, MODEL_ROLES } from '../../../model-manifest.js';
 
-const PROVIDER_COST_MICROS_PER_TOKEN = {
-  anthropic: { input: 5, output: 25 },
-  openai: { input: 5, output: 30 },
+const MATRIX_GENERATION_PROVIDER_COST_CEILING_MODEL = {
+  anthropic: MODEL_ROLES.creativeWriter,
+  openai: MODEL_ROLES.creativeRecovery,
 } as const;
 
 const PROVIDER_FRAMING_TOKEN_CEILING = 512;
@@ -77,9 +78,12 @@ export function matrixGenerationRenderedInputUtf8Bytes(
 
 /** OpenAI-rate ceiling used by preview so exact accepted cost never rounds below runtime. */
 export function matrixGenerationEstimatedUsdCeiling(inputTokens: number, outputTokens: number): number {
-  const micros = (inputTokens * PROVIDER_COST_MICROS_PER_TOKEN.openai.input)
-    + (outputTokens * PROVIDER_COST_MICROS_PER_TOKEN.openai.output);
-  return Math.ceil(micros / 100) / 10_000;
+  const estimated = estimateModelCostUsd({
+    model: MATRIX_GENERATION_PROVIDER_COST_CEILING_MODEL.openai,
+    promptTokens: inputTokens,
+    completionTokens: outputTokens,
+  });
+  return Math.ceil(estimated * 10_000) / 10_000;
 }
 
 /** Pessimistic reservation for the exact rendered dispatch using the shared 4:1 estimate. */
@@ -92,12 +96,15 @@ export function matrixGenerationProviderReservation(
   }
   const inputTokens = matrixGenerationInputReservationCeiling(serializedUtf8Bytes);
   const outputTokens = dispatch.maxOutputTokens;
-  const rates = PROVIDER_COST_MICROS_PER_TOKEN[dispatch.provider];
-  const costMicros = (inputTokens * rates.input) + (outputTokens * rates.output);
+  const estimatedUsd = estimateModelCostUsd({
+    model: MATRIX_GENERATION_PROVIDER_COST_CEILING_MODEL[dispatch.provider],
+    promptTokens: inputTokens,
+    completionTokens: outputTokens,
+  });
   return {
     providerCalls: 1,
     inputTokens,
     outputTokens,
-    estimatedUsd: Math.ceil(costMicros) / 1_000_000,
+    estimatedUsd: Math.ceil(estimatedUsd * 1_000_000) / 1_000_000,
   };
 }

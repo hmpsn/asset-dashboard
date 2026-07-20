@@ -777,7 +777,21 @@ describe('content matrix generation M1', () => {
         { href: '/services', anchorText: 'All services' },
         { href: '/services/', anchorText: 'Duplicate services' },
       ],
-    }, 'duplicate-link')).rejects.toThrow('at least 2 distinct verified destinations');
+    }, 'duplicate-link')).rejects.toMatchObject({
+      code: 'precondition_failed',
+      message: expect.stringContaining('cannot repeat the same canonical destination'),
+    });
+    await expect(resolveInternalLinkEvidence(fixture, cell.id, {
+      kind: 'link_list',
+      value: [
+        { href: '/services', anchorText: 'All services' },
+        { href: '/services/', anchorText: 'Duplicate services' },
+        { href: '/financing', anchorText: 'Financing' },
+      ],
+    }, 'duplicate-link-minimum-met')).rejects.toMatchObject({
+      code: 'precondition_failed',
+      message: expect.stringContaining('cannot repeat the same canonical destination'),
+    });
 
     await resolveInternalLinkEvidence(fixture, cell.id, {
       kind: 'link_list',

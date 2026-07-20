@@ -160,7 +160,15 @@ function templateCensusCheck(
     && post.sections.every((section, index) => {
       const contract = bodyContracts[index];
       const renderedH2 = firstH2(section.content);
-      if (!contract || !renderedH2) return false;
+      if (!contract) return false;
+      if (contract.heading.renderedText === null) {
+        return section.index === index
+          && section.status === 'done'
+          && countHtmlWords(section.content) > 0
+          && section.heading === ''
+          && renderedH2 === '';
+      }
+      if (!renderedH2) return false;
       const headingAgrees = normalizeHeading(section.heading) === normalizeHeading(renderedH2);
       const lockedHeadingAgrees = !contract.heading.locked || (
         contract.heading.renderedText !== null
@@ -229,6 +237,9 @@ function keywordChecks(
   post: GeneratedPost,
 ): GenerationAuditCheck[] {
   const keyword = target.targetKeyword.value;
+  const hasVisibleBodyHeading = target.blockManifest.blocks.some(block => (
+    block.source === 'template' && block.heading.renderedText !== null
+  ));
   return [
     check(
       'keyword-url-coverage',
@@ -251,13 +262,19 @@ function keywordChecks(
       'The introduction covers the material target-keyword terms.',
       'The introduction is missing material target-keyword terms.',
     ),
-    check(
-      'keyword-heading-coverage',
-      'seo',
-      post.sections.some(section => containsKeywordTerms(section.heading, keyword)),
-      'A locked body heading covers the material target-keyword terms.',
-      'No locked body heading covers the material target-keyword terms.',
-    ),
+    hasVisibleBodyHeading
+      ? check(
+          'keyword-heading-coverage',
+          'seo',
+          post.sections.some(section => containsKeywordTerms(section.heading, keyword)),
+          'A body heading covers the material target-keyword terms.',
+          'No body heading covers the material target-keyword terms.',
+        )
+      : notApplicable(
+          'keyword-heading-coverage',
+          'seo',
+          'The frozen template intentionally contains no visible body headings.',
+        ),
     check(
       'keyword-metadata-coverage',
       'seo',

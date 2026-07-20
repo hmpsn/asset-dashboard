@@ -494,7 +494,12 @@ function verifiedLinksForSection(
         'Internal-link evidence must reference a destination in the current workspace page census',
       );
     }
-    if (seen.has(canonicalPath)) continue;
+    if (seen.has(canonicalPath)) {
+      throw new MatrixGenerationEvidenceError(
+        'precondition_failed',
+        'Internal-link evidence cannot repeat the same canonical destination',
+      );
+    }
     seen.add(canonicalPath);
     links.push({ href: canonicalPath, anchorText: link.anchorText.trim() });
   }

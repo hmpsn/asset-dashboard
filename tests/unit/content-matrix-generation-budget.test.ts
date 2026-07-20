@@ -66,6 +66,7 @@ import {
   generateMatrixPostStage,
 } from '../../server/domains/content/matrix-generation/stages.js';
 import type { BoundedProviderDispatch } from '../../server/content-posts-ai.js';
+import { estimateModelCostUsd, MODEL_ROLES } from '../../server/model-manifest.js';
 
 const NOW = '2026-07-14T12:00:00.000Z';
 const WORKSPACE_ID = 'ws_matrix_budget';
@@ -350,6 +351,27 @@ describe('content matrix preview budget', () => {
     expect(() => matrixGenerationProviderReservation(dispatchFor(
       `${exactUnicode.renderedInput.messages[0]!.content}${emoji}`,
     ))).toThrow(MatrixGenerationProviderInputEnvelopeError);
+  });
+
+  it('prices provider reservations through the canonical conservative model ceiling', () => {
+    const dispatch = (provider: 'openai' | 'anthropic'): BoundedProviderDispatch => ({
+      provider,
+      fallback: false,
+      renderedInput: provider === 'openai'
+        ? { provider, system: undefined, messages: [{ role: 'user', content: 'Grounded copy.' }] }
+        : { provider, system: 'System.', messages: [{ role: 'user', content: 'Grounded copy.' }] },
+      maxOutputTokens: 500,
+    });
+    for (const provider of ['openai', 'anthropic'] as const) {
+      const usage = matrixGenerationProviderReservation(dispatch(provider));
+      const canonical = estimateModelCostUsd({
+        model: provider === 'openai' ? MODEL_ROLES.creativeRecovery : MODEL_ROLES.creativeWriter,
+        promptTokens: usage.inputTokens,
+        completionTokens: usage.outputTokens,
+      });
+      expect(usage.estimatedUsd).toBeGreaterThanOrEqual(canonical);
+      expect(usage.estimatedUsd - canonical).toBeLessThan(0.0000011);
+    }
   });
 
   it('keeps a six-page, fifteen-section service batch inside the accepted hard ceilings', () => {
