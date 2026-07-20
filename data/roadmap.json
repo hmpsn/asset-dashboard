@@ -89,17 +89,6 @@
       "rationale": "Close the 2026-07-16 content-generation audit without expanding raw prompts indiscriminately. Repair contradictory writing contracts and context continuity first, then project only relevant approved brand/proof/local evidence, add whole-document quality measurement, and use a human-rated golden set before changing model defaults. Source audit: 2026-07-16 content intelligence and generation audit in the Codex task; related context groundwork: genq-content-context-v2.",
       "items": [
         {
-          "id": "mcp-matrix-output-quality-2c",
-          "title": "Matrix output quality — mixed headings, verified links, same-model revision, and semantic tables",
-          "source": "Obsidian spec-open-work-2026-07-16 §2c-1 through §2c-5",
-          "est": "L",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-07-20",
-          "owner": "content-pipeline",
-          "notes": "Correctness repair after the first real generated pages: preserve literal AEO headings while unlocking conversion headings, freeze and render census-backed internal anchors, reject zero/self links, keep automatic revision on the accepted prose model, and preserve/audit semantic comparison tables. Preserve all evidence, paid-work, human approval, send, and publication gates."
-        },
-        {
           "id": "content-quality-prompt-contract-cleanup",
           "title": "Content prompt contract cleanup — natural structure and evidence-only specifics",
           "source": "2026-07-16 content intelligence and generation audit",

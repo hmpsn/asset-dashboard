@@ -50,7 +50,7 @@ The operator profile exposes 25 tools: `list_workspaces`, `get_portfolio_brief`,
 
 Operator discovery replaces top-level prose with explicit compact descriptions and removes only
 nested JSON-schema `description` metadata. All schema validation constraints remain intact, and
-the serialized tool catalog plus operator instructions is contract-tested at 32,222 bytes, below
+the serialized tool catalog plus operator instructions is contract-tested at 32,733 bytes, below
 the 32 KiB UTF-8 ceiling. Repeated input/output schema subtrees use lossless draft-07 references;
 no validation field is removed to meet the budget. Discovery and invocation use the same allowlist:
 calling any hidden or unregistered tool
