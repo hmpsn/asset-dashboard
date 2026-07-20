@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { GenerationResolverAttribution } from '../../../../shared/types/generation-evidence.js';
+import { toGenerationProviderErrorDetail } from '../../../../shared/types/generation-evidence.js';
 import type {
   MatrixGenerationAttempt,
   MatrixGenerationItem,
@@ -96,7 +97,16 @@ function runFailureStatus(status: 'failed' | 'conflict' | 'cancelled'): MatrixGe
   return status;
 }
 
-function terminalError(status: 'failed' | 'conflict' | 'cancelled', stage?: string) {
+function terminalError(
+  status: 'failed' | 'conflict' | 'cancelled',
+  stage?: string,
+  cause?: unknown,
+) {
+  // Only a genuine failure carries a provider detail: conflict and cancel have
+  // self-explanatory causes, and echoing their control-flow errors would be
+  // noise. Without this, the operator sees only "A required generation stage
+  // failed." while the actionable provider error is discarded (2026-07-20 P0).
+  const providerError = status === 'failed' ? toGenerationProviderErrorDetail(cause) : undefined;
   return {
     code: `matrix_generation_${status}`,
     message: status === 'conflict'
@@ -106,6 +116,7 @@ function terminalError(status: 'failed' | 'conflict' | 'cancelled', stage?: stri
         : 'A required generation stage failed.',
     retryable: status === 'failed',
     ...(stage ? { stage } : {}),
+    ...(providerError ? { providerError } : {}),
   };
 }
 
@@ -114,6 +125,7 @@ function safelyFinishAttempt(
   itemId: string,
   attempt: MatrixGenerationAttempt | null,
   status: 'failed' | 'conflict' | 'cancelled',
+  cause?: unknown,
 ): void {
   if (!attempt || attempt.status !== 'running') return;
   try {
@@ -122,7 +134,7 @@ function safelyFinishAttempt(
       itemId,
       attemptId: attempt.id,
       nextStatus: status === 'cancelled' ? 'cancelled' : 'failed',
-      error: terminalError(status, attempt.stage),
+      error: terminalError(status, attempt.stage, cause),
     });
   } catch { // catch-ok -- the item terminal remains authoritative if attempt bookkeeping raced
     // The durable item transition below remains authoritative if attempt bookkeeping raced.
@@ -136,6 +148,7 @@ function persistFailure(
   status: 'failed' | 'conflict' | 'cancelled',
   stage?: string,
   terminalizeRun = true,
+  cause?: unknown,
 ): void {
   const item = getMatrixGenerationItem(workspaceId, itemId);
   if (item && !['ready_for_human_review', 'needs_attention', 'blocked_missing_evidence', 'conflict', 'cancelled', 'failed'].includes(item.status)) {
@@ -145,7 +158,7 @@ function persistFailure(
         itemId,
         expectedRevision: item.revision,
         nextStatus: status,
-        error: terminalError(status, stage),
+        error: terminalError(status, stage, cause),
       });
     } catch { // catch-ok -- a competing item terminal write wins over this stale worker
       // A competing terminal write wins; never rewrite it from this stale worker.
@@ -330,8 +343,8 @@ export async function generateMatrixRunItem(
     };
   } catch (error) {
     const status = executionFailureStatus(error, request.signal);
-    safelyFinishAttempt(request.workspaceId, item.id, activeAttempt, status);
-    persistFailure(request.workspaceId, request.runId, item.id, status, stage, false);
+    safelyFinishAttempt(request.workspaceId, item.id, activeAttempt, status, error);
+    persistFailure(request.workspaceId, request.runId, item.id, status, stage, false, error);
     throw new MatrixGenerationCellExecutionError(status, request.runId, item.id);
   }
 }
@@ -461,7 +474,7 @@ export async function generateMatrixCell(
     const status = error instanceof MatrixGenerationCellExecutionError
       ? error.status
       : executionFailureStatus(error, request.signal);
-    persistFailure(request.workspaceId, run.id, item.id, status);
+    persistFailure(request.workspaceId, run.id, item.id, status, undefined, true, error);
     throw new MatrixGenerationCellExecutionError(status, run.id, item.id);
   }
 }

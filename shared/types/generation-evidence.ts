@@ -363,4 +363,34 @@ export interface GenerationSanitizedError {
   message: string;
   retryable: boolean;
   stage?: string;
+  /**
+   * Underlying provider/runtime error for the failed stage, truncated and
+   * OPERATOR-FACING ONLY (matrix generation is an admin surface; no public
+   * portal endpoint serializes this type).
+   *
+   * Exists because the generic `message` above ("A required generation stage
+   * failed.") is not actionable: during the 2026-07-20 temperature-contract
+   * outage the matrix pipeline held the OpenAI 400 explaining the failure and
+   * discarded it, so the bug was only diagnosable by running a standalone brief
+   * and reading its `job.error`. Standalone jobs already surface the provider
+   * error; matrix items now match that.
+   */
+  providerError?: string;
+}
+
+/** Cap on {@link GenerationSanitizedError.providerError}; enough for a provider message + code. */
+export const GENERATION_PROVIDER_ERROR_MAX_CHARS = 600;
+
+/**
+ * Extract a bounded provider/runtime detail string from a caught error.
+ * Returns undefined when there is nothing more informative than the generic
+ * stage message (so the field stays absent rather than echoing boilerplate).
+ */
+export function toGenerationProviderErrorDetail(error: unknown): string | undefined {
+  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  return trimmed.length > GENERATION_PROVIDER_ERROR_MAX_CHARS
+    ? `${trimmed.slice(0, GENERATION_PROVIDER_ERROR_MAX_CHARS)}…`
+    : trimmed;
 }

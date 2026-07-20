@@ -585,6 +585,9 @@ const sanitizedErrorSchema = z.object({
   message: z.string(),
   retryable: z.boolean(),
   stage: z.string().optional(),
+  // Operator-facing provider detail (admin surface only). Kept optional so
+  // rows written before this field existed still parse.
+  providerError: z.string().optional(),
 });
 
 const batchBudgetLimitsSchema = z.object({
