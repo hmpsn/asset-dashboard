@@ -24,6 +24,8 @@ import {
   parseMatrixGenerationModelAuditAIOutput,
   parseMatrixGenerationRevisionAIOutput,
 } from '../../server/domains/content/matrix-generation/output-schemas.js';
+import { matrixGenerationProviderReservation } from '../../server/domains/content/matrix-generation/budget.js';
+import type { BoundedProviderDispatch } from '../../server/content-posts-ai.js';
 
 const NOW = '2026-07-14T12:00:00.000Z';
 const LOCATION_REQUIREMENT = 'matrix-cell:cell-1:location-relevance';
@@ -736,6 +738,7 @@ describe('content matrix generation structured operation contracts', () => {
       executionChainId: 'same-model-revision',
     };
     const prepared = prepareMatrixGenerationRevisionOperation(input);
+    const boundedDispatches: BoundedProviderDispatch[] = [];
     const call = vi.fn(async options => ({
       text: JSON.stringify({
         blocks: targetValue.blockManifest.blocks.map(block => ({
@@ -761,6 +764,7 @@ describe('content matrix generation structured operation contracts', () => {
       ...input,
       prepared,
       dependencies: { callAI: call as never },
+      beforeBoundedProviderDispatch: dispatch => boundedDispatches.push(dispatch),
     });
     expect(call).toHaveBeenCalledWith(expect.objectContaining({
       provider: 'anthropic',
@@ -769,6 +773,10 @@ describe('content matrix generation structured operation contracts', () => {
       timeoutMs: 240_000,
     }));
     expect(call.mock.calls[0][0]).not.toHaveProperty('temperature');
+    expect(boundedDispatches).toEqual([
+      expect.objectContaining({ provider: 'anthropic', model: 'claude-opus-4-8' }),
+    ]);
+    expect(matrixGenerationProviderReservation(boundedDispatches[0]).outputTokens).toBe(16_096);
   });
   it('treats leaked evidence mechanics as a revisionable reader-facing contract violation', () => {
     const prepared = prepareMatrixGenerationAuditOperation({

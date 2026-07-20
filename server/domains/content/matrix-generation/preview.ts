@@ -36,6 +36,7 @@ import {
 import { getMatrix } from '../../../content-matrices.js';
 import { getTemplate } from '../../../content-templates.js';
 import { getPost } from '../../../content-posts-db.js';
+import { getAnthropicRequestPolicy, MODEL_ROLES } from '../../../model-manifest.js';
 import {
   buildContentGenerationContextV2,
   ContentGenerationContextBudgetError,
@@ -533,11 +534,18 @@ export function estimateMatrixGenerationCellBudget(
   // Creative prose may reserve both Anthropic and OpenAI when fallback is needed.
   // Three item-level calls cover the reachable audit→revision→audit ceiling.
   const providerCalls = 1 + (2 * (bodyBlocks.length + 3)) + 1 + 3;
+  const anthropicThinkingHeadroom = getAnthropicRequestPolicy(
+    MODEL_ROLES.creativeWriter,
+  ).thinkingHeadroomTokens;
+  // One Anthropic attempt for every creative prose stage, plus the reachable
+  // same-model automatic revision when Claude prose is accepted.
+  const anthropicOutputHeadroom = anthropicThinkingHeadroom * (bodyBlocks.length + 4);
   const outputTokens = BRIEF_OUTPUT_TOKENS
     + (creativeOutputTokens * 2)
     + 200
     + (ITEM_AUDIT_OUTPUT_TOKENS * 2)
-    + ITEM_REVISION_OUTPUT_TOKENS;
+    + ITEM_REVISION_OUTPUT_TOKENS
+    + anthropicOutputHeadroom;
   return {
     providerCalls,
     inputTokens,
@@ -604,6 +612,7 @@ export function estimateMatrixGenerationSetAuditInputReservation(
   const { renderedInput } = renderMatrixGenerationSetAuditProviderInput(pages);
   const serializedUtf8Bytes = matrixGenerationRenderedInputUtf8Bytes({
     provider: 'openai',
+    model: MODEL_ROLES.structuredSynthesis,
     fallback: false,
     renderedInput,
     maxOutputTokens: SET_AUDIT_OUTPUT_TOKENS,

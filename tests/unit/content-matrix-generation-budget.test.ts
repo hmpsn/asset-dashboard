@@ -318,6 +318,7 @@ describe('content matrix preview budget', () => {
   it('enforces the shared envelope on exact rendered UTF-8 input at the dispatch boundary', () => {
     const dispatchFor = (content: string): BoundedProviderDispatch => ({
       provider: 'openai',
+      model: MODEL_ROLES.creativeRecovery,
       fallback: false,
       renderedInput: {
         provider: 'openai',
@@ -353,9 +354,13 @@ describe('content matrix preview budget', () => {
     ))).toThrow(MatrixGenerationProviderInputEnvelopeError);
   });
 
-  it('prices provider reservations through the canonical conservative model ceiling', () => {
-    const dispatch = (provider: 'openai' | 'anthropic'): BoundedProviderDispatch => ({
+  it('prices provider reservations through the canonical exact-model policy', () => {
+    const dispatch = (
+      provider: 'openai' | 'anthropic',
+      model = provider === 'openai' ? MODEL_ROLES.creativeRecovery : MODEL_ROLES.creativeWriter,
+    ): BoundedProviderDispatch => ({
       provider,
+      model,
       fallback: false,
       renderedInput: provider === 'openai'
         ? { provider, system: undefined, messages: [{ role: 'user', content: 'Grounded copy.' }] }
@@ -371,7 +376,27 @@ describe('content matrix preview budget', () => {
       });
       expect(usage.estimatedUsd).toBeGreaterThanOrEqual(canonical);
       expect(usage.estimatedUsd - canonical).toBeLessThan(0.0000011);
+      expect(usage.outputTokens).toBe(provider === 'anthropic' ? 4_596 : 500);
     }
+
+    expect(matrixGenerationProviderReservation(
+      dispatch('anthropic', 'claude-sonnet-5'),
+    ).outputTokens).toBe(4_596);
+    expect(matrixGenerationProviderReservation(
+      dispatch('anthropic', 'claude-haiku-4-5'),
+    ).outputTokens).toBe(500);
+    expect(matrixGenerationProviderReservation(
+      dispatch('openai', MODEL_ROLES.structuredSynthesis),
+    ).outputTokens).toBe(500);
+  });
+
+  it('adds manifest-derived Anthropic headroom to every reachable creative call and revision', () => {
+    const target = legalGuidanceHeavyTarget();
+    const estimate = estimateMatrixGenerationCellBudget(target, generationContext(), []);
+    const bodyBlockCount = target.blockManifest.blocks.filter(block => block.source === 'template').length;
+    const proseWithoutThinking = 600 + (bodyBlockCount * 800) + 800 + 8_000;
+    const baseOutput = 7_000 + (proseWithoutThinking * 2) + 200 + (2_500 * 2) + 12_000;
+    expect(estimate.outputTokens - baseOutput).toBe(4_096 * (bodyBlockCount + 4));
   });
 
   it('keeps a six-page, fifteen-section service batch inside the accepted hard ceilings', () => {
@@ -436,6 +461,7 @@ describe('content matrix preview budget', () => {
     const { renderedInput } = renderMatrixGenerationSetAuditProviderInput(runtimePages);
     const exactRuntimeBytes = matrixGenerationRenderedInputUtf8Bytes({
       provider: 'openai',
+      model: MODEL_ROLES.structuredSynthesis,
       fallback: false,
       renderedInput,
       maxOutputTokens: 5_000,

@@ -1934,6 +1934,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   const briefMessages = [{ role: 'user' as const, content: prompt }];
   await options?.beforeBoundedProviderDispatch?.({
     provider: 'openai',
+    model: MODEL_ROLES.structuredSynthesis,
     fallback: false,
     renderedInput: renderAIProviderInput({
       provider: 'openai',

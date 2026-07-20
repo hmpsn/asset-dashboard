@@ -5,6 +5,7 @@ import { callAI } from '../../../ai.js';
 import { buildGenerationProvenance } from '../../../generation-provenance.js';
 import { stripHtmlToText } from '../../../utils/text.js';
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
+import { MODEL_ROLES } from '../../../model-manifest.js';
 import type { PersistedGeneratedPost } from '../../../../shared/types/content.js';
 import { isBlockingMatrixGenerationSetAuditFinding } from '../../../../shared/types/matrix-generation.js';
 import type {
@@ -258,12 +259,14 @@ export async function auditMatrixGenerationSet(input: {
   const executionChainId = `matrix-set-audit:${randomUUID()}`;
   input.beforeBoundedProviderDispatch?.({
     provider: 'openai',
+    model: MODEL_ROLES.structuredSynthesis,
     fallback: false,
     renderedInput,
     maxOutputTokens: 5_000,
   });
   const result = await (input.dependencies?.callAI ?? DEFAULT_DEPENDENCIES.callAI)({
     operation: 'content-matrix-set-audit',
+    model: MODEL_ROLES.structuredSynthesis,
     system: MATRIX_GENERATION_SET_AUDIT_SYSTEM_PROMPT,
     messages,
     workspaceId: input.workspaceId,

@@ -1,11 +1,12 @@
 import type { MatrixGenerationBudgetUsage } from '../../../../shared/types/matrix-generation.js';
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
-import { estimateModelCostUsd, MODEL_ROLES } from '../../../model-manifest.js';
+import {
+  estimateModelCostUsd,
+  getAnthropicRequestPolicy,
+  MODEL_ROLES,
+} from '../../../model-manifest.js';
 
-const MATRIX_GENERATION_PROVIDER_COST_CEILING_MODEL = {
-  anthropic: MODEL_ROLES.creativeWriter,
-  openai: MODEL_ROLES.creativeRecovery,
-} as const;
+const MATRIX_GENERATION_COST_CEILING_MODEL = MODEL_ROLES.creativeRecovery;
 
 const PROVIDER_FRAMING_TOKEN_CEILING = 512;
 const ESTIMATED_UTF8_BYTES_PER_INPUT_TOKEN = 4;
@@ -79,7 +80,7 @@ export function matrixGenerationRenderedInputUtf8Bytes(
 /** OpenAI-rate ceiling used by preview so exact accepted cost never rounds below runtime. */
 export function matrixGenerationEstimatedUsdCeiling(inputTokens: number, outputTokens: number): number {
   const estimated = estimateModelCostUsd({
-    model: MATRIX_GENERATION_PROVIDER_COST_CEILING_MODEL.openai,
+    model: MATRIX_GENERATION_COST_CEILING_MODEL,
     promptTokens: inputTokens,
     completionTokens: outputTokens,
   });
@@ -95,9 +96,13 @@ export function matrixGenerationProviderReservation(
     throw new MatrixGenerationProviderInputEnvelopeError(serializedUtf8Bytes);
   }
   const inputTokens = matrixGenerationInputReservationCeiling(serializedUtf8Bytes);
-  const outputTokens = dispatch.maxOutputTokens;
+  const outputTokens = dispatch.maxOutputTokens + (
+    dispatch.provider === 'anthropic'
+      ? getAnthropicRequestPolicy(dispatch.model).thinkingHeadroomTokens
+      : 0
+  );
   const estimatedUsd = estimateModelCostUsd({
-    model: MATRIX_GENERATION_PROVIDER_COST_CEILING_MODEL[dispatch.provider],
+    model: dispatch.model,
     promptTokens: inputTokens,
     completionTokens: outputTokens,
   });

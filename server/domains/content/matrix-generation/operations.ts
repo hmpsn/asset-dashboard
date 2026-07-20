@@ -511,6 +511,7 @@ export async function auditMatrixGenerationCandidate(
   );
   input.beforeBoundedProviderDispatch?.({
     provider: prepared.provider,
+    model: prepared.model,
     fallback: false,
     renderedInput: renderAIProviderInput({
       provider: prepared.provider,
@@ -595,6 +596,7 @@ export async function reviseMatrixGenerationCandidate(
   );
   input.beforeBoundedProviderDispatch?.({
     provider: prepared.provider,
+    model: prepared.model,
     fallback: false,
     renderedInput: renderAIProviderInput({
       provider: prepared.provider,
