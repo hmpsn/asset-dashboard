@@ -1425,7 +1425,15 @@ export function createContentMatrixActionHandler(
           matrixId: parsed.data.matrix_id,
           cellId: parsed.data.cell_id,
           requirementId: parsed.data.requirement_id,
-          value: parsed.data.value,
+          value: parsed.data.value.kind === 'link_list'
+            ? {
+                kind: 'link_list',
+                value: parsed.data.value.value.map(link => ({
+                  href: link.href,
+                  anchorText: link.anchor_text,
+                })),
+              }
+            : parsed.data.value,
           sourceRef: {
             sourceType: parsed.data.source_ref.source_type,
             sourceId: parsed.data.source_ref.source_id,

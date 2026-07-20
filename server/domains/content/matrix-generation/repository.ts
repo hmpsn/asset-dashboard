@@ -24,6 +24,7 @@ import type {
   PersistedContentBrief,
   PersistedGeneratedPost,
 } from '../../../../shared/types/content.js';
+import { TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT } from '../../../../shared/types/content.js';
 import { normalizeMatrixGenerationSchemaTypes } from '../../../../shared/types/matrix-generation.js';
 import type {
   GenerationResolverAttribution,
@@ -272,6 +273,10 @@ const resolvedBlockBaseShape = {
   ctaContract: resolvedCtaContractSchema,
 };
 
+const internalLinkContractSchema = z.object({
+  minimum: z.number().int().min(1).max(TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT),
+}).strict();
+
 const resolvedBlockSchema = z.union([
   z.object({
     id: z.literal('system:introduction'),
@@ -285,6 +290,8 @@ const resolvedBlockSchema = z.union([
     sourceSectionId: z.string().min(1),
     generationRole: z.enum(['body', 'answer_first', 'definition', 'proof', 'process', 'faq', 'cta']),
     optional: z.boolean().optional(),
+    renderAs: z.enum(['prose', 'table']).optional(),
+    internalLinkContract: internalLinkContractSchema.optional(),
     ...resolvedBlockBaseShape,
   }).strict(),
   z.object({
@@ -463,6 +470,8 @@ const resolvedStructuralTargetSchema = z.object({
       generationRole: z.enum(['body', 'answer_first', 'definition', 'proof', 'process', 'faq', 'cta']),
       evidenceRequirementId: z.string().min(1),
       reason: z.literal('missing_section_evidence'),
+      renderAs: z.enum(['prose', 'table']).optional(),
+      internalLinkContract: internalLinkContractSchema.optional(),
     }).strict()).optional(),
     totalWordCountTarget: z.number().nonnegative(),
     fingerprint: z.string().min(1),
@@ -507,6 +516,16 @@ const previewTargetSchema = resolvedStructuralTargetSchema.extend({
     estimatedUsd: z.number().nonnegative(),
     maxConcurrency: z.number().int().positive(),
   }),
+  verifiedInternalLinks: z.array(z.object({
+    blockId: z.string().regex(/^template:.+/),
+    sourceSectionId: z.string().min(1),
+    evidenceRequirementId: z.string().min(1),
+    minimum: z.number().int().min(1).max(TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT),
+    links: z.array(z.object({
+      href: z.string().min(1),
+      anchorText: z.string().min(1),
+    }).strict()).min(1),
+  }).strict()).optional(),
 });
 
 const auditCheckSchema = z.object({

@@ -15,7 +15,7 @@ import { isFeatureEnabled } from '../../../feature-flags.js';
 import { GenerationRevisionConflictError } from '../../../generation-provenance.js';
 import { canonicalGenerationFingerprint } from './fingerprint.js';
 import { assertPreviewIdentityCurrent, prepareMatrixGenerationCell } from './preview.js';
-import { resolveMatrixStructures } from './read-service.js';
+import { resolveMatrixStructuresWithCensus } from './read-service.js';
 import {
   commitMatrixGenerationDraft,
   createMatrixGenerationRun,
@@ -192,7 +192,7 @@ export async function generateMatrixRunItem(
   let stage: 'preflight' | 'brief_generation' | 'post_generation' = 'preflight';
 
   try {
-    const structural = await resolveMatrixStructures({
+    const structuralWithCensus = await resolveMatrixStructuresWithCensus({
       workspaceId: request.workspaceId,
       matrixId: item.matrixId,
       selections: [{
@@ -200,11 +200,15 @@ export async function generateMatrixRunItem(
         expectedSourceRevision: item.sourceRevision,
       }],
     });
-    const structuralResult = structural.results[0];
+    const structuralResult = structuralWithCensus.result.results[0];
     if (!structuralResult || structuralResult.status !== 'resolved') {
       throw new MatrixGenerationRevisionConflictError('item', item.id);
     }
-    const prepared = await prepareMatrixGenerationCell(request.workspaceId, structuralResult);
+    const prepared = await prepareMatrixGenerationCell(
+      request.workspaceId,
+      structuralResult,
+      structuralWithCensus.pageCensus,
+    );
     if (
       prepared.result.status !== 'ready'
       || !prepared.context
@@ -367,7 +371,7 @@ export async function generateMatrixCell(
       replayed: true,
     };
   }
-  const structural = await resolveMatrixStructures({
+  const structuralWithCensus = await resolveMatrixStructuresWithCensus({
     workspaceId: request.workspaceId,
     matrixId: request.matrixId,
     selections: [{
@@ -375,13 +379,17 @@ export async function generateMatrixCell(
       expectedSourceRevision: request.expectedSourceRevision,
     }],
   });
-  const structuralResult = structural.results[0];
+  const structuralResult = structuralWithCensus.result.results[0];
   if (!structuralResult || structuralResult.status !== 'resolved') {
     throw new MatrixGenerationCellPreconditionError(
       'The matrix cell does not satisfy structural generation preflight',
     );
   }
-  const prepared = await prepareMatrixGenerationCell(request.workspaceId, structuralResult);
+  const prepared = await prepareMatrixGenerationCell(
+    request.workspaceId,
+    structuralResult,
+    structuralWithCensus.pageCensus,
+  );
   if (prepared.result.status !== 'ready' || !prepared.context) {
     throw new MatrixGenerationCellPreconditionError(
       'The matrix cell has unresolved preflight requirements',

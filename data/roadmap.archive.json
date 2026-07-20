@@ -1,6 +1,26 @@
 {
   "sprints": [
     {
+      "id": "sprint-content-intelligence-quality-2026-07-16-terminal-history",
+      "name": "✅ SHIPPED — Content Intelligence & Generation Quality — context before model upgrades",
+      "hours": "TBD — six staging-first PRs",
+      "rationale": "Terminal item history split from sprint-content-intelligence-quality-2026-07-16. Close the 2026-07-16 content-generation audit without expanding raw prompts indiscriminately. Repair contradictory writing contracts and context continuity first, then project only relevant approved brand/proof/local evidence, add whole-document quality measurement, and use a human-rated golden set before changing model defaults. Source audit: 2026-07-16 content intelligence and generation audit in the Codex task; related context groundwork: genq-content-context-v2.",
+      "items": [
+        {
+          "id": "mcp-matrix-output-quality-2c",
+          "title": "Matrix output quality — mixed headings, verified links, same-model revision, and semantic tables",
+          "source": "Obsidian spec-open-work-2026-07-16 §2c-1 through §2c-5",
+          "est": "L",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-20",
+          "owner": "content-pipeline",
+          "notes": "Completed locally on codex/mcp-matrix-output-quality. Mixed heading policy uses required AEO authority plus generation role; declared link sections now require typed census-verified block-scoped anchors frozen into preview fingerprints; deterministic audit rejects zero, duplicate-under-minimum, wrong-block, unlisted, and self links; automatic revision pins the one homogeneous active prose provider/model and fails closed without spend when provenance is absent/mixed/stale; semantic table tags survive sanitization and table-designated blocks require structural markup. Existing evidence, placeholder, paid-work, human approval, send, and publication gates are unchanged. Generated/read/export table safety is covered; TipTap editing round-trip support remains a separate UI follow-up because the active editor does not register table extensions."
+        }
+      ],
+      "shippedAt": "2026-07-20"
+    },
+    {
       "id": "sprint-mcp-operator-control-plane-2026-07-17-terminal-history",
       "name": "✅ SHIPPED — MCP Operator Control Plane",
       "hours": "Seven staging-first backend phases; one PR at a time",

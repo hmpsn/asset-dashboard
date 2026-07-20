@@ -1,3 +1,5 @@
+import * as cheerio from 'cheerio';
+
 import type { VoiceGuardrails } from '../../../../shared/types/brand-engine.js';
 import type { GeneratedPost } from '../../../../shared/types/content.js';
 import type {
@@ -138,6 +140,15 @@ function pageHtml(post: GeneratedPost): string {
     .join('\n');
 }
 
+function firstH2(html: string): string {
+  const $ = cheerio.load(html, null, false);
+  return $('h2').first().text().replace(/\s+/g, ' ').trim();
+}
+
+function normalizeHeading(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
 function templateCensusCheck(
   target: MatrixGenerationPreviewTarget,
   post: GeneratedPost,
@@ -146,18 +157,35 @@ function templateCensusCheck(
   const passed = countHtmlWords(post.introduction) > 0
     && countHtmlWords(post.conclusion) > 0
     && post.sections.length === bodyContracts.length
-    && post.sections.every((section, index) => (
-      section.index === index
-      && section.status === 'done'
-      && countHtmlWords(section.content) > 0
-      && section.heading === bodyContracts[index]?.heading.renderedText
-    ));
+    && post.sections.every((section, index) => {
+      const contract = bodyContracts[index];
+      const renderedH2 = firstH2(section.content);
+      if (!contract) return false;
+      if (contract.heading.renderedText === null) {
+        return section.index === index
+          && section.status === 'done'
+          && countHtmlWords(section.content) > 0
+          && section.heading === ''
+          && renderedH2 === '';
+      }
+      if (!renderedH2) return false;
+      const headingAgrees = normalizeHeading(section.heading) === normalizeHeading(renderedH2);
+      const lockedHeadingAgrees = !contract.heading.locked || (
+        contract.heading.renderedText !== null
+        && normalizeHeading(renderedH2) === normalizeHeading(contract.heading.renderedText)
+      );
+      return section.index === index
+        && section.status === 'done'
+        && countHtmlWords(section.content) > 0
+        && headingAgrees
+        && lockedHeadingAgrees;
+    });
   return check(
     'template-block-census',
     'structure',
     passed,
-    'The draft preserves every locked block, heading, and order exactly.',
-    'The draft added, removed, reordered, renamed, emptied, or left a locked block incomplete.',
+    'The draft preserves every block and order, keeps literal headings locked, and binds generated headings to their first H2.',
+    'The draft added, removed, reordered, emptied, or mismatched a section heading and its first H2.',
   );
 }
 
@@ -209,6 +237,9 @@ function keywordChecks(
   post: GeneratedPost,
 ): GenerationAuditCheck[] {
   const keyword = target.targetKeyword.value;
+  const hasVisibleBodyHeading = target.blockManifest.blocks.some(block => (
+    block.source === 'template' && block.heading.renderedText !== null
+  ));
   return [
     check(
       'keyword-url-coverage',
@@ -231,13 +262,19 @@ function keywordChecks(
       'The introduction covers the material target-keyword terms.',
       'The introduction is missing material target-keyword terms.',
     ),
-    check(
-      'keyword-heading-coverage',
-      'seo',
-      post.sections.some(section => containsKeywordTerms(section.heading, keyword)),
-      'A locked body heading covers the material target-keyword terms.',
-      'No locked body heading covers the material target-keyword terms.',
-    ),
+    hasVisibleBodyHeading
+      ? check(
+          'keyword-heading-coverage',
+          'seo',
+          post.sections.some(section => containsKeywordTerms(section.heading, keyword)),
+          'A body heading covers the material target-keyword terms.',
+          'No body heading covers the material target-keyword terms.',
+        )
+      : notApplicable(
+          'keyword-heading-coverage',
+          'seo',
+          'The frozen template intentionally contains no visible body headings.',
+        ),
     check(
       'keyword-metadata-coverage',
       'seo',
@@ -248,8 +285,23 @@ function keywordChecks(
   ];
 }
 
+function canonicalHrefPath(href: string): string | null {
+  const trimmed = href.trim();
+  if (trimmed.startsWith('/')) {
+    return canonicalizeMatrixPath(trimmed.split(/[?#]/, 1)[0] ?? '');
+  }
+  if (!/^(?:https?:)?\/\//i.test(trimmed)) return null;
+  try {
+    const parsed = new URL(trimmed.startsWith('//') ? `https:${trimmed}` : trimmed);
+    return canonicalizeMatrixPath(parsed.pathname);
+  } catch { // catch-ok: malformed links fail the deterministic path audit.
+    return null;
+  }
+}
+
 function internalPathCheck(
-  post: GeneratedPost,
+  target: MatrixGenerationPreviewTarget,
+  blocks: readonly CandidateBlock[],
   knownInternalPaths: readonly string[],
   censusComplete: boolean,
 ): GenerationAuditCheck {
@@ -257,23 +309,118 @@ function internalPathCheck(
     const canonical = canonicalizeMatrixPath(path);
     return canonical ? [canonical] : [];
   }));
-  let hasRelativeInternalPath = false;
-  const invalid = extractLinks(pageHtml(post)).flatMap(link => {
-    const href = link.href.trim();
-    if (!href || href.startsWith('#') || /^(?:mailto|tel):/i.test(href)) return [];
-    if (/^(?:https?:)?\/\//i.test(href)) return [];
-    if (!href.startsWith('/')) return [href];
-    hasRelativeInternalPath = true;
-    const path = href.split(/[?#]/, 1)[0] ?? '';
-    const canonical = canonicalizeMatrixPath(path);
-    return canonical && known.has(canonical) ? [] : [href];
-  });
+  const plannedPath = canonicalizeMatrixPath(target.plannedUrl);
+  const verifiedByBlock = new Map(
+    (target.verifiedInternalLinks ?? []).map(linkBlock => [linkBlock.blockId, linkBlock]),
+  );
+  const frozenOwners = new Map<string, Set<string>>();
+  const frozenPathOwners = new Map<string, Set<string>>();
+  for (const frozen of target.verifiedInternalLinks ?? []) {
+    for (const link of frozen.links) {
+      const identity = linkIdentity(link.href, link.anchorText);
+      const owners = frozenOwners.get(identity) ?? new Set<string>();
+      owners.add(frozen.blockId);
+      frozenOwners.set(identity, owners);
+      const canonical = canonicalHrefPath(link.href);
+      if (canonical) {
+        const pathOwners = frozenPathOwners.get(canonical) ?? new Set<string>();
+        pathOwners.add(frozen.blockId);
+        frozenPathOwners.set(canonical, pathOwners);
+      }
+    }
+  }
+  const hasFrozenPolicy = verifiedByBlock.size > 0;
+  const invalid = new Set<string>();
+
+  for (const block of blocks) {
+    const contract = block.contract.source === 'template'
+      ? block.contract.internalLinkContract
+      : undefined;
+    const frozen = verifiedByBlock.get(block.contract.id as `template:${string}`);
+    const allowed = new Set((frozen?.links ?? []).map(link => linkIdentity(link.href, link.anchorText)));
+    const accepted = new Set<string>();
+    for (const link of extractLinks(block.html)) {
+      const href = link.href.trim();
+      if (!href || href.startsWith('#') || /^(?:mailto|tel):/i.test(href)) continue;
+      const identity = linkIdentity(href, link.text);
+      const canonical = canonicalHrefPath(href);
+      const isAbsolute = /^(?:https?:)?\/\//i.test(href);
+      const isRelative = href.startsWith('/');
+      if (!canonical) {
+        if (!isAbsolute) invalid.add(`${block.contract.id}:${href}`);
+        continue;
+      }
+      const isSelf = canonical === plannedPath;
+      const isFrozenHere = allowed.has(identity);
+      const owners = frozenOwners.get(identity);
+      const isFrozenElsewhere = Boolean(owners && !owners.has(block.contract.id));
+      const destinationOwners = frozenPathOwners.get(canonical);
+      const isFrozenDestinationElsewhere = Boolean(
+        destinationOwners && !destinationOwners.has(block.contract.id),
+      );
+      const isKnownInternal = known.has(canonical);
+      const isInternal = isRelative
+        || isKnownInternal
+        || isSelf
+        || Boolean(owners)
+        || Boolean(destinationOwners);
+
+      if (isSelf || isFrozenElsewhere || isFrozenDestinationElsewhere) {
+        invalid.add(`${block.contract.id}:${href}`);
+        continue;
+      }
+      if (contract) {
+        if (isInternal && !isFrozenHere) invalid.add(`${block.contract.id}:${href}`);
+        if (isFrozenHere) accepted.add(identity);
+        continue;
+      }
+      if (hasFrozenPolicy && isInternal) {
+        invalid.add(`${block.contract.id}:${href}`);
+        continue;
+      }
+      if (isInternal && (!known.has(canonical) || !censusComplete)) {
+        invalid.add(`${block.contract.id}:${href}`);
+      }
+    }
+    if (contract) {
+      const minimum = frozen?.minimum ?? contract.minimum;
+      if (!frozen || accepted.size < minimum) invalid.add(block.contract.id);
+    }
+  }
   return check(
     'internal-paths',
     'seo',
-    invalid.length === 0 && (!hasRelativeInternalPath || censusComplete),
-    'Every relative internal link resolves to an authoritative workspace path.',
-    'The draft contains a malformed or unverified relative internal path.',
+    invalid.size === 0,
+    'Every internal-link block contains its minimum frozen anchors, and every internal destination is authoritative and non-self-referential.',
+    'The draft is missing a required verified internal anchor or contains a malformed, unverified, unlisted, or self-referential internal link.',
+  );
+}
+
+function linkIdentity(href: string, anchorText: string): string {
+  return JSON.stringify([href.trim(), anchorText.replace(/\s+/g, ' ').trim()]);
+}
+
+function tableStructureCheck(blocks: readonly CandidateBlock[]): GenerationAuditCheck {
+  const tableBlocks = blocks.filter(block => (
+    block.contract.source === 'template' && block.contract.renderAs === 'table'
+  ));
+  if (tableBlocks.length === 0) {
+    return notApplicable('semantic-tables', 'structure', 'No block requires semantic table markup.');
+  }
+  const failed = tableBlocks.filter(block => {
+    const $ = cheerio.load(block.html, null, false);
+    const tables = $('table');
+    return tables.length !== 1
+      || tables.first().find('tr').length < 2
+      || tables.first().find('th').length < 1
+      || tables.first().find('td').length < 1;
+  });
+  return check(
+    'semantic-tables',
+    'structure',
+    failed.length === 0,
+    'Every table-designated block contains one semantic table with headers, rows, and data cells.',
+    'A table-designated block was flattened or lacks semantic table, row, header, or data-cell markup.',
   );
 }
 
@@ -309,6 +456,7 @@ function evidenceTexts(value: GenerationEvidenceValue): string[] {
   switch (value.kind) {
     case 'text': return [value.value];
     case 'text_list': return value.value;
+    case 'link_list': return value.value.flatMap(link => [link.anchorText, link.href]);
     case 'number': return [`${value.value}${value.unit ? ` ${value.unit}` : ''}`];
     case 'boolean': return [value.value ? 'confirmed' : 'not confirmed'];
     case 'date': return [value.value];
@@ -539,7 +687,13 @@ export function runMatrixGenerationDeterministicAudit(
     metadataCheck(input.target, input.post),
     metadataLengthCheck(input.post),
     ...keywordChecks(input.target, input.post),
-    internalPathCheck(input.post, input.knownInternalPaths, input.internalPathCensusComplete),
+    internalPathCheck(
+      input.target,
+      blocks,
+      input.knownInternalPaths,
+      input.internalPathCensusComplete,
+    ),
+    tableStructureCheck(blocks),
     placeholderCheck(input.target, input.post),
     localEvidenceCheck(input),
     aeoCheck(blocks),

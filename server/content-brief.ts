@@ -1442,7 +1442,14 @@ export async function generateBrief(
     styleExamples?: ScrapedPage[];
     // Template constraints (Phase 1b — keyword pre-assignment)
     templateId?: string;
-    templateSections?: { name: string; headingTemplate: string; guidance: string; wordCountTarget: number }[];
+    templateSections?: {
+      name: string;
+      headingTemplate: string;
+      headingLocked?: boolean;
+      headingPresent?: boolean;
+      guidance: string;
+      wordCountTarget: number;
+    }[];
     templateToneOverride?: string;
     templateTitlePattern?: string;
     templateMetaDescPattern?: string;
@@ -1740,7 +1747,13 @@ export async function generateBrief(
     templateBlock = `\n\nTEMPLATE STRUCTURE (REQUIRED — you MUST follow this exact section structure):
 The outline sections MUST match the following template sections in order. You may add 1-2 supplementary sections (FAQ, conclusion) but the core structure is fixed:`;
     for (const s of context.templateSections) {
-      templateBlock += `\n- Section "${s.name}": heading pattern "${s.headingTemplate}" — ${s.guidance} (target ~${s.wordCountTarget} words)`;
+      const headingPolicy = s.headingLocked === false
+        ? `write a distinctive, brand-voice H2; use "${s.headingTemplate}" only as a literal fallback when no stronger on-voice heading is possible`
+        : `use the exact literal H2 "${s.headingTemplate}"`;
+      const renderedHeadingPolicy = s.headingPresent === false
+        ? 'plan the section without a visible H2; any outline heading is generation scaffolding only and must not appear in final copy'
+        : headingPolicy;
+      templateBlock += `\n- Section "${s.name}": ${renderedHeadingPolicy} — ${s.guidance} (target ~${s.wordCountTarget} words)`;
     }
     if (context.templateToneOverride) {
       templateBlock += `\n\nTONE OVERRIDE: Use this specific tone and style instead of your default: ${context.templateToneOverride}`;
@@ -1921,6 +1934,7 @@ Return ONLY valid JSON, no markdown fences, no explanation.`;
   const briefMessages = [{ role: 'user' as const, content: prompt }];
   await options?.beforeBoundedProviderDispatch?.({
     provider: 'openai',
+    model: MODEL_ROLES.structuredSynthesis,
     fallback: false,
     renderedInput: renderAIProviderInput({
       provider: 'openai',

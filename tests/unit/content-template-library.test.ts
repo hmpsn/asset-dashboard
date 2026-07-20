@@ -34,6 +34,8 @@ function createGenerationTemplate(name = 'Dental Treatment Page') {
       generationRole: 'answer_first',
       aeoContract: { modes: ['answer_first'], required: true },
       ctaContract: { role: 'none', required: false },
+      renderAs: 'table',
+      internalLinkContract: { minimum: 1 },
     }],
     urlPattern: '/services/{service}',
     keywordPattern: '{service}',
@@ -114,6 +116,10 @@ describe('content template studio library', () => {
     expect(copyA.sections[0]?.id).not.toBe(source.sections[0]?.id);
     expect(copyB.sections[0]?.id).not.toBe(source.sections[0]?.id);
     expect(copyA.sections[0]?.id).not.toBe(copyB.sections[0]?.id);
+    expect(copyA.sections[0]).toMatchObject({
+      renderAs: 'table',
+      internalLinkContract: { minimum: 1 },
+    });
 
     const edited = updateTemplate(targetWorkspaceA, copyA.id, {
       sections: copyA.sections.map(section => ({ ...section, guidance: 'Client A edit.' })),

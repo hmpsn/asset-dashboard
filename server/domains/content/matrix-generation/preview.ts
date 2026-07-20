@@ -36,6 +36,7 @@ import {
 import { getMatrix } from '../../../content-matrices.js';
 import { getTemplate } from '../../../content-templates.js';
 import { getPost } from '../../../content-posts-db.js';
+import { getAnthropicRequestPolicy, MODEL_ROLES } from '../../../model-manifest.js';
 import {
   buildContentGenerationContextV2,
   ContentGenerationContextBudgetError,
@@ -46,6 +47,7 @@ import {
 } from '../../../prompt-assembly.js';
 import {
   buildMatrixCellEvidenceRequirements,
+  freezeMatrixGenerationVerifiedInternalLinks,
   listCurrentMatrixCellEvidence,
   matrixArtifactRevisionExpectations,
 } from './evidence.js';
@@ -60,7 +62,11 @@ import {
   matrixGenerationProjectionTokenEstimate,
   matrixGenerationRenderedInputUtf8Bytes,
 } from './budget.js';
-import { resolveMatrixStructures } from './read-service.js';
+import {
+  resolveMatrixStructures,
+  resolveMatrixStructuresWithCensus,
+  type WorkspaceKnownPageCensus,
+} from './read-service.js';
 import {
   MATRIX_GENERATION_SET_AUDIT_MAX_ITEM_ID_UTF8_BYTES,
   MATRIX_GENERATION_SET_AUDIT_MAX_PAGE_TEXT_CHARS,
@@ -528,11 +534,18 @@ export function estimateMatrixGenerationCellBudget(
   // Creative prose may reserve both Anthropic and OpenAI when fallback is needed.
   // Three item-level calls cover the reachable audit→revision→audit ceiling.
   const providerCalls = 1 + (2 * (bodyBlocks.length + 3)) + 1 + 3;
+  const anthropicThinkingHeadroom = getAnthropicRequestPolicy(
+    MODEL_ROLES.creativeWriter,
+  ).thinkingHeadroomTokens;
+  // One Anthropic attempt for every creative prose stage, plus the reachable
+  // same-model automatic revision when Claude prose is accepted.
+  const anthropicOutputHeadroom = anthropicThinkingHeadroom * (bodyBlocks.length + 4);
   const outputTokens = BRIEF_OUTPUT_TOKENS
     + (creativeOutputTokens * 2)
     + 200
     + (ITEM_AUDIT_OUTPUT_TOKENS * 2)
-    + ITEM_REVISION_OUTPUT_TOKENS;
+    + ITEM_REVISION_OUTPUT_TOKENS
+    + anthropicOutputHeadroom;
   return {
     providerCalls,
     inputTokens,
@@ -599,6 +612,7 @@ export function estimateMatrixGenerationSetAuditInputReservation(
   const { renderedInput } = renderMatrixGenerationSetAuditProviderInput(pages);
   const serializedUtf8Bytes = matrixGenerationRenderedInputUtf8Bytes({
     provider: 'openai',
+    model: MODEL_ROLES.structuredSynthesis,
     fallback: false,
     renderedInput,
     maxOutputTokens: SET_AUDIT_OUTPUT_TOKENS,
@@ -620,6 +634,7 @@ export async function prepareMatrixGenerationCell(
     Awaited<ReturnType<typeof resolveMatrixStructures>>['results'][number],
     { status: 'resolved' }
   >,
+  pageCensus: WorkspaceKnownPageCensus,
 ): Promise<PreparedMatrixGenerationCell> {
   const target = structural.target;
   const matrix = getMatrix(workspaceId, target.matrixId);
@@ -648,7 +663,16 @@ export async function prepareMatrixGenerationCell(
     target.matrixId,
     target.cellId,
   );
-  const cellRequirements = buildMatrixCellEvidenceRequirements(target, resolutions);
+  const verifiedInternalLinks = freezeMatrixGenerationVerifiedInternalLinks(
+    target,
+    resolutions,
+    pageCensus,
+  );
+  const cellRequirements = buildMatrixCellEvidenceRequirements(
+    target,
+    resolutions,
+    new Set(verifiedInternalLinks.map(block => block.evidenceRequirementId)),
+  );
   const identity = freezeIdentity(target.pageType, listDeliverables(workspaceId));
 
   const voiceSummary = getBrandVoiceAuthoritySummary(workspaceId);
@@ -744,6 +768,7 @@ export async function prepareMatrixGenerationCell(
     expectedArtifactRevisions,
     contextFingerprint: context.effectiveInputFingerprint,
     estimatedPaidBudget,
+    ...(verifiedInternalLinks.length > 0 ? { verifiedInternalLinks } : {}),
   };
   const effectiveInputFingerprint = await runPreviewStage(
     'preview_fingerprint',
@@ -761,6 +786,7 @@ export async function prepareMatrixGenerationCell(
     effectiveInputFingerprint,
     blockingRequirementIds: [],
     estimatedPaidBudget,
+    ...(verifiedInternalLinks.length > 0 ? { verifiedInternalLinks } : {}),
   };
   return {
     result: {
@@ -778,7 +804,8 @@ export async function prepareMatrixGenerationCell(
 export async function previewMatrixGeneration(
   request: PreviewMatrixGenerationRequest,
 ): Promise<PreviewMatrixGenerationResult> {
-  const structural = await resolveMatrixStructures(request);
+  const structuralWithCensus = await resolveMatrixStructuresWithCensus(request);
+  const structural = structuralWithCensus.result;
   const results: MatrixGenerationPreviewResult[] = [];
   for (const item of structural.results) {
     if (item.status === 'upgrade_required') {
@@ -813,7 +840,11 @@ export async function previewMatrixGeneration(
       });
       continue;
     }
-    results.push((await prepareMatrixGenerationCell(request.workspaceId, item)).result);
+    results.push((await prepareMatrixGenerationCell(
+      request.workspaceId,
+      item,
+      structuralWithCensus.pageCensus,
+    )).result);
   }
   const readyResults = results.filter(
     (result): result is Extract<MatrixGenerationPreviewResult, { status: 'ready' }> => (

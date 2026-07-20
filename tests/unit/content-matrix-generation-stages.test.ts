@@ -98,6 +98,83 @@ function target(): MatrixGenerationPreviewTarget {
 }
 
 describe('matrix generation post stage', () => {
+  it('preserves schema-valid headingless template blocks without leaking an internal section id', async () => {
+    const headinglessTarget = target();
+    headinglessTarget.evidenceRequirements = [];
+    const bodyBlock = headinglessTarget.blockManifest.blocks.find(block => block.id === 'template:body');
+    if (!bodyBlock || bodyBlock.source !== 'template') throw new Error('Missing body block');
+    bodyBlock.heading = { level: null, renderedText: null, locked: true };
+    const generatedBrief = {
+      id: 'brief-headingless',
+      workspaceId: 'ws-1',
+      targetKeyword: headinglessTarget.targetKeyword.value,
+      secondaryKeywords: [],
+      suggestedTitle: headinglessTarget.title,
+      suggestedMetaDesc: headinglessTarget.metaDescription,
+      outline: [{
+        heading: 'Temporary generation scaffold',
+        notes: 'Write the body without a visible heading.',
+        wordCount: 300,
+        keywords: [],
+      }],
+      wordCountTarget: 300,
+      intent: 'commercial',
+      audience: 'Austin organizations',
+      competitorInsights: '',
+      internalLinkSuggestions: [],
+      createdAt: '2026-07-14T12:00:00.000Z',
+    } as ContentBrief;
+    vi.mocked(generateBrief).mockResolvedValue(generatedBrief);
+    const options = {
+      workspaceId: 'ws-1',
+      target: headinglessTarget,
+      context: {} as ContentGenerationContextV2Result,
+      executionChainId: 'chain-headingless',
+      assertAuthority: vi.fn(),
+    };
+    const brief = await generateMatrixBriefStage(options);
+    const templateSection = vi.mocked(generateBrief).mock.calls.at(-1)?.[2].templateSections?.[0];
+    expect(templateSection).toMatchObject({
+      name: 'Section 1',
+      headingTemplate: '',
+      headingPresent: false,
+    });
+    expect(JSON.stringify(templateSection)).not.toContain('body');
+    expect(brief.outline[0].notes).toContain('no visible heading');
+
+    vi.mocked(generatePost).mockResolvedValue({
+      id: 'post-headingless',
+      workspaceId: 'ws-1',
+      briefId: brief.id,
+      targetKeyword: brief.targetKeyword,
+      title: brief.suggestedTitle,
+      metaDescription: brief.suggestedMetaDesc,
+      introduction: '<p>Introduction.</p>',
+      sections: [{
+        index: 0,
+        heading: 'body',
+        content: '<h2>body</h2><p>Useful service detail.</p><h2>Extra model heading</h2><p>More detail.</p>',
+        wordCount: 7,
+        targetWordCount: 300,
+        keywords: [],
+        status: 'done',
+      }],
+      conclusion: '<p>Next step.</p>',
+      totalWordCount: 10,
+      targetWordCount: 300,
+      status: 'draft',
+      createdAt: '2026-07-14T12:00:00.000Z',
+      updatedAt: '2026-07-14T12:00:00.000Z',
+    });
+    const result = await generateMatrixPostStage(brief, options);
+    expect(result.sections[0].heading).toBe('');
+    expect(result.sections[0].content).not.toContain('<h2');
+    expect(result.sections[0].content).not.toContain('body</h2>');
+    expect(result.sections[0].content).toContain('Useful service detail.');
+    expect(result.sections[0].wordCount).toBe(5);
+    expect(result.totalWordCount).toBe(8);
+  });
+
   it('keeps internal evidence mechanics out of every reader-facing generation stage', async () => {
     const generatedBrief: ContentBrief = {
       id: 'brief-1',

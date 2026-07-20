@@ -31,6 +31,7 @@ import {
 
 import { requireWorkspaceAccess } from '../auth.js';
 import { validate, z } from '../middleware/validate.js';
+import { TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT } from '../../shared/types/content.js';
 import {
   MATRIX_GENERATION_CONTRACT_VERSION,
   MATRIX_GENERATION_SOURCE_LIMITS,
@@ -94,6 +95,10 @@ const templateSectionSchema = z.object({
     required: z.boolean(),
   }).optional(),
   optional: z.boolean().optional(),
+  renderAs: z.enum(['prose', 'table']).optional(),
+  internalLinkContract: z.object({
+    minimum: z.number().int().min(1).max(TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT),
+  }).strict().optional(),
 });
 
 const cmsFieldMapSchema = z.record(boundedUtf8String(

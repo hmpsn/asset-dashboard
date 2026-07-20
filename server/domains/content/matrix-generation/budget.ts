@@ -1,10 +1,12 @@
 import type { MatrixGenerationBudgetUsage } from '../../../../shared/types/matrix-generation.js';
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
+import {
+  estimateModelCostUsd,
+  getAnthropicRequestPolicy,
+  MODEL_ROLES,
+} from '../../../model-manifest.js';
 
-const PROVIDER_COST_MICROS_PER_TOKEN = {
-  anthropic: { input: 3, output: 15 },
-  openai: { input: 5, output: 30 },
-} as const;
+const MATRIX_GENERATION_COST_CEILING_MODEL = MODEL_ROLES.creativeRecovery;
 
 const PROVIDER_FRAMING_TOKEN_CEILING = 512;
 const ESTIMATED_UTF8_BYTES_PER_INPUT_TOKEN = 4;
@@ -77,9 +79,12 @@ export function matrixGenerationRenderedInputUtf8Bytes(
 
 /** OpenAI-rate ceiling used by preview so exact accepted cost never rounds below runtime. */
 export function matrixGenerationEstimatedUsdCeiling(inputTokens: number, outputTokens: number): number {
-  const micros = (inputTokens * PROVIDER_COST_MICROS_PER_TOKEN.openai.input)
-    + (outputTokens * PROVIDER_COST_MICROS_PER_TOKEN.openai.output);
-  return Math.ceil(micros / 100) / 10_000;
+  const estimated = estimateModelCostUsd({
+    model: MATRIX_GENERATION_COST_CEILING_MODEL,
+    promptTokens: inputTokens,
+    completionTokens: outputTokens,
+  });
+  return Math.ceil(estimated * 10_000) / 10_000;
 }
 
 /** Pessimistic reservation for the exact rendered dispatch using the shared 4:1 estimate. */
@@ -91,13 +96,20 @@ export function matrixGenerationProviderReservation(
     throw new MatrixGenerationProviderInputEnvelopeError(serializedUtf8Bytes);
   }
   const inputTokens = matrixGenerationInputReservationCeiling(serializedUtf8Bytes);
-  const outputTokens = dispatch.maxOutputTokens;
-  const rates = PROVIDER_COST_MICROS_PER_TOKEN[dispatch.provider];
-  const costMicros = (inputTokens * rates.input) + (outputTokens * rates.output);
+  const outputTokens = dispatch.maxOutputTokens + (
+    dispatch.provider === 'anthropic'
+      ? getAnthropicRequestPolicy(dispatch.model).thinkingHeadroomTokens
+      : 0
+  );
+  const estimatedUsd = estimateModelCostUsd({
+    model: dispatch.model,
+    promptTokens: inputTokens,
+    completionTokens: outputTokens,
+  });
   return {
     providerCalls: 1,
     inputTokens,
     outputTokens,
-    estimatedUsd: Math.ceil(costMicros) / 1_000_000,
+    estimatedUsd: Math.ceil(estimatedUsd * 1_000_000) / 1_000_000,
   };
 }

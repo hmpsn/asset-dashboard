@@ -7,6 +7,8 @@ import {
   type MatrixCell,
   type TemplateAeoContract,
   type TemplateCtaContract,
+  type TemplateInternalLinkContract,
+  type TemplateSectionRenderMode,
   type TemplateSectionGenerationRole,
 } from './content.js';
 import type { McpToolExecutionContext } from './mcp-runtime.js';
@@ -940,6 +942,8 @@ export interface ResolvedTemplatePageBlock extends ResolvedPageBlockBase {
   sourceSectionId: string;
   generationRole: TemplateSectionGenerationRole;
   optional?: boolean;
+  renderAs?: TemplateSectionRenderMode;
+  internalLinkContract?: TemplateInternalLinkContract;
 }
 
 export interface ResolvedSystemConclusionBlock extends ResolvedPageBlockBase {
@@ -965,6 +969,8 @@ export interface ResolvedOptionalTemplateSectionOmission {
   generationRole: TemplateSectionGenerationRole;
   evidenceRequirementId: string;
   reason: 'missing_section_evidence';
+  renderAs?: TemplateSectionRenderMode;
+  internalLinkContract?: TemplateInternalLinkContract;
 }
 
 /** Complete immutable block census, including stable system wrappers. */
@@ -1132,6 +1138,21 @@ export interface MatrixGenerationPreviewTarget extends ResolvedMatrixStructuralT
   effectiveInputFingerprint: string;
   blockingRequirementIds: string[];
   estimatedPaidBudget: MatrixGenerationCostEstimate;
+  /** Frozen block-scoped destinations verified against the workspace page census. */
+  verifiedInternalLinks?: MatrixGenerationVerifiedInternalLinkBlock[];
+}
+
+export interface MatrixGenerationVerifiedInternalLink {
+  href: string;
+  anchorText: string;
+}
+
+export interface MatrixGenerationVerifiedInternalLinkBlock {
+  blockId: `template:${string}`;
+  sourceSectionId: string;
+  evidenceRequirementId: string;
+  minimum: number;
+  links: MatrixGenerationVerifiedInternalLink[];
 }
 
 export interface PreviewMatrixGenerationSelection {

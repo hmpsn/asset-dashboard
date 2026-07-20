@@ -231,6 +231,14 @@ describe('callCreativeAI fallback correlation', () => {
     })).rejects.toThrow(budgetError);
 
     expect(beforeBoundedProviderDispatch).toHaveBeenCalledTimes(2);
+    expect(beforeBoundedProviderDispatch).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      provider: 'anthropic',
+      model: 'claude-opus-4-8',
+    }));
+    expect(beforeBoundedProviderDispatch).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      provider: 'openai',
+      model: 'gpt-5.6-terra',
+    }));
     expect(callAIMock).toHaveBeenCalledOnce();
     expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
       provider: 'anthropic',

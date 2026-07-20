@@ -121,7 +121,7 @@ program plan, the allowlist census, and the discovery/invocation tests together.
 - [x] Parsed text JSON deep-equals `structuredContent.data`, and all three wrapper
       objects validate against their advertised root output schema.
 - [x] Operator discovery exposes all 25 names and remains at or below 32 KiB
-      (32,222 bytes including instructions).
+      (32,733 bytes including instructions).
 - [x] Workspace keys cannot invoke the global portfolio tool or cross workspace;
       `/mcp/operator` remains master-key-only in P2.
 - [x] No raw prompt/evidence/payload fields, provider/AI calls, paid triggers,

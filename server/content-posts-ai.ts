@@ -138,6 +138,8 @@ export interface CreativeAICallOptions {
 
 export interface BoundedProviderDispatch {
   provider: 'anthropic' | 'openai';
+  /** Exact model dispatched; runtime reservations derive provider policy from this value. */
+  model: string;
   fallback: boolean;
   renderedInput: ReturnType<typeof renderAIProviderInput>;
   maxOutputTokens: number;
@@ -184,6 +186,7 @@ export async function callCreativeAIWithMetadata(
     await opts.beforeProviderDispatch?.({ provider: 'anthropic', fallback: false });
     await opts.beforeBoundedProviderDispatch?.({
       provider: 'anthropic',
+      model: CLAUDE_MODEL,
       fallback: false,
       renderedInput: renderAIProviderInput({
         provider: 'anthropic',
@@ -237,8 +240,10 @@ export async function callCreativeAIWithMetadata(
     fallback: claudeAttemptFailed,
   });
   const providerInput = renderCreativeProviderCallInput({ systemPrompt, userPrompt, json }, 'openai');
+  const openAIModel = opts.openAIModel ?? CONTENT_MODEL;
   await opts.beforeBoundedProviderDispatch?.({
     provider: 'openai',
+    model: openAIModel,
     fallback: claudeAttemptFailed,
     renderedInput: renderAIProviderInput({
       provider: 'openai',
@@ -250,7 +255,7 @@ export async function callCreativeAIWithMetadata(
   const result = await callAI({
     operation: opts.operation,
     provider: 'openai',
-    model: opts.openAIModel ?? CONTENT_MODEL,
+    model: openAIModel,
     ...providerInput,
     maxTokens,
     temperature: opts.temperature,
@@ -806,6 +811,7 @@ Return valid JSON only:
     const messages = [{ role: 'user' as const, content: prompt }];
     await options.beforeBoundedProviderDispatch?.({
       provider: 'openai',
+      model: MODEL_ROLES.structuredSynthesis,
       fallback: false,
       renderedInput: renderAIProviderInput({
         provider: 'openai',
@@ -817,6 +823,7 @@ Return valid JSON only:
     });
     const result = await callAI({
       operation: 'content-post-seo-meta',
+      model: MODEL_ROLES.structuredSynthesis,
       system: systemPrompt,
       messages,
       maxTokens: 200,
@@ -1057,6 +1064,7 @@ Return ONLY valid JSON in this exact format:
   const messages = [{ role: 'user' as const, content: prompt }];
   await options.beforeBoundedProviderDispatch?.({
     provider: 'openai',
+    model: MODEL_ROLES.structuredSynthesis,
     fallback: false,
     renderedInput: renderAIProviderInput({
       provider: 'openai',
@@ -1069,6 +1077,7 @@ Return ONLY valid JSON in this exact format:
 
   const result = await callAI({
     operation: 'voice-scoring',
+    model: MODEL_ROLES.structuredSynthesis,
     system: systemPrompt,
     messages,
     maxTokens: 500,
