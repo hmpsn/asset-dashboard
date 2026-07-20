@@ -97,21 +97,45 @@ describe('callOpenAI response_format', () => {
     expect(body.temperature).toBeUndefined();
   });
 
-  it('keeps custom temperature for gpt-5.6-terra (gpt-5.4 lineage)', async () => {
+  // REGRESSION (2026-07-20 P0): this test previously asserted the OPPOSITE —
+  // "keeps custom temperature for gpt-5.6-terra (gpt-5.4 lineage)" — because it
+  // encoded the same unverified lineage assumption as the policy it was meant to
+  // guard. terra rejects any non-default temperature with a 400, so passing one
+  // took down all brief and post generation. A test that restates an assumption
+  // proves nothing; this one is pinned to probed API behavior instead. See
+  // tests/contract/model-sampling-contracts.test.ts for the per-model census.
+  it('omits custom temperature for gpt-5.6-terra (rejects non-default values)', async () => {
     process.env.OPENAI_API_KEY = 'test-key-for-format-test';
     const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation
 
     await callOpenAI({
       model: 'gpt-5.6-terra',
       messages: [{ role: 'user', content: 'test' }],
-      feature: 'test-gpt54-temperature',
+      feature: 'test-terra-temperature',
       temperature: 0.25,
       maxRetries: 0,
     });
 
     const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1);
     const body = JSON.parse(call?.[1].body);
-    expect(body.temperature).toBe(0.25);
+    expect(body.temperature).toBeUndefined();
+  });
+
+  it('omits custom temperature for gpt-5.6-luna', async () => {
+    process.env.OPENAI_API_KEY = 'test-key-for-format-test';
+    const { callOpenAI } = await import('../openai-helpers.js'); // dynamic-import-ok — vitest isolation
+
+    await callOpenAI({
+      model: 'gpt-5.6-luna',
+      messages: [{ role: 'user', content: 'test' }],
+      feature: 'test-luna-temperature',
+      temperature: 0.25,
+      maxRetries: 0,
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1);
+    const body = JSON.parse(call?.[1].body);
+    expect(body.temperature).toBeUndefined();
   });
 
 });

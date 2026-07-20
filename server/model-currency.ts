@@ -6,7 +6,13 @@
  * instead of refusing to boot — a model retirement should page us, not take
  * production down harder than the retirement itself).
  */
-import { ACTIVE_MODEL_IDS } from './model-manifest.js';
+import {
+  ACTIVE_MODEL_IDS,
+  ANTHROPIC_CHAT_MODELS,
+  OPENAI_CHAT_MODELS,
+  getAnthropicRequestPolicy,
+  getOpenAIRequestPolicy,
+} from './model-manifest.js';
 import { createLogger } from './logger.js';
 import { isLocalFakeProviderModeEnabled } from './local-provider-mode.js';
 import { Sentry, isSentryEnabled } from './sentry.js';
@@ -87,6 +93,114 @@ export async function checkModelCurrency(opts?: {
   const models = opts?.models ?? ACTIVE_MODEL_IDS;
   const timeoutMs = opts?.timeoutMs ?? 15_000;
   return Promise.all(models.map(entry => checkOneModel(entry, timeoutMs)));
+}
+
+// --- Sampling-contract verification (the 2026-07-20 P0 guard) ---
+
+export interface SamplingContractResult {
+  provider: 'openai' | 'anthropic';
+  model: string;
+  /** What the manifest claims. */
+  recorded: boolean;
+  /** What the provider actually did when sent a non-default sampling param. */
+  observed: boolean | null;
+  status: 'match' | 'mismatch' | 'inconclusive';
+  detail?: string;
+}
+
+/**
+ * Send a deliberately non-default sampling param and see whether the provider
+ * accepts it. A 400 means the model rejects custom sampling; a 200 means it
+ * accepts. Any other outcome is inconclusive (network, quota, auth) and must
+ * NOT be reported as a contract verdict.
+ *
+ * Deliberately tiny: 1 token of output per probe.
+ */
+async function probeSamplingSupport(
+  provider: 'openai' | 'anthropic',
+  model: string,
+  timeoutMs: number,
+): Promise<{ observed: boolean | null; detail?: string }> {
+  try {
+    const res = provider === 'openai'
+      ? await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: 'hi' }],
+          max_completion_tokens: 1,
+          temperature: 0.5,
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      : await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY ?? '',
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: 'hi' }],
+          max_tokens: 1,
+          temperature: 0.7,
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+    if (res.ok) return { observed: true };
+    const text = await res.text().catch(() => '');
+    // Only a param-rejection 400 is evidence the contract forbids sampling.
+    if (res.status === 400 && /temperature/i.test(text)) {
+      return { observed: false, detail: text.slice(0, 140) };
+    }
+    return { observed: null, detail: `HTTP ${res.status}: ${text.slice(0, 140)}` };
+  } catch (err) {
+    return { observed: null, detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Verify every recorded sampling contract against the live provider APIs.
+ *
+ * This is the periodic half of the guard added after the 2026-07-20 outage:
+ * the contract test pins the recorded values in CI, and this re-verifies those
+ * values against the providers so drift (or an assumption that was wrong from
+ * the start) surfaces in the nightly rather than in a client's generation run.
+ */
+export async function checkSamplingContracts(opts?: {
+  timeoutMs?: number;
+}): Promise<SamplingContractResult[]> {
+  const timeoutMs = opts?.timeoutMs ?? 15_000;
+  const targets: Array<{ provider: 'openai' | 'anthropic'; model: string; recorded: boolean }> = [
+    ...(process.env.OPENAI_API_KEY
+      ? OPENAI_CHAT_MODELS.map(model => ({
+        provider: 'openai' as const,
+        model,
+        recorded: getOpenAIRequestPolicy(model).supportsCustomTemperature,
+      }))
+      : []),
+    ...(process.env.ANTHROPIC_API_KEY
+      ? ANTHROPIC_CHAT_MODELS.map(model => ({
+        provider: 'anthropic' as const,
+        model,
+        recorded: getAnthropicRequestPolicy(model).supportsSamplingParams,
+      }))
+      : []),
+  ];
+
+  return Promise.all(targets.map(async (target) => {
+    const { observed, detail } = await probeSamplingSupport(target.provider, target.model, timeoutMs);
+    const status = observed === null
+      ? 'inconclusive' as const
+      : observed === target.recorded ? 'match' as const : 'mismatch' as const;
+    return { ...target, observed, status, detail };
+  }));
 }
 
 /**

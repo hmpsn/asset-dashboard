@@ -168,7 +168,32 @@ export function estimateModelCostUsd(entry: {
   );
 }
 
-// --- Per-family request-parameter rules ---
+// --- Per-model request-parameter contracts ---
+//
+// EVERY VALUE BELOW IS VERIFIED AGAINST THE PROVIDER API, NOT INFERRED.
+//
+// A previous version of this file derived the sampling contract from model
+// lineage via `startsWith` ("terra succeeds gpt-5.4, so it inherits gpt-5.4's
+// sampling contract"). That reasoning is invalid — a successor model does not
+// inherit its predecessor's request surface — and it took down all brief and
+// post generation platform-wide: `gpt-5.6-terra` rejects any non-default
+// temperature, so every call passing one 400'd.
+//
+// The rules that follow from that incident:
+//   1. Contracts are recorded PER MODEL, never derived from a prefix.
+//   2. The maps are keyed by the model unions, so adding a model without
+//      recording its contract fails `tsc`, not a client's generation run.
+//   3. Unknown models get the SAFE default (send nothing optional): omitting a
+//      supported param loses variance, but sending an unsupported one is a hard
+//      400.
+//   4. `tests/contract/model-sampling-contracts.test.ts` pins these values, and
+//      `verify:model-currency --check-sampling` re-verifies them against the
+//      live APIs in the nightly so provider drift surfaces there.
+//
+// Verified 2026-07-20 against both provider APIs (see the contract test for the
+// probe used). Re-verify and update `SAMPLING_CONTRACTS_VERIFIED_AT` whenever a
+// model is added or a provider changes a contract.
+export const SAMPLING_CONTRACTS_VERIFIED_AT = '2026-07-20';
 
 export interface AnthropicRequestPolicy {
   /**
@@ -194,36 +219,74 @@ export interface AnthropicRequestPolicy {
   thinkingHeadroomTokens: number;
 }
 
-const OPUS_ADAPTIVE_POLICY: AnthropicRequestPolicy = {
+/**
+ * Recorded Anthropic contracts. Keyed by the model union — adding a model to
+ * ANTHROPIC_CHAT_MODELS without a row here is a compile error.
+ *
+ * Verified 2026-07-20: opus-4-8 and sonnet-5 return 400 "`temperature` is
+ * deprecated for this model"; haiku-4-5 (both the alias and the dated ID)
+ * accepts temperature 0.7.
+ */
+export const ANTHROPIC_MODEL_CONTRACTS = {
+  'claude-opus-4-8': {
+    supportsSamplingParams: false,
+    thinking: { type: 'adaptive' },
+    outputConfig: { effort: 'high' },
+    thinkingHeadroomTokens: 4096,
+  },
+  // Adaptive thinking is already the omitted-field default on Sonnet 5, so no
+  // explicit thinking config is sent; sampling params are rejected as on Opus.
+  'claude-sonnet-5': { supportsSamplingParams: false, thinkingHeadroomTokens: 4096 },
+  // Haiku 4.5 keeps the classic request surface (verified: accepts temperature).
+  'claude-haiku-4-5': { supportsSamplingParams: true, thinkingHeadroomTokens: 0 },
+  'claude-haiku-4-5-20251001': { supportsSamplingParams: true, thinkingHeadroomTokens: 0 },
+} as const satisfies Record<AnthropicChatModel, AnthropicRequestPolicy>;
+
+/**
+ * Safe default for a model with no recorded contract: send no optional params.
+ * Omitting a supported param costs variance; sending an unsupported one is a
+ * hard 400 that takes the feature down.
+ */
+const ANTHROPIC_SAFE_DEFAULT: AnthropicRequestPolicy = {
   supportsSamplingParams: false,
-  thinking: { type: 'adaptive' },
-  outputConfig: { effort: 'high' },
-  thinkingHeadroomTokens: 4096,
+  thinkingHeadroomTokens: 0,
 };
 
 export function getAnthropicRequestPolicy(model: string): AnthropicRequestPolicy {
-  if (model.startsWith('claude-opus-4-8') || model.startsWith('claude-opus-4-7')) {
-    return OPUS_ADAPTIVE_POLICY;
-  }
-  if (model.startsWith('claude-sonnet-5')) {
-    // Adaptive thinking is already the omitted-field default on Sonnet 5;
-    // sampling params are rejected the same as on Opus 4.7+.
-    return { supportsSamplingParams: false, thinkingHeadroomTokens: 4096 };
-  }
-  // Haiku 4.5 and older families keep the classic request surface.
-  return { supportsSamplingParams: true, thinkingHeadroomTokens: 0 };
+  return (ANTHROPIC_MODEL_CONTRACTS as Record<string, AnthropicRequestPolicy | undefined>)[model]
+    ?? ANTHROPIC_SAFE_DEFAULT;
 }
 
 export interface OpenAIRequestPolicy {
   /**
-   * gpt-5.5 accepted only its default temperature; its successor gpt-5.6-sol
-   * keeps that contract. Terra/Luna (gpt-5.4 lineage) accept custom values.
+   * Whether the model accepts a non-default `temperature`. Verified per model
+   * against the API — NOT inferred from the model's lineage. Every GPT-5.6
+   * tier rejects a non-default value with
+   * `400 unsupported_value: Only the default (1) value is supported`.
    */
   supportsCustomTemperature: boolean;
 }
 
+/**
+ * Recorded OpenAI contracts. Keyed by the model union — adding a model to
+ * OPENAI_CHAT_MODELS without a row here is a compile error.
+ *
+ * Verified 2026-07-20: terra, luna, sol, and chat-latest ALL reject
+ * temperature 0.5 and accept only the default (1). No currently-supported
+ * OpenAI model accepts a custom temperature; callers that want lower variance
+ * must steer via the prompt.
+ */
+export const OPENAI_MODEL_CONTRACTS = {
+  'gpt-5.6-sol': { supportsCustomTemperature: false },
+  'gpt-5.6-terra': { supportsCustomTemperature: false },
+  'gpt-5.6-luna': { supportsCustomTemperature: false },
+  'chat-latest': { supportsCustomTemperature: false },
+} as const satisfies Record<OpenAIChatModel, OpenAIRequestPolicy>;
+
+/** Safe default: omit temperature for any model with no recorded contract. */
+const OPENAI_SAFE_DEFAULT: OpenAIRequestPolicy = { supportsCustomTemperature: false };
+
 export function getOpenAIRequestPolicy(model: string): OpenAIRequestPolicy {
-  return {
-    supportsCustomTemperature: !(model.startsWith('gpt-5.5') || model.startsWith('gpt-5.6-sol')),
-  };
+  return (OPENAI_MODEL_CONTRACTS as Record<string, OpenAIRequestPolicy | undefined>)[model]
+    ?? OPENAI_SAFE_DEFAULT;
 }
