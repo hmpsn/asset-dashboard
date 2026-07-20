@@ -25,8 +25,8 @@ const registryModule = await import('../../server/mcp/tool-registry.js') as unkn
 
 const FULL_DISCOVERY_BYTES = 161_926;
 const FULL_DISCOVERY_SHA256 = '354b9a6dccae6c3df8d361debfcd1c47471e94612892bf9c15a4b7888cd088ef';
-const FULL_INSTRUCTIONS_BYTES = 11_862;
-const FULL_INSTRUCTIONS_SHA256 = '442536613942c966472445b3d5519c4629d63bbebfed78e5b90295c1c68c67fd';
+const FULL_INSTRUCTIONS_BYTES = 12_151;
+const FULL_INSTRUCTIONS_SHA256 = '6e7f8c0c6820bf1881377f5dfbeb7fdd414e1e9ea4048196d6d146e5354ef0f0';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');

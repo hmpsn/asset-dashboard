@@ -14,6 +14,7 @@ import {
 import type {
   MatrixArtifactRevisionExpectations,
   MatrixGenerationEvidenceResolution,
+  MatrixGenerationVerifiedInternalLinkBlock,
   MatrixSourceRevision,
   ResolveMatrixGenerationEvidenceRequest,
   ResolveMatrixGenerationEvidenceResult,
@@ -28,7 +29,12 @@ import { parseJsonSafe } from '../../../db/json-validation.js';
 import { createStmtCache } from '../../../db/stmt-cache.js';
 import { z } from '../../../middleware/validate.js';
 import { canonicalGenerationFingerprint } from './fingerprint.js';
-import { MatrixReadServiceError, resolveMatrixStructures } from './read-service.js';
+import {
+  MatrixReadServiceError,
+  resolveMatrixStructuresWithCensus,
+  type WorkspaceKnownPageCensus,
+} from './read-service.js';
+import { canonicalizeMatrixPath } from './renderer.js';
 import { matrixCellSectionEvidenceRequirementId } from './requirements.js';
 
 const evidenceValueSchema = z.discriminatedUnion('kind', [
@@ -259,6 +265,7 @@ function verifiedSourceRef(
 export function buildMatrixCellEvidenceRequirements(
   target: ResolvedMatrixStructuralTarget,
   resolutions: readonly MatrixGenerationEvidenceResolution[],
+  verifiedInternalLinkRequirementIds: ReadonlySet<string> = new Set(),
 ): GenerationEvidenceRequirement[] {
   const resolutionByRequirement = new Map(
     resolutions
@@ -276,6 +283,7 @@ export function buildMatrixCellEvidenceRequirements(
     reason: string;
     requirementStage: 'preflight' | 'ready' | 'optional_omit';
     clientSafePrompt: string;
+    expectedValueKind?: 'link_list';
   }> = [];
 
   if (target.pageType === 'service' || target.pageType === 'location') {
@@ -318,29 +326,51 @@ export function buildMatrixCellEvidenceRequirements(
   }
   const optionalSections = [
     ...target.blockManifest.blocks.flatMap(block => (
-      block.source === 'template' && block.optional === true
+      block.source === 'template'
+        && (block.optional === true || block.internalLinkContract !== undefined)
         ? [{
             sourceSectionId: block.sourceSectionId,
             generationRole: block.generationRole,
+            included: true,
+            internalLinkContract: block.internalLinkContract,
           }]
         : []
     )),
-    ...(target.blockManifest.omittedOptionalSections ?? []),
+    ...(target.blockManifest.omittedOptionalSections ?? []).map(section => ({
+      ...section,
+      included: false,
+    })),
   ].sort((left, right) => left.sourceSectionId.localeCompare(right.sourceSectionId));
   for (const section of optionalSections) {
-    definitions.push({
-      id: matrixCellSectionEvidenceRequirementId(target.cellId, section.sourceSectionId),
-      fieldPath: `sections.${section.sourceSectionId}.evidence`,
-      claim: `The optional ${section.generationRole} section has source-backed facts.`,
-      reason: `The optional section is omitted unless evidence supports it.`,
-      requirementStage: 'optional_omit',
-      clientSafePrompt: `Provide verified facts for the optional ${section.generationRole} section.`,
-    });
+    if (section.internalLinkContract) {
+      definitions.push({
+        id: matrixCellSectionEvidenceRequirementId(target.cellId, section.sourceSectionId),
+        fieldPath: `sections.${section.sourceSectionId}.internal_links`,
+        claim: `The ${section.generationRole} section has verified internal destinations.`,
+        reason: `This section requires at least ${section.internalLinkContract.minimum} distinct verified internal link${section.internalLinkContract.minimum === 1 ? '' : 's'}.`,
+        requirementStage: section.included ? 'preflight' : 'optional_omit',
+        clientSafePrompt: `Provide at least ${section.internalLinkContract.minimum} verified internal destination${section.internalLinkContract.minimum === 1 ? '' : 's'} and anchor text.`,
+        expectedValueKind: 'link_list',
+      });
+    } else {
+      definitions.push({
+        id: matrixCellSectionEvidenceRequirementId(target.cellId, section.sourceSectionId),
+        fieldPath: `sections.${section.sourceSectionId}.evidence`,
+        claim: `The optional ${section.generationRole} section has source-backed facts.`,
+        reason: `The optional section is omitted unless evidence supports it.`,
+        requirementStage: 'optional_omit',
+        clientSafePrompt: `Provide verified facts for the optional ${section.generationRole} section.`,
+      });
+    }
   }
 
   return definitions.map(definition => {
     const resolution = resolutionByRequirement.get(definition.id);
-    if (!resolution) {
+    const resolutionMatchesContract = resolution
+      && (definition.expectedValueKind !== 'link_list'
+        || (resolution.value.kind === 'link_list'
+          && verifiedInternalLinkRequirementIds.has(definition.id)));
+    if (!resolutionMatchesContract) {
       return {
         ...definition,
         claimKind: 'factual' as const,
@@ -355,6 +385,158 @@ export function buildMatrixCellEvidenceRequirements(
       sourceRefs: [verifiedSourceRef(resolution)],
     };
   });
+}
+
+function internalLinkSectionContract(
+  target: ResolvedMatrixStructuralTarget,
+  sectionId: string,
+) {
+  const included = target.blockManifest.blocks.find(block => (
+    block.source === 'template'
+    && block.sourceSectionId === sectionId
+    && block.internalLinkContract !== undefined
+  ));
+  if (included?.source === 'template' && included.internalLinkContract) {
+    return {
+      blockId: included.id,
+      sourceSectionId: included.sourceSectionId,
+      minimum: included.internalLinkContract.minimum,
+      included: true as const,
+      order: included.order,
+    };
+  }
+  const omitted = (target.blockManifest.omittedOptionalSections ?? []).find(section => (
+    section.sourceSectionId === sectionId && section.internalLinkContract !== undefined
+  ));
+  if (!omitted?.internalLinkContract) return null;
+  return {
+    blockId: `template:${omitted.sourceSectionId}` as const,
+    sourceSectionId: omitted.sourceSectionId,
+    minimum: omitted.internalLinkContract.minimum,
+    included: false as const,
+    order: Number.MAX_SAFE_INTEGER,
+  };
+}
+
+function sectionIdFromRequirement(cellId: string, requirementIdValue: string): string | null {
+  const prefix = `${matrixCellSectionEvidenceRequirementId(cellId, '')}`;
+  return requirementIdValue.startsWith(prefix)
+    ? requirementIdValue.slice(prefix.length)
+    : null;
+}
+
+function canonicalKnownPaths(pageCensus: WorkspaceKnownPageCensus): Set<string> {
+  return new Set([
+    ...pageCensus.paths,
+    ...pageCensus.publishedSlugs,
+  ].flatMap(path => {
+    const canonical = canonicalizeMatrixPath(path);
+    return canonical ? [canonical] : [];
+  }));
+}
+
+function verifiedLinksForSection(
+  target: ResolvedMatrixStructuralTarget,
+  pageCensus: WorkspaceKnownPageCensus,
+  resolution: MatrixGenerationEvidenceResolution,
+): MatrixGenerationVerifiedInternalLinkBlock | null {
+  const sectionId = sectionIdFromRequirement(target.cellId, resolution.requirementId);
+  if (!sectionId) return null;
+  const contract = internalLinkSectionContract(target, sectionId);
+  if (!contract) {
+    if (resolution.value.kind === 'link_list') {
+      throw new MatrixGenerationEvidenceError(
+        'precondition_failed',
+        'Internal-link evidence must target an exact declared section requirement',
+      );
+    }
+    return null;
+  }
+  if (resolution.value.kind !== 'link_list') {
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      'A declared internal-link section requires link_list evidence',
+    );
+  }
+  if (!pageCensus.complete) {
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      'The workspace page census must be complete before internal links can be verified',
+    );
+  }
+  const currentCanonicalPath = canonicalizeMatrixPath(target.plannedUrl);
+  if (!currentCanonicalPath) {
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      'The matrix target path must be valid before internal links can be verified',
+    );
+  }
+  const knownPaths = canonicalKnownPaths(pageCensus);
+  const links = [];
+  const seen = new Set<string>();
+  for (const link of resolution.value.value) {
+    const canonicalPath = canonicalizeMatrixPath(link.href);
+    if (!canonicalPath) {
+      throw new MatrixGenerationEvidenceError(
+        'precondition_failed',
+        'Internal-link destinations must be canonical workspace-relative paths',
+      );
+    }
+    if (canonicalPath === currentCanonicalPath) {
+      throw new MatrixGenerationEvidenceError(
+        'precondition_failed',
+        'Internal-link evidence cannot point to the page being generated',
+      );
+    }
+    if (!knownPaths.has(canonicalPath)) {
+      throw new MatrixGenerationEvidenceError(
+        'precondition_failed',
+        'Internal-link evidence must reference a destination in the current workspace page census',
+      );
+    }
+    if (seen.has(canonicalPath)) continue;
+    seen.add(canonicalPath);
+    links.push({ href: canonicalPath, anchorText: link.anchorText.trim() });
+  }
+  if (links.length < contract.minimum) {
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      `The internal-link section requires at least ${contract.minimum} distinct verified destinations`,
+    );
+  }
+  if (!contract.included) return null;
+  return {
+    blockId: contract.blockId,
+    sourceSectionId: contract.sourceSectionId,
+    evidenceRequirementId: resolution.requirementId,
+    minimum: contract.minimum,
+    links,
+  };
+}
+
+/** Revalidates stored link evidence and freezes only links from included declared blocks. */
+export function freezeMatrixGenerationVerifiedInternalLinks(
+  target: ResolvedMatrixStructuralTarget,
+  resolutions: readonly MatrixGenerationEvidenceResolution[],
+  pageCensus: WorkspaceKnownPageCensus,
+): MatrixGenerationVerifiedInternalLinkBlock[] {
+  return resolutions
+    .filter(resolution => (
+      resolution.expectedSourceRevision.templateRevision === target.sourceRevision.templateRevision
+    ))
+    .flatMap(resolution => {
+      try {
+        const block = verifiedLinksForSection(target, pageCensus, resolution);
+        return block ? [block] : [];
+      } catch (error) {
+        // Stored evidence is revalidated on every preview. A destination may
+        // disappear from a still-complete census after it was accepted; that
+        // is a normal missing requirement, not an exceptional preview failure.
+        if (error instanceof MatrixGenerationEvidenceError) return [];
+        throw error;
+      }
+    })
+    .sort((left, right) => left.blockId.localeCompare(right.blockId));
 }
 
 function evidenceValueText(value: GenerationEvidenceValue): string {
@@ -379,6 +561,9 @@ export function renderMatrixCellEvidencePrompt(
   const lines = requirements.flatMap(requirement => {
     const resolution = resolutionByRequirement.get(requirement.id);
     if (resolution && requirement.status === 'verified') {
+      // Frozen block-scoped link notes are the sole anchor authority. Rendering
+      // links here would duplicate them and let another block consume them.
+      if (resolution.value.kind === 'link_list') return [];
       return [`- ${requirement.fieldPath}: ${evidenceValueText(resolution.value)}`];
     }
     if (requirement.status === 'missing' && requirement.requirementStage === 'ready') {
@@ -422,6 +607,7 @@ function assertRequirementValue(requirementIdValue: string, value: GenerationEvi
       || value.kind === 'number'
       || value.kind === 'date'
       || value.kind === 'url'
+      || (value.kind === 'link_list' && value.value.length > 0)
       || (value.kind === 'boolean' && value.value);
     if (hasEvidence) return;
     throw new MatrixGenerationEvidenceError(
@@ -528,7 +714,7 @@ export async function resolveContentMatrixEvidence(
 
   let resolved;
   try {
-    resolved = await resolveMatrixStructures({
+    resolved = await resolveMatrixStructuresWithCensus({
       workspaceId: request.workspaceId,
       matrixId: request.matrixId,
       selections: [{
@@ -545,7 +731,7 @@ export async function resolveContentMatrixEvidence(
     }
     throw error;
   }
-  const structural = resolved.results[0];
+  const structural = resolved.result.results[0];
   if (!structural || structural.status !== 'resolved') {
     throw new MatrixGenerationEvidenceError(
       'precondition_failed',
@@ -558,6 +744,37 @@ export async function resolveContentMatrixEvidence(
       'precondition_failed',
       'The requirement ID does not belong to this matrix cell',
     );
+  }
+  const requestedLinkSection = sectionIdFromRequirement(request.cellId, request.requirementId);
+  const requestedLinkContract = requestedLinkSection
+    ? internalLinkSectionContract(structural.target, requestedLinkSection)
+    : null;
+  if (request.value.kind === 'link_list' && !requestedLinkContract) {
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      'Internal-link evidence must target an exact declared section requirement',
+    );
+  }
+  if (requestedLinkContract && request.value.kind !== 'link_list') {
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      'A declared internal-link section requires link_list evidence',
+    );
+  }
+  if (request.value.kind === 'link_list') {
+    verifiedLinksForSection(structural.target, resolved.pageCensus, {
+      id: 'pending-link-evidence',
+      workspaceId: request.workspaceId,
+      matrixId: request.matrixId,
+      cellId: request.cellId,
+      requirementId: request.requirementId,
+      value: request.value,
+      sourceRef: request.sourceRef,
+      resolvedBy: request.resolvedBy,
+      expectedSourceRevision: request.expectedSourceRevision,
+      expectedArtifactRevisions: request.expectedArtifactRevisions,
+      resolvedAt: request.sourceRef.capturedAt,
+    });
   }
 
   return db.transaction((): ResolveMatrixGenerationEvidenceResult => {

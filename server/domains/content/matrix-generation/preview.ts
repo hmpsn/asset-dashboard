@@ -46,6 +46,7 @@ import {
 } from '../../../prompt-assembly.js';
 import {
   buildMatrixCellEvidenceRequirements,
+  freezeMatrixGenerationVerifiedInternalLinks,
   listCurrentMatrixCellEvidence,
   matrixArtifactRevisionExpectations,
 } from './evidence.js';
@@ -60,7 +61,11 @@ import {
   matrixGenerationProjectionTokenEstimate,
   matrixGenerationRenderedInputUtf8Bytes,
 } from './budget.js';
-import { resolveMatrixStructures } from './read-service.js';
+import {
+  resolveMatrixStructures,
+  resolveMatrixStructuresWithCensus,
+  type WorkspaceKnownPageCensus,
+} from './read-service.js';
 import {
   MATRIX_GENERATION_SET_AUDIT_MAX_ITEM_ID_UTF8_BYTES,
   MATRIX_GENERATION_SET_AUDIT_MAX_PAGE_TEXT_CHARS,
@@ -620,6 +625,7 @@ export async function prepareMatrixGenerationCell(
     Awaited<ReturnType<typeof resolveMatrixStructures>>['results'][number],
     { status: 'resolved' }
   >,
+  pageCensus: WorkspaceKnownPageCensus,
 ): Promise<PreparedMatrixGenerationCell> {
   const target = structural.target;
   const matrix = getMatrix(workspaceId, target.matrixId);
@@ -648,7 +654,16 @@ export async function prepareMatrixGenerationCell(
     target.matrixId,
     target.cellId,
   );
-  const cellRequirements = buildMatrixCellEvidenceRequirements(target, resolutions);
+  const verifiedInternalLinks = freezeMatrixGenerationVerifiedInternalLinks(
+    target,
+    resolutions,
+    pageCensus,
+  );
+  const cellRequirements = buildMatrixCellEvidenceRequirements(
+    target,
+    resolutions,
+    new Set(verifiedInternalLinks.map(block => block.evidenceRequirementId)),
+  );
   const identity = freezeIdentity(target.pageType, listDeliverables(workspaceId));
 
   const voiceSummary = getBrandVoiceAuthoritySummary(workspaceId);
@@ -744,6 +759,7 @@ export async function prepareMatrixGenerationCell(
     expectedArtifactRevisions,
     contextFingerprint: context.effectiveInputFingerprint,
     estimatedPaidBudget,
+    ...(verifiedInternalLinks.length > 0 ? { verifiedInternalLinks } : {}),
   };
   const effectiveInputFingerprint = await runPreviewStage(
     'preview_fingerprint',
@@ -761,6 +777,7 @@ export async function prepareMatrixGenerationCell(
     effectiveInputFingerprint,
     blockingRequirementIds: [],
     estimatedPaidBudget,
+    ...(verifiedInternalLinks.length > 0 ? { verifiedInternalLinks } : {}),
   };
   return {
     result: {
@@ -778,7 +795,8 @@ export async function prepareMatrixGenerationCell(
 export async function previewMatrixGeneration(
   request: PreviewMatrixGenerationRequest,
 ): Promise<PreviewMatrixGenerationResult> {
-  const structural = await resolveMatrixStructures(request);
+  const structuralWithCensus = await resolveMatrixStructuresWithCensus(request);
+  const structural = structuralWithCensus.result;
   const results: MatrixGenerationPreviewResult[] = [];
   for (const item of structural.results) {
     if (item.status === 'upgrade_required') {
@@ -813,7 +831,11 @@ export async function previewMatrixGeneration(
       });
       continue;
     }
-    results.push((await prepareMatrixGenerationCell(request.workspaceId, item)).result);
+    results.push((await prepareMatrixGenerationCell(
+      request.workspaceId,
+      item,
+      structuralWithCensus.pageCensus,
+    )).result);
   }
   const readyResults = results.filter(
     (result): result is Extract<MatrixGenerationPreviewResult, { status: 'ready' }> => (
