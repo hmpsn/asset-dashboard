@@ -111,6 +111,13 @@ When a producer supplies authoritative intent, CPC/value, source, provenance, fr
 - Test the real persisted read path, not only hand-built in-memory fixtures.
 - Requested/client-directed evidence is mandatory before prompt caps or sampling.
 
+For content-matrix generation, cross-page set audit is required only when the
+original selected candidate census contains at least two pages. Estimation,
+worker dispatch, failure/restart reconciliation, and human-approval readiness
+must all consume the same cardinality policy. A one-page run must not reserve or
+dispatch the cross-page audit and must not be demoted solely because no set-audit
+report exists; a partial multi-page run must never masquerade as one page.
+
 ## 5. Dependent recompute is ordered
 
 Systems that consume regenerated intelligence must not start independently from the producer they depend on.

@@ -7,7 +7,10 @@ import {
   transitionMatrixGenerationItem,
   transitionMatrixGenerationRun,
 } from './repository.js';
-import { isItemBlockingMatrixGenerationSetAuditFinding } from './set-audit.js';
+import {
+  isItemBlockingMatrixGenerationSetAuditFinding,
+  isMatrixGenerationSetAuditRequired,
+} from './set-audit.js';
 import { matrixGenerationTerminalStatus } from './worker.js';
 
 const TERMINAL_ITEM_STATUSES = new Set([
@@ -59,23 +62,25 @@ export function reconcileMatrixGenerationRunsAfterRestart(): number {
     const items = listMatrixGenerationItems(run.workspaceId, run.id);
     const currentRun = getPersistedMatrixGenerationRun(run.workspaceId, run.id);
     if (!currentRun) continue;
-    for (const item of items) {
-      const unresolvedSetFinding = currentRun.setAuditReport?.findings.some(
-        finding => isItemBlockingMatrixGenerationSetAuditFinding(finding)
-          && finding.affectedItemIds.includes(item.id),
-      ) ?? true;
-      if (item.status !== 'ready_for_human_review' || !unresolvedSetFinding) continue;
-      transitionMatrixGenerationItem({
-        workspaceId: run.workspaceId,
-        itemId: item.id,
-        expectedRevision: item.revision,
-        nextStatus: 'needs_attention',
-        error: {
-          code: 'matrix_generation_set_audit_incomplete',
-          message: 'The server restarted before the required cross-page review completed.',
-          retryable: true,
-        },
-      });
+    if (isMatrixGenerationSetAuditRequired(currentRun.selections.length)) {
+      for (const item of items) {
+        const unresolvedSetFinding = currentRun.setAuditReport?.findings.some(
+          finding => isItemBlockingMatrixGenerationSetAuditFinding(finding)
+            && finding.affectedItemIds.includes(item.id),
+        ) ?? true;
+        if (item.status !== 'ready_for_human_review' || !unresolvedSetFinding) continue;
+        transitionMatrixGenerationItem({
+          workspaceId: run.workspaceId,
+          itemId: item.id,
+          expectedRevision: item.revision,
+          nextStatus: 'needs_attention',
+          error: {
+            code: 'matrix_generation_set_audit_incomplete',
+            message: 'The server restarted before the required cross-page review completed.',
+            retryable: true,
+          },
+        });
+      }
     }
     const reconciledItems = listMatrixGenerationItems(run.workspaceId, run.id);
     transitionMatrixGenerationRun({

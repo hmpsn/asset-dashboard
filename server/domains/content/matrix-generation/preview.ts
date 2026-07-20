@@ -73,6 +73,7 @@ import {
   projectMatrixGenerationSetAuditPage,
   renderMatrixGenerationSetAuditProviderInput,
 } from './set-audit-input.js';
+import { isMatrixGenerationSetAuditRequired } from './set-audit.js';
 
 export const MATRIX_PAGE_TYPE_IDENTITY_ALLOWLIST = {
   blog: ['messaging_pillars', 'personas'],
@@ -561,7 +562,7 @@ export function estimateMatrixGenerationBatchBudget(
   const estimates = targets.map(target => target.estimatedPaidBudget);
   const generationInput = estimates.reduce((sum, estimate) => sum + estimate.inputTokens, 0);
   const generationOutput = estimates.reduce((sum, estimate) => sum + estimate.outputTokens, 0);
-  const setAuditPasses = targets.length >= 2 ? 2 : 0;
+  const setAuditPasses = isMatrixGenerationSetAuditRequired(targets.length) ? 2 : 0;
   const setAuditInputPerDispatch = setAuditPasses === 0
     ? 0
     : estimateMatrixGenerationSetAuditInputReservation(targets);

@@ -67,7 +67,7 @@ interface Fixture {
   matrix: ContentMatrix;
 }
 
-function createFixture(): Fixture {
+function createFixture(candidateCount = 1): Fixture {
   const workspaceId = createWorkspace(`M2 matrix audit ${randomUUID()}`).id;
   cleanupWorkspaceIds.add(workspaceId);
   const template = createTemplate(workspaceId, {
@@ -112,7 +112,12 @@ function createFixture(): Fixture {
     templateId: template.id,
     dimensions: [
       { variableName: 'service', values: ['SEO consulting'] },
-      { variableName: 'city', values: ['Austin'] },
+      {
+        variableName: 'city',
+        values: Array.from({ length: candidateCount }, (_, index) => (
+          index === 0 ? 'Austin' : `Austin ${index + 1}`
+        )),
+      },
     ],
     urlPattern: template.urlPattern,
     keywordPattern: template.keywordPattern,
@@ -360,8 +365,9 @@ function candidates(
 async function committedFixture(
   resolveCta: boolean,
   mutatePost?: (post: GeneratedPost) => void,
+  candidateCount = 1,
 ) {
-  const fixture = createFixture();
+  const fixture = createFixture(candidateCount);
   seedBrandAuthority(fixture.workspaceId);
   const cellId = fixture.matrix.cells[0].id;
   await resolveEvidence(
@@ -404,7 +410,17 @@ async function committedFixture(
     templateId: fixture.template.id,
     idempotencyKey: `run-${randomUUID()}`,
     selectionFingerprint: target.effectiveInputFingerprint,
-    selections: [selection],
+    selections: [
+      selection,
+      ...fixture.matrix.cells.slice(1).map(cell => ({
+        ...selection,
+        cellId: cell.id,
+        sourceRevision: {
+          ...selection.sourceRevision,
+          cellRevision: cell.revision ?? 0,
+        },
+      })),
+    ],
     createdBy: { actorType: 'operator', actorId: 'matrix-audit-operator' },
     mcpExecutionContext: null,
   }).run;
@@ -503,8 +519,51 @@ function revisedBlocks(input: ReviseMatrixGenerationCandidateInput) {
 }
 
 describe('auditMatrixGenerationItem', () => {
-  it('requires the set audit before human approval and never queues publication', async () => {
+  it('allows a one-cell run to reach human approval without a set audit and never queues publication', async () => {
     const committed = await committedFixture(true);
+    const audited = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-single-approval-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => operationResult(
+        input,
+        'content-matrix-item-audit',
+        { revisionRecommended: false, findings: [] },
+      ),
+    });
+    const run = getPersistedMatrixGenerationRun(
+      committed.fixture.workspaceId,
+      audited.item.runId,
+    )!;
+    expect(run.selections).toHaveLength(1);
+    expect(run.setAuditReport).toBeNull();
+    const publishJobsBefore = listJobs(committed.fixture.workspaceId)
+      .filter(job => job.type === 'content-publish').length;
+
+    const approved = approveMatrixPageForPublishReadiness({
+      workspaceId: committed.fixture.workspaceId,
+      runId: run.id,
+      itemId: audited.item.id,
+      expectedRunRevision: run.revision,
+      expectedItemRevision: audited.item.revision,
+      expectedPostRevision: audited.post.generationRevision,
+      approvedBy: { actorType: 'operator', actorId: 'matrix-approver' },
+    });
+
+    expect(approved.item.approvalEvidence).toMatchObject({
+      postId: audited.post.id,
+      approvedBy: { actorType: 'operator', actorId: 'matrix-approver' },
+    });
+    expect(listJobs(committed.fixture.workspaceId)
+      .filter(job => job.type === 'content-publish')).toHaveLength(publishJobsBefore);
+  });
+
+  it('requires a nonblocking set audit before human approval for a multi-cell run', async () => {
+    const committed = await committedFixture(true, undefined, 2);
     const audited = await auditMatrixGenerationItem({
       workspaceId: committed.fixture.workspaceId,
       itemId: committed.item.id,

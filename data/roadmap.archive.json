@@ -23,7 +23,7 @@
     {
       "id": "sprint-mcp-operator-control-plane-2026-07-17-terminal-history",
       "name": "✅ SHIPPED — MCP Operator Control Plane",
-      "hours": "Seven staging-first backend phases; one PR at a time",
+      "hours": "Sequential staging-first backend phases; one PR at a time",
       "rationale": "Terminal item history split from sprint-mcp-operator-control-plane-2026-07-17. Make desktop administration compact, deterministic, and safer while the Insights Engine remains the authoritative database and client-view layer. Preserve the full MCP surface for advanced work and avoid the active UI rebuild.",
       "items": [
         {
@@ -47,9 +47,20 @@
           "createdAt": "2026-07-17",
           "owner": "analytics-intelligence",
           "notes": "Completed 2026-07-19. Added bounded DB-only portfolio and five-of-fifteen-slice workspace decision briefs plus the exact fail-closed public client projection for Free, active trial, Growth, and Premium. Exact counts use skinny aggregate reads; details load once only for selected top workspaces. Partial subreads fail closed, approval intelligence reads are non-mutating, outputs provide validated structuredContent plus text JSON, and lossless schema compaction keeps the 25-tool operator orientation at 32,222 bytes. No UI, migration, AI/provider call, paid trigger, job, send, approval, publication, or database sync. Two independent release reviews approved final HEAD."
+        },
+        {
+          "id": "mcp-single-cell-set-audit-consistency",
+          "title": "M0 — Single-cell set-audit consistency",
+          "source": "2026-07-20 MCP and Matrix Reliability Closure Program",
+          "est": "S",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-20",
+          "owner": "content-pipeline",
+          "notes": "One canonical candidate-count policy now governs preview reservation, worker dispatch/demotion, restart recovery, and human-approval readiness. One-cell runs require no cross-page set report; the original selected census keeps the requirement intact for every 2+ page run. Focused execution, budget, recovery, approval, and policy tests pass without provider or paid calls. Staging smoke remains the release gate before P3 begins."
         }
       ],
-      "shippedAt": "2026-07-19"
+      "shippedAt": "2026-07-20"
     },
     {
       "id": "admin-ux-flow-2026-07-terminal-history",

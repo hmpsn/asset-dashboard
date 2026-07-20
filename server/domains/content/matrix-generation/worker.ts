@@ -31,6 +31,7 @@ import {
 import { getMatrixGenerationRetryCommandByJob } from './retry-repository.js';
 import {
   auditMatrixGenerationSet,
+  isMatrixGenerationSetAuditRequired,
   isItemBlockingMatrixGenerationSetAuditFinding,
 } from './set-audit.js';
 import { generateMatrixRunItem } from './single-cell.js';
@@ -136,6 +137,7 @@ function cancelQueuedItems(workspaceId: string, runId: string): void {
 function demoteReadyItemsWithoutSetAudit(workspaceId: string, runId: string): void {
   const run = getPersistedMatrixGenerationRun(workspaceId, runId);
   if (!run) return;
+  if (!isMatrixGenerationSetAuditRequired(run.selections.length)) return;
   for (const item of listMatrixGenerationItems(workspaceId, runId)) {
     const unresolvedSetFinding = run.setAuditReport?.findings.some(
       finding => isItemBlockingMatrixGenerationSetAuditFinding(finding)
@@ -279,6 +281,7 @@ async function runSetAudit(
   const auditRun = getPersistedMatrixGenerationRun(workspaceId, runId);
   if (!auditRun) return;
   const expectedCandidateCount = auditRun.selections.length;
+  if (!isMatrixGenerationSetAuditRequired(expectedCandidateCount)) return;
   let readyItems = listMatrixGenerationItems(workspaceId, runId)
     .filter(item => item.status === 'ready_for_human_review' && item.postId && item.previewTarget);
   if (readyItems.length === 0 || signal.aborted) return;
@@ -445,12 +448,14 @@ export async function runMatrixGenerationJob(jobId: string): Promise<void> {
           });
         });
         if (signal.aborted) cancelQueuedItems(run.workspaceId, run.id);
-        else await runSetAudit(
-          run.workspaceId,
-          run.id,
-          signal,
-          beforeBoundedProviderDispatch,
-        );
+        else if (isMatrixGenerationSetAuditRequired(run.selections.length)) {
+          await runSetAudit(
+            run.workspaceId,
+            run.id,
+            signal,
+            beforeBoundedProviderDispatch,
+          );
+        }
       }
       demoteReadyItemsWithoutSetAudit(run.workspaceId, run.id);
       const current = getPersistedMatrixGenerationRun(run.workspaceId, run.id);
