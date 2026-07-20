@@ -1680,6 +1680,63 @@ function findEmptyStateOpeningTags(content: string): Array<{ lineIndex: number; 
   return tags;
 }
 
+/**
+ * Inline LLM model-ID string literals that should route through the model
+ * manifest (server/model-manifest.ts). Shared by the two "Inline model-ID
+ * literal" rules — one scoped to server/, one to scripts/, because a single
+ * pathFilter can't span both roots and `scripts` sits in EXCLUDED_DIRS.
+ *
+ * Matches a *specific* model ID inside a straight-quoted string literal:
+ * `model: 'gpt-5.6-terra'`, `'claude-opus-4-8'`, `'gpt-image-2'`, etc. It
+ * deliberately does NOT match:
+ *   - a bare family prefix used for capability detection
+ *     (`startsWith('gpt-5')`, `=== 'chat-latest'`),
+ *   - a backtick or comment reference (line comments are stripped first, and
+ *     backtick-delimited strings are never matched),
+ *   - files that are the sanctioned home for model IDs (the manifest, the
+ *     currency checker) or that pin literals to assert wiring (`__tests__`).
+ *
+ * Escape hatch: `// model-id-ok` on the offending line.
+ */
+const INLINE_MODEL_ID_LITERAL_RE =
+  /(['"])(gpt-(?:5\.[0-9]|4\.|4o|3\.5|image)[\w.-]*|claude-(?:opus|sonnet|haiku)-[0-9][\w.-]*|claude-3-5-[\w.-]*)\1/;
+
+export function findInlineModelIdLiterals(files: string[]): CustomCheckMatch[] {
+  const hits: CustomCheckMatch[] = [];
+  for (const file of files) {
+    const normalized = file.split(path.sep).join('/');
+    if (
+      normalized.endsWith('server/model-manifest.ts') ||
+      normalized.endsWith('server/model-currency.ts') ||
+      normalized.includes('/__tests__/')
+    ) {
+      continue;
+    }
+    const lines = readFileOrEmpty(file).split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i];
+      const trimmed = raw.trim();
+      // Skip comment-only lines: `//` line comments and `/* … */` / `* …` block
+      // and JSDoc continuation lines. A model literal in a comment is
+      // documentation (this helper's own docstring includes example ids), never
+      // a call site.
+      if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) continue;
+      // Per-line hatch. Honored here (not only via the runner's excludeLines)
+      // so the rule's fixture tests, which invoke the customCheck directly,
+      // observe the suppression.
+      if (raw.includes('// model-id-ok')) continue;
+      // Strip a trailing line comment that starts at line-start or after
+      // whitespace. Leaves `https://` (// preceded by ':') intact; a model
+      // literal never lives in a URL. The raw line is still used for match text.
+      const code = raw.replace(/(^|\s)\/\/.*$/, '$1');
+      if (INLINE_MODEL_ID_LITERAL_RE.test(code)) {
+        hits.push({ file, line: i + 1, text: trimmed });
+      }
+    }
+  }
+  return hits;
+}
+
 export const CHECKS: Check[] = [
   {
     name: 'Actionless EmptyState in rebuilt surface',
@@ -1900,6 +1957,30 @@ export const CHECKS: Check[] = [
       }
       return matches;
     },
+  },
+  {
+    name: 'Inline model-ID literal in server code',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'server/',
+    displayScope: 'server/**/*.ts except model-manifest.ts, model-currency.ts, and __tests__/',
+    message: 'Do not hard-code an LLM model-ID string literal at a call site. Import a semantic role from server/model-manifest.ts (MODEL_ROLES.*, DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL) so the next model upgrade is a one-file edit. See docs/rules/model-manifest.md. Add // model-id-ok if this literal is genuinely manifest-internal.',
+    severity: 'error',
+    rationale: 'Scattered model-ID literals are exactly what made the 2026-07 model upgrade a ~70-file sweep and let two retired Claude 3.5 IDs sit live for ~9 months.',
+    claudeMdRef: '#code-conventions',
+    excludeLines: ['// model-id-ok'],
+    customCheck: (files) => findInlineModelIdLiterals(files),
+  },
+  {
+    name: 'Inline model-ID literal in scripts',
+    fileGlobs: ['*.ts'],
+    pathFilter: 'scripts/',
+    displayScope: 'scripts/**/*.ts except __tests__/',
+    message: 'Do not hard-code an LLM model-ID string literal in a script. Import a semantic role from server/model-manifest.ts (MODEL_ROLES.*, DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL). See docs/rules/model-manifest.md. Add // model-id-ok if this literal is genuinely manifest-internal.',
+    severity: 'error',
+    rationale: 'Same drift as the server rule — a stale model literal pasted into a script (e.g. the content-generation experiment default) bypasses the manifest and silently pins an old model.',
+    claudeMdRef: '#code-conventions',
+    excludeLines: ['// model-id-ok'],
+    customCheck: (files) => findInlineModelIdLiterals(files),
   },
   {
     name: 'Bare JSON.parse on server',
