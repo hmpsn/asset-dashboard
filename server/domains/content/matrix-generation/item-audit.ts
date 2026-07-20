@@ -38,6 +38,7 @@ import {
   auditMatrixGenerationCandidate,
   prepareMatrixGenerationAuditOperation,
   prepareMatrixGenerationRevisionOperation,
+  resolveMatrixGenerationRevisionDispatch,
   reviseMatrixGenerationCandidate,
   type MatrixGenerationAuditAuthority,
 } from './operations.js';
@@ -252,6 +253,33 @@ function failedModelReport(
   });
 }
 
+function revisionProvenanceReport(
+  target: MatrixGenerationPreviewTarget,
+  report: GenerationAuditReport,
+): GenerationAuditReport {
+  return {
+    ...report,
+    verdict: 'needs_attention',
+    modelFindings: [...report.modelFindings, {
+      code: 'revision_provenance_unavailable',
+      severity: 'error',
+      message: 'Automatic revision was skipped because the accepted prose does not resolve to one active provider/model pair.',
+      affectedTargetIds: [target.blockManifest.blocks[0].id],
+      requiresHumanReview: true,
+    }],
+    unresolvedRequirementIds: [],
+  };
+}
+
+function revisionProvenanceError(): GenerationSanitizedError {
+  return stageError(
+    'revision',
+    'matrix_generation_revision_provenance_unavailable',
+    'Automatic revision requires one active provider/model pair across the accepted prose.',
+    false,
+  );
+}
+
 function currentPostOrFallback(
   workspaceId: string,
   post: PersistedGeneratedPost,
@@ -464,11 +492,20 @@ export async function auditMatrixGenerationItem(
       loaded.item.automaticRevisionCount,
       modelResult.output.revisionRecommended,
     );
+    let revisionEligibilityError: GenerationSanitizedError | undefined;
+    if (disposition === 'revise') {
+      try {
+        resolveMatrixGenerationRevisionDispatch(loaded.post);
+      } catch { // catch-ok: mixed or stale prose provenance fails closed without revision spend.
+        mergedReport = revisionProvenanceReport(loaded.target, mergedReport);
+        revisionEligibilityError = revisionProvenanceError();
+      }
+    }
     const modelNextStatus: MatrixGenerationItemStatus = disposition === 'ready'
       ? 'ready_for_human_review'
       : disposition === 'blocked_missing_evidence'
         ? 'blocked_missing_evidence'
-        : disposition === 'revise'
+        : disposition === 'revise' && !revisionEligibilityError
           ? 'revising'
           : 'needs_attention';
     loaded = {
@@ -480,6 +517,7 @@ export async function auditMatrixGenerationItem(
         nextItemStatus: modelNextStatus,
         report: mergedReport,
         provenance: modelResult.provenance,
+        error: revisionEligibilityError,
       }),
     };
     if (modelNextStatus !== 'revising') {
@@ -516,6 +554,8 @@ export async function auditMatrixGenerationItem(
       if (
         revisionResult.effectiveInputFingerprint !== preparedRevision.effectiveInputFingerprint
         || revisionResult.provenance.inputFingerprint !== preparedRevision.effectiveInputFingerprint
+        || revisionResult.execution.provider !== preparedRevision.provider
+        || revisionResult.execution.model !== preparedRevision.model
       ) {
         throw new MatrixGenerationItemAuditPreconditionError(
           'The revision result does not match its reserved provider input.',
@@ -632,6 +672,20 @@ export async function reviseMatrixGenerationItemForSetAudit(
     modelFindings: [...loaded.item.auditReport.modelFindings, ...modelFindings],
     unresolvedRequirementIds: [],
   };
+  try {
+    resolveMatrixGenerationRevisionDispatch(loaded.post);
+  } catch { // catch-ok: set revision preserves the accepted artifact when prose provenance is mixed.
+    const report = revisionProvenanceReport(loaded.target, revisionReport);
+    const item = transitionMatrixGenerationItem({
+      workspaceId: request.workspaceId,
+      itemId: loaded.item.id,
+      expectedRevision: loaded.item.revision,
+      nextStatus: 'needs_attention',
+      auditReport: report,
+      error: revisionProvenanceError(),
+    });
+    return terminalResult(item, loaded.post, 0, false);
+  }
   loaded = {
     ...loaded,
     item: transitionMatrixGenerationItem({
@@ -671,6 +725,8 @@ export async function reviseMatrixGenerationItemForSetAudit(
     if (
       revisionResult.effectiveInputFingerprint !== preparedRevision.effectiveInputFingerprint
       || revisionResult.provenance.inputFingerprint !== preparedRevision.effectiveInputFingerprint
+      || revisionResult.execution.provider !== preparedRevision.provider
+      || revisionResult.execution.model !== preparedRevision.model
     ) {
       throw new MatrixGenerationItemAuditPreconditionError(
         'The set-level revision result does not match its reserved provider input.',

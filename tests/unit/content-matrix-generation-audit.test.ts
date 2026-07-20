@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { GeneratedPost } from '../../shared/types/content.js';
 import type { VoiceGuardrails } from '../../shared/types/brand-engine.js';
@@ -17,6 +17,8 @@ import {
   applyMatrixGenerationRevision,
   prepareMatrixGenerationAuditOperation,
   prepareMatrixGenerationRevisionOperation,
+  reviseMatrixGenerationCandidate,
+  resolveMatrixGenerationRevisionDispatch,
 } from '../../server/domains/content/matrix-generation/operations.js';
 import {
   parseMatrixGenerationModelAuditAIOutput,
@@ -200,6 +202,9 @@ function target(
 
 function post(targetValue = target()): GeneratedPost {
   const sections = targetValue.blockManifest.blocks.filter(block => block.source === 'template');
+  const sectionHtml = (index: number, body: string) => (
+    `<h2>${sections[index]?.heading.renderedText ?? ''}</h2>${body}`
+  );
   return {
     id: 'post-1',
     workspaceId: targetValue.workspaceId,
@@ -214,7 +219,7 @@ function post(targetValue = target()): GeneratedPost {
       {
         index: 0,
         heading: sections[0]?.heading.renderedText ?? '',
-        content: '<p>SEO consulting in Austin starts with a direct review of the pages people use to understand a service. The work focuses on clear priorities, useful explanations, and measurable search improvements for the client.</p>',
+        content: sectionHtml(0, '<p>SEO consulting in Austin starts with a direct review of the pages people use to understand a service. The work focuses on clear priorities, useful explanations, and measurable search improvements for the client.</p>'),
         wordCount: 32,
         targetWordCount: 80,
         keywords: [targetValue.targetKeyword.value],
@@ -223,7 +228,7 @@ function post(targetValue = target()): GeneratedPost {
       {
         index: 1,
         heading: sections[1]?.heading.renderedText ?? '',
-        content: '<p>What does an SEO consulting engagement include?</p><p>It includes a focused review, an ordered plan, and clear recommendations the client can evaluate before deciding what to implement.</p>',
+        content: sectionHtml(1, '<p>What does an SEO consulting engagement include?</p><p>It includes a focused review, an ordered plan, and clear recommendations the client can evaluate before deciding what to implement.</p>'),
         wordCount: 27,
         targetWordCount: 80,
         keywords: [],
@@ -232,7 +237,7 @@ function post(targetValue = target()): GeneratedPost {
       {
         index: 2,
         heading: sections[2]?.heading.renderedText ?? '',
-        content: '<p>Serving Austin businesses with on-site workshops in the verified downtown service area. <a href="https://example.com/contact">Schedule an SEO consulting conversation</a> when the timing is right.</p>',
+        content: sectionHtml(2, '<p>Serving Austin businesses with on-site workshops in the verified downtown service area. <a href="https://example.com/contact">Schedule an SEO consulting conversation</a> when the timing is right.</p>'),
         wordCount: 25,
         targetWordCount: 50,
         keywords: [],
@@ -243,6 +248,35 @@ function post(targetValue = target()): GeneratedPost {
     totalWordCount: 120,
     targetWordCount: targetValue.blockManifest.totalWordCountTarget,
     status: 'draft',
+    generationProvenance: {
+      runId: 'seo-run',
+      operation: 'content-post-seo-meta',
+      provider: 'openai',
+      model: 'gpt-5.6-terra',
+      inputFingerprint: 'a'.repeat(64),
+      startedAt: NOW,
+      completedAt: NOW,
+      executions: [
+        {
+          runId: 'intro-run',
+          operation: 'content-post-introduction',
+          provider: 'anthropic',
+          model: 'claude-opus-4-8',
+          inputFingerprint: 'b'.repeat(64),
+          startedAt: NOW,
+          completedAt: NOW,
+        },
+        {
+          runId: 'section-run',
+          operation: 'content-post-section',
+          provider: 'anthropic',
+          model: 'claude-opus-4-8',
+          inputFingerprint: 'c'.repeat(64),
+          startedAt: NOW,
+          completedAt: NOW,
+        },
+      ],
+    },
     createdAt: NOW,
     updatedAt: NOW,
   };
@@ -341,6 +375,7 @@ describe('content matrix generation deterministic audit', () => {
 
   it('does not require a complete internal-path census when the draft has no relative links', () => {
     const candidate = post();
+    candidate.sections[2].content = '<h2>Schedule SEO consulting</h2><p><a href="https://external.example/resource">Read an external resource</a>.</p>';
 
     expect(checkResult(audit({
       post: candidate,
@@ -397,6 +432,116 @@ describe('content matrix generation deterministic audit', () => {
     );
     expect(checkResult(audit({ target: unresolvedTarget, post: candidate }), 'placeholder-completeness'))
       .toBe('failed');
+  });
+
+  it('binds unlocked headings to the generated first H2 while keeping locked headings literal', () => {
+    const targetValue = target();
+    const candidate = post(targetValue);
+    const bodyBlocks = targetValue.blockManifest.blocks.filter(block => block.source === 'template');
+    expect(bodyBlocks[2].heading.locked).toBe(false);
+    candidate.sections[2].heading = 'A calmer next step';
+    candidate.sections[2].content = candidate.sections[2].content.replace(
+      /<h2>.*?<\/h2>/,
+      '<h2>A calmer next step</h2>',
+    );
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'template-block-census'))
+      .toBe('passed');
+
+    candidate.sections[0].heading = 'A branded answer';
+    candidate.sections[0].content = candidate.sections[0].content.replace(
+      /<h2>.*?<\/h2>/,
+      '<h2>A branded answer</h2>',
+    );
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'template-block-census'))
+      .toBe('failed');
+  });
+
+  it('requires frozen block-scoped internal anchors and rejects absolute self-links', () => {
+    const targetValue = target();
+    const cta = targetValue.blockManifest.blocks.find(block => block.id === 'template:cta');
+    if (!cta || cta.source !== 'template') throw new Error('Missing CTA block');
+    cta.internalLinkContract = { minimum: 1 };
+    targetValue.verifiedInternalLinks = [{
+      blockId: 'template:cta',
+      sourceSectionId: 'cta',
+      evidenceRequirementId: 'matrix-cell:cell-1:section:cta',
+      minimum: 1,
+      links: [{ href: '/about', anchorText: 'Meet the team' }],
+    }];
+    const candidate = post(targetValue);
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'internal-paths'))
+      .toBe('failed');
+
+    candidate.sections[2].content = '<h2>A calmer next step</h2><p><a href="/about">Meet the team</a></p>';
+    candidate.sections[2].heading = 'A calmer next step';
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'internal-paths'))
+      .toBe('passed');
+    expect(checkResult(audit({
+      target: targetValue,
+      post: candidate,
+      knownInternalPaths: [],
+      internalPathCensusComplete: false,
+    }), 'internal-paths')).toBe('passed');
+
+    candidate.sections[2].content = '<h2>A calmer next step</h2><p><a href="https://example.com/about">Changed anchor</a></p>';
+    expect(checkResult(audit({
+      target: targetValue,
+      post: candidate,
+      knownInternalPaths: [],
+      internalPathCensusComplete: false,
+    }), 'internal-paths')).toBe('failed');
+    candidate.sections[0].content += '<p><a href="https://example.com/about">Meet the team</a></p>';
+    candidate.sections[2].content = '<h2>A calmer next step</h2><p>No internal destination here.</p>';
+    expect(checkResult(audit({
+      target: targetValue,
+      post: candidate,
+      knownInternalPaths: [],
+      internalPathCensusComplete: false,
+    }), 'internal-paths')).toBe('failed');
+
+    candidate.sections[2].content = '<h2>A calmer next step</h2><p><a href="https://example.com/austin/seo-consulting">Meet the team</a></p>';
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'internal-paths'))
+      .toBe('failed');
+  });
+
+  it('counts distinct frozen anchors and rejects a frozen anchor in the wrong block', () => {
+    const targetValue = target();
+    const cta = targetValue.blockManifest.blocks.find(block => block.id === 'template:cta');
+    if (!cta || cta.source !== 'template') throw new Error('Missing CTA block');
+    cta.internalLinkContract = { minimum: 2 };
+    targetValue.verifiedInternalLinks = [{
+      blockId: 'template:cta',
+      sourceSectionId: 'cta',
+      evidenceRequirementId: 'matrix-cell:cell-1:section:cta',
+      minimum: 2,
+      links: [
+        { href: '/about', anchorText: 'Meet the team' },
+        { href: '/contact', anchorText: 'Contact the team' },
+      ],
+    }];
+    const candidate = post(targetValue);
+    candidate.sections[2].heading = 'A calmer next step';
+    candidate.sections[2].content = '<h2>A calmer next step</h2><p><a href="/about">Meet the team</a> or <a href="/about">Meet the team</a>.</p>';
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'internal-paths'))
+      .toBe('failed');
+
+    candidate.sections[0].content += '<p><a href="/about">Meet the team</a></p>';
+    candidate.sections[2].content = '<h2>A calmer next step</h2><p><a href="/contact">Contact the team</a></p>';
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'internal-paths'))
+      .toBe('failed');
+  });
+
+  it('requires semantic table markup only for table-designated blocks', () => {
+    const targetValue = target();
+    const answer = targetValue.blockManifest.blocks.find(block => block.id === 'template:answer');
+    if (!answer || answer.source !== 'template') throw new Error('Missing answer block');
+    answer.renderAs = 'table';
+    const candidate = post(targetValue);
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'semantic-tables'))
+      .toBe('failed');
+    candidate.sections[0].content = '<h2>SEO consulting in Austin</h2><table><thead><tr><th>Option</th><th>Speed</th></tr></thead><tbody><tr><td>Focused review</td><td>Clear priorities</td></tr></tbody></table>';
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'semantic-tables'))
+      .toBe('passed');
   });
 });
 
@@ -496,6 +641,91 @@ describe('content matrix generation model audit merge', () => {
 });
 
 describe('content matrix generation structured operation contracts', () => {
+  it('derives automatic revision from homogeneous prose executions, not top-level SEO metadata', () => {
+    const candidate = post() as GeneratedPost & { generationProvenance: NonNullable<GeneratedPost['generationProvenance']> };
+    expect(resolveMatrixGenerationRevisionDispatch(candidate as never)).toEqual({
+      provider: 'anthropic',
+      model: 'claude-opus-4-8',
+    });
+    const imageCandidate = structuredClone(candidate);
+    for (const execution of imageCandidate.generationProvenance.executions ?? []) {
+      if (execution.operation.startsWith('content-post-') && execution.operation !== 'content-post-seo-meta') {
+        execution.provider = 'openai';
+        execution.model = 'gpt-image-2';
+      }
+    }
+    expect(() => resolveMatrixGenerationRevisionDispatch(imageCandidate as never))
+      .toThrow(/active provider\/model pair/i);
+    candidate.generationProvenance.executions?.push({
+      runId: 'mixed-run',
+      operation: 'content-post-section',
+      provider: 'openai',
+      model: 'gpt-5.6-terra',
+      inputFingerprint: 'd'.repeat(64),
+      startedAt: NOW,
+      completedAt: NOW,
+    });
+    expect(() => resolveMatrixGenerationRevisionDispatch(candidate as never))
+      .toThrow(/one active provider\/model pair|cross or infer/i);
+  });
+
+  it('dispatches revision on the exact reserved prose provider/model without fallback', async () => {
+    const targetValue = target();
+    const candidate = post(targetValue);
+    const input = {
+      workspaceId: 'ws-1',
+      target: targetValue,
+      post: candidate as never,
+      authority: {
+        voiceSnapshot: {
+          voiceVersion: 1,
+          profileRevision: 1,
+          voiceDNA: voiceGuardrails as never,
+          guardrails: voiceGuardrails,
+          contextModifiers: [],
+          anchors: [],
+        },
+        approvedIdentity: [],
+        evidenceResolutions: [],
+      } as never,
+      auditReport: audit(),
+      executionChainId: 'same-model-revision',
+    };
+    const prepared = prepareMatrixGenerationRevisionOperation(input);
+    const call = vi.fn(async options => ({
+      text: JSON.stringify({
+        blocks: targetValue.blockManifest.blocks.map(block => ({
+          targetId: block.id,
+          html: '<p>Preserved block.</p>',
+        })),
+      }),
+      tokens: { prompt: 1, completion: 1, total: 2 },
+      execution: {
+        runId: 'revision-run',
+        executionChainId: input.executionChainId,
+        operation: 'content-matrix-item-revise',
+        provider: options.provider,
+        model: options.model,
+        attempts: 1,
+        cacheOutcome: 'bypass',
+        startedAt: NOW,
+        completedAt: NOW,
+        durationMs: 1,
+      },
+    }));
+    await reviseMatrixGenerationCandidate({
+      ...input,
+      prepared,
+      dependencies: { callAI: call as never },
+    });
+    expect(call).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'anthropic',
+      model: 'claude-opus-4-8',
+      maxRetries: 0,
+      timeoutMs: 240_000,
+    }));
+    expect(call.mock.calls[0][0]).not.toHaveProperty('temperature');
+  });
   it('treats leaked evidence mechanics as a revisionable reader-facing contract violation', () => {
     const prepared = prepareMatrixGenerationAuditOperation({
       workspaceId: 'ws-1',
@@ -547,6 +777,9 @@ describe('content matrix generation structured operation contracts', () => {
 
     expect(prepared.system).toContain('Never narrate internal evidence');
     expect(prepared.system).toContain('Never create or preserve an unauthorized placeholder');
+    expect(prepared.system).toContain('Do not return detached heading fields');
+    expect(prepared.system).toContain('locked=true exactly');
+    expect(prepared.system).toContain('locked=false blocks');
     expect(JSON.parse(prepared.messages[0].content)).toMatchObject({
       authorizedPlaceholderTokens: [],
     });
@@ -570,7 +803,9 @@ describe('content matrix generation structured operation contracts', () => {
     const output = parseMatrixGenerationRevisionAIOutput(JSON.stringify({
       blocks: targetValue.blockManifest.blocks.map((block, index) => ({
         targetId: block.id,
-        html: `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
+        html: block.source === 'template'
+          ? `<h2>${block.heading.renderedText}</h2><p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`
+          : `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
       })),
     }));
 
@@ -602,7 +837,7 @@ describe('content matrix generation structured operation contracts', () => {
         if (index === 3) {
           return {
             ...block,
-            html: '<p><a href="https://example.com/contact">New same-url CTA</a> before <a href="https://example.com/contact">Schedule an SEO consulting conversation</a></p>',
+            html: '<h2>Schedule SEO consulting</h2><p><a href="https://example.com/contact">New same-url CTA</a> before <a href="https://example.com/contact">Schedule an SEO consulting conversation</a></p>',
           };
         }
         return block;
@@ -623,13 +858,16 @@ describe('content matrix generation structured operation contracts', () => {
   it('preserves an accepted query-string link through revision sanitization', () => {
     const targetValue = target();
     const candidate = post(targetValue);
-    candidate.sections[2].content = '<p><a href="https://example.com/contact?source=matrix&amp;medium=cta">Contact the team</a>.</p>';
+    candidate.sections[2].content = '<h2>Schedule SEO consulting</h2><p><a href="https://example.com/contact?source=matrix&amp;medium=cta">Contact the team</a>.</p>';
+    candidate.sections[2].heading = 'Schedule SEO consulting';
     const revised = applyMatrixGenerationRevision(targetValue, candidate, {
       blocks: targetValue.blockManifest.blocks.map((block, index) => ({
         targetId: block.id,
         html: index === 3
-          ? '<p><a href="https://example.com/contact?source=matrix&amp;medium=cta">Contact the team</a>.</p>'
-          : `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
+          ? '<h2>Schedule SEO consulting</h2><p><a href="https://example.com/contact?source=matrix&amp;medium=cta">Contact the team</a>.</p>'
+          : block.source === 'template'
+            ? `<h2>${block.heading.renderedText}</h2><p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`
+            : `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
       })),
     });
 

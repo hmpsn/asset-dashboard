@@ -44,16 +44,32 @@ function lockedOutline(target: MatrixGenerationPreviewTarget, generated: Content
     .map(placeholderToken);
   return bodyBlocks.map((block, index) => {
     const generatedSection = generated.outline[index];
+    const literalHeading = block.heading.renderedText ?? block.sourceSectionId;
+    const resolvedHeading = block.heading.locked
+      ? literalHeading
+      : generatedSection?.heading?.trim() || literalHeading;
     const blockPlaceholders = block.ctaContract.required ? readyPlaceholders : [];
+    const frozenLinkBlock = target.verifiedInternalLinks?.find(candidate => (
+      candidate.blockId === block.id
+    ));
     const notes = [
       block.guidance,
       generatedSection?.notes,
+      block.heading.locked
+        ? `Start this section with the exact H2: ${literalHeading}`
+        : `Start this section with the branded H2 from this outline. Preserve its wording exactly in the generated HTML. The literal fallback is: ${literalHeading}`,
+      frozenLinkBlock
+        ? `Render at least ${frozenLinkBlock.minimum} verified internal anchor(s) in this block. Use only these exact href and anchor-text pairs: ${frozenLinkBlock.links.map(link => `<a href="${link.href}">${link.anchorText}</a>`).join(' ')}`
+        : undefined,
+      block.renderAs === 'table'
+        ? 'Render this structured comparison as semantic HTML: one <table> containing <thead> or header <tr>, <th> labels, at least two <tr> rows total, and <td> data cells. Do not flatten the comparison into prose.'
+        : undefined,
       blockPlaceholders.length > 0
         ? `Keep these typed requirements visible in the draft: ${blockPlaceholders.join(' ')}`
         : undefined,
     ].filter((value): value is string => Boolean(value?.trim())).join('\n');
     return {
-      heading: block.heading.renderedText ?? generatedSection?.heading ?? block.sourceSectionId,
+      heading: resolvedHeading,
       ...(generatedSection?.subheadings?.length
         ? { subheadings: generatedSection.subheadings }
         : {}),
@@ -92,6 +108,7 @@ export async function generateMatrixBriefStage(
       templateSections: bodyBlocks.map(block => ({
         name: block.heading.renderedText ?? block.sourceSectionId,
         headingTemplate: block.heading.renderedText ?? block.sourceSectionId,
+        headingLocked: block.heading.locked,
         guidance: block.guidance,
         wordCountTarget: block.wordCountTarget ?? 250,
       })),

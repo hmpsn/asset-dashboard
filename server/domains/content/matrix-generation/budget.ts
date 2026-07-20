@@ -2,7 +2,7 @@ import type { MatrixGenerationBudgetUsage } from '../../../../shared/types/matri
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
 
 const PROVIDER_COST_MICROS_PER_TOKEN = {
-  anthropic: { input: 3, output: 15 },
+  anthropic: { input: 5, output: 25 },
   openai: { input: 5, output: 30 },
 } as const;
 

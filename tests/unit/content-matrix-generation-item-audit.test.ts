@@ -248,6 +248,34 @@ function provenance(operation: string, inputFingerprint = 'a'.repeat(64)): Gener
   };
 }
 
+function postProvenance(): GenerationProvenance {
+  const timestamp = new Date().toISOString();
+  const accepted = provenance('content-post-seo-meta');
+  return {
+    ...accepted,
+    executions: [...['content-post-introduction', 'content-post-section', 'content-post-conclusion']
+      .map(operation => ({
+        runId: `${operation}-${randomUUID()}`,
+        executionChainId: 'matrix-audit-chain',
+        operation,
+        provider: 'openai' as const,
+        model: 'gpt-5.6-terra',
+        inputFingerprint: 'b'.repeat(64),
+        startedAt: timestamp,
+        completedAt: timestamp,
+      })), {
+        runId: accepted.runId,
+        executionChainId: accepted.executionChainId,
+        operation: accepted.operation,
+        provider: accepted.provider,
+        model: accepted.model,
+        inputFingerprint: accepted.inputFingerprint,
+        startedAt: accepted.startedAt,
+        completedAt: accepted.completedAt,
+      }],
+  };
+}
+
 function candidates(
   workspaceId: string,
   target: MatrixGenerationPreviewTarget,
@@ -300,7 +328,7 @@ function candidates(
         {
           index: 0,
           heading: templateBlocks[0].heading.renderedText ?? '',
-          content: '<p>SEO consulting in Austin starts with a focused review of the pages people use to understand the organization. The client receives clear priorities, direct explanations, and a practical sequence for deciding what should change first.</p>',
+          content: `<h2>${templateBlocks[0].heading.renderedText}</h2><p>SEO consulting in Austin starts with a focused review of the pages people use to understand the organization. The client receives clear priorities, direct explanations, and a practical sequence for deciding what should change first.</p>`,
           wordCount: 34,
           targetWordCount: 150,
           keywords: [target.targetKeyword.value],
@@ -310,8 +338,8 @@ function candidates(
           index: 1,
           heading: templateBlocks[1].heading.renderedText ?? '',
           content: placeholder
-            ? `<p>Contact the team to discuss SEO consulting when the timing is right. ${placeholder}</p>`
-            : '<p><a href="https://example.com/contact">Contact the team</a> to discuss SEO consulting when the timing is right.</p>',
+            ? `<h2>${templateBlocks[1].heading.renderedText}</h2><p>Contact the team to discuss SEO consulting when the timing is right. ${placeholder}</p>`
+            : `<h2>${templateBlocks[1].heading.renderedText}</h2><p><a href="https://example.com/contact">Contact the team</a> to discuss SEO consulting when the timing is right.</p>`,
           wordCount: 14,
           targetWordCount: 50,
           keywords: [],
@@ -322,14 +350,17 @@ function candidates(
       totalWordCount: 86,
       targetWordCount: target.blockManifest.totalWordCountTarget,
       status: 'draft',
-      generationProvenance: provenance('content-post-generate'),
+      generationProvenance: postProvenance(),
       createdAt: now,
       updatedAt: now,
     },
   };
 }
 
-async function committedFixture(resolveCta: boolean) {
+async function committedFixture(
+  resolveCta: boolean,
+  mutatePost?: (post: GeneratedPost) => void,
+) {
   const fixture = createFixture();
   seedBrandAuthority(fixture.workspaceId);
   const cellId = fixture.matrix.cells[0].id;
@@ -410,12 +441,14 @@ async function committedFixture(resolveCta: boolean) {
     expectedRevision: item.revision,
     nextStatus: 'generating_post',
   });
+  const generated = candidates(fixture.workspaceId, target);
+  mutatePost?.(generated.post);
   const committed = commitMatrixGenerationDraft({
     workspaceId: fixture.workspaceId,
     itemId: item.id,
     expectedItemRevision: item.revision,
     target,
-    ...candidates(fixture.workspaceId, target),
+    ...generated,
   });
   return { fixture, target, ...committed };
 }
@@ -670,6 +703,60 @@ describe('auditMatrixGenerationItem', () => {
     expect(result.providerCalls).toBe(1);
     expect(result.automaticRevisionApplied).toBe(false);
     expect(revisionCalls).toBe(0);
+  });
+
+  it('fails closed before revision spend when accepted prose provenance is mixed', async () => {
+    const committed = await committedFixture(true, candidate => {
+      candidate.generationProvenance?.executions?.push({
+        runId: `mixed-${randomUUID()}`,
+        executionChainId: 'matrix-audit-chain',
+        operation: 'content-post-section',
+        provider: 'anthropic',
+        model: 'claude-opus-4-8',
+        inputFingerprint: 'c'.repeat(64),
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+      });
+    });
+    let revisionCalls = 0;
+    const result = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => operationResult(
+        input,
+        'content-matrix-item-audit',
+        {
+          revisionRecommended: true,
+          findings: [{
+            code: 'person_drift',
+            severity: 'warning' as const,
+            message: 'The draft shifted out of its direct-reader register.',
+            affectedTargetIds: ['template:body'],
+            requiresHumanReview: false,
+          }],
+        },
+      ),
+      reviseCandidate: async () => {
+        revisionCalls += 1;
+        throw new Error('Revision must not run');
+      },
+    });
+
+    expect(result.item.status).toBe('needs_attention');
+    expect(result.item.error?.code).toBe('matrix_generation_revision_provenance_unavailable');
+    expect(result.item.auditReport?.modelFindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'revision_provenance_unavailable' }),
+    ]));
+    expect(result.providerCalls).toBe(1);
+    expect(revisionCalls).toBe(0);
+    expect(listMatrixGenerationAttempts(
+      committed.fixture.workspaceId,
+      committed.item.id,
+    ).map(attempt => attempt.stage)).not.toContain('revision');
   });
 
   it('continues model audit with an incomplete page census when there are no relative links', async () => {
