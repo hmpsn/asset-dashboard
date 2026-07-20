@@ -77,7 +77,6 @@ router.post('/api/admin-chat', aiLimiter, requireWorkspaceAccessFromBody(), asyn
         ...historyMessages.slice(-10),
         { role: 'user', content: question },
       ],
-      temperature: 0.6,
       maxTokens,
       feature: 'admin-chat',
       workspaceId: ws.id,

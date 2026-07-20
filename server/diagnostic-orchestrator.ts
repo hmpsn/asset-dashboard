@@ -460,7 +460,6 @@ Rules for remediation:
     system: systemPrompt,
     messages: [{ role: 'user', content: JSON.stringify(context) }],
     maxTokens: 3000,
-    temperature: 0.3,
     responseFormat: { type: 'json_object' },
     feature: 'diagnostics',
     workspaceId,

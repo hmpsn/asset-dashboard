@@ -134,7 +134,6 @@ IMPORTANT DETAILS:
 Be concise but specific. Use bullet points. Only include information actually found on the website — never fabricate.`,
       }],
       maxTokens: 2000,
-      temperature: 0.3,
       workspaceId,
       timeoutMs: 90_000,
     });
@@ -184,7 +183,6 @@ EXAMPLE PHRASES:
 Be specific and actionable. An AI writer should be able to follow this guide to produce copy that sounds like it belongs on this website.`,
       }],
       maxTokens: 2000,
-      temperature: 0.4,
       workspaceId,
       timeoutMs: 90_000,
     });
@@ -223,7 +221,6 @@ Rules:
 - ONLY return the JSON array, nothing else`,
     }],
     maxTokens: 2500,
-    temperature: 0.4,
     workspaceId,
     timeoutMs: 90_000,
   });

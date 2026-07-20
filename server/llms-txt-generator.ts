@@ -459,7 +459,6 @@ async function generatePageSummary(
         content: formatPageSummaryEvidence(evidence),
       }],
       maxTokens: 200,
-      temperature: 0.3,
       feature: 'llms-txt-summary',
       workspaceId,
     });

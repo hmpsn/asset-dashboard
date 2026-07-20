@@ -199,7 +199,6 @@ Return ONLY valid JSON, no markdown fences.`;
       system: buildSystemPrompt(workspaceId, 'You are an expert SEO copywriter who preserves brand voice while optimizing for search. Return valid JSON only.'),
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
-      temperature: 0.6,
       feature: 'content-score',
       workspaceId,
       responseFormat: { type: 'json_object' },

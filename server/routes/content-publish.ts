@@ -147,7 +147,6 @@ Map to these properties (use the field SLUG values, or null if no match):
 Return ONLY the JSON object with the mapping.`,
       }],
       maxTokens: 500,
-      temperature: 0.1,
       responseFormat: { type: 'json_object' },
     });
 

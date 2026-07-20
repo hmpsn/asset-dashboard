@@ -482,13 +482,11 @@ describe('monthly-digest generation', () => {
       operation?: string;
       messages: Array<{ role: string; content: string }>;
       maxTokens?: number;
-      temperature?: number;
     };
     const prompt = callArgs.messages[0]?.content ?? '';
 
     expect(callArgs.operation).toBe('monthly-digest');
     expect(callArgs.maxTokens).toBe(200);
-    expect(callArgs.temperature).toBe(0);
     expect(prompt).toContain('Return exactly one JSON object');
     expect(prompt).toContain('"clauseIds"');
     expect(prompt).toContain('metric.search.clicks');

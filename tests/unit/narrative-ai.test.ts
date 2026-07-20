@@ -49,7 +49,6 @@ describe('narrative-ai', () => {
       system: 'system',
       messages: [{ role: 'user', content: 'prompt' }],
       maxTokens: 1500,
-      temperature: 0.3,
       workspaceId: 'ws_1',
     }));
   });
@@ -82,7 +81,9 @@ describe('narrative-ai', () => {
         { role: 'assistant', content: '{"title":42}' },
         { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
       ],
-      temperature: 0.1,
+      // No temperature: the retry's lever is the corrective prompt above. The
+      // old 0.3 → 0.1 drop was inert once every model stopped accepting a
+      // custom temperature (see model-manifest sampling contracts).
     }));
     expect(logger.debug).toHaveBeenCalledWith(
       expect.objectContaining({ issues: expect.any(Array) }),

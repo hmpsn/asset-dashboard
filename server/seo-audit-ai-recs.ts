@@ -166,7 +166,6 @@ Respond in this exact JSON format (only include fields that need fixing):
             model: MODEL_ROLES.utilityExtraction,
             system: buildSystemPrompt(wsId ?? '', 'You are an expert SEO copywriter. Return only valid JSON matching the requested shape. Use provided page evidence and workspace context only; do not invent services, outcomes, statistics, or claims.'),
             messages: [{ role: 'user', content: prompt }],
-            temperature: 0.6,
             maxTokens: 400,
             feature: 'seo-audit-recs',
             workspaceId: wsId,

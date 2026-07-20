@@ -33,7 +33,6 @@ export async function callKeywordStrategyAI(
     system,
     messages: aiMessages,
     maxTokens,
-    temperature: 0.3,
     workspaceId,
     maxRetries: 3,
     timeoutMs: 90_000,
@@ -63,7 +62,6 @@ export async function callNamedStrategyAI(
     system,
     messages: aiMessages,
     maxTokens,
-    temperature: 0.3,
     workspaceId,
   });
   onExecution?.({ execution: result.execution, inputFingerprint: fingerprint(system, aiMessages) });

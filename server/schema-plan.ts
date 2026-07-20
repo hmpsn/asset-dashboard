@@ -348,7 +348,6 @@ IMPORTANT:
       model: MODEL_ROLES.utilityExtraction,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
-      temperature: 0.1,
       responseFormat: { type: 'json_object' },
       workspaceId,
       maxRetries: 3,

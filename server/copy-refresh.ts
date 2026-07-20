@@ -189,7 +189,6 @@ Prioritize sections that are most likely contributing to the decline (outdated i
       model: MODEL_ROLES.utilityExtraction,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1500,
-      temperature: 0.4,
       responseFormat: { type: 'json_object' },
       feature: 'copy-refresh',
       workspaceId,
