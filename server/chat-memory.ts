@@ -453,7 +453,6 @@ export async function generateSessionSummary(
         system: 'Summarize this conversation in 1-2 sentences. Focus on the key topics discussed, questions asked, and any preferences or concerns the user expressed. Be concise.',
         messages: [{ role: 'user', content: transcript }],
         maxTokens: 150,
-        temperature: 0.3,
         feature: 'chat-summary',
         workspaceId,
       });

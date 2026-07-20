@@ -56,7 +56,10 @@ const batchConfigSchema = z.object({
 interface VariantConfig {
   id: string;
   label: string;
-  temperature: number;
+  // NOTE: variants previously differed by `temperature` as well as
+  // `instructions`. No current model accepts a custom temperature (see the
+  // sampling contracts in server/model-manifest.ts), so that dimension was
+  // inert — variants are distinguished by their instructions alone.
   instructions: string;
 }
 
@@ -64,25 +67,21 @@ const VARIANTS: Record<string, VariantConfig> = {
   current: {
     id: 'current',
     label: 'Current Contract',
-    temperature: 0.5,
     instructions: `Use the current platform intent: factual, brand-aware, SEO-informed, and right-sized for the page type. Do not add extra sections just because more context is available.`,
   },
   concise: {
     id: 'concise',
     label: 'Concise Outline',
-    temperature: 0.45,
     instructions: `Bias toward fewer sections, fewer subheadings, and tighter notes. Preserve search intent and factual safety, but remove article-style expansion from conversion pages.`,
   },
   'conversion-dense': {
     id: 'conversion-dense',
     label: 'Conversion Dense',
-    temperature: 0.55,
     instructions: `Prioritize buyer decision flow: problem, fit, proof, process, objections, and one clear next step. Keep brand voice present but compact.`,
   },
   blended: {
     id: 'blended',
     label: 'Blended Candidate',
-    temperature: 0.5,
     instructions: `Blend the current contract's factual and brand discipline with the concise variant's compressed outline shape. Add light buyer-flow guidance, but avoid duplicate CTAs, sales repetition, and blog-style teaching sprawl.`,
   },
 };
@@ -815,7 +814,6 @@ async function generateBriefCandidate(args: {
     model: args.model,
     messages: [{ role: 'user', content: args.prompt }],
     maxTokens: args.maxTokens,
-    temperature: args.variant.temperature,
     responseFormat: { type: 'json_object' },
     researchMode: true,
     workspaceId: args.workspaceId,
@@ -846,7 +844,6 @@ async function generateDraftCandidate(args: {
     model: args.model,
     messages: [{ role: 'user', content: args.prompt }],
     maxTokens: Math.max(args.maxTokens, 7000),
-    temperature: Math.min(0.65, args.variant.temperature + 0.1),
     researchMode: true,
     workspaceId: args.workspaceId,
   });

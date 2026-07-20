@@ -329,7 +329,6 @@ IMPORTANT: If real SEMRush data is provided, use those EXACT numbers. Return ONL
             system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
             messages: [{ role: 'user', content: prompt }],
             maxTokens: 1000,
-            temperature: 0.4,
             feature: 'keyword-analysis',
             workspaceId,
             responseFormat: { type: 'json_object' },

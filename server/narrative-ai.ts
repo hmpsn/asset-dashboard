@@ -18,8 +18,6 @@ export interface CallNarrativeAIOptions<TParsed, TOutput = TParsed> {
   schema: z.ZodType<TParsed>;
   parserContext: string;
   maxTokens: number;
-  temperature?: number;
-  retryTemperature?: number;
   normalize?: (parsed: TParsed) => TOutput;
   logger: NarrativeLogger;
   retryDebugMessage: string;
@@ -35,8 +33,6 @@ export async function callNarrativeAI<TParsed, TOutput = TParsed>({
   schema,
   parserContext,
   maxTokens,
-  temperature = 0.3,
-  retryTemperature = 0.1,
   normalize,
   logger,
   retryDebugMessage,
@@ -50,7 +46,6 @@ export async function callNarrativeAI<TParsed, TOutput = TParsed>({
     system: systemPrompt,
     messages,
     maxTokens,
-    temperature,
     workspaceId,
   });
 
@@ -67,10 +62,13 @@ export async function callNarrativeAI<TParsed, TOutput = TParsed>({
       messages: [
         ...messages,
         { role: 'assistant', content: result.text },
+        // The corrective prompt IS the retry mechanism. This previously also
+        // dropped temperature (0.3 → 0.1) to bias toward valid JSON, but no
+        // current model accepts a custom temperature (see model-manifest
+        // sampling contracts), so that knob was inert and has been removed.
         { role: 'user', content: 'Your response was not valid JSON. Return only the JSON object, no explanation.' },
       ],
       maxTokens,
-      temperature: retryTemperature,
       workspaceId,
     });
     try {

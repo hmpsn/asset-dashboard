@@ -123,7 +123,6 @@ Return ONLY valid JSON, no markdown, no explanation.`;
       system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 1000,
-      temperature: 0.4,
       feature: 'keyword-analysis',
       workspaceId,
       responseFormat: { type: 'json_object' },

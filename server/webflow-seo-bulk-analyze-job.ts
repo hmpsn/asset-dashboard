@@ -114,7 +114,6 @@ IMPORTANT: Return ONLY valid JSON.`;
           system: 'You are an expert SEO keyword analyst. Return valid JSON only.',
           messages: [{ role: 'user', content: prompt }],
           maxTokens: 600,
-          temperature: 0.3,
           feature: 'bulk-page-analysis',
           workspaceId,
           responseFormat: { type: 'json_object' },

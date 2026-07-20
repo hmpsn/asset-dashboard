@@ -584,7 +584,6 @@ async function generateDigestSummary(
       system: 'Select and order pre-approved Monthly Digest evidence clauses. Never author or modify prose. Return JSON only.',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,
-      temperature: 0,
       workspaceId,
     });
     const selectedClauseIds = parseMonthlyDigestClauseSelection(

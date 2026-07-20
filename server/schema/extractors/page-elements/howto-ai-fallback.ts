@@ -80,7 +80,6 @@ export async function aiDisambiguateHowTo(
         feature: 'schema-ai-element-classifier',
         workspaceId: opts.workspaceId,
         maxTokens: 50,
-        temperature: 0,
         messages: [{
           role: 'user',
           content: DISAMBIG_PROMPT + items.map((t, idx) => `${idx + 1}. ${t}`).join('\n'),

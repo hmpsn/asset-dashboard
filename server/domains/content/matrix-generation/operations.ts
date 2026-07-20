@@ -529,7 +529,6 @@ export async function auditMatrixGenerationCandidate(
     messages: prepared.messages,
     workspaceId: input.workspaceId,
     maxTokens: 2_500,
-    temperature: 0.1,
     researchMode: true,
     maxRetries: 0,
     executionChainId: input.executionChainId,

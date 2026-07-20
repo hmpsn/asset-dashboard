@@ -539,7 +539,6 @@ async function generateAiSummary(anomalies: Anomaly[], workspaceName: string, wo
         },
       ],
       maxTokens: 200,
-      temperature: 0.5,
       feature: 'anomaly-summary',
       workspaceId,
     });

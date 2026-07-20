@@ -271,7 +271,6 @@ export async function auditMatrixGenerationSet(input: {
     messages,
     workspaceId: input.workspaceId,
     maxTokens: 5_000,
-    temperature: 0.1,
     researchMode: true,
     maxRetries: 0,
     executionChainId,

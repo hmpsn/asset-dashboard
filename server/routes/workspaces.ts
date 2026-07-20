@@ -590,7 +590,6 @@ router.post('/api/workspaces/:id/intelligence-profile/autofill', requireWorkspac
     const result = await callAI({
       operation: 'intelligence-profile-autofill',
       workspaceId: ws.id,
-      temperature: 0.3,  // low temperature for consistent JSON output
       maxTokens: 300,    // response is a small JSON object
       system: 'You are a business analyst. Based on the website context provided, infer the business profile. Respond with ONLY valid JSON — no markdown, no explanation.',
       messages: [

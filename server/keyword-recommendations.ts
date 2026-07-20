@@ -543,7 +543,6 @@ Return ONLY a JSON object with this shape, ranking keywords best first:
     operation: 'keyword-recommendation-rank',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
-    temperature: 0.2,
     workspaceId,
   });
 

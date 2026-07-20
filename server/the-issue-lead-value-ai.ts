@@ -47,7 +47,6 @@ export async function enrichLeadValue(input: EnrichLeadValueInput): Promise<Enri
       system: SYSTEM,
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 200,
-      temperature: 0.2,
       workspaceId: input.workspaceId,
     });
     raw = result.text || '{}';

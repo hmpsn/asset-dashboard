@@ -340,7 +340,6 @@ ${pageAssist.blocks.keywordBlock}${pageAssist.blocks.brandVoiceBlock}${pageAssis
       model: MODEL_ROLES.structuredSynthesis,
       system: systemPrompt,
       messages,
-      temperature: 0.6,
       maxTokens: 4000,
       feature: 'rewrite-chat',
       workspaceId: ws.id,
