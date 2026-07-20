@@ -14,6 +14,8 @@ describe('matrix reliability closure shared contracts', () => {
       'feature_disabled',
       'invalid_selection',
       'invalid_budget',
+      'template_upgrade_required',
+      'generation_preconditions_unresolved',
       'source_revision_changed',
       'preview_fingerprint_stale',
       'invalid_cursor',

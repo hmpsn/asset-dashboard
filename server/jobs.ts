@@ -529,6 +529,24 @@ export function getJob(id: string): Job | undefined {
   return undefined;
 }
 
+/**
+ * Read one job from durable storage and replace any process-cached projection.
+ *
+ * Use this at authorization or external read boundaries where the database must
+ * be authoritative. Ordinary worker and WebSocket reads should keep using
+ * getJob(), whose cache-first behavior is intentional.
+ */
+export function getJobAuthoritative(id: string): Job | undefined {
+  const row = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as JobRow | undefined;
+  if (!row) {
+    jobs.delete(id);
+    return undefined;
+  }
+  const job = rowToJob(row);
+  jobs.set(job.id, job);
+  return job;
+}
+
 export function listJobs(workspaceId?: string): Job[] {
   const all = [...jobs.values()].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()

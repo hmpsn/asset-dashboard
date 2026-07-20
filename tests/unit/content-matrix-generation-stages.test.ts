@@ -17,12 +17,14 @@ vi.mock('../../server/content-posts-ai.js', () => ({
 }));
 
 vi.mock('../../server/domains/content/matrix-generation/evidence.js', () => ({
+  readFrozenMatrixCellEvidence: vi.fn(() => []),
   listCurrentMatrixCellEvidence: vi.fn(() => []),
   renderMatrixCellEvidencePrompt: vi.fn(() => 'MATRIX PAGE FACTS'),
 }));
 
 import { generateBrief } from '../../server/content-brief.js';
 import { generatePost } from '../../server/content-posts.js';
+import { readFrozenMatrixCellEvidence } from '../../server/domains/content/matrix-generation/evidence.js';
 import {
   generateMatrixBriefStage,
   generateMatrixPostStage,
@@ -57,6 +59,7 @@ function target(): MatrixGenerationPreviewTarget {
       sourceRefs: [],
       clientSafePrompt: 'Provide the verified CTA destination.',
     }],
+    frozenEvidenceResolutionIds: ['evidence-preview-frozen'],
     blockManifest: {
       totalWordCountTarget: 300,
       blocks: [
@@ -98,6 +101,72 @@ function target(): MatrixGenerationPreviewTarget {
 }
 
 describe('matrix generation post stage', () => {
+  it('loads only the evidence rows frozen by preview for every paid prose stage', async () => {
+    const frozen = target();
+    const options = {
+      workspaceId: 'ws-1',
+      target: frozen,
+      context: {} as ContentGenerationContextV2Result,
+      executionChainId: 'chain-frozen-evidence',
+      assertAuthority: vi.fn(),
+    };
+    vi.mocked(generateBrief).mockResolvedValue({
+      id: 'brief-frozen-evidence',
+      workspaceId: 'ws-1',
+      targetKeyword: frozen.targetKeyword.value,
+      secondaryKeywords: [],
+      suggestedTitle: frozen.title,
+      suggestedMetaDesc: frozen.metaDescription,
+      outline: [{ heading: 'SEO Consulting in Austin', notes: '', wordCount: 300, keywords: [] }],
+      wordCountTarget: 300,
+      intent: 'commercial',
+      audience: 'Austin organizations',
+      competitorInsights: '',
+      internalLinkSuggestions: [],
+      createdAt: '2026-07-14T12:00:00.000Z',
+    });
+    const brief = await generateMatrixBriefStage(options);
+    vi.mocked(generatePost).mockResolvedValue({
+      id: 'post-frozen-evidence',
+      workspaceId: 'ws-1',
+      briefId: brief.id,
+      targetKeyword: brief.targetKeyword,
+      title: brief.suggestedTitle,
+      metaDescription: brief.suggestedMetaDesc,
+      introduction: '<p>Introduction.</p>',
+      sections: [{
+        index: 0,
+        heading: 'SEO Consulting in Austin',
+        content: '<h2>SEO Consulting in Austin</h2><p>Service details.</p>',
+        wordCount: 5,
+        targetWordCount: 300,
+        keywords: [],
+        status: 'done',
+      }],
+      conclusion: '<p>Next step.</p>',
+      totalWordCount: 8,
+      targetWordCount: 300,
+      status: 'draft',
+      createdAt: '2026-07-14T12:00:00.000Z',
+      updatedAt: '2026-07-14T12:00:00.000Z',
+    });
+    await generateMatrixPostStage(brief, options);
+
+    expect(readFrozenMatrixCellEvidence).toHaveBeenCalledTimes(2);
+    expect(readFrozenMatrixCellEvidence).toHaveBeenNthCalledWith(1, {
+      workspaceId: 'ws-1',
+      matrixId: 'matrix-1',
+      cellId: 'cell-1',
+      evidenceResolutionIds: ['evidence-preview-frozen'],
+    });
+    expect(readFrozenMatrixCellEvidence).toHaveBeenNthCalledWith(2, {
+      workspaceId: 'ws-1',
+      matrixId: 'matrix-1',
+      cellId: 'cell-1',
+      evidenceResolutionIds: ['evidence-preview-frozen'],
+    });
+  });
+
   it('preserves schema-valid headingless template blocks without leaking an internal section id', async () => {
     const headinglessTarget = target();
     headinglessTarget.evidenceRequirements = [];

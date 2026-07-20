@@ -11,7 +11,16 @@ import { BACKGROUND_JOB_TYPES } from '../../../shared/types/background-jobs.js';
 import type { LocalSeoRefreshRequest } from '../../../shared/types/local-seo.js';
 import { addActivity } from '../../activity-log.js';
 import { broadcastToWorkspace } from '../../broadcast.js';
-import { cancelJob, createJob, getJob, getJobCancellationError, hasActiveJob, listJobs, updateJob } from '../../jobs.js';
+import {
+  cancelJob,
+  createJob,
+  getJob,
+  getJobAuthoritative,
+  getJobCancellationError,
+  hasActiveJob,
+  listJobs,
+  updateJob,
+} from '../../jobs.js';
 import type { Job } from '../../jobs.js';
 import { createLocalSeoRefreshPlan, runLocalSeoRefreshJob } from '../../local-seo.js';
 import { recordPaidCall } from '../paid-call-counter.js';
@@ -336,8 +345,9 @@ async function handleStartLocalSeoRefresh(
 function requireJobWorkspaceMatch(
   workspaceId: string,
   jobId: string,
+  readJob: (id: string) => Job | undefined = getJob,
 ): Job | McpToolErrorResponse {
-  const job = getJob(jobId);
+  const job = readJob(jobId);
   if (!job) return mcpNotFoundError('The job was not found.', { resource_type: 'job' });
   if (job.workspaceId && job.workspaceId !== workspaceId) {
     return mcpNotFoundError('The job was not found in this workspace.', { resource_type: 'job' });
@@ -357,7 +367,8 @@ async function handleGetJobStatus(
   const workspace = requireWorkspace(workspaceId);
   if ('isError' in workspace) return workspace;
 
-  const job = requireJobWorkspaceMatch(workspaceId, jobId);
+  // Authorization and response projection must use the same DB-fresh record.
+  const job = requireJobWorkspaceMatch(workspaceId, jobId, getJobAuthoritative);
   if ('isError' in job) return job;
 
   return mcpSuccess({

@@ -53,10 +53,10 @@ export const MCP_OPERATOR_TOOL_DESCRIPTIONS = Object.freeze({
   resolve_content_matrix_cells: 'Resolve cells/blockers.',
   accept_content_template_generation_upgrade: 'Accept/reject exact upgrade.',
   preview_content_matrix_generation: 'Preview blockers/fingerprint/cost.',
-  resolve_content_matrix_evidence: 'Resolve stable evidence.',
+  resolve_content_matrix_evidence: 'Resolve evidence.',
   start_content_matrix_generation: 'Start confirmed paid generation.',
-  get_content_matrix_generation: 'Read generation outcomes.',
-  retry_content_matrix_generation: 'Retry failed checkpoints.',
+  get_content_matrix_generation: 'Read run outcomes.',
+  retry_content_matrix_generation: 'Retry failed items.',
   get_job_status: 'Poll background job.',
   send_to_client: 'Send saved target to client.',
 } satisfies Readonly<Record<McpOperatorToolName, string>>);

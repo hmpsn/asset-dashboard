@@ -8,6 +8,7 @@ vi.mock('../../server/jobs.js', () => ({
   cancelJob: vi.fn(),
   createJob: vi.fn(),
   getJob: vi.fn(),
+  getJobAuthoritative: vi.fn(),
   getJobCancellationError: vi.fn(() => null),
   hasActiveJob: vi.fn(),
   listJobs: vi.fn(),
@@ -43,7 +44,14 @@ vi.mock('../../server/activity-log.js', () => ({
 
 import { BACKGROUND_JOB_TYPES } from '../../shared/types/background-jobs.js';
 import { getWorkspace, getTokenForSite } from '../../server/workspaces.js';
-import { cancelJob, createJob, getJob, hasActiveJob, listJobs } from '../../server/jobs.js';
+import {
+  cancelJob,
+  createJob,
+  getJob,
+  getJobAuthoritative,
+  hasActiveJob,
+  listJobs,
+} from '../../server/jobs.js';
 import { hasActiveKeywordStrategyGeneration } from '../../server/keyword-strategy-generation.js';
 import { createLocalSeoRefreshPlan, runLocalSeoRefreshJob } from '../../server/local-seo.js';
 import { handleJobActionTool, jobActionTools } from '../../server/mcp/tools/job-actions.js';
@@ -142,12 +150,14 @@ describe('mcp job action tools', () => {
   });
 
   it('supports get/list/cancel job tools', async () => {
-    (getJob as ReturnType<typeof vi.fn>).mockReturnValue({
+    const job = {
       id: 'job-1',
       workspaceId: 'ws-1',
       status: 'running',
       type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY,
-    });
+    };
+    (getJob as ReturnType<typeof vi.fn>).mockReturnValue(job);
+    (getJobAuthoritative as ReturnType<typeof vi.fn>).mockReturnValue(job);
     (listJobs as ReturnType<typeof vi.fn>).mockReturnValue([
       { id: 'job-1', workspaceId: 'ws-1', status: 'running', type: BACKGROUND_JOB_TYPES.KEYWORD_STRATEGY },
     ]);

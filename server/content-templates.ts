@@ -24,7 +24,11 @@ import {
   getTemplateGenerationSourceCensus,
   templateGenerationSourceIsComplete,
 } from './domains/content/matrix-generation/source-integrity.js';
-import { renderMatrixPattern } from './domains/content/matrix-generation/renderer.js';
+import {
+  renderMatrixPattern,
+  validateRenderedMatrixPath,
+  type MatrixRenderMode,
+} from './domains/content/matrix-generation/renderer.js';
 import {
   assertContentTemplateGenerationSourceWithinLimits,
   MATRIX_GENERATION_CONTRACT_VERSION,
@@ -206,13 +210,139 @@ export class ContentTemplateRevisionRequiredError extends Error {
 
 export class ContentTemplateGenerationContractError extends Error {
   readonly issueCodes: string[];
+  readonly issues: ContentTemplateGenerationContractIssue[];
 
-  constructor(issueCodes: string[]) {
+  constructor(inputIssues: Array<string | ContentTemplateGenerationContractIssue>) {
+    const issues = inputIssues.map(issue => (
+      typeof issue === 'string' ? { code: issue } : issue
+    ));
+    const issueCodes = issues.map(issue => issue.code);
     const detail = issueCodes.length > 0 ? `: ${issueCodes.join(', ')}` : '';
-    super(`Content template generation contract is invalid${detail}`);
+    const firstFieldPath = issues[0]?.fieldPath;
+    super(`${firstFieldPath ? `${firstFieldPath}: ` : ''}Content template generation contract is invalid${detail}`);
     this.name = 'ContentTemplateGenerationContractError';
     this.issueCodes = issueCodes;
+    this.issues = issues;
   }
+}
+
+export type ContentTemplateGenerationPatternField =
+  | 'urlPattern'
+  | 'keywordPattern'
+  | 'titlePattern'
+  | 'metaDescPattern';
+
+export interface ContentTemplateGenerationContractIssue {
+  code: string;
+  fieldPath?: ContentTemplateGenerationPatternField;
+  constraint?: string;
+}
+
+export interface ContentTemplateGenerationPatternIssue
+  extends ContentTemplateGenerationContractIssue {
+  fieldPath: ContentTemplateGenerationPatternField;
+  constraint: string;
+}
+
+interface ContentTemplateGenerationPatternInput {
+  variables: readonly Pick<TemplateVariable, 'name'>[];
+  urlPattern?: string;
+  keywordPattern?: string;
+  titlePattern?: string;
+  metaDescPattern?: string;
+}
+
+const generationPatternPolicies = [
+  {
+    fieldPath: 'urlPattern',
+    mode: 'slug',
+    missingCode: 'missing_url_pattern',
+    invalidCode: 'invalid_url_pattern',
+    label: 'URL',
+  },
+  {
+    fieldPath: 'keywordPattern',
+    mode: 'prose',
+    missingCode: 'missing_keyword_pattern',
+    invalidCode: 'invalid_keyword_pattern',
+    label: 'keyword',
+  },
+  {
+    fieldPath: 'titlePattern',
+    mode: 'prose',
+    missingCode: 'missing_title_pattern',
+    invalidCode: 'invalid_title_pattern',
+    label: 'title',
+  },
+  {
+    fieldPath: 'metaDescPattern',
+    mode: 'prose',
+    missingCode: 'missing_meta_description_pattern',
+    invalidCode: 'invalid_meta_description_pattern',
+    label: 'meta description',
+  },
+] as const satisfies ReadonlyArray<{
+  fieldPath: ContentTemplateGenerationPatternField;
+  mode: MatrixRenderMode;
+  missingCode: string;
+  invalidCode: string;
+  label: string;
+}>;
+
+/**
+ * Validates direct-v1 template patterns against the same renderer used at
+ * matrix resolution. Dummy values prove the pattern itself without depending
+ * on a future cell; URL output additionally passes the strict path boundary.
+ */
+export function contentTemplateGenerationPatternIssues(
+  input: ContentTemplateGenerationPatternInput,
+): ContentTemplateGenerationPatternIssue[] {
+  const variableNames = input.variables.map(variable => variable.name);
+  const patternValues = Object.create(null) as Record<string, string>;
+  variableNames.forEach((variableName, index) => {
+    patternValues[variableName] = `declared-variable-${index + 1}`;
+  });
+
+  const issues: ContentTemplateGenerationPatternIssue[] = [];
+  for (const policy of generationPatternPolicies) {
+    const pattern = input[policy.fieldPath];
+    if (typeof pattern !== 'string' || pattern.trim().length === 0) {
+      issues.push({
+        code: policy.missingCode,
+        fieldPath: policy.fieldPath,
+        constraint: `A generation-ready template requires a non-empty ${policy.label} pattern`,
+      });
+      continue;
+    }
+
+    const rendered = renderMatrixPattern(
+      pattern,
+      patternValues,
+      policy.mode,
+      variableNames,
+    );
+    if (rendered.status === 'blocked') {
+      const reasonCodes = rendered.issues.map(issue => issue.code).join(', ');
+      issues.push({
+        code: policy.invalidCode,
+        fieldPath: policy.fieldPath,
+        constraint: `${policy.label} pattern must contain only well-formed declared placeholders (${reasonCodes})`,
+      });
+      continue;
+    }
+
+    if (policy.fieldPath === 'urlPattern') {
+      const pathValidation = validateRenderedMatrixPath(rendered.value);
+      if (pathValidation.status === 'blocked') {
+        issues.push({
+          code: policy.invalidCode,
+          fieldPath: policy.fieldPath,
+          constraint: `Rendered URL pattern must be a safe absolute workspace path (${pathValidation.code})`,
+        });
+      }
+    }
+  }
+  return issues;
 }
 
 export class ContentTemplateSourceIntegrityError extends Error {
@@ -232,35 +362,8 @@ function assertTemplateGenerationContract(template: ContentTemplate): void {
   if (!generationPageTypeSet.has(template.pageType)) {
     issueCodes.push(`unsupported_page_type:${template.pageType}`);
   }
-  if (typeof template.titlePattern !== 'string' || template.titlePattern.trim().length === 0) {
-    issueCodes.push('missing_title_pattern');
-  }
-  if (typeof template.metaDescPattern !== 'string' || template.metaDescPattern.trim().length === 0) {
-    issueCodes.push('missing_meta_description_pattern');
-  }
   const variableNames = template.variables.map(variable => variable.name);
-  const patternValues = Object.create(null) as Record<string, string>;
-  for (const variableName of variableNames) patternValues[variableName] = variableName;
-  if (typeof template.titlePattern === 'string' && template.titlePattern.trim().length > 0) {
-    const renderedTitle = renderMatrixPattern(
-      template.titlePattern,
-      patternValues,
-      'prose',
-      variableNames,
-    );
-    if (renderedTitle.status === 'blocked') issueCodes.push('invalid_title_pattern');
-  }
-  if (typeof template.metaDescPattern === 'string' && template.metaDescPattern.trim().length > 0) {
-    const renderedMetaDescription = renderMatrixPattern(
-      template.metaDescPattern,
-      patternValues,
-      'prose',
-      variableNames,
-    );
-    if (renderedMetaDescription.status === 'blocked') {
-      issueCodes.push('invalid_meta_description_pattern');
-    }
-  }
+  const patternIssues = contentTemplateGenerationPatternIssues(template);
   for (const section of template.sections) {
     if (section.ctaContract?.role === 'primary' && section.ctaContract.required !== true) {
       issueCodes.push(`primary_cta_must_be_required:${section.id}`);
@@ -275,8 +378,8 @@ function assertTemplateGenerationContract(template: ContentTemplate): void {
       issue.sectionId ? `${issue.code}:${issue.sectionId}` : issue.code
     )));
   }
-  if (issueCodes.length > 0) {
-    throw new ContentTemplateGenerationContractError(issueCodes);
+  if (issueCodes.length > 0 || patternIssues.length > 0) {
+    throw new ContentTemplateGenerationContractError([...issueCodes, ...patternIssues]);
   }
 }
 

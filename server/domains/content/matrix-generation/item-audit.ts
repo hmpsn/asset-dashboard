@@ -31,7 +31,7 @@ import {
   mergeMatrixGenerationAudit,
   runMatrixGenerationDeterministicAudit,
 } from './audit.js';
-import { listCurrentMatrixCellEvidence } from './evidence.js';
+import { readFrozenMatrixCellEvidence } from './evidence.js';
 import { canonicalGenerationFingerprint } from './fingerprint.js';
 import {
   applyMatrixGenerationRevision,
@@ -192,11 +192,12 @@ function loadAuditItem(
     authority: {
       voiceSnapshot,
       approvedIdentity: approvedIdentity(request.workspaceId, target),
-      evidenceResolutions: listCurrentMatrixCellEvidence(
-        request.workspaceId,
-        target.matrixId,
-        target.cellId,
-      ),
+      evidenceResolutions: readFrozenMatrixCellEvidence({
+        workspaceId: request.workspaceId,
+        matrixId: target.matrixId,
+        cellId: target.cellId,
+        evidenceResolutionIds: target.frozenEvidenceResolutionIds,
+      }).map(read => read.resolution),
     },
   };
 }

@@ -22,7 +22,16 @@ review, paid confirmation, send, approval, or publication gates.
   evidence survives generated-artifact replacement; section evidence continues
   to invalidate when template authority changes.
 - `include_evidence_values` is opt-in, returns at most ten exact frozen rows, and
-  fails closed as `not_found` across workspace, matrix, or cell boundaries.
+  reports whether the bounded result was truncated. It fails closed as
+  `not_found` across workspace, matrix, or cell boundaries. Legacy accepted runs
+  derive the same exact IDs from their persisted verified requirement refs. If
+  one item exceeds the cap, the opaque run cursor remains on that item and
+  advances its evidence offset; callers preserve evidence-read mode while the
+  item repeats until every consumed row is reachable.
+- Internal-link evidence uses `kind: "link_list"` with
+  `value: [{ href: "/workspace-relative-path", anchorText: "Visible text" }]`.
+  MCP uses the same shape with `anchor_text`; destinations never accept an
+  origin, query, fragment, protocol-relative path, or raw provider URL.
 - MCP job status authorization and projection read durable SQLite state and then
   refresh the process cache. Restart recovery records the existing explicit
   interruption error on every nonterminal matrix item before terminalizing it.

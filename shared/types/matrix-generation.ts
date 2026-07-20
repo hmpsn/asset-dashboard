@@ -154,6 +154,8 @@ export const MATRIX_GENERATION_PRECONDITION_REASONS = [
   'feature_disabled',
   'invalid_selection',
   'invalid_budget',
+  'template_upgrade_required',
+  'generation_preconditions_unresolved',
   'source_revision_changed',
   'preview_fingerprint_stale',
   'invalid_cursor',
@@ -1579,7 +1581,11 @@ export interface GetMatrixGenerationRequest {
   runId: string;
   cursor?: string;
   limit?: number;
-  /** Opt-in exact frozen evidence values; bounded across the response. */
+  /**
+   * Opt-in exact frozen evidence values; bounded across the response. When a
+   * single item exceeds the cap, items.nextCursor repeats that item with the
+   * next evidence segment until every frozen row is reachable.
+   */
   includeEvidenceValues?: boolean;
 }
 
@@ -1587,7 +1593,8 @@ export const MATRIX_GENERATION_EVIDENCE_VALUE_READ_LIMIT = 10;
 
 export interface MatrixGenerationEvidenceValueRead {
   resolution: MatrixGenerationEvidenceResolution;
-  isCurrent: boolean;
+  status: 'current' | 'superseded';
+  supersedesId: string | null;
   supersededAt: string | null;
 }
 
@@ -1610,6 +1617,12 @@ export interface MatrixGenerationItemRead extends Omit<
 export interface GetMatrixGenerationResult {
   run: MatrixGenerationRun;
   items: MatrixCursorPage<MatrixGenerationItemRead>;
+  /** Present only when includeEvidenceValues=true. */
+  evidenceValuesSummary?: {
+    includedCount: number;
+    /** Follow items.nextCursor with the same includeEvidenceValues mode. */
+    truncated: boolean;
+  };
 }
 
 export type RetryMatrixGenerationCommandRequest = RetryMatrixGenerationRequest & {

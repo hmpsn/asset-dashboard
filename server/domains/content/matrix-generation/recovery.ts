@@ -22,6 +22,15 @@ const TERMINAL_ITEM_STATUSES = new Set([
   'failed',
 ]);
 
+function restartInterruptedError(message: string, stage?: string) {
+  return {
+    code: 'matrix_generation_restart_interrupted' as const,
+    message,
+    retryable: true,
+    ...(stage ? { stage } : {}),
+  };
+}
+
 /** Reconciles interrupted paid work to explicit, retryable item outcomes; never repeats a paid call. */
 export function reconcileMatrixGenerationRunsAfterRestart(): number {
   let reconciled = 0;
@@ -36,12 +45,10 @@ export function reconcileMatrixGenerationRunsAfterRestart(): number {
           itemId: item.id,
           attemptId: runningAttempt.id,
           nextStatus: 'failed',
-          error: {
-            code: 'matrix_generation_restart_interrupted',
-            message: 'The server restarted before this generation stage completed.',
-            retryable: true,
-            stage: runningAttempt.stage,
-          },
+          error: restartInterruptedError(
+            'The server restarted before this generation stage completed.',
+            runningAttempt.stage,
+          ),
         });
       }
       const current = listMatrixGenerationItems(run.workspaceId, run.id)
@@ -52,11 +59,9 @@ export function reconcileMatrixGenerationRunsAfterRestart(): number {
         itemId: current.id,
         expectedRevision: current.revision,
         nextStatus: 'failed',
-        error: {
-          code: 'matrix_generation_restart_interrupted',
-          message: 'The server restarted before this page completed. Retry the selected item explicitly.',
-          retryable: true,
-        },
+        error: restartInterruptedError(
+          'The server restarted before this page completed. Retry the selected item explicitly.',
+        ),
       });
     }
     const items = listMatrixGenerationItems(run.workspaceId, run.id);

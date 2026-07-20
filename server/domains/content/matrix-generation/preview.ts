@@ -16,13 +16,18 @@ import type {
   MatrixArtifactRevisionExpectations,
   MatrixGenerationEvidenceResolution,
   MatrixGenerationCostEstimate,
+  MatrixGenerationPreviewDiagnostics,
+  MatrixGenerationPreconditionReason,
   MatrixGenerationPreviewResult,
   MatrixGenerationPreviewTarget,
   PreviewMatrixGenerationRequest,
   PreviewMatrixGenerationResult,
   ResolvedMatrixStructuralTarget,
 } from '../../../../shared/types/matrix-generation.js';
-import { MATRIX_GENERATION_BATCH_LIMITS } from '../../../../shared/types/matrix-generation.js';
+import {
+  MATRIX_GENERATION_BATCH_LIMITS,
+  MATRIX_GENERATION_MAX_REPORTED_LIMIT_ISSUES,
+} from '../../../../shared/types/matrix-generation.js';
 import { listDeliverables } from '../../../brand-deliverable-read-model.js';
 import { getBrief } from '../../../content-brief.js';
 import {
@@ -36,6 +41,7 @@ import {
 import { getMatrix } from '../../../content-matrices.js';
 import { getTemplate } from '../../../content-templates.js';
 import { getPost } from '../../../content-posts-db.js';
+import { isFeatureEnabled } from '../../../feature-flags.js';
 import { getAnthropicRequestPolicy, MODEL_ROLES } from '../../../model-manifest.js';
 import {
   buildContentGenerationContextV2,
@@ -65,6 +71,7 @@ import {
 import {
   resolveMatrixStructures,
   resolveMatrixStructuresWithCensus,
+  MatrixReadServiceError,
   type WorkspaceKnownPageCensus,
 } from './read-service.js';
 import {
@@ -163,6 +170,7 @@ export class MatrixGenerationPreviewStageError extends Error {
   readonly stage: MatrixGenerationPreviewStage;
   readonly cellId: string;
   readonly classification: string;
+  readonly reason: MatrixGenerationPreconditionReason | null;
   readonly fieldPath: string | null;
   readonly constraint: string | null;
 
@@ -171,6 +179,7 @@ export class MatrixGenerationPreviewStageError extends Error {
     stage: MatrixGenerationPreviewStage;
     cellId: string;
     classification: string;
+    reason?: MatrixGenerationPreconditionReason;
     fieldPath?: string;
     constraint?: string;
   }) {
@@ -182,6 +191,7 @@ export class MatrixGenerationPreviewStageError extends Error {
     this.stage = input.stage;
     this.cellId = input.cellId;
     this.classification = input.classification;
+    this.reason = input.reason ?? null;
     this.fieldPath = input.fieldPath ?? null;
     this.constraint = input.constraint ?? null;
   }
@@ -198,6 +208,7 @@ export class MatrixGenerationPreviewStageError extends Error {
         stage,
         cellId,
         classification: safeFailureClassification(error),
+        reason: 'invalid_budget',
         fieldPath: `generation_context.${error.stage}`,
         constraint: `required frozen authority and target evidence must fit within the ${MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET}-token matrix context budget`,
       });
@@ -208,6 +219,7 @@ export class MatrixGenerationPreviewStageError extends Error {
         stage,
         cellId,
         classification: safeFailureClassification(error),
+        reason: 'invalid_budget',
         fieldPath: 'generation_context.authority',
         constraint: `serialized frozen voice, approved identity, and custom notes must not exceed ${MATRIX_GENERATION_AUTHORITY_UTF8_BYTE_CEILING} UTF-8 bytes`,
       });
@@ -218,6 +230,7 @@ export class MatrixGenerationPreviewStageError extends Error {
         stage,
         cellId,
         classification: safeFailureClassification(error),
+        reason: 'invalid_budget',
         fieldPath: 'generation_context.provider_input',
         constraint: 'every rendered matrix provider input must fit the shared per-dispatch application envelope',
       });
@@ -228,6 +241,7 @@ export class MatrixGenerationPreviewStageError extends Error {
         stage,
         cellId,
         classification: safeFailureClassification(error),
+        reason: 'invalid_budget',
         fieldPath: `accepted_budget.${error.dimension}`,
         constraint: 'the complete batch estimate must fit the start-content-matrix-generation hard limits',
       });
@@ -395,9 +409,49 @@ function artifactRequirements(
       status: 'missing',
       sourceRefs: [],
       clientSafePrompt: 'Return the page to an editable lifecycle state before regenerating it.',
+      resolvable: false,
+      resolutionAuthority: 'human_authorization',
     });
   }
   return requirements;
+}
+
+function evidenceResolvable(
+  requirements: readonly GenerationEvidenceRequirement[],
+): GenerationEvidenceRequirement[] {
+  return requirements.map(requirement => ({
+    ...requirement,
+    resolvable: true,
+    resolutionAuthority: 'evidence_submission' as const,
+  }));
+}
+
+function previewDiagnostics(
+  pageCensus: WorkspaceKnownPageCensus,
+  requirementsComplete: boolean,
+): MatrixGenerationPreviewDiagnostics {
+  const allIssues = pageCensus.sourceLimitIssues ?? [];
+  return {
+    requirementsComplete,
+    sourceLimitIssues: allIssues.slice(0, MATRIX_GENERATION_MAX_REPORTED_LIMIT_ISSUES),
+    sourceLimitIssuesTruncated: Boolean(pageCensus.sourceLimitIssuesTruncated)
+      || allIssues.length > MATRIX_GENERATION_MAX_REPORTED_LIMIT_ISSUES,
+    censusFailures: [...(pageCensus.failures ?? [])],
+  };
+}
+
+function frozenEvidenceResolutionIds(
+  requirements: readonly GenerationEvidenceRequirement[],
+): string[] {
+  return [...new Set(requirements.flatMap(requirement => (
+    requirement.status === 'verified'
+      ? requirement.sourceRefs.flatMap(sourceRef => (
+          sourceRef.sourceType === 'content_matrix_cell_evidence'
+            ? [sourceRef.sourceId]
+            : []
+        ))
+      : []
+  )))].sort();
 }
 
 function renderVoiceAnchors(
@@ -648,6 +702,7 @@ export async function prepareMatrixGenerationCell(
         templateId: target.templateId,
         cellId: target.cellId,
         sourceRevision: target.sourceRevision,
+        diagnostics: previewDiagnostics(pageCensus, false),
         omittedOptionalSections: target.blockManifest.omittedOptionalSections ?? [],
         evidenceRequirements: target.structuralRequirements,
         blockingRequirementIds: target.structuralBlockingRequirementIds,
@@ -669,10 +724,12 @@ export async function prepareMatrixGenerationCell(
     resolutions,
     pageCensus,
   );
-  const cellRequirements = buildMatrixCellEvidenceRequirements(
-    target,
-    resolutions,
-    new Set(verifiedInternalLinks.map(block => block.evidenceRequirementId)),
+  const cellRequirements = evidenceResolvable(
+    buildMatrixCellEvidenceRequirements(
+      target,
+      resolutions,
+      new Set(verifiedInternalLinks.map(block => block.evidenceRequirementId)),
+    ),
   );
   const identity = freezeIdentity(target.pageType, listDeliverables(workspaceId));
 
@@ -707,6 +764,7 @@ export async function prepareMatrixGenerationCell(
         templateId: target.templateId,
         cellId: target.cellId,
         sourceRevision: target.sourceRevision,
+        diagnostics: previewDiagnostics(pageCensus, true),
         omittedOptionalSections: target.blockManifest.omittedOptionalSections ?? [],
         evidenceRequirements: requirements,
         blockingRequirementIds,
@@ -714,6 +772,11 @@ export async function prepareMatrixGenerationCell(
       },
     };
   }
+  const acceptedEvidenceResolutionIds = frozenEvidenceResolutionIds(requirements);
+  const acceptedEvidenceResolutionIdSet = new Set(acceptedEvidenceResolutionIds);
+  const acceptedResolutions = resolutions.filter(resolution => (
+    acceptedEvidenceResolutionIdSet.has(resolution.id)
+  ));
 
   const context = await runPreviewStage('generation_context', target.cellId, () => {
     const authority = {
@@ -745,13 +808,13 @@ export async function prepareMatrixGenerationCell(
     });
   });
   const estimatedPaidBudget = await runPreviewStage('cell_budget', target.cellId, () => (
-    estimateMatrixGenerationCellBudget(target, context, resolutions)
+    estimateMatrixGenerationCellBudget(target, context, acceptedResolutions)
   ));
   const evidence = await runPreviewStage('evidence_range', target.cellId, () => evidenceRange([
     ...context.evidence.observedAt,
     voiceSnapshot.finalizedAt,
     ...identity.evidenceTimestamps,
-    ...resolutions.map(resolution => resolution.sourceRef.capturedAt),
+    ...acceptedResolutions.map(resolution => resolution.sourceRef.capturedAt),
   ], context.evidence.capturedAt));
   const previewCore = {
     structuralFingerprint: target.structuralFingerprint,
@@ -769,6 +832,7 @@ export async function prepareMatrixGenerationCell(
     expectedArtifactRevisions,
     contextFingerprint: context.effectiveInputFingerprint,
     estimatedPaidBudget,
+    frozenEvidenceResolutionIds: acceptedEvidenceResolutionIds,
     ...(verifiedInternalLinks.length > 0 ? { verifiedInternalLinks } : {}),
   };
   const effectiveInputFingerprint = await runPreviewStage(
@@ -786,6 +850,7 @@ export async function prepareMatrixGenerationCell(
     expectedArtifactRevisions,
     effectiveInputFingerprint,
     blockingRequirementIds: [],
+    frozenEvidenceResolutionIds: previewCore.frozenEvidenceResolutionIds,
     estimatedPaidBudget,
     ...(verifiedInternalLinks.length > 0 ? { verifiedInternalLinks } : {}),
   };
@@ -796,6 +861,7 @@ export async function prepareMatrixGenerationCell(
       templateId: target.templateId,
       cellId: target.cellId,
       sourceRevision: target.sourceRevision,
+      diagnostics: previewDiagnostics(pageCensus, true),
       target: previewTarget,
     },
     context,
@@ -805,6 +871,18 @@ export async function prepareMatrixGenerationCell(
 export async function previewMatrixGeneration(
   request: PreviewMatrixGenerationRequest,
 ): Promise<PreviewMatrixGenerationResult> {
+  if (!isFeatureEnabled('content-matrix-generation', request.workspaceId)) {
+    throw new MatrixReadServiceError(
+      'precondition_failed',
+      'Content matrix generation is not enabled.',
+      {
+        reason: 'feature_disabled',
+        retryable: false,
+        fieldPath: 'workspace_id',
+        constraint: 'enable content-matrix-generation before previewing paid work',
+      },
+    );
+  }
   const structuralWithCensus = await resolveMatrixStructuresWithCensus(request);
   const structural = structuralWithCensus.result;
   const results: MatrixGenerationPreviewResult[] = [];
@@ -816,6 +894,7 @@ export async function previewMatrixGeneration(
         templateId: item.templateId,
         cellId: item.cellId,
         sourceRevision: item.sourceRevision,
+        diagnostics: previewDiagnostics(structuralWithCensus.pageCensus, false),
         proposal: item.proposal,
       });
       continue;
@@ -829,6 +908,7 @@ export async function previewMatrixGeneration(
         templateId: item.templateId,
         cellId: item.cellId,
         sourceRevision: item.sourceRevision,
+        diagnostics: previewDiagnostics(structuralWithCensus.pageCensus, false),
         omittedOptionalSections: [],
         evidenceRequirements: item.blockers,
         blockingRequirementIds: item.blockers.map(blocker => blocker.id),
@@ -873,9 +953,13 @@ export function assertPreviewIdentityCurrent(
 ): void {
   const matrix = getMatrix(workspaceId, target.matrixId);
   const cell = matrix?.cells.find(candidate => candidate.id === target.cellId);
-  if (!matrix || !cell) throw new Error('Matrix generation source no longer exists');
+  if (!matrix || !cell) {
+    throw new MatrixReadServiceError('not_found', 'Matrix generation source no longer exists');
+  }
   const template = getTemplate(workspaceId, matrix.templateId);
-  if (!template) throw new Error('Matrix generation template no longer exists');
+  if (!template) {
+    throw new MatrixReadServiceError('not_found', 'Matrix generation template no longer exists');
+  }
   const sourceRevision = {
     matrixRevision: matrix.revision ?? 0,
     templateRevision: template.revision ?? 0,
@@ -883,21 +967,61 @@ export function assertPreviewIdentityCurrent(
   };
   if (canonicalGenerationFingerprint(sourceRevision)
     !== canonicalGenerationFingerprint(target.sourceRevision)) {
-    throw new Error('Matrix generation source changed after preview');
+    throw new MatrixReadServiceError(
+      'conflict',
+      'Current generation authority no longer matches the accepted preview. Re-preview immediately.',
+      {
+        reason: 'source_revision_changed',
+        retryable: true,
+        fieldPath: 'source_revision',
+        constraint: 're-preview immediately using current authority',
+      },
+    );
   }
   if (canonicalGenerationFingerprint(matrixArtifactRevisionExpectations(workspaceId, cell))
     !== canonicalGenerationFingerprint(target.expectedArtifactRevisions)) {
-    throw new Error('A linked content artifact changed after preview');
+    throw new MatrixReadServiceError(
+      'conflict',
+      'A linked content artifact changed after preview.',
+      {
+        reason: 'artifact_revision_changed',
+        retryable: true,
+        fieldPath: 'expected_artifact_revisions',
+        constraint: 're-preview immediately using current artifact revisions',
+      },
+    );
   }
-  getFinalizedVoiceSnapshotForGeneration({
-    workspaceId,
-    expectedVoiceVersion: target.voiceSnapshot.voiceVersion,
-    expectedFingerprint: target.voiceSnapshot.fingerprint,
-    requireCurrentAuthority: true,
-  });
+  try {
+    getFinalizedVoiceSnapshotForGeneration({
+      workspaceId,
+      expectedVoiceVersion: target.voiceSnapshot.voiceVersion,
+      expectedFingerprint: target.voiceSnapshot.fingerprint,
+      requireCurrentAuthority: true,
+    });
+  } catch { // catch-ok - caller receives only the stable authority mismatch classification.
+    throw new MatrixReadServiceError(
+      'conflict',
+      'Finalized voice authority changed after preview.',
+      {
+        reason: 'preview_fingerprint_stale',
+        retryable: true,
+        fieldPath: 'voice_snapshot',
+        constraint: 're-preview immediately using current finalized voice authority',
+      },
+    );
+  }
   const current = freezeIdentity(target.pageType, listDeliverables(workspaceId));
   if (canonicalGenerationFingerprint(current.refs)
     !== canonicalGenerationFingerprint(target.identitySnapshot)) {
-    throw new Error('Approved brand identity changed after preview');
+    throw new MatrixReadServiceError(
+      'conflict',
+      'Approved brand identity changed after preview.',
+      {
+        reason: 'preview_fingerprint_stale',
+        retryable: true,
+        fieldPath: 'identity_snapshot',
+        constraint: 're-preview immediately using current approved identity',
+      },
+    );
   }
 }

@@ -63,6 +63,26 @@
       "shippedAt": "2026-07-20"
     },
     {
+      "id": "sprint-matrix-reliability-closure-2026-07-20-terminal-history",
+      "name": "✅ SHIPPED — Matrix Reliability Closure",
+      "hours": "Two staging-first PRs plus one owner-confirmed paid canary",
+      "rationale": "Terminal item history split from sprint-matrix-reliability-closure-2026-07-20. Close the remaining paid-generation truth, durability, and output-integrity gaps without extending the MCP control-plane program into speculative schema work.",
+      "items": [
+        {
+          "id": "matrix-prepaid-reliability",
+          "title": "Pre-paid reliability — preview truth, durable jobs, frozen evidence, and template contracts",
+          "source": "2026-07-20 compressed MCP and Matrix Reliability Closure Program",
+          "est": "L",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-20",
+          "owner": "content",
+          "notes": "Completed 2026-07-20. Preview/start/retry now expose truthful stable preconditions and bounded safe census diagnostics; durable job reads and restart recovery are DB-truthful; paid stages and optional run reads consume exact preview-frozen evidence rows with legacy compatibility; direct contract-v1 templates validate all canonical patterns. No paid calls or local/staging DB synchronization. Staging smoke remains read-only/free preview only."
+        }
+      ],
+      "shippedAt": "2026-07-20"
+    },
+    {
       "id": "admin-ux-flow-2026-07-terminal-history",
       "name": "✅ SHIPPED — Admin UX flow & ease-of-use (from 2026-07-16 audits)",
       "hours": "~60",
