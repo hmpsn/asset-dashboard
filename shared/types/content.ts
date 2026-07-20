@@ -609,6 +609,16 @@ export const TEMPLATE_SECTION_GENERATION_ROLES = [
 export type TemplateSectionGenerationRole =
   (typeof TEMPLATE_SECTION_GENERATION_ROLES)[number];
 
+export const TEMPLATE_SECTION_RENDER_MODES = ['prose', 'table'] as const;
+export type TemplateSectionRenderMode = (typeof TEMPLATE_SECTION_RENDER_MODES)[number];
+
+export const TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT = 10;
+
+export interface TemplateInternalLinkContract {
+  /** Minimum distinct verified workspace destinations required in this included block. */
+  minimum: number;
+}
+
 export interface TemplateAeoContract {
   modes: Array<'answer_first' | 'definition' | 'faq' | 'paa'>;
   required: boolean;
@@ -638,6 +648,10 @@ export interface TemplateSection {
   ctaContract?: TemplateCtaContract;
   /** Evidence-driven section: omitted when its exact matrix-cell evidence is absent. */
   optional?: boolean;
+  /** Explicit semantic rendering requirement; absent legacy values behave as prose. */
+  renderAs?: TemplateSectionRenderMode;
+  /** Presence declares a block-scoped verified internal-link requirement. */
+  internalLinkContract?: TemplateInternalLinkContract;
 }
 
 export type ContentPageType =

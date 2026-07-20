@@ -9,7 +9,9 @@ import {
   type ResolvedTemplatePageBlock,
 } from '../../../../shared/types/matrix-generation.js';
 import {
+  TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT,
   TEMPLATE_SECTION_GENERATION_ROLES,
+  TEMPLATE_SECTION_RENDER_MODES,
   type TemplateAeoContract,
   type TemplateCtaContract,
   type TemplateSection,
@@ -39,6 +41,7 @@ export type BuildResolvedPageBlockManifestResult =
   | { status: 'blocked'; issues: BlockManifestIssue[] };
 
 const GENERATION_ROLE_SET = new Set<string>(TEMPLATE_SECTION_GENERATION_ROLES);
+const RENDER_MODE_SET = new Set<string>(TEMPLATE_SECTION_RENDER_MODES);
 const AEO_MODE_SET = new Set<string>(['answer_first', 'definition', 'faq', 'paa']);
 
 function isAeoContract(value: unknown): value is TemplateAeoContract {
@@ -60,8 +63,9 @@ function isCtaContract(value: unknown): value is TemplateCtaContract {
 }
 
 function sectionShapeIsValid(section: TemplateSection): boolean {
-  return Boolean(section)
-    && typeof section.id === 'string'
+  if (!section) return false;
+  const internalLinkMinimum = section.internalLinkContract?.minimum;
+  return typeof section.id === 'string'
     && section.id.trim().length > 0
     && typeof section.name === 'string'
     && typeof section.headingTemplate === 'string'
@@ -69,7 +73,23 @@ function sectionShapeIsValid(section: TemplateSection): boolean {
     && Number.isInteger(section.wordCountTarget)
     && section.wordCountTarget >= 0
     && Number.isInteger(section.order)
-    && section.order >= 0;
+    && section.order >= 0
+    && (section.renderAs === undefined || RENDER_MODE_SET.has(section.renderAs))
+    && (section.internalLinkContract === undefined || (
+      Number.isInteger(internalLinkMinimum)
+      && internalLinkMinimum !== undefined
+      && internalLinkMinimum >= 1
+      && internalLinkMinimum <= TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT
+    ));
+}
+
+function templateHeadingIsLocked(section: TemplateSection): boolean {
+  if (section.headingTemplate.length === 0) return true;
+  if (section.aeoContract?.required === true) return true;
+  return section.generationRole === 'answer_first'
+    || section.generationRole === 'definition'
+    || section.generationRole === 'faq'
+    || section.generationRole === 'process';
 }
 
 function systemBlocks(hasTemplatePrimaryCta: boolean): {
@@ -249,13 +269,17 @@ export function buildResolvedBlockSequence(
       heading: {
         level: renderedHeading === null ? null : 2,
         renderedText: renderedHeading,
-        locked: true,
+        locked: templateHeadingIsLocked(section),
       },
       guidance: section.guidance,
       wordCountTarget: section.wordCountTarget,
       aeoContract: section.aeoContract!,
       ctaContract: section.ctaContract!,
       ...(section.optional === true ? { optional: true } : {}),
+      ...(section.renderAs !== undefined ? { renderAs: section.renderAs } : {}),
+      ...(section.internalLinkContract !== undefined
+        ? { internalLinkContract: { ...section.internalLinkContract } }
+        : {}),
     });
   }
   if (issues.length > 0) return { status: 'blocked', issues };
@@ -305,6 +329,10 @@ export function buildResolvedPageBlockManifest(
       generationRole: section.generationRole!,
       evidenceRequirementId: matrixCellSectionEvidenceRequirementId(cellId, section.id),
       reason: 'missing_section_evidence',
+      ...(section.renderAs !== undefined ? { renderAs: section.renderAs } : {}),
+      ...(section.internalLinkContract !== undefined
+        ? { internalLinkContract: { ...section.internalLinkContract } }
+        : {}),
     }));
 
   const totalWordCountTarget = sequence.blocks.reduce(

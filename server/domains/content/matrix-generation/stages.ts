@@ -1,3 +1,5 @@
+import * as cheerio from 'cheerio';
+
 import type {
   ContentBrief,
   GeneratedPost,
@@ -44,16 +46,37 @@ function lockedOutline(target: MatrixGenerationPreviewTarget, generated: Content
     .map(placeholderToken);
   return bodyBlocks.map((block, index) => {
     const generatedSection = generated.outline[index];
+    const hasVisibleHeading = block.heading.renderedText !== null;
+    const literalHeading = block.heading.renderedText
+      ?? generatedSection?.heading?.trim()
+      ?? `Section ${index + 1}`;
+    const resolvedHeading = block.heading.locked && hasVisibleHeading
+      ? literalHeading
+      : generatedSection?.heading?.trim() || literalHeading;
     const blockPlaceholders = block.ctaContract.required ? readyPlaceholders : [];
+    const frozenLinkBlock = target.verifiedInternalLinks?.find(candidate => (
+      candidate.blockId === block.id
+    ));
     const notes = [
       block.guidance,
       generatedSection?.notes,
+      !hasVisibleHeading
+        ? 'This template block has no visible heading. Treat the outline heading as generation scaffolding only; final output must contain no H2 in this block.'
+        : block.heading.locked
+        ? `Start this section with the exact H2: ${literalHeading}`
+        : `Start this section with the branded H2 from this outline. Preserve its wording exactly in the generated HTML. The literal fallback is: ${literalHeading}`,
+      frozenLinkBlock
+        ? `Render at least ${frozenLinkBlock.minimum} verified internal anchor(s) in this block. Use only these exact href and anchor-text pairs: ${frozenLinkBlock.links.map(link => `<a href="${link.href}">${link.anchorText}</a>`).join(' ')}`
+        : undefined,
+      block.renderAs === 'table'
+        ? 'Render this structured comparison as semantic HTML: one <table> containing <thead> or header <tr>, <th> labels, at least two <tr> rows total, and <td> data cells. Do not flatten the comparison into prose.'
+        : undefined,
       blockPlaceholders.length > 0
         ? `Keep these typed requirements visible in the draft: ${blockPlaceholders.join(' ')}`
         : undefined,
     ].filter((value): value is string => Boolean(value?.trim())).join('\n');
     return {
-      heading: block.heading.renderedText ?? generatedSection?.heading ?? block.sourceSectionId,
+      heading: resolvedHeading,
       ...(generatedSection?.subheadings?.length
         ? { subheadings: generatedSection.subheadings }
         : {}),
@@ -89,9 +112,11 @@ export async function generateMatrixBriefStage(
       ].filter(Boolean).join('\n\n'),
       pageType: target.pageType,
       templateId: target.templateId,
-      templateSections: bodyBlocks.map(block => ({
-        name: block.heading.renderedText ?? block.sourceSectionId,
-        headingTemplate: block.heading.renderedText ?? block.sourceSectionId,
+      templateSections: bodyBlocks.map((block, index) => ({
+        name: block.heading.renderedText ?? `Section ${index + 1}`,
+        headingTemplate: block.heading.renderedText ?? '',
+        headingLocked: block.heading.locked,
+        headingPresent: block.heading.renderedText !== null,
         guidance: block.guidance,
         wordCountTarget: block.wordCountTarget ?? 250,
       })),
@@ -183,6 +208,20 @@ export async function generateMatrixPostStage(
     assertAuthority: options.assertAuthority,
     maxRetries: 0,
     beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
+  });
+  const bodyBlocks = options.target.blockManifest.blocks
+    .filter(block => block.source === 'template');
+  post.sections = post.sections.map((section, index) => {
+    if (bodyBlocks[index]?.heading.renderedText !== null) return section;
+    const $ = cheerio.load(section.content, null, false);
+    $('h2').remove();
+    const content = $.html();
+    return {
+      ...section,
+      heading: '',
+      content,
+      wordCount: countHtmlWords(content),
+    };
   });
   const placeholders = options.target.evidenceRequirements
     .filter(canRenderGenerationPlaceholder)

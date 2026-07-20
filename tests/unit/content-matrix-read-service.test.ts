@@ -200,6 +200,39 @@ function liveWorkspaceCensusDependencies(
 }
 
 describe('content matrix read service', () => {
+  it('returns the authoritative census only through the internal sidecar', async () => {
+    const source = matrix('mtx_sidecar', '2026-07-04T00:00:00.000Z');
+    const deps = dependencies([source]);
+    const service = createContentMatrixReadService(deps);
+    const request = {
+      workspaceId: 'ws_1',
+      matrixId: source.id,
+      selections: [{
+        cellId: source.cells[0].id,
+        expectedSourceRevision: {
+          matrixRevision: source.revision ?? 0,
+          templateRevision: template().revision ?? 0,
+          cellRevision: source.cells[0].revision ?? 0,
+        },
+      }] as const,
+    };
+
+    const internal = await service.resolveMatrixStructuresWithCensus(request);
+    expect(internal.pageCensus).toEqual({
+      paths: ['/existing-page'],
+      publishedSlugs: [],
+      complete: true,
+    });
+    expect(internal.result).not.toHaveProperty('pageCensus');
+    expect(deps.getKnownWorkspacePageCensus).toHaveBeenCalledTimes(1);
+
+    deps.getKnownWorkspacePageCensus.mockClear();
+    const publicResult = await service.resolveMatrixStructures(request);
+    expect(publicResult).not.toHaveProperty('pageCensus');
+    expect(JSON.stringify(publicResult)).not.toContain('existing-page');
+    expect(deps.getKnownWorkspacePageCensus).toHaveBeenCalledTimes(1);
+  });
+
   it('adds same-site CMS item paths from the complete sitemap census and blocks collisions', async () => {
     const discoverSitemapUrls = vi.fn(async () => [
       'https://www.example.com/services/austin/seo-audits?campaign=ignored#overview',

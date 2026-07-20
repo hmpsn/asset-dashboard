@@ -198,11 +198,22 @@ export function canRenderGenerationPlaceholder(
 }
 
 /** Values accepted by version-safe evidence-resolution mutations. */
+export const GENERATION_INTERNAL_LINK_LIMIT = 25;
+export const GENERATION_INTERNAL_LINK_ANCHOR_MAX_LENGTH = 300;
+export const GENERATION_INTERNAL_LINK_HREF_MAX_LENGTH = 2_048;
+
+export interface GenerationInternalLinkValue {
+  /** Canonical workspace-relative path; preview must still verify it against the page census. */
+  href: string;
+  anchorText: string;
+}
+
 export type GenerationEvidenceValue =
   | { kind: 'text'; value: string }
   | { kind: 'number'; value: number; unit?: string }
   | { kind: 'boolean'; value: boolean }
   | { kind: 'text_list'; value: string[] }
+  | { kind: 'link_list'; value: GenerationInternalLinkValue[] }
   | { kind: 'date'; value: string }
   | { kind: 'url'; value: string };
 

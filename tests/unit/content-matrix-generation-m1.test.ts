@@ -63,7 +63,11 @@ afterEach(() => {
   cleanupWorkspaceIds.clear();
 });
 
-function createFixture(cities = ['Austin', 'Dallas'], includeOptionalProof = false): Fixture {
+function createFixture(
+  cities = ['Austin', 'Dallas'],
+  includeOptionalProof = false,
+  internalLinkSection: 'none' | 'required' | 'optional' = 'none',
+): Fixture {
   const workspaceId = createWorkspace(`M1 matrix generation ${randomUUID()}`).id;
   cleanupWorkspaceIds.add(workspaceId);
   const template = createTemplate(workspaceId, {
@@ -97,6 +101,19 @@ function createFixture(cities = ['Austin', 'Dallas'], includeOptionalProof = fal
         ctaContract: { role: 'none' as const, required: false },
         optional: true,
       }] : []),
+      ...(internalLinkSection === 'none' ? [] : [{
+        id: 'related-services',
+        name: 'Related services',
+        headingTemplate: 'Related services',
+        guidance: 'Link to verified related services using the supplied anchor text.',
+        wordCountTarget: 100,
+        order: 2,
+        generationRole: 'body' as const,
+        aeoContract: { modes: [] as [], required: false },
+        ctaContract: { role: 'none' as const, required: false },
+        ...(internalLinkSection === 'optional' ? { optional: true } : {}),
+        internalLinkContract: { minimum: 2 },
+      }]),
     ],
     urlPattern: '/services/{city}/{service}',
     keywordPattern: '{service} in {city}',
@@ -115,6 +132,14 @@ function createFixture(cities = ['Austin', 'Dallas'], includeOptionalProof = fal
     keywordPattern: template.keywordPattern,
   }, { validateTemplate: true });
   return { workspaceId, template, matrix };
+}
+
+function seedKnownPagePath(workspaceId: string, pagePath: string): void {
+  db.prepare(`
+    INSERT INTO page_keywords (
+      workspace_id, page_path, page_title, primary_keyword, secondary_keywords
+    ) VALUES (?, ?, '', '', '[]')
+  `).run(workspaceId, pagePath);
 }
 
 function sourceRevision(fixture: Fixture, cellId: string) {
@@ -304,6 +329,43 @@ async function resolveRequiredServiceEvidence(fixture: Fixture, cellId: string):
   await resolveServiceDetailsEvidence(fixture, cellId);
 }
 
+async function resolveInternalLinkEvidence(
+  fixture: Fixture,
+  cellId: string,
+  value: { kind: 'link_list'; value: Array<{ href: string; anchorText: string }> },
+  idempotencyKey: string,
+) {
+  const revision = sourceRevision(fixture, cellId);
+  const preview = await previewMatrixGeneration({
+    workspaceId: fixture.workspaceId,
+    matrixId: fixture.matrix.id,
+    selections: [{ cellId, expectedSourceRevision: revision }],
+  });
+  const previewResult = preview.results[0];
+  if (!previewResult || previewResult.status === 'upgrade_required') {
+    throw new Error('Expected current-contract link preview');
+  }
+  const expectedArtifactRevisions = previewResult.status === 'ready'
+    ? previewResult.target.expectedArtifactRevisions
+    : previewResult.expectedArtifactRevisions;
+  return resolveContentMatrixEvidence({
+    workspaceId: fixture.workspaceId,
+    matrixId: fixture.matrix.id,
+    cellId,
+    requirementId: `matrix-cell:${cellId}:section:related-services`,
+    value,
+    sourceRef: {
+      sourceType: 'operator_attestation',
+      sourceId: `verified-links-${idempotencyKey}`,
+      capturedAt: new Date().toISOString(),
+    },
+    resolvedBy: { actorType: 'operator', actorId: 'matrix-generation-test-operator' },
+    expectedSourceRevision: revision,
+    expectedArtifactRevisions,
+    idempotencyKey,
+  });
+}
+
 async function readyTarget(fixture: Fixture, cellId: string): Promise<MatrixGenerationPreviewTarget> {
   const preview = await previewMatrixGeneration({
     workspaceId: fixture.workspaceId,
@@ -481,6 +543,9 @@ describe('content matrix generation M1', () => {
     const singleRepeat = await previewMatrixGeneration(singleRequest);
     expect(single.results).toHaveLength(1);
     expect(single.results[0]?.status).toBe('ready');
+    if (single.results[0]?.status === 'ready') {
+      expect(single.results[0].target).not.toHaveProperty('verifiedInternalLinks');
+    }
     expect(singleRepeat).toEqual(single);
     expect(single.estimatedBatchBudget).toMatchObject({ maxConcurrency: 1 });
     expect(Number.isFinite(single.estimatedBatchBudget?.estimatedUsd)).toBe(true);
@@ -583,6 +648,26 @@ describe('content matrix generation M1', () => {
     });
     expect(initialResult.blockingRequirementIds).not.toContain(requirementId);
 
+    await expect(resolveContentMatrixEvidence({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      cellId: cell.id,
+      requirementId,
+      value: {
+        kind: 'link_list',
+        value: [{ href: '/unrelated', anchorText: 'Unrelated page' }],
+      },
+      sourceRef: {
+        sourceType: 'operator_attestation',
+        sourceId: 'wrong-section-link-list',
+        capturedAt: new Date().toISOString(),
+      },
+      resolvedBy: { actorType: 'operator', actorId: 'test-operator' },
+      expectedSourceRevision: initialRevision,
+      expectedArtifactRevisions: initialResult.expectedArtifactRevisions,
+      idempotencyKey: 'wrong-section-link-list',
+    })).rejects.toThrow('exact declared section requirement');
+
     await resolveContentMatrixEvidence({
       workspaceId: fixture.workspaceId,
       matrixId: fixture.matrix.id,
@@ -638,6 +723,190 @@ describe('content matrix generation M1', () => {
       staleResult.evidenceRequirements,
       listCurrentMatrixCellEvidence(fixture.workspaceId, fixture.matrix.id, cell.id),
     )).not.toContain('Customers consistently cite');
+  });
+
+  it('validates, canonicalizes, freezes, and fingerprints only verified internal destinations', async () => {
+    const fixture = createFixture(['Austin'], false, 'required');
+    const cell = fixture.matrix.cells[0];
+    seedKnownPagePath(fixture.workspaceId, '/services');
+    seedKnownPagePath(fixture.workspaceId, '/financing');
+    seedBrandAuthority(fixture.workspaceId);
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+
+    const blocked = await previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: sourceRevision(fixture, cell.id) }],
+    });
+    const blockedResult = blocked.results[0];
+    expect(blockedResult?.status).toBe('blocked');
+    if (!blockedResult || blockedResult.status !== 'blocked') return;
+    const linkRequirementId = `matrix-cell:${cell.id}:section:related-services`;
+    expect(blockedResult.evidenceRequirements.find(item => item.id === linkRequirementId))
+      .toMatchObject({
+        fieldPath: 'sections.related-services.internal_links',
+        requirementStage: 'preflight',
+        status: 'missing',
+      });
+    expect(blockedResult.blockingRequirementIds).toContain(linkRequirementId);
+
+    await expect(resolveInternalLinkEvidence(fixture, cell.id, {
+      kind: 'link_list',
+      value: [
+        { href: 'https://example.com/services', anchorText: 'All services' },
+        { href: '/financing', anchorText: 'Financing' },
+      ],
+    }, 'external-link')).rejects.toMatchObject({ code: 'precondition_failed' });
+    await expect(resolveInternalLinkEvidence(fixture, cell.id, {
+      kind: 'link_list',
+      value: [
+        { href: cell.plannedUrl, anchorText: 'This page' },
+        { href: '/financing', anchorText: 'Financing' },
+      ],
+    }, 'self-link')).rejects.toThrow('cannot point to the page being generated');
+    await expect(resolveInternalLinkEvidence(fixture, cell.id, {
+      kind: 'link_list',
+      value: [
+        { href: '/unknown', anchorText: 'Unknown page' },
+        { href: '/financing', anchorText: 'Financing' },
+      ],
+    }, 'unknown-link')).rejects.toThrow('current workspace page census');
+    await expect(resolveInternalLinkEvidence(fixture, cell.id, {
+      kind: 'link_list',
+      value: [
+        { href: '/services', anchorText: 'All services' },
+        { href: '/services/', anchorText: 'Duplicate services' },
+      ],
+    }, 'duplicate-link')).rejects.toMatchObject({
+      code: 'precondition_failed',
+      message: expect.stringContaining('cannot repeat the same canonical destination'),
+    });
+    await expect(resolveInternalLinkEvidence(fixture, cell.id, {
+      kind: 'link_list',
+      value: [
+        { href: '/services', anchorText: 'All services' },
+        { href: '/services/', anchorText: 'Duplicate services' },
+        { href: '/financing', anchorText: 'Financing' },
+      ],
+    }, 'duplicate-link-minimum-met')).rejects.toMatchObject({
+      code: 'precondition_failed',
+      message: expect.stringContaining('cannot repeat the same canonical destination'),
+    });
+
+    await resolveInternalLinkEvidence(fixture, cell.id, {
+      kind: 'link_list',
+      value: [
+        { href: '/services/', anchorText: '  All services  ' },
+        { href: '/financing', anchorText: 'Financing options' },
+      ],
+    }, 'valid-links');
+    const request = {
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: sourceRevision(fixture, cell.id) }],
+    } as const;
+    const ready = await previewMatrixGeneration(request);
+    const repeat = await previewMatrixGeneration(request);
+    expect(repeat).toEqual(ready);
+    const result = ready.results[0];
+    expect(result?.status).toBe('ready');
+    if (!result || result.status !== 'ready') return;
+    expect(result.target.verifiedInternalLinks).toEqual([{
+      blockId: 'template:related-services',
+      sourceSectionId: 'related-services',
+      evidenceRequirementId: linkRequirementId,
+      minimum: 2,
+      links: [
+        { href: '/services', anchorText: 'All services' },
+        { href: '/financing', anchorText: 'Financing options' },
+      ],
+    }]);
+    expect(result.target.effectiveInputFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(renderMatrixCellEvidencePrompt(
+      result.target.evidenceRequirements,
+      listCurrentMatrixCellEvidence(fixture.workspaceId, fixture.matrix.id, cell.id),
+    )).not.toContain('/services');
+
+    const beforeCensusDrift = previewSideEffectCounts(fixture.workspaceId);
+    db.prepare('DELETE FROM page_keywords WHERE workspace_id = ? AND page_path = ?')
+      .run(fixture.workspaceId, '/financing');
+    const afterDestinationRemoval = await previewMatrixGeneration(request);
+    const removedResult = afterDestinationRemoval.results[0];
+    expect(removedResult?.status).toBe('blocked');
+    if (!removedResult || removedResult.status !== 'blocked') return;
+    expect(removedResult.blockingRequirementIds).toContain(linkRequirementId);
+    expect(removedResult.evidenceRequirements.find(item => item.id === linkRequirementId))
+      .toMatchObject({ status: 'missing', requirementStage: 'preflight' });
+    expect(previewSideEffectCounts(fixture.workspaceId)).toEqual(beforeCensusDrift);
+
+    seedKnownPagePath(fixture.workspaceId, '/financing');
+    const restored = await previewMatrixGeneration(request);
+    expect(restored.results[0]?.status).toBe('ready');
+
+    const currentTemplate = getTemplate(fixture.workspaceId, fixture.template.id)!;
+    updateTemplate(fixture.workspaceId, currentTemplate.id, {
+      sections: currentTemplate.sections.map(section => (
+        section.id === 'related-services'
+          ? { ...section, guidance: `${section.guidance} Keep the links concise.` }
+          : section
+      )),
+    }, { expectedTemplateRevision: currentTemplate.revision });
+    const afterTemplateChange = await previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: sourceRevision(fixture, cell.id) }],
+    });
+    const staleResult = afterTemplateChange.results[0];
+    expect(staleResult?.status).toBe('blocked');
+    if (!staleResult || staleResult.status !== 'blocked') return;
+    expect(staleResult.blockingRequirementIds).toContain(linkRequirementId);
+    expect(staleResult.evidenceRequirements.find(item => item.id === linkRequirementId))
+      .toMatchObject({ status: 'missing', requirementStage: 'preflight' });
+    expect(previewSideEffectCounts(fixture.workspaceId)).toEqual(beforeCensusDrift);
+  });
+
+  it('keeps an optional internal-link block omitted until its exact link evidence exists', async () => {
+    const fixture = createFixture(['Austin'], false, 'optional');
+    const cell = fixture.matrix.cells[0];
+    seedKnownPagePath(fixture.workspaceId, '/services');
+    seedKnownPagePath(fixture.workspaceId, '/financing');
+    seedBrandAuthority(fixture.workspaceId);
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+
+    const before = await readyTarget(fixture, cell.id);
+    const requirementId = `matrix-cell:${cell.id}:section:related-services`;
+    expect(before.blockManifest.omittedOptionalSections).toEqual([
+      expect.objectContaining({
+        sourceSectionId: 'related-services',
+        evidenceRequirementId: requirementId,
+        internalLinkContract: { minimum: 2 },
+      }),
+    ]);
+    expect(before.evidenceRequirements.find(item => item.id === requirementId)).toMatchObject({
+      requirementStage: 'optional_omit',
+      status: 'missing',
+    });
+    expect(before).not.toHaveProperty('verifiedInternalLinks');
+
+    await resolveInternalLinkEvidence(fixture, cell.id, {
+      kind: 'link_list',
+      value: [
+        { href: '/services', anchorText: 'All services' },
+        { href: '/financing', anchorText: 'Financing options' },
+      ],
+    }, 'optional-links');
+    const after = await readyTarget(fixture, cell.id);
+    expect(after.blockManifest.omittedOptionalSections).toEqual([]);
+    expect(after.blockManifest.blocks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'template:related-services' }),
+    ]));
+    expect(after.verifiedInternalLinks).toEqual([
+      expect.objectContaining({
+        blockId: 'template:related-services',
+        evidenceRequirementId: requirementId,
+        minimum: 2,
+      }),
+    ]);
   });
 
   it('resolves pre-run evidence by durable cell identity and invalidates the old preview', async () => {

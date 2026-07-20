@@ -199,6 +199,170 @@ describe('resolveMatrixStructure', () => {
     expect(first.target.structuralFingerprint).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it('locks AEO and process headings while allowing branded conversion headings', () => {
+    const targetTemplate = template({
+      sections: [
+        section({
+          id: 'section-hero',
+          name: 'Hero',
+          headingTemplate: '{service} in {city}',
+          generationRole: 'body',
+          order: 0,
+        }),
+        section({
+          id: 'section-cost',
+          name: 'Cost',
+          headingTemplate: 'What does {service} cost in {city}?',
+          generationRole: 'body',
+          aeoContract: { modes: ['answer_first'], required: true },
+          order: 1,
+        }),
+        section({
+          id: 'section-proof',
+          name: 'Proof',
+          headingTemplate: 'Why patients choose us',
+          generationRole: 'proof',
+          order: 2,
+        }),
+        section({
+          id: 'section-why-us',
+          name: 'Why us',
+          headingTemplate: 'Why choose us',
+          generationRole: 'body',
+          order: 3,
+        }),
+        section({
+          id: 'section-process',
+          name: 'Process',
+          headingTemplate: 'What to expect',
+          generationRole: 'process',
+          order: 4,
+        }),
+        section({
+          id: 'section-faq',
+          name: 'FAQ',
+          headingTemplate: '{service} questions',
+          generationRole: 'faq',
+          aeoContract: { modes: ['faq'], required: true },
+          order: 5,
+        }),
+        section({
+          id: 'section-cta',
+          name: 'CTA',
+          headingTemplate: 'Book {service}',
+          generationRole: 'cta',
+          ctaContract: { role: 'primary', required: true },
+          order: 6,
+        }),
+      ],
+    });
+
+    const result = resolveMatrixStructure(input({ template: targetTemplate }));
+
+    expect(result.status).toBe('resolved');
+    if (result.status !== 'resolved') return;
+    const headingLocks = Object.fromEntries(result.target.blockManifest.blocks
+      .filter(block => block.source === 'template')
+      .map(block => [block.sourceSectionId, block.heading.locked]));
+    expect(headingLocks).toEqual({
+      'section-hero': false,
+      'section-cost': true,
+      'section-proof': false,
+      'section-why-us': false,
+      'section-process': true,
+      'section-faq': true,
+      'section-cta': false,
+    });
+  });
+
+  it('does not treat an empty heading template as permission to invent a heading', () => {
+    const result = resolveMatrixStructure(input({
+      template: template({
+        sections: [section({ headingTemplate: '' })],
+      }),
+    }));
+
+    expect(result.status).toBe('resolved');
+    if (result.status !== 'resolved') return;
+    expect(result.target.blockManifest.blocks[1]?.heading).toEqual({
+      level: null,
+      renderedText: null,
+      locked: true,
+    });
+  });
+
+  it('projects table and internal-link contracts into included and omitted blocks', () => {
+    const comparison = section({
+      id: 'section-comparison',
+      name: 'Comparison',
+      headingTemplate: 'Your {service} options',
+      generationRole: 'proof',
+      renderAs: 'table',
+      optional: true,
+      order: 1,
+    });
+    const related = section({
+      id: 'section-related',
+      name: 'Related care',
+      headingTemplate: 'More ways we can help',
+      internalLinkContract: { minimum: 2 },
+      order: 2,
+    });
+    const targetTemplate = template({ sections: [section(), comparison, related] });
+
+    const omitted = resolveMatrixStructure(input({ template: targetTemplate }));
+    const included = resolveMatrixStructure(input({
+      template: targetTemplate,
+      currentEvidenceRequirementIds: ['matrix-cell:cell-1:section:section-comparison'],
+    }));
+    const withoutLinkContract = resolveMatrixStructure(input({
+      template: template({
+        sections: [section(), comparison, { ...related, internalLinkContract: undefined }],
+      }),
+      currentEvidenceRequirementIds: ['matrix-cell:cell-1:section:section-comparison'],
+    }));
+    const withoutRenderContract = resolveMatrixStructure(input({
+      template: template({
+        sections: [section(), { ...comparison, renderAs: undefined }, related],
+      }),
+      currentEvidenceRequirementIds: ['matrix-cell:cell-1:section:section-comparison'],
+    }));
+
+    expect(omitted.status).toBe('resolved');
+    expect(included.status).toBe('resolved');
+    expect(withoutLinkContract.status).toBe('resolved');
+    expect(withoutRenderContract.status).toBe('resolved');
+    if (omitted.status !== 'resolved'
+      || included.status !== 'resolved'
+      || withoutLinkContract.status !== 'resolved'
+      || withoutRenderContract.status !== 'resolved') return;
+    expect(omitted.target.blockManifest.omittedOptionalSections).toEqual([
+      expect.objectContaining({ sourceSectionId: 'section-comparison', renderAs: 'table' }),
+    ]);
+    expect(included.target.blockManifest.blocks.find(
+      block => block.id === 'template:section-comparison',
+    )).toMatchObject({ renderAs: 'table' });
+    expect(included.target.blockManifest.blocks.find(
+      block => block.id === 'template:section-related',
+    )).toMatchObject({ internalLinkContract: { minimum: 2 } });
+    expect(included.target.blockManifest.fingerprint).not.toBe(
+      withoutLinkContract.target.blockManifest.fingerprint,
+    );
+    expect(included.target.blockManifest.fingerprint).not.toBe(
+      withoutRenderContract.target.blockManifest.fingerprint,
+    );
+  });
+
+  it('blocks out-of-bounds internal-link requirements before manifest persistence', () => {
+    const result = resolveMatrixStructure(input({
+      template: template({
+        sections: [section({ internalLinkContract: { minimum: 11 } })],
+      }),
+    }));
+
+    expect(blockerIds(result)).toContain('invalid_template_block:section-body:invalid_section');
+  });
+
   it('omits an optional section without evidence and records the omission in the manifest', () => {
     const optionalProof = section({
       id: 'section-proof',

@@ -4,7 +4,12 @@ import {
   MATRIX_GENERATION_SOURCE_LIMITS,
   MATRIX_READ_LIMITS,
 } from './matrix-generation.js';
-import { GENERATION_EVIDENCE_SOURCE_TYPES } from './generation-evidence.js';
+import {
+  GENERATION_EVIDENCE_SOURCE_TYPES,
+  GENERATION_INTERNAL_LINK_ANCHOR_MAX_LENGTH,
+  GENERATION_INTERNAL_LINK_HREF_MAX_LENGTH,
+  GENERATION_INTERNAL_LINK_LIMIT,
+} from './generation-evidence.js';
 
 const workspaceIdSchema = z.string().trim().min(1, 'workspace_id is required')
   .max(MATRIX_GENERATION_SOURCE_LIMITS.matrix.maxTemplateIdBytes)
@@ -172,6 +177,14 @@ const evidenceValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('number'), value: z.number().finite(), unit: z.string().trim().min(1).max(100).optional() }).strict(),
   z.object({ kind: z.literal('boolean'), value: z.boolean() }).strict(),
   z.object({ kind: z.literal('text_list'), value: z.array(z.string().trim().min(1).max(2_000)).min(1).max(100) }).strict(),
+  z.object({
+    kind: z.literal('link_list'),
+    value: z.array(z.object({
+      href: z.string().trim().min(1).max(GENERATION_INTERNAL_LINK_HREF_MAX_LENGTH)
+        .regex(/^\/(?!\/)[^\s?#]*\/?$/, 'href must be a canonical workspace-relative path'),
+      anchor_text: z.string().trim().min(1).max(GENERATION_INTERNAL_LINK_ANCHOR_MAX_LENGTH),
+    }).strict()).min(1).max(GENERATION_INTERNAL_LINK_LIMIT),
+  }).strict(),
   z.object({ kind: z.literal('date'), value: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict(),
   z.object({ kind: z.literal('url'), value: z.string().url().max(2_048) }).strict(),
 ]);

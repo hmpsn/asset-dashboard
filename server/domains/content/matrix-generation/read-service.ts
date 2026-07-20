@@ -260,10 +260,15 @@ interface WorkspaceMatrixUrlCensus {
   complete: boolean;
 }
 
-interface WorkspaceKnownPageCensus {
+export interface WorkspaceKnownPageCensus {
   paths: string[];
   publishedSlugs: string[];
   complete: boolean;
+}
+
+export interface ResolveMatrixStructuresWithCensusResult {
+  result: ResolveMatrixStructuresResult;
+  pageCensus: WorkspaceKnownPageCensus;
 }
 
 export interface WorkspaceKnownPageCensusExternalDependencies {
@@ -1529,9 +1534,9 @@ export function createContentMatrixReadService(
     return result;
   }
 
-  async function resolveMatrixStructures(
+  async function resolveMatrixStructuresWithCensus(
     request: ResolveMatrixStructuresRequest,
-  ): Promise<ResolveMatrixStructuresResult> {
+  ): Promise<ResolveMatrixStructuresWithCensusResult> {
     assertResolveSelections(request.selections);
     requireWorkspace(request.workspaceId);
 
@@ -1770,13 +1775,20 @@ export function createContentMatrixReadService(
       response,
       MATRIX_GENERATION_SOURCE_LIMITS.read.maxResponseBytes,
     );
-    return response;
+    return { result: response, pageCensus: knownWorkspacePageCensus };
+  }
+
+  async function resolveMatrixStructures(
+    request: ResolveMatrixStructuresRequest,
+  ): Promise<ResolveMatrixStructuresResult> {
+    return (await resolveMatrixStructuresWithCensus(request)).result;
   }
 
   return {
     listContentMatrices,
     getContentMatrix,
     resolveMatrixStructures,
+    resolveMatrixStructuresWithCensus,
   };
 }
 
@@ -1785,3 +1797,5 @@ const contentMatrixReadService = createContentMatrixReadService();
 export const listContentMatrices = contentMatrixReadService.listContentMatrices;
 export const getContentMatrix = contentMatrixReadService.getContentMatrix;
 export const resolveMatrixStructures = contentMatrixReadService.resolveMatrixStructures;
+export const resolveMatrixStructuresWithCensus =
+  contentMatrixReadService.resolveMatrixStructuresWithCensus;

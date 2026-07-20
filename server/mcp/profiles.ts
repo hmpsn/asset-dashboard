@@ -74,10 +74,4 @@ export function operatorToolDescription(toolName: McpOperatorToolName): string {
   return MCP_OPERATOR_TOOL_DESCRIPTIONS[toolName];
 }
 
-export const MCP_OPERATOR_PROFILE_INSTRUCTIONS = `${STUDIO_NAME} operator. Start with list_workspaces; copy IDs and follow schemas.
-
-Brand drafts are not approvals; generation requires finalized voice and approved identity.
-
-For matrices, resolve cells/evidence, accept the exact upgrade, then preview. Preview is free and side-effect-free. Before paid start/retry, show targets, fingerprint, estimate, and limits; get explicit human confirmation—never infer it. Generation ends at human review; never auto-approve, send, or publish.
-
-send_to_client needs explicit intent for its saved target. On conflict, re-read revisions. Poll with get_job_status. Hidden tools are unavailable; use full /mcp for advanced work.`;
+export const MCP_OPERATOR_PROFILE_INSTRUCTIONS = `${STUDIO_NAME} operator. Start list_workspaces; obey schemas. Drafts need approval; preview is free. Before paid start/retry show targets, fingerprint, estimate/limits and get human confirmation. Generation stops at human review—never approve/send/publish. Re-read conflicts; poll get_job_status.`;
