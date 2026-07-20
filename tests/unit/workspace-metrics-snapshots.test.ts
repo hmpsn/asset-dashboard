@@ -35,24 +35,26 @@ describe('workspace-metrics-snapshots', () => {
 
   describe('recordSnapshot + getSnapshots', () => {
     it('persists a snapshot and reads it back', () => {
+      const snapshotDate = dateKey(30);
       const snap = recordSnapshot({
         workspaceId: WS,
-        snapshotDate: '2026-04-20',
+        snapshotDate,
         metrics: { totalClicks: 100, totalImpressions: 5000, avgPosition: 12.5, auditScore: 85, organicTrafficValue: 1200 },
       });
       expect(snap.workspaceId).toBe(WS);
-      expect(snap.snapshotDate).toBe('2026-04-20');
+      expect(snap.snapshotDate).toBe(snapshotDate);
       expect(snap.totalClicks).toBe(100);
       expect(snap.auditScore).toBe(85);
 
       const list = getSnapshots(WS, 90);
       expect(list).toHaveLength(1);
-      expect(list[0].snapshotDate).toBe('2026-04-20');
+      expect(list[0].snapshotDate).toBe(snapshotDate);
     });
 
     it('upserts on (workspaceId, snapshotDate) — re-records overwrite', () => {
-      recordSnapshot({ workspaceId: WS, snapshotDate: '2026-04-20', metrics: { totalClicks: 50 } });
-      const second = recordSnapshot({ workspaceId: WS, snapshotDate: '2026-04-20', metrics: { totalClicks: 75 } });
+      const snapshotDate = dateKey(30);
+      recordSnapshot({ workspaceId: WS, snapshotDate, metrics: { totalClicks: 50 } });
+      const second = recordSnapshot({ workspaceId: WS, snapshotDate, metrics: { totalClicks: 75 } });
       expect(second.totalClicks).toBe(75);
 
       const list = getSnapshots(WS, 90);
@@ -62,7 +64,7 @@ describe('workspace-metrics-snapshots', () => {
     it('persists nulls for unset metrics', () => {
       recordSnapshot({
         workspaceId: WS,
-        snapshotDate: '2026-04-20',
+        snapshotDate: dateKey(30),
         metrics: { totalClicks: 100 }, // others omitted
       });
       const list = getSnapshots(WS, 90);
