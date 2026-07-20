@@ -163,7 +163,7 @@ const getContentTemplateInputSchema = z.object({
 
 const createContentTemplateInputSchema = z.object({
   workspace_id: workspaceIdSchema,
-  template: createTemplateSchema.describe('Content template fields using the same contract as the admin HTTP create route. Pattern variables use one brace pair, for example /{service}-{city}; do not use {{double_braces}}.'),
+  template: createTemplateSchema.describe('Content template fields using the same contract as the admin HTTP create route. A complete generation_contract_version: 1 payload becomes generation-ready directly; no upgrade action is needed. Pattern variables use one brace pair, for example /{service}-{city}; do not use {{double_braces}}.'),
   idempotency_key: z.string().trim().min(1).max(200).optional()
     .describe('Optional caller correlation key; template creation itself is not replay-idempotent.'),
 }).strict();
@@ -293,7 +293,7 @@ export const contentMatrixActionTools: Tool[] = [
   },
   {
     name: 'create_content_template',
-    description: 'Create a reusable page structure through the same validated template service used by the admin UI. Mark a section optional only when evidence should decide whether it appears; missing section evidence omits it without blocking the page, and at least one section must remain required. Pattern variables use a single brace pair, for example /{service}-{city}; never use {{double_braces}}. This does not create pages, start AI work, or approve content.',
+    description: 'Create a reusable page structure through the same validated template service used by the admin UI. A fully specified generation_contract_version: 1 template validates and becomes generation-ready immediately without a later upgrade round trip. Mark a section optional only when evidence should decide whether it appears; missing section evidence omits it without blocking the page, and at least one section must remain required. Pattern variables use a single brace pair, for example /{service}-{city}; never use {{double_braces}}. This does not create pages, start AI work, or approve content.',
     inputSchema: toMcpJsonSchema(createContentTemplateInputSchema),
   },
   {
@@ -968,11 +968,17 @@ function readServiceError(error: MatrixReadServiceError): CallToolResult {
       : error.code === 'precondition_failed'
         ? 'The matrix operation prerequisites are not satisfied.'
         : 'The cursor is invalid for this query.';
+  const retryable = error.details?.retryable === true;
+  const details = error.details
+    ? toMcpPayload(Object.fromEntries(
+        Object.entries(error.details).filter(([key]) => key !== 'retryable'),
+      )) as Record<string, string | number | boolean | null>
+    : undefined;
   return mcpJsonV1Error({
     code,
     message,
-    retryable: error.code === 'conflict',
-    ...(error.details ? { details: error.details } : {}),
+    retryable,
+    ...(details ? { details } : {}),
   });
 }
 
@@ -1557,6 +1563,7 @@ export function createContentMatrixActionHandler(
           runId: parsed.data.run_id,
           cursor: parsed.data.cursor,
           limit: parsed.data.limit,
+          includeEvidenceValues: parsed.data.include_evidence_values,
         })));
       }
 
@@ -1726,6 +1733,7 @@ export function createContentMatrixActionHandler(
             message: 'The matrix generation preview exceeds a safe generation limit.',
             retryable: false,
             details: {
+              reason: error.reason ?? 'invalid_budget',
               field_path: error.fieldPath,
               constraint: error.constraint,
               stage: error.stage,
@@ -1762,7 +1770,12 @@ export function createContentMatrixActionHandler(
         return mcpJsonV1Error({
           code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
           message: error.message,
-          retryable: true,
+          retryable: error.details.retryable,
+          details: toMcpPayload({
+            reason: error.details.reason,
+            fieldPath: error.details.fieldPath,
+            constraint: error.details.constraint,
+          }) as Record<string, string | number | boolean | null>,
         });
       }
       if (error instanceof ActiveJobResourceConflict) {
@@ -1770,7 +1783,10 @@ export function createContentMatrixActionHandler(
           code: MCP_TOOL_ERROR_CODES.CONFLICT,
           message: error.message,
           retryable: true,
-          details: { active_job_id: error.jobId },
+          details: {
+            reason: 'active_job_conflict',
+            active_job_id: error.jobId,
+          },
         });
       }
       throw error;

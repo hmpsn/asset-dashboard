@@ -23,8 +23,8 @@ const registryModule = await import('../../server/mcp/tool-registry.js') as unkn
   listMcpToolDefinitionsForProfile?: (profile: McpServerProfile) => Tool[];
 };
 
-const FULL_DISCOVERY_BYTES = 161_926;
-const FULL_DISCOVERY_SHA256 = '354b9a6dccae6c3df8d361debfcd1c47471e94612892bf9c15a4b7888cd088ef';
+const FULL_DISCOVERY_BYTES = 162_469;
+const FULL_DISCOVERY_SHA256 = 'c9d10e32bdec3ca9ede0ab8a6126e4a5e66798545d8f7d76d52a9820f2e7f43f';
 const FULL_INSTRUCTIONS_BYTES = 12_151;
 const FULL_INSTRUCTIONS_SHA256 = '6e7f8c0c6820bf1881377f5dfbeb7fdd414e1e9ea4048196d6d146e5354ef0f0';
 

@@ -19,6 +19,7 @@ import { createMatrix, getMatrix } from '../../server/content-matrices.js';
 import { createTemplate } from '../../server/content-templates.js';
 import { getPost, updatePostField } from '../../server/content-posts-db.js';
 import { listJobs } from '../../server/jobs.js';
+import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import {
   approveMatrixPageForPublishReadiness,
 } from '../../server/domains/content/matrix-generation/approval-service.js';
@@ -57,7 +58,10 @@ import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 const cleanupWorkspaceIds = new Set<string>();
 
 afterEach(() => {
-  for (const workspaceId of cleanupWorkspaceIds) deleteWorkspace(workspaceId);
+  for (const workspaceId of cleanupWorkspaceIds) {
+    setWorkspaceFlagOverride('content-matrix-generation', workspaceId, null);
+    deleteWorkspace(workspaceId);
+  }
   cleanupWorkspaceIds.clear();
 });
 
@@ -70,6 +74,7 @@ interface Fixture {
 function createFixture(candidateCount = 1): Fixture {
   const workspaceId = createWorkspace(`M2 matrix audit ${randomUUID()}`).id;
   cleanupWorkspaceIds.add(workspaceId);
+  setWorkspaceFlagOverride('content-matrix-generation', workspaceId, true);
   const template = createTemplate(workspaceId, {
     name: 'Audited service template',
     pageType: 'service',
@@ -233,6 +238,7 @@ function structuralTarget(target: MatrixGenerationPreviewTarget): ResolvedMatrix
     expectedArtifactRevisions: _expectedArtifactRevisions,
     effectiveInputFingerprint: _effectiveInputFingerprint,
     blockingRequirementIds: _blockingRequirementIds,
+    frozenEvidenceResolutionIds: _frozenEvidenceResolutionIds,
     estimatedPaidBudget: _estimatedPaidBudget,
     ...resolved
   } = target;
@@ -519,6 +525,67 @@ function revisedBlocks(input: ReviseMatrixGenerationCandidateInput) {
 }
 
 describe('auditMatrixGenerationItem', () => {
+  it('audits the exact preview-frozen evidence row after a newer value supersedes it', async () => {
+    const committed = await committedFixture(true);
+    const frozenIds = committed.target.frozenEvidenceResolutionIds;
+    const supersededId = frozenIds[0];
+    if (!supersededId) throw new Error('Expected frozen evidence');
+    const replacementId = `mce_${randomUUID()}`;
+    const supersededAt = new Date().toISOString();
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE content_matrix_cell_evidence
+        SET is_current = 0, superseded_at = ?
+        WHERE id = ? AND workspace_id = ?
+      `).run(supersededAt, supersededId, committed.fixture.workspaceId);
+      db.prepare(`
+        INSERT INTO content_matrix_cell_evidence (
+          id, workspace_id, matrix_id, cell_id, requirement_id,
+          matrix_revision, template_revision, cell_revision,
+          value, source_ref, resolved_by, expected_artifact_revisions,
+          idempotency_key, supersedes_id, is_current, created_at, superseded_at
+        )
+        SELECT
+          ?, workspace_id, matrix_id, cell_id, requirement_id,
+          matrix_revision, template_revision, cell_revision,
+          value, source_ref, resolved_by, expected_artifact_revisions,
+          ?, id, 1, ?, NULL
+        FROM content_matrix_cell_evidence
+        WHERE id = ? AND workspace_id = ?
+      `).run(
+        replacementId,
+        `replacement-${randomUUID()}`,
+        supersededAt,
+        supersededId,
+        committed.fixture.workspaceId,
+      );
+    }).immediate();
+
+    let auditedEvidenceIds: string[] = [];
+    const result = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-frozen-evidence-audit-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => {
+        auditedEvidenceIds = input.authority.evidenceResolutions.map(item => item.id);
+        return operationResult(
+          input,
+          'content-matrix-item-audit',
+          { revisionRecommended: false, findings: [] },
+        );
+      },
+    });
+
+    expect(result.item.status).toBe('ready_for_human_review');
+    expect(auditedEvidenceIds).toEqual(frozenIds);
+    expect(auditedEvidenceIds).toContain(supersededId);
+    expect(auditedEvidenceIds).not.toContain(replacementId);
+  });
+
   it('allows a one-cell run to reach human approval without a set audit and never queues publication', async () => {
     const committed = await committedFixture(true);
     const audited = await auditMatrixGenerationItem({

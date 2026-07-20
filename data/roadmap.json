@@ -1,6 +1,36 @@
 {
   "sprints": [
     {
+      "id": "sprint-matrix-reliability-closure-2026-07-20",
+      "name": "Matrix Reliability Closure",
+      "hours": "Two staging-first PRs plus one owner-confirmed paid canary",
+      "rationale": "Close the remaining paid-generation truth, durability, and output-integrity gaps without extending the MCP control-plane program into speculative schema work.",
+      "items": [
+        {
+          "id": "matrix-output-integrity-closure",
+          "title": "Output integrity — heading synchronization and essential quality correction",
+          "source": "2026-07-20 compressed MCP and Matrix Reliability Closure Program",
+          "est": "L",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-07-20",
+          "owner": "content",
+          "notes": "Combines former M5 and essential M6. Stop after one explicit-owner-confirmed Rinse canary reaches human review; never approve, send, publish, or automatically retry."
+        },
+        {
+          "id": "matrix-retry-budget-top-up",
+          "title": "Optional retry budget top-up authority",
+          "source": "2026-07-20 compressed MCP and Matrix Reliability Closure Program",
+          "est": "M",
+          "priority": "P2",
+          "status": "pending",
+          "createdAt": "2026-07-20",
+          "owner": "content",
+          "notes": "Parked. Build former M8 only if the staging canary or real usage proves exhaustion of the originally accepted retry budget is an operational problem."
+        }
+      ]
+    },
+    {
       "id": "sprint-mcp-operator-control-plane-2026-07-17",
       "name": "MCP Operator Control Plane",
       "hours": "Sequential staging-first backend phases; one PR at a time",
@@ -15,7 +45,7 @@
           "status": "pending",
           "createdAt": "2026-07-17",
           "owner": "platform-foundation",
-          "notes": "Add validated structuredContent, explicit output schemas, and policy-derived annotations for every active operator tool while preserving text JSON compatibility. The complete self-contained operator contract has a 64 KiB hard ceiling and 48 KiB optimization target; the prior 32 KiB P1/P2 ceiling is superseded rather than met with lossy schemas."
+          "notes": "PARKED 2026-07-20 after a contract census proved complete self-contained schemas would produce a 110,062-byte operator catalog, exceeding the 64 KiB ceiling and undermining the compact-control-plane goal. Revisit only with demonstrated structured-client parsing failures or a real machine-complete consumer; restart from bounded operator read models, not internal domain graphs."
         },
         {
           "id": "mcp-workspace-aliases",

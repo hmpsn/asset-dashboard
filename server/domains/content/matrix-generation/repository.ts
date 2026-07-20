@@ -206,6 +206,8 @@ const evidenceRequirementSchema = z.object({
   status: z.enum(['verified', 'inferred', 'missing', 'conflicting', 'creative_proposal']),
   sourceRefs: z.array(evidenceSourceRefSchema),
   clientSafePrompt: z.string().optional(),
+  resolvable: z.boolean().optional(),
+  resolutionAuthority: z.enum(['evidence_submission', 'human_authorization']).optional(),
 }).superRefine((requirement, ctx) => {
   if (requirement.claimKind === 'creative') {
     if (requirement.status !== 'creative_proposal') {
@@ -509,6 +511,7 @@ const previewTargetSchema = resolvedStructuralTargetSchema.extend({
   }),
   effectiveInputFingerprint: z.string().min(1),
   blockingRequirementIds: z.array(z.string()),
+  frozenEvidenceResolutionIds: z.array(z.string().min(1)).optional(),
   estimatedPaidBudget: z.object({
     providerCalls: z.number().int().nonnegative(),
     inputTokens: z.number().int().nonnegative(),
@@ -526,7 +529,23 @@ const previewTargetSchema = resolvedStructuralTargetSchema.extend({
       anchorText: z.string().min(1),
     }).strict()).min(1),
   }).strict()).optional(),
-});
+}).transform(target => ({
+  ...target,
+  // Runs accepted before the frozen-ID field shipped already persisted the
+  // exact accepted row IDs in verified requirement source refs. Derive them
+  // for read/retry compatibility instead of dropping evidence or substituting
+  // current rows.
+  frozenEvidenceResolutionIds: target.frozenEvidenceResolutionIds
+    ?? [...new Set(target.evidenceRequirements.flatMap(requirement => (
+      requirement.status === 'verified'
+        ? requirement.sourceRefs.flatMap(sourceRef => (
+            sourceRef.sourceType === 'content_matrix_cell_evidence'
+              ? [sourceRef.sourceId]
+              : []
+          ))
+        : []
+    )))].sort(),
+}));
 
 const auditCheckSchema = z.object({
   id: z.string().min(1),

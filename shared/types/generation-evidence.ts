@@ -143,6 +143,10 @@ interface GenerationEvidenceRequirementBase {
   requirementStage: GenerationEvidenceRequirementStage;
   /** Safe wording for a client/operator resolution prompt; never a raw prompt. */
   clientSafePrompt?: string;
+  /** Whether the normal evidence-resolution mutation can satisfy this requirement. */
+  resolvable?: boolean;
+  /** Human-only authorization remains outside MCP evidence submission. */
+  resolutionAuthority?: 'evidence_submission' | 'human_authorization';
 }
 
 type SourceBackedGenerationEvidenceRequirement<

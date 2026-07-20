@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 718** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 719** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 719. Content-matrix pre-paid reliability closure 2026-07-20
+
+**What it does:** Makes preview, paid-start preflight, durable run reads, restart recovery, and template creation agree on one safe contract before any provider spend. Disabled features fail before census work; stale authority, invalid limits/cursors, retry conflicts, and known context ceilings return stable reason codes with truthful retryability. Preview diagnostics state whether requirements are complete and expose only bounded source-limit and provider stage/code/status metadata. Direct contract-v1 templates validate URL, keyword, title, and metadata patterns through the canonical renderer and can become generation-ready without an upgrade round trip.
+
+**Evidence and job integrity:** Preview freezes the exact accepted evidence row IDs into its fingerprint and durable target. Brief, draft, audit, and opt-in run reads consume those rows even after supersession, never a newer substitute; value reads cap each response at ten, continue through a mode-bound cursor until every row is reachable, and fail closed across workspace/matrix/cell scope. Legacy runs recover the same IDs from persisted verified source refs. DB-fresh job reads authorize and project one durable record, refresh process cache, and restart recovery records an explicit retryable interruption on every unfinished item.
+
+**Why it matters:** Operators get actionable failures before spending money, reliable status after restarts, and auditable proof of exactly which facts a generated page consumed. The change preserves evidence, voice finalization, human review, paid confirmation, send, approval, and publication gates. It adds no UI, local/staging database sync, provider call, or automatic paid retry.
+
+**Verification:** Deterministic unit, contract, HTTP integration, real Webflow-adapter seam, workspace-isolation, persistence-compatibility, and restart-state coverage; typecheck and the full platform PR gates run before release.
 
 ---
 

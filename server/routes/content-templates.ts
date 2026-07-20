@@ -9,6 +9,7 @@ import {
   updateTemplate,
   deleteTemplate,
   duplicateTemplate,
+  contentTemplateGenerationPatternIssues,
   ContentTemplateGenerationContractError,
   ContentTemplateRevisionConflictError,
   ContentTemplateRevisionRequiredError,
@@ -191,6 +192,19 @@ export const createTemplateSchema = templateWriteFieldsSchema.superRefine((value
       });
     }
   });
+  for (const issue of contentTemplateGenerationPatternIssues({
+    variables: value.variables ?? [],
+    urlPattern: value.urlPattern,
+    keywordPattern: value.keywordPattern,
+    titlePattern: value.titlePattern,
+    metaDescPattern: value.metaDescPattern,
+  })) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [issue.fieldPath],
+      message: issue.constraint,
+    });
+  }
 });
 
 export const updateTemplateFieldsSchema = templateWriteFieldsBaseSchema

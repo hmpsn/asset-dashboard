@@ -9,6 +9,7 @@ import {
   assertContentTemplateGenerationSourceWithinLimits,
   assertMatrixGenerationSerializedPayloadWithinLimit,
   MATRIX_READ_LIMITS,
+  MATRIX_GENERATION_MAX_REPORTED_LIMIT_ISSUES,
   MATRIX_GENERATION_SOURCE_LIMITS,
   MatrixGenerationSchemaTypeContractError,
   MatrixGenerationSourceLimitError,
@@ -23,6 +24,8 @@ import {
   type ListContentMatricesResult,
   type MatrixSourceRevision,
   type MatrixGenerationSourceLimitIssue,
+  type MatrixGenerationCensusFailure,
+  type MatrixGenerationPreconditionDetails,
   type ResolveMatrixStructuresRequest,
   type ResolveMatrixStructuresResult,
 } from '../../../../shared/types/matrix-generation.js';
@@ -75,6 +78,13 @@ export class MatrixReadServiceError extends Error {
   }
 }
 
+function preconditionDetails(
+  details: MatrixGenerationPreconditionDetails,
+  additional: Readonly<Record<string, string | number | boolean | null>> = {},
+): Readonly<Record<string, string | number | boolean | null>> {
+  return { ...details, ...additional };
+}
+
 function asBoundedReadError(error: MatrixGenerationSourceLimitError): MatrixReadServiceError {
   const firstIssue = error.issues[0];
   const responseBudgetExceeded = error.sourceKind === 'matrix_read_page'
@@ -85,6 +95,8 @@ function asBoundedReadError(error: MatrixGenerationSourceLimitError): MatrixRead
       ? 'The matrix response exceeds the MCP response budget. Request a smaller page or fewer cells.'
       : 'Stored matrix generation sources exceed the bounded generation contract.',
     {
+      reason: 'invalid_budget',
+      retryable: false,
       sourceKind: error.sourceKind,
       fieldPath: firstIssue?.fieldPath ?? null,
       actual: firstIssue?.actual ?? null,
@@ -97,7 +109,11 @@ function asSchemaTypeReadError(error: MatrixGenerationSchemaTypeContractError): 
   return new MatrixReadServiceError(
     'precondition_failed',
     'Stored matrix generation schema types are blank, duplicated, or unnormalized.',
-    { fieldPath: error.issues[0]?.fieldPath ?? null },
+    preconditionDetails({
+      reason: 'invalid_selection',
+      retryable: false,
+      fieldPath: error.issues[0]?.fieldPath,
+    }),
   );
 }
 
@@ -258,12 +274,18 @@ interface RawGenerationSourceShapeRow {
 interface WorkspaceMatrixUrlCensus {
   items: WorkspaceMatrixPlannedUrl[];
   complete: boolean;
+  sourceLimitIssues?: MatrixGenerationSourceLimitIssue[];
+  sourceLimitIssuesTruncated?: boolean;
 }
 
 export interface WorkspaceKnownPageCensus {
   paths: string[];
   publishedSlugs: string[];
   complete: boolean;
+  /** Content-free, bounded diagnostics for callers deciding whether to retry. */
+  failures?: MatrixGenerationCensusFailure[];
+  sourceLimitIssues?: MatrixGenerationSourceLimitIssue[];
+  sourceLimitIssuesTruncated?: boolean;
 }
 
 export interface ResolveMatrixStructuresWithCensusResult {
@@ -546,6 +568,7 @@ function rowToMatrixSummary(row: MatrixSummaryRow): ContentMatrixSummary {
     throw new MatrixReadServiceError(
       'precondition_failed',
       'Stored matrix summary fields exceed the bounded read contract.',
+      preconditionDetails({ reason: 'invalid_selection', retryable: false }),
     );
   }
   const summary: ContentMatrixSummary = {
@@ -647,6 +670,12 @@ function decodeCursor(cursor: string): Record<string, unknown> {
     throw new MatrixReadServiceError(
       'invalid_cursor',
       'The cursor is invalid. Start again without a cursor.',
+      preconditionDetails({
+        reason: 'invalid_cursor',
+        retryable: false,
+        fieldPath: 'cursor',
+        constraint: 'restart the read without a cursor',
+      }),
     );
   }
 }
@@ -671,6 +700,12 @@ function decodeMatrixListCursor(
     throw new MatrixReadServiceError(
       'invalid_cursor',
       'The cursor does not belong to this matrix list query.',
+      preconditionDetails({
+        reason: 'invalid_cursor',
+        retryable: false,
+        fieldPath: 'cursor',
+        constraint: 'restart the matrix list read without a cursor',
+      }),
     );
   }
   return {
@@ -705,6 +740,12 @@ function decodeMatrixCellCursor(
     throw new MatrixReadServiceError(
       'invalid_cursor',
       'The cursor does not belong to this matrix cell query.',
+      preconditionDetails({
+        reason: 'invalid_cursor',
+        retryable: false,
+        fieldPath: 'cursor',
+        constraint: 'restart the matrix read without a cursor',
+      }),
     );
   }
   if (
@@ -714,7 +755,15 @@ function decodeMatrixCellCursor(
     throw new MatrixReadServiceError(
       'conflict',
       'The matrix cells changed after this cursor was issued. Re-read the matrix from the first page.',
-      { expectedRevision: parsed.matrixRevision, currentRevision: matrixRevision },
+      preconditionDetails(
+        {
+          reason: 'source_revision_changed',
+          retryable: true,
+          fieldPath: 'cursor',
+          constraint: 'restart the matrix read without a cursor',
+        },
+        { expectedRevision: parsed.matrixRevision, currentRevision: matrixRevision },
+      ),
     );
   }
   return {
@@ -737,6 +786,7 @@ function pageSize(limit: number | undefined): number {
     throw new MatrixReadServiceError(
       'precondition_failed',
       `Page size must be between 1 and ${MATRIX_READ_LIMITS.maxPageSize}.`,
+      preconditionDetails({ reason: 'invalid_selection', retryable: false, fieldPath: 'limit' }),
     );
   }
   return resolved;
@@ -753,6 +803,7 @@ function assertResolveSelections(
     throw new MatrixReadServiceError(
       'precondition_failed',
       `Structural resolution requires 1 to ${MATRIX_READ_LIMITS.maxResolveSelection} cells.`,
+      preconditionDetails({ reason: 'invalid_selection', retryable: false, fieldPath: 'selections' }),
     );
   }
   const cellIds = new Set<string>();
@@ -765,12 +816,14 @@ function assertResolveSelections(
       throw new MatrixReadServiceError(
         'precondition_failed',
         'Structural resolution requires durable non-empty cell IDs.',
+        preconditionDetails({ reason: 'invalid_selection', retryable: false, fieldPath: 'selections.cell_id' }),
       );
     }
     if (cellIds.has(selection.cellId)) {
       throw new MatrixReadServiceError(
         'precondition_failed',
         'Structural resolution requires unique cell IDs.',
+        preconditionDetails({ reason: 'invalid_selection', retryable: false, fieldPath: 'selections' }),
       );
     }
     cellIds.add(selection.cellId);
@@ -906,14 +959,19 @@ function assertSourceRevision(
     throw new MatrixReadServiceError(
       'conflict',
       'The matrix source changed. Re-read the matrix and resolve the cell again.',
-      {
+      preconditionDetails({
+        reason: 'source_revision_changed',
+        retryable: true,
+        fieldPath: 'selections.expected_source_revision',
+        constraint: 're-read the matrix and re-preview immediately with current revisions',
+      }, {
         expectedMatrixRevision: expected.matrixRevision,
         currentMatrixRevision: current.matrixRevision,
         expectedTemplateRevision: expected.templateRevision,
         currentTemplateRevision: current.templateRevision,
         expectedCellRevision: expected.cellRevision,
         currentCellRevision: current.cellRevision,
-      },
+      }),
     );
   }
 }
@@ -929,6 +987,18 @@ function canonicalSiteHostname(url: URL): string {
   return url.hostname.toLowerCase().replace(/^www\./, '');
 }
 
+function safeProviderHttpStatus(error: unknown): number | undefined {
+  if (!isRecord(error)) return undefined;
+  for (const key of ['status', 'statusCode', 'httpStatus'] as const) {
+    if (!Object.prototype.hasOwnProperty.call(error, key)) continue;
+    const value = error[key];
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 100 && value <= 599) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 export async function buildKnownWorkspacePageCensus(
   workspaceId: string,
   externalDependencies: WorkspaceKnownPageCensusExternalDependencies = defaultWorkspaceKnownPageCensusExternalDependencies,
@@ -941,6 +1011,25 @@ export async function buildKnownWorkspacePageCensus(
   let aggregatePathBytes = 0;
   let sitemapPaths: Set<string> | null = null;
   let sitemapPathsByLeaf: Map<string, string[]> | null = null;
+  const failures: MatrixGenerationCensusFailure[] = [];
+  const sourceLimitIssues: MatrixGenerationSourceLimitIssue[] = [];
+  let sourceLimitIssuesTruncated = false;
+
+  const recordFailure = (failure: MatrixGenerationCensusFailure): void => {
+    if (failures.some(candidate => (
+      candidate.stage === failure.stage
+      && candidate.code === failure.code
+      && candidate.httpStatus === failure.httpStatus
+    ))) return;
+    failures.push(failure);
+  };
+  const recordLimitIssue = (issue: MatrixGenerationSourceLimitIssue): void => {
+    if (sourceLimitIssues.length >= MATRIX_GENERATION_MAX_REPORTED_LIMIT_ISSUES) {
+      sourceLimitIssuesTruncated = true;
+      return;
+    }
+    sourceLimitIssues.push(issue);
+  };
 
   const addKnownPath = (value: string): string | null => {
     const canonicalPath = canonicalizeMatrixPath(value);
@@ -955,6 +1044,21 @@ export async function buildKnownWorkspacePageCensus(
       || aggregatePathBytes + pathBytes > limits.maxAggregatePathBytes
     ) {
       complete = false;
+      if (paths.size >= limits.maxWorkspacePaths) {
+        recordLimitIssue({
+          code: 'array_items_exceeded',
+          fieldPath: 'census.paths',
+          actual: paths.size + 1,
+          limit: limits.maxWorkspacePaths,
+        });
+      } else {
+        recordLimitIssue({
+          code: 'serialized_bytes_exceeded',
+          fieldPath: 'census.paths',
+          actual: aggregatePathBytes + pathBytes,
+          limit: limits.maxAggregatePathBytes,
+        });
+      }
       return null;
     }
     paths.add(canonicalPath);
@@ -976,14 +1080,68 @@ export async function buildKnownWorkspacePageCensus(
         !livePageCensus.complete
         || livePageCensus.pages.length === 0
         || livePageCensus.pages.length > limits.maxWebflowPages
-      ) complete = false;
+      ) {
+        complete = false;
+        if (!livePageCensus.complete) {
+          const adapterFailure = livePageCensus.failure;
+          if (adapterFailure?.code === 'provider_error') {
+            const httpStatus = safeProviderHttpStatus(adapterFailure);
+            recordFailure({
+              stage: 'webflow_pages',
+              code: 'provider_error',
+              ...(httpStatus === undefined ? {} : { httpStatus }),
+            });
+          } else if (adapterFailure?.code === 'invalid_response') {
+            recordFailure({ stage: 'webflow_pages', code: 'invalid_response' });
+          } else if (
+            adapterFailure?.code === 'limit_exceeded'
+            && Number.isInteger(adapterFailure.actual)
+            && adapterFailure.actual >= 0
+            && Number.isInteger(adapterFailure.limit)
+            && adapterFailure.limit >= 0
+          ) {
+            recordFailure({ stage: 'webflow_pages', code: 'limit_exceeded' });
+            recordLimitIssue({
+              code: 'array_items_exceeded',
+              fieldPath: 'census.webflow_pages',
+              actual: adapterFailure.actual,
+              limit: adapterFailure.limit,
+            });
+          } else {
+            // Compatibility fallback for injected adapters that predate safe
+            // failure classification.
+            recordFailure({ stage: 'webflow_pages', code: 'incomplete' });
+          }
+        }
+        if (livePageCensus.pages.length === 0 && livePageCensus.failure === undefined) {
+          recordFailure({ stage: 'webflow_pages', code: 'invalid_response' });
+        }
+        if (livePageCensus.pages.length > limits.maxWebflowPages) {
+          recordFailure({ stage: 'webflow_pages', code: 'limit_exceeded' });
+          recordLimitIssue({
+            code: 'array_items_exceeded',
+            fieldPath: 'census.webflow_pages',
+            actual: livePageCensus.pages.length,
+            limit: limits.maxWebflowPages,
+          });
+        }
+      }
       for (const page of livePageCensus.pages.slice(0, limits.maxWebflowPages)) {
         const path = tryResolvePagePath(page);
         if (path) addKnownPath(path);
-        else complete = false;
+        else {
+          complete = false;
+          recordFailure({ stage: 'webflow_pages', code: 'invalid_response' });
+        }
       }
-    } catch { // catch-ok: collision-sensitive generation fails closed below.
+    } catch (error) { // catch-ok: collision-sensitive generation fails closed below.
       complete = false;
+      const httpStatus = safeProviderHttpStatus(error);
+      recordFailure({
+        stage: 'webflow_pages',
+        code: 'provider_error',
+        ...(httpStatus === undefined ? {} : { httpStatus }),
+      });
     }
   }
 
@@ -994,18 +1152,26 @@ export async function buildKnownWorkspacePageCensus(
         workspace,
         workspace.webflowToken,
       );
-    } catch { // catch-ok: collision-sensitive generation fails closed below.
+    } catch (error) { // catch-ok: collision-sensitive generation fails closed below.
       complete = false;
+      const httpStatus = safeProviderHttpStatus(error);
+      recordFailure({
+        stage: 'base_url',
+        code: 'provider_error',
+        ...(httpStatus === undefined ? {} : { httpStatus }),
+      });
     }
 
     if (!baseUrl) {
       complete = false;
+      recordFailure({ stage: 'base_url', code: 'invalid_response' });
     } else {
       let base: URL | null = null;
       try {
         base = new URL(baseUrl);
       } catch { // catch-ok: an invalid configured base URL fails closed.
         complete = false;
+        recordFailure({ stage: 'base_url', code: 'invalid_response' });
       }
 
       if (
@@ -1028,7 +1194,21 @@ export async function buildKnownWorkspacePageCensus(
           if (
             sitemapUrls.length === 0
             || sitemapUrls.length > limits.maxSitemapLocations
-          ) complete = false;
+          ) {
+            complete = false;
+            if (sitemapUrls.length === 0) {
+              recordFailure({ stage: 'sitemap', code: 'invalid_response' });
+            }
+            if (sitemapUrls.length > limits.maxSitemapLocations) {
+              recordFailure({ stage: 'sitemap', code: 'limit_exceeded' });
+              recordLimitIssue({
+                code: 'array_items_exceeded',
+                fieldPath: 'census.sitemap_locations',
+                actual: sitemapUrls.length,
+                limit: limits.maxSitemapLocations,
+              });
+            }
+          }
           const baseHostname = canonicalSiteHostname(base);
           sitemapPaths = new Set<string>();
           sitemapPathsByLeaf = new Map<string, string[]>();
@@ -1037,6 +1217,13 @@ export async function buildKnownWorkspacePageCensus(
             returnedSitemapUrlBytes += matrixGenerationUtf8Bytes(sitemapUrl);
             if (returnedSitemapUrlBytes > limits.maxSitemapAggregateBytes) {
               complete = false;
+              recordFailure({ stage: 'sitemap', code: 'limit_exceeded' });
+              recordLimitIssue({
+                code: 'serialized_bytes_exceeded',
+                fieldPath: 'census.sitemap_locations',
+                actual: returnedSitemapUrlBytes,
+                limit: limits.maxSitemapAggregateBytes,
+              });
               break;
             }
             try {
@@ -1045,6 +1232,7 @@ export async function buildKnownWorkspacePageCensus(
               const isSameSite = canonicalSiteHostname(parsed) === baseHostname;
               if (!isWebUrl || !isSameSite || parsed.username || parsed.password) {
                 complete = false;
+                recordFailure({ stage: 'sitemap', code: 'invalid_response' });
                 continue;
               }
               const sitemapPath = normalizePageUrl(parsed.pathname);
@@ -1060,15 +1248,23 @@ export async function buildKnownWorkspacePageCensus(
               }
             } catch { // catch-ok: a malformed sitemap URL fails the authoritative census.
               complete = false;
+              recordFailure({ stage: 'sitemap', code: 'invalid_response' });
             }
           }
-        } catch { // catch-ok: strict discovery failure blocks generation below.
+        } catch (error) { // catch-ok: strict discovery failure blocks generation below.
           // Strict sitemap discovery throws if any child sitemap is missing or
           // malformed, so partial sitemap indexes cannot authorize paid work.
           complete = false;
+          const httpStatus = safeProviderHttpStatus(error);
+          recordFailure({
+            stage: 'sitemap',
+            code: 'provider_error',
+            ...(httpStatus === undefined ? {} : { httpStatus }),
+          });
         }
       } else if (base) {
         complete = false;
+        recordFailure({ stage: 'base_url', code: 'invalid_response' });
       }
     }
   }
@@ -1089,6 +1285,22 @@ export async function buildKnownWorkspacePageCensus(
     && localPathBounds!.aggregate_bytes <= limits.maxAggregatePathBytes;
   if (!localPathBoundsAreSafe) {
     complete = false;
+    if ((localPathBounds?.item_count ?? 0) > limits.maxWorkspacePaths) {
+      recordLimitIssue({
+        code: 'array_items_exceeded',
+        fieldPath: 'census.local_paths',
+        actual: localPathBounds!.item_count,
+        limit: limits.maxWorkspacePaths,
+      });
+    }
+    if ((localPathBounds?.aggregate_bytes ?? 0) > limits.maxAggregatePathBytes) {
+      recordLimitIssue({
+        code: 'serialized_bytes_exceeded',
+        fieldPath: 'census.local_paths',
+        actual: localPathBounds!.aggregate_bytes,
+        limit: limits.maxAggregatePathBytes,
+      });
+    }
   } else {
     const rows = readStmts().knownPagePaths.all(
       workspaceId,
@@ -1114,7 +1326,25 @@ export async function buildKnownWorkspacePageCensus(
   const publishedPageCensus = publishedBoundsAreSafe
     ? getPublishedPostPagePathCensus(workspaceId)
     : null;
-  if (!publishedBoundsAreSafe) complete = false;
+  if (!publishedBoundsAreSafe) {
+    complete = false;
+    if ((publishedBounds?.item_count ?? 0) > limits.maxWorkspacePaths) {
+      recordLimitIssue({
+        code: 'array_items_exceeded',
+        fieldPath: 'census.published_paths',
+        actual: publishedBounds!.item_count,
+        limit: limits.maxWorkspacePaths,
+      });
+    }
+    if ((publishedBounds?.aggregate_bytes ?? 0) > limits.maxAggregatePathBytes) {
+      recordLimitIssue({
+        code: 'serialized_bytes_exceeded',
+        fieldPath: 'census.published_paths',
+        actual: publishedBounds!.aggregate_bytes,
+        limit: limits.maxAggregatePathBytes,
+      });
+    }
+  }
   for (const publishedPath of publishedPageCensus?.paths ?? []) addKnownPath(publishedPath);
 
   let publishedPathsComplete = publishedPageCensus?.complete ?? false;
@@ -1143,6 +1373,11 @@ export async function buildKnownWorkspacePageCensus(
     paths: [...paths].sort(),
     publishedSlugs: publishedSlugs.sort(),
     complete,
+    ...(failures.length > 0 ? { failures } : {}),
+    ...(sourceLimitIssues.length > 0 ? {
+      sourceLimitIssues,
+      sourceLimitIssuesTruncated,
+    } : {}),
   };
 }
 
@@ -1160,12 +1395,16 @@ function assertGenerationSourceArrayIntegrity(
   throw new MatrixReadServiceError(
     'precondition_failed',
     'Stored matrix generation sources failed their complete-array integrity census.',
-    {
+    preconditionDetails({
+      reason: 'invalid_selection',
+      retryable: false,
+      constraint: 'repair the stored matrix/template source arrays before previewing',
+    }, {
       matrixId: matrix.id,
       templateId: matrix.templateId,
       matrixArraysComplete: matrixArraysAreComplete,
       templateArraysComplete: templateArraysAreComplete,
-    },
+    }),
   );
 }
 
@@ -1181,6 +1420,26 @@ function defaultOtherWorkspaceMatrixPlannedUrls(
   const bounds = readStmts().otherMatrixCensusBounds.get(
     query,
   ) as WorkspaceMatrixCensusBoundsRow | undefined;
+  const boundsLimitIssues: MatrixGenerationSourceLimitIssue[] = [];
+  if (Number.isInteger(bounds?.item_count) && bounds!.item_count > limits.maxOtherMatrices) {
+    boundsLimitIssues.push({
+      code: 'array_items_exceeded',
+      fieldPath: 'census.other_matrices',
+      actual: bounds!.item_count,
+      limit: limits.maxOtherMatrices,
+    });
+  }
+  if (
+    Number.isInteger(bounds?.aggregate_bytes)
+    && bounds!.aggregate_bytes > limits.maxAggregatePathBytes
+  ) {
+    boundsLimitIssues.push({
+      code: 'serialized_bytes_exceeded',
+      fieldPath: 'census.other_matrix_paths',
+      actual: bounds!.aggregate_bytes,
+      limit: limits.maxAggregatePathBytes,
+    });
+  }
   if (
     !bounds
     || !Number.isInteger(bounds.item_count)
@@ -1190,7 +1449,14 @@ function defaultOtherWorkspaceMatrixPlannedUrls(
     || bounds.aggregate_bytes < 0
     || bounds.aggregate_bytes > limits.maxAggregatePathBytes
   ) {
-    return { items: [], complete: false };
+    return {
+      items: [],
+      complete: false,
+      ...(boundsLimitIssues.length === 0 ? {} : {
+        sourceLimitIssues: boundsLimitIssues,
+        sourceLimitIssuesTruncated: false,
+      }),
+    };
   }
 
   // JSON functions run only after the raw aggregate byte preflight above. This
@@ -1198,6 +1464,15 @@ function defaultOtherWorkspaceMatrixPlannedUrls(
   const shape = readStmts().otherMatrixCensusShape.get(
     query,
   ) as WorkspaceMatrixCensusShapeRow | undefined;
+  const shapeLimitIssues: MatrixGenerationSourceLimitIssue[] = [];
+  if (Number.isInteger(shape?.cell_count) && shape!.cell_count > limits.maxMatrixCandidates) {
+    shapeLimitIssues.push({
+      code: 'array_items_exceeded',
+      fieldPath: 'census.other_matrix_cells',
+      actual: shape!.cell_count,
+      limit: limits.maxMatrixCandidates,
+    });
+  }
   if (
     !shape
     || shape.invalid_array_count !== 0
@@ -1205,7 +1480,14 @@ function defaultOtherWorkspaceMatrixPlannedUrls(
     || shape.cell_count < 0
     || shape.cell_count > limits.maxMatrixCandidates
   ) {
-    return { items: [], complete: false };
+    return {
+      items: [],
+      complete: false,
+      ...(shapeLimitIssues.length === 0 ? {} : {
+        sourceLimitIssues: shapeLimitIssues,
+        sourceLimitIssuesTruncated: false,
+      }),
+    };
   }
 
   const rows = readStmts().otherMatrixCells.all({
@@ -1214,6 +1496,7 @@ function defaultOtherWorkspaceMatrixPlannedUrls(
   const items: WorkspaceMatrixPlannedUrl[] = [];
   let complete = rows.length === bounds.item_count;
   let projectedBytes = 0;
+  const sourceLimitIssues: MatrixGenerationSourceLimitIssue[] = [];
   const invalidStoredCells = Symbol('invalid-stored-matrix-cells');
   for (const row of rows) {
     if (
@@ -1238,6 +1521,12 @@ function defaultOtherWorkspaceMatrixPlannedUrls(
         + matrixGenerationUtf8Bytes(cell.plannedUrl);
       if (projectedBytes + itemBytes > limits.maxAggregatePathBytes) {
         complete = false;
+        sourceLimitIssues.push({
+          code: 'serialized_bytes_exceeded',
+          fieldPath: 'census.other_matrix_paths',
+          actual: projectedBytes + itemBytes,
+          limit: limits.maxAggregatePathBytes,
+        });
         break;
       }
       projectedBytes += itemBytes;
@@ -1249,7 +1538,14 @@ function defaultOtherWorkspaceMatrixPlannedUrls(
     }
     if (!complete && projectedBytes >= limits.maxAggregatePathBytes) break;
   }
-  return { items, complete };
+  return {
+    items,
+    complete,
+    ...(sourceLimitIssues.length === 0 ? {} : {
+      sourceLimitIssues,
+      sourceLimitIssuesTruncated: false,
+    }),
+  };
 }
 
 function assertRawGenerationSourceBounds(workspaceId: string, matrixId: string): void {
@@ -1304,7 +1600,11 @@ function assertRawGenerationSourceBounds(workspaceId: string, matrixId: string):
     throw new MatrixReadServiceError(
       'precondition_failed',
       'Stored matrix generation sources failed raw JSON source preflight.',
-      { fieldPath: invalidField[0] },
+      preconditionDetails({
+        reason: 'invalid_selection',
+        retryable: false,
+        fieldPath: String(invalidField[0]),
+      }),
     );
   }
 
@@ -1562,9 +1862,27 @@ export function createContentMatrixReadService(
       request.selections,
     );
 
-    const knownWorkspacePageCensus = await dependencies.getKnownWorkspacePageCensus(
+    const discoveredWorkspacePageCensus = await dependencies.getKnownWorkspacePageCensus(
       request.workspaceId,
     );
+    const knownWorkspacePageCensus: WorkspaceKnownPageCensus = {
+      ...discoveredWorkspacePageCensus,
+      ...(discoveredWorkspacePageCensus.failures
+        ? { failures: [...discoveredWorkspacePageCensus.failures] }
+        : {}),
+      ...(discoveredWorkspacePageCensus.sourceLimitIssues
+        ? { sourceLimitIssues: [...discoveredWorkspacePageCensus.sourceLimitIssues] }
+        : {}),
+    };
+    const recordResolutionLimitIssue = (issue: MatrixGenerationSourceLimitIssue): void => {
+      const issues = knownWorkspacePageCensus.sourceLimitIssues ?? [];
+      if (issues.length >= MATRIX_GENERATION_MAX_REPORTED_LIMIT_ISSUES) {
+        knownWorkspacePageCensus.sourceLimitIssuesTruncated = true;
+        return;
+      }
+      knownWorkspacePageCensus.sourceLimitIssues = [...issues, issue];
+      knownWorkspacePageCensus.sourceLimitIssuesTruncated ??= false;
+    };
 
     // Re-read after the only await and require the exact initial generation
     // snapshot. There is deliberately no await after this authoritative check.
@@ -1574,6 +1892,12 @@ export function createContentMatrixReadService(
       throw new MatrixReadServiceError(
         'conflict',
         'The matrix source changed during URL discovery. Re-read and resolve again.',
+        preconditionDetails({
+          reason: 'source_revision_changed',
+          retryable: true,
+          fieldPath: 'selections.expected_source_revision',
+          constraint: 're-preview immediately using current authority',
+        }),
       );
     }
     assertBoundedMatrix(stored);
@@ -1590,6 +1914,12 @@ export function createContentMatrixReadService(
       throw new MatrixReadServiceError(
         'conflict',
         'The matrix source changed during URL discovery. Re-read and resolve again.',
+        preconditionDetails({
+          reason: 'source_revision_changed',
+          retryable: true,
+          fieldPath: 'selections.expected_source_revision',
+          constraint: 're-preview immediately using current authority',
+        }),
       );
     }
     const cellsById = validateSelectionSnapshot(matrix, template, request.selections);
@@ -1597,6 +1927,12 @@ export function createContentMatrixReadService(
       request.workspaceId,
       matrix.id,
     );
+    if (otherMatrixUrlCensus.sourceLimitIssuesTruncated === true) {
+      knownWorkspacePageCensus.sourceLimitIssuesTruncated = true;
+    }
+    for (const issue of otherMatrixUrlCensus.sourceLimitIssues ?? []) {
+      recordResolutionLimitIssue(issue);
+    }
     const ownMatrixPlannedUrls = matrix.cells.map(item => ({
         cellId: item.id,
         plannedUrl: item.plannedUrl,
@@ -1613,6 +1949,12 @@ export function createContentMatrixReadService(
       : [];
     if (otherMatrixItems.length > MATRIX_GENERATION_SOURCE_LIMITS.census.maxMatrixCandidates) {
       matrixUrlCensusComplete = false;
+      recordResolutionLimitIssue({
+        code: 'array_items_exceeded',
+        fieldPath: 'census.other_matrix_cells',
+        actual: otherMatrixItems.length,
+        limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxMatrixCandidates,
+      });
     }
     let otherMatrixProjectedBytes = 0;
     for (const item of otherMatrixItems.slice(
@@ -1636,6 +1978,12 @@ export function createContentMatrixReadService(
         > MATRIX_GENERATION_SOURCE_LIMITS.census.maxAggregatePathBytes
       ) {
         matrixUrlCensusComplete = false;
+        recordResolutionLimitIssue({
+          code: 'serialized_bytes_exceeded',
+          fieldPath: 'census.other_matrix_paths',
+          actual: otherMatrixProjectedBytes,
+          limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxAggregatePathBytes,
+        });
         break;
       }
       const canonicalPath = canonicalizeMatrixPath(item.plannedUrl);
@@ -1658,6 +2006,12 @@ export function createContentMatrixReadService(
       : [];
     if (knownWorkspacePaths.length > MATRIX_GENERATION_SOURCE_LIMITS.census.maxWorkspacePaths) {
       workspaceUrlCensusComplete = false;
+      recordResolutionLimitIssue({
+        code: 'array_items_exceeded',
+        fieldPath: 'census.paths',
+        actual: knownWorkspacePaths.length,
+        limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxWorkspacePaths,
+      });
     }
     let workspacePathBytes = 0;
     for (const path of knownWorkspacePaths.slice(
@@ -1667,6 +2021,12 @@ export function createContentMatrixReadService(
       workspacePathBytes += typeof path === 'string' ? matrixGenerationUtf8Bytes(path) : 0;
       if (workspacePathBytes > MATRIX_GENERATION_SOURCE_LIMITS.census.maxAggregatePathBytes) {
         workspaceUrlCensusComplete = false;
+        recordResolutionLimitIssue({
+          code: 'serialized_bytes_exceeded',
+          fieldPath: 'census.paths',
+          actual: workspacePathBytes,
+          limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxAggregatePathBytes,
+        });
         break;
       }
       const canonicalPath = typeof path === 'string' ? canonicalizeMatrixPath(path) : null;
@@ -1685,6 +2045,12 @@ export function createContentMatrixReadService(
       : [];
     if (knownPublishedPaths.length > MATRIX_GENERATION_SOURCE_LIMITS.census.maxWorkspacePaths) {
       workspaceUrlCensusComplete = false;
+      recordResolutionLimitIssue({
+        code: 'array_items_exceeded',
+        fieldPath: 'census.published_paths',
+        actual: knownPublishedPaths.length,
+        limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxWorkspacePaths,
+      });
     }
     let publishedPathBytes = workspacePathBytes;
     for (const path of knownPublishedPaths.slice(
@@ -1694,6 +2060,12 @@ export function createContentMatrixReadService(
       publishedPathBytes += typeof path === 'string' ? matrixGenerationUtf8Bytes(path) : 0;
       if (publishedPathBytes > MATRIX_GENERATION_SOURCE_LIMITS.census.maxAggregatePathBytes) {
         workspaceUrlCensusComplete = false;
+        recordResolutionLimitIssue({
+          code: 'serialized_bytes_exceeded',
+          fieldPath: 'census.published_paths',
+          actual: publishedPathBytes,
+          limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxAggregatePathBytes,
+        });
         break;
       }
       const canonicalPath = typeof path === 'string'
@@ -1710,7 +2082,18 @@ export function createContentMatrixReadService(
 
     const results = request.selections.map((selection) => {
       const cell = cellsById.get(selection.cellId);
-      if (!cell) throw new MatrixReadServiceError('conflict', 'Selected cell changed during resolution.');
+      if (!cell) {
+        throw new MatrixReadServiceError(
+          'conflict',
+          'Selected cell changed during resolution.',
+          preconditionDetails({
+            reason: 'source_revision_changed',
+            retryable: true,
+            fieldPath: 'selections.cell_id',
+            constraint: 're-preview immediately using current authority',
+          }),
+        );
+      }
       const currentRevision = sourceRevision(matrix, template, cell);
       const selectedCanonicalPath = canonicalizeMatrixPath(cell.plannedUrl);
 

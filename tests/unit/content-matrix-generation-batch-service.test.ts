@@ -28,7 +28,6 @@ vi.mock('../../server/domains/content/matrix-generation/worker.js', () => ({
 import {
   retryMatrixGeneration,
   getMatrixGeneration,
-  MatrixGenerationBatchPreconditionError,
   startMatrixGeneration,
 } from '../../server/domains/content/matrix-generation/batch-service.js';
 import {
@@ -109,6 +108,59 @@ afterEach(() => {
 });
 
 describe('content matrix batch start', () => {
+  it.each([
+    {
+      status: 'upgrade_required' as const,
+      result: {
+        status: 'upgrade_required' as const,
+        matrixId: 'matrix-1',
+        templateId: 'template-1',
+        cellId: 'cell-1',
+        sourceRevision: { matrixRevision: 2, templateRevision: 3, cellRevision: 4 },
+        proposal: {
+          templateId: 'template-1',
+          expectedTemplateRevision: 3,
+          proposalFingerprint: 'c'.repeat(64),
+          generationContractVersion: 1,
+          blocks: [],
+          blockers: [],
+        },
+      },
+      reason: 'template_upgrade_required',
+    },
+    {
+      status: 'blocked' as const,
+      result: {
+        status: 'blocked' as const,
+        matrixId: 'matrix-1',
+        templateId: 'template-1',
+        cellId: 'cell-1',
+        sourceRevision: { matrixRevision: 2, templateRevision: 3, cellRevision: 4 },
+        omittedOptionalSections: [],
+        evidenceRequirements: [],
+        blockingRequirementIds: ['requirement-1'],
+        expectedArtifactRevisions: {
+          brief: { artifactType: 'content_brief' as const, artifactId: null, generationRevision: 0 },
+          post: { artifactType: 'generated_post' as const, artifactId: null, generationRevision: 0 },
+        },
+      },
+      reason: 'generation_preconditions_unresolved',
+    },
+  ])('reports $status start preconditions truthfully without retrying', async ({ result, reason }) => {
+    const workspaceId = createWorkspace(`Matrix blocked start ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    setWorkspaceFlagOverride('content-matrix-generation', workspaceId, true);
+    mocks.previewMatrixGeneration.mockResolvedValue({
+      results: [result],
+      estimatedBatchBudget: null,
+    } as PreviewMatrixGenerationResult);
+
+    await expect(startMatrixGeneration(request(workspaceId))).rejects.toMatchObject({
+      details: { reason, retryable: false, fieldPath: 'selections.0' },
+    });
+    expect(mocks.queueMatrixGenerationJob).not.toHaveBeenCalled();
+  });
+
   it('accepts the exact preview budget atomically and replays without another job', async () => {
     const workspaceId = createWorkspace(`Matrix batch ${randomUUID()}`).id;
     cleanupWorkspaceIds.add(workspaceId);
@@ -419,9 +471,51 @@ describe('content matrix batch start', () => {
     const startRequest = request(workspaceId);
     startRequest.acceptedBudget.maxEstimatedUsd = 0.97;
 
-    await expect(startMatrixGeneration(startRequest)).rejects.toBeInstanceOf(
-      MatrixGenerationBatchPreconditionError,
-    );
+    await expect(startMatrixGeneration(startRequest)).rejects.toMatchObject({
+      details: {
+        reason: 'invalid_budget',
+        retryable: false,
+        fieldPath: 'accepted_budget',
+      },
+    });
+    expect(mocks.queueMatrixGenerationJob).not.toHaveBeenCalled();
+  });
+
+  it('requires an immediate re-preview when accepted fingerprint authority is stale', async () => {
+    const workspaceId = createWorkspace(`Matrix stale preview ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    setWorkspaceFlagOverride('content-matrix-generation', workspaceId, true);
+    const target = {
+      ...previewTarget(workspaceId),
+      effectiveInputFingerprint: 'c'.repeat(64),
+    };
+    mocks.previewMatrixGeneration.mockResolvedValue({
+      results: [{
+        status: 'ready',
+        matrixId: target.matrixId,
+        templateId: target.templateId,
+        cellId: target.cellId,
+        sourceRevision: target.sourceRevision,
+        target,
+      }],
+      estimatedBatchBudget: {
+        providerCalls: 15,
+        inputTokens: 31_000,
+        outputTokens: 27_500,
+        estimatedUsd: 0.98,
+        maxConcurrency: 1,
+      },
+    } as PreviewMatrixGenerationResult);
+
+    await expect(startMatrixGeneration(request(workspaceId))).rejects.toMatchObject({
+      message: expect.stringContaining('Re-preview immediately'),
+      details: {
+        reason: 'preview_fingerprint_stale',
+        retryable: true,
+        fieldPath: 'selections.0.expected_preview_fingerprint',
+        constraint: 're-preview immediately and accept the current fingerprint before starting',
+      },
+    });
     expect(mocks.queueMatrixGenerationJob).not.toHaveBeenCalled();
   });
 });

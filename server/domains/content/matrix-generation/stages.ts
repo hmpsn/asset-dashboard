@@ -15,7 +15,7 @@ import { countHtmlWords } from '../../../content-posts-ai.js';
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
 import { MATRIX_READER_FACING_PROSE_CONTRACT } from './audit.js';
 import {
-  listCurrentMatrixCellEvidence,
+  readFrozenMatrixCellEvidence,
   renderMatrixCellEvidencePrompt,
 } from './evidence.js';
 
@@ -91,11 +91,12 @@ export async function generateMatrixBriefStage(
   options: MatrixGenerationStageOptions,
 ): Promise<ContentBrief> {
   const { target } = options;
-  const resolutions = listCurrentMatrixCellEvidence(
-    options.workspaceId,
-    target.matrixId,
-    target.cellId,
-  );
+  const resolutions = readFrozenMatrixCellEvidence({
+    workspaceId: options.workspaceId,
+    matrixId: target.matrixId,
+    cellId: target.cellId,
+    evidenceResolutionIds: target.frozenEvidenceResolutionIds,
+  }).map(read => read.resolution);
   const evidencePrompt = renderMatrixCellEvidencePrompt(
     target.evidenceRequirements,
     resolutions,
@@ -179,11 +180,12 @@ export async function generateMatrixPostStage(
   brief: ContentBrief,
   options: MatrixGenerationStageOptions,
 ): Promise<GeneratedPost> {
-  const resolutions = listCurrentMatrixCellEvidence(
-    options.workspaceId,
-    options.target.matrixId,
-    options.target.cellId,
-  );
+  const resolutions = readFrozenMatrixCellEvidence({
+    workspaceId: options.workspaceId,
+    matrixId: options.target.matrixId,
+    cellId: options.target.cellId,
+    evidenceResolutionIds: options.target.frozenEvidenceResolutionIds,
+  }).map(read => read.resolution);
   const evidencePrompt = renderMatrixCellEvidencePrompt(
     options.target.evidenceRequirements,
     resolutions,

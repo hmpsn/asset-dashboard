@@ -19,6 +19,7 @@ import {
   listContentMatrices,
   MatrixReadServiceError,
   resolveMatrixStructures,
+  resolveMatrixStructuresWithCensus,
   type WorkspaceKnownPageCensusExternalDependencies,
 } from '../../server/domains/content/matrix-generation/read-service.js';
 import { canonicalGenerationFingerprint } from '../../server/domains/content/matrix-generation/fingerprint.js';
@@ -308,6 +309,7 @@ describe('content matrix read service', () => {
 
     expect(pageCensus.paths).toContain('/');
     expect(pageCensus.complete).toBe(false);
+    expect(pageCensus.failures).toEqual([{ stage: 'webflow_pages', code: 'incomplete' }]);
   });
 
   it('fails closed when a page adapter returns more than the bounded Webflow census', async () => {
@@ -325,10 +327,30 @@ describe('content matrix read service', () => {
     }));
     const pageCensus = await buildKnownWorkspacePageCensus(
       'ws_live_page_budget',
-      liveWorkspaceCensusDependencies({ listPagesWithCompleteness }),
+      liveWorkspaceCensusDependencies({
+        listPagesWithCompleteness,
+        discoverSitemapUrls: async () => Array.from(
+          { length: MATRIX_GENERATION_MAX_REPORTED_LIMIT_ISSUES + 2 },
+          (_, index) => `https://example.com/sitemap-page-${index}`,
+        ),
+      }),
     );
 
     expect(pageCensus.complete).toBe(false);
+    expect(pageCensus.failures).toContainEqual({
+      stage: 'webflow_pages',
+      code: 'limit_exceeded',
+    });
+    expect(pageCensus.sourceLimitIssues).toContainEqual({
+      code: 'array_items_exceeded',
+      fieldPath: 'census.webflow_pages',
+      actual: MATRIX_GENERATION_SOURCE_LIMITS.census.maxWebflowPages + 1,
+      limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxWebflowPages,
+    });
+    expect(pageCensus.sourceLimitIssues).toHaveLength(
+      MATRIX_GENERATION_MAX_REPORTED_LIMIT_ISSUES,
+    );
+    expect(pageCensus.sourceLimitIssuesTruncated).toBe(true);
     expect(pageCensus.paths.length)
       .toBeLessThanOrEqual(MATRIX_GENERATION_SOURCE_LIMITS.census.maxWorkspacePaths);
     expect(listPagesWithCompleteness).toHaveBeenCalledWith(
@@ -463,6 +485,13 @@ describe('content matrix read service', () => {
 
     expect(census.complete).toBe(false);
     expect(census.paths).not.toContain(oversizedPublishedPath);
+    expect(census.sourceLimitIssues).toContainEqual({
+      code: 'serialized_bytes_exceeded',
+      fieldPath: 'census.published_paths',
+      actual: expect.any(Number),
+      limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxAggregatePathBytes,
+    });
+    expect(census.sourceLimitIssuesTruncated).toBe(false);
   });
 
   it('turns unavailable sitemap discovery into a generation preflight blocker', async () => {
@@ -475,6 +504,8 @@ describe('content matrix read service', () => {
       }),
     );
     expect(pageCensus.complete).toBe(false);
+    expect(pageCensus.failures).toEqual([{ stage: 'sitemap', code: 'provider_error' }]);
+    expect(JSON.stringify(pageCensus)).not.toContain('sitemap child unavailable');
 
     const source = matrix('mtx_missing_sitemap', '2026-07-04T00:00:00.000Z');
     const deps = dependencies([source]);
@@ -498,6 +529,56 @@ describe('content matrix read service', () => {
     expect(result.results[0].status).toBe('blocked');
     if (result.results[0].status !== 'blocked') throw new Error('Expected incomplete census blocker');
     expect(result.results[0].blockers.map(item => item.id)).toContain('malformed_workspace_url_census');
+  });
+
+  it('exposes only a safe provider status for census failures', async () => {
+    const census = await buildKnownWorkspacePageCensus(
+      'ws_live_safe_failure',
+      liveWorkspaceCensusDependencies({
+        listPagesWithCompleteness: async () => ({
+          pages: [],
+          complete: false,
+          failure: { code: 'provider_error', httpStatus: 503 },
+        }),
+      }),
+    );
+
+    expect(census.complete).toBe(false);
+    expect(census.failures).toEqual([{
+      stage: 'webflow_pages',
+      code: 'provider_error',
+      httpStatus: 503,
+    }]);
+  });
+
+  it('propagates a page-adapter max-page early return as a bounded limit issue', async () => {
+    const census = await buildKnownWorkspacePageCensus(
+      'ws_live_page_adapter_limit',
+      liveWorkspaceCensusDependencies({
+        listPagesWithCompleteness: async () => ({
+          pages: [],
+          complete: false,
+          failure: {
+            code: 'limit_exceeded',
+            actual: MATRIX_GENERATION_SOURCE_LIMITS.census.maxWebflowPages + 1,
+            limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxWebflowPages,
+          },
+        }),
+      }),
+    );
+
+    expect(census.complete).toBe(false);
+    expect(census.failures).toEqual([{
+      stage: 'webflow_pages',
+      code: 'limit_exceeded',
+    }]);
+    expect(census.sourceLimitIssues).toEqual([{
+      code: 'array_items_exceeded',
+      fieldPath: 'census.webflow_pages',
+      actual: MATRIX_GENERATION_SOURCE_LIMITS.census.maxWebflowPages + 1,
+      limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxWebflowPages,
+    }]);
+    expect(census.sourceLimitIssuesTruncated).toBe(false);
   });
 
   it('keyset-pages summaries in updated_at DESC, id ASC order and binds the template filter', () => {
@@ -541,6 +622,11 @@ describe('content matrix read service', () => {
       cursor: first.nextCursor ?? undefined,
     })).toThrowError(expect.objectContaining<Partial<MatrixReadServiceError>>({
       code: 'invalid_cursor',
+      details: expect.objectContaining({
+        reason: 'invalid_cursor',
+        retryable: false,
+        fieldPath: 'cursor',
+      }),
     }));
 
     expect(() => service.listContentMatrices({
@@ -1066,7 +1152,7 @@ describe('content matrix read service', () => {
     );
 
     const sourceCell = sourceMatrix.cells[0];
-    const result = await resolveMatrixStructures({
+    const { result, pageCensus } = await resolveMatrixStructuresWithCensus({
       workspaceId: workspace.id,
       matrixId: sourceMatrix.id,
       selections: [{
@@ -1083,6 +1169,13 @@ describe('content matrix read service', () => {
     if (result.results[0].status !== 'blocked') throw new Error('Expected bounded census blocker');
     expect(result.results[0].blockers.map(item => item.id))
       .toContain('malformed_matrix_url_census');
+    expect(pageCensus.sourceLimitIssues).toContainEqual({
+      code: 'serialized_bytes_exceeded',
+      fieldPath: 'census.other_matrix_paths',
+      actual: expect.any(Number),
+      limit: MATRIX_GENERATION_SOURCE_LIMITS.census.maxAggregatePathBytes,
+    });
+    expect(pageCensus.sourceLimitIssuesTruncated).toBe(false);
   });
 
   it.each([

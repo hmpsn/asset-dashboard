@@ -16,6 +16,7 @@ const h = vi.hoisted(() => {
     createJob: vi.fn(),
     cancelJob: vi.fn(),
     getJob: vi.fn(),
+    getJobAuthoritative: vi.fn(),
     getJobCancellationError: vi.fn(() => null),
     hasActiveJob: vi.fn(),
     listJobs: vi.fn(),
@@ -52,6 +53,7 @@ vi.mock('../../server/jobs.js', () => ({
   cancelJob: h.cancelJob,
   createJob: h.createJob,
   getJob: h.getJob,
+  getJobAuthoritative: h.getJobAuthoritative,
   getJobCancellationError: h.getJobCancellationError,
   hasActiveJob: h.hasActiveJob,
   listJobs: h.listJobs,
@@ -94,6 +96,7 @@ describe('mcp job action tools', () => {
     h.hasActiveJob.mockReturnValue(undefined);
     h.createJob.mockReturnValue({ id: 'job-1' });
     h.getJob.mockReturnValue({ id: 'job-1', status: 'running' });
+    h.getJobAuthoritative.mockReturnValue({ id: 'job-1', status: 'running' });
     h.getJobCancellationError.mockReturnValue(null);
     h.generateKeywordStrategy.mockResolvedValue({
       strategy: { pageMap: [{ id: 'p1' }, { id: 'p2' }] },
@@ -295,11 +298,13 @@ describe('mcp job action tools', () => {
 
   it('supports get_job_status, list_jobs, and cancel_job', async () => {
     h.getJob.mockReturnValue({ id: 'job-1', workspaceId: 'ws-1', status: 'running', type: 'keyword-strategy' });
+    h.getJobAuthoritative.mockReturnValue({ id: 'job-1', workspaceId: 'ws-1', status: 'running', type: 'keyword-strategy' });
     h.listJobs.mockReturnValue([{ id: 'job-1', workspaceId: 'ws-1', status: 'running', type: 'keyword-strategy' }]);
     h.cancelJob.mockReturnValue({ id: 'job-1', workspaceId: 'ws-1', status: 'cancelled', type: 'keyword-strategy' });
 
     const status = await handleJobActionTool('get_job_status', { workspace_id: 'ws-1', job_id: 'job-1' });
     expect(status.isError).toBeUndefined();
+    expect(h.getJobAuthoritative).toHaveBeenCalledWith('job-1');
 
     const list = await handleJobActionTool('list_jobs', { workspace_id: 'ws-1' });
     expect(list.isError).toBeUndefined();

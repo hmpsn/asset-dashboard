@@ -97,7 +97,10 @@ interface MatrixCellEvidenceRow {
   resolved_by: string;
   expected_artifact_revisions: string;
   idempotency_key: string;
+  supersedes_id: string | null;
+  is_current: 0 | 1;
   created_at: string;
+  superseded_at: string | null;
 }
 
 const stmts = createStmtCache(() => ({
@@ -139,6 +142,11 @@ const stmts = createStmtCache(() => ({
     FROM content_matrix_cell_evidence
     WHERE workspace_id = ? AND matrix_id = ? AND cell_id = ?
       AND requirement_id = ? AND is_current = 1
+  `),
+  findScopedById: db.prepare(`
+    SELECT *
+    FROM content_matrix_cell_evidence
+    WHERE id = ? AND workspace_id = ? AND matrix_id = ? AND cell_id = ?
   `),
 }));
 
@@ -217,6 +225,54 @@ export function listCurrentMatrixCellEvidence(
 ): MatrixGenerationEvidenceResolution[] {
   return (stmts().listCurrent.all(workspaceId, matrixId, cellId) as MatrixCellEvidenceRow[])
     .map(rowToResolution);
+}
+
+export interface FrozenMatrixCellEvidenceRead {
+  resolution: MatrixGenerationEvidenceResolution;
+  status: 'current' | 'superseded';
+  supersedesId: string | null;
+  supersededAt: string | null;
+}
+
+/**
+ * Loads the exact evidence rows accepted by preview, including historical rows.
+ *
+ * Artifact revisions captured on a resolution are write-time CAS evidence. They
+ * are intentionally not compared with current brief/post revisions here: paid
+ * stages must consume the accepted row rather than silently substitute a newer
+ * value after artifact replacement.
+ */
+export function readFrozenMatrixCellEvidence(input: {
+  workspaceId: string;
+  matrixId: string;
+  cellId: string;
+  evidenceResolutionIds: readonly string[];
+}): FrozenMatrixCellEvidenceRead[] {
+  if (new Set(input.evidenceResolutionIds).size !== input.evidenceResolutionIds.length) {
+    throw new MatrixGenerationEvidenceError(
+      'precondition_failed',
+      'Frozen matrix evidence IDs must be unique',
+    );
+  }
+  return input.evidenceResolutionIds.map(id => {
+    const row = stmts().findScopedById.get(
+      id,
+      input.workspaceId,
+      input.matrixId,
+      input.cellId,
+    ) as MatrixCellEvidenceRow | undefined;
+    if (!row) {
+      // A cross-workspace, matrix, or cell row is deliberately indistinguishable
+      // from a missing row at this authority boundary.
+      throw new MatrixGenerationEvidenceError('not_found', 'Frozen matrix evidence not found');
+    }
+    return {
+      resolution: rowToResolution(row),
+      status: row.is_current === 1 ? 'current' : 'superseded',
+      supersedesId: row.supersedes_id,
+      supersededAt: row.superseded_at,
+    };
+  });
 }
 
 export function matrixArtifactRevisionExpectations(

@@ -183,7 +183,8 @@ const evidenceValueSchema = z.discriminatedUnion('kind', [
       href: z.string().trim().min(1).max(GENERATION_INTERNAL_LINK_HREF_MAX_LENGTH)
         .regex(/^\/(?!\/)[^\s?#]*\/?$/, 'href must be a canonical workspace-relative path'),
       anchor_text: z.string().trim().min(1).max(GENERATION_INTERNAL_LINK_ANCHOR_MAX_LENGTH),
-    }).strict()).min(1).max(GENERATION_INTERNAL_LINK_LIMIT),
+    }).strict()).min(1).max(GENERATION_INTERNAL_LINK_LIMIT)
+      .describe('Verified workspace-relative destinations and their visible anchor text.'),
   }).strict(),
   z.object({ kind: z.literal('date'), value: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict(),
   z.object({ kind: z.literal('url'), value: z.string().url().max(2_048) }).strict(),
@@ -269,9 +270,11 @@ export const getContentMatrixGenerationInputSchema = z.object({
   workspace_id: workspaceIdSchema,
   run_id: durableIdSchema.describe('Durable matrix generation run ID.'),
   cursor: cursorSchema.optional()
-    .describe('Opaque item cursor bound to the current run revision.'),
+    .describe('Opaque run cursor bound to revision and evidence-read mode.'),
   limit: z.number().int().min(1).max(MATRIX_READ_LIMITS.maxPageSize).optional()
     .describe(`Item page size; defaults to 25 and caps at ${MATRIX_READ_LIMITS.maxPageSize}.`),
+  include_evidence_values: z.boolean().optional()
+    .describe('Include up to ten exact frozen evidence rows. Keep true while following next_cursor; an item may repeat until all rows are read.'),
 }).strict();
 
 const retryItemSchema = z.object({

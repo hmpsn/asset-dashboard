@@ -160,6 +160,7 @@ function legalGuidanceHeavyTarget(): MatrixGenerationPreviewTarget {
       brief: { artifactType: 'content_brief', artifactId: null, generationRevision: 0 },
       post: { artifactType: 'generated_post', artifactId: null, generationRevision: 0 },
     },
+    frozenEvidenceResolutionIds: [],
     effectiveInputFingerprint: 'd'.repeat(64),
     blockingRequirementIds: [],
     estimatedPaidBudget: {
