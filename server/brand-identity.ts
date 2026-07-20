@@ -190,7 +190,6 @@ Write in the brand's calibrated voice. Be specific to this business. Do not writ
     systemPrompt: system,
     userPrompt,
     maxTokens: 2000,
-    temperature: 0.7,
     feature: 'brand-identity-generate',
     workspaceId,
   })).trim();
@@ -333,7 +332,6 @@ Return only the refined content — no preamble.`;
     systemPrompt: system,
     userPrompt,
     maxTokens: 2000,
-    temperature: 0.6,
     feature: 'brand-identity-refine',
     workspaceId,
   })).trim();

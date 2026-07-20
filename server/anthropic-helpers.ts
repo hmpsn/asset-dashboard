@@ -139,7 +139,15 @@ async function executeAnthropicCall(opts: AnthropicChatOptions): Promise<Anthrop
     messages,
     max_tokens: maxTokens + policy.thinkingHeadroomTokens,
   };
-  if (policy.supportsSamplingParams) bodyObj.temperature = temperature ?? 0.7;
+  if (policy.supportsSamplingParams) {
+    bodyObj.temperature = temperature ?? 0.7;
+  } else if (temperature !== undefined) {
+    // Same silent-drop hazard as the OpenAI path — make it observable.
+    log.warn(
+      { model, feature, requestedTemperature: temperature },
+      `[${feature}] temperature ignored: ${model} rejects sampling params. Steer variance via the prompt and remove the argument.`,
+    );
+  }
   if (policy.thinking) bodyObj.thinking = policy.thinking;
   if (policy.outputConfig) bodyObj.output_config = policy.outputConfig;
   if (system) bodyObj.system = system;

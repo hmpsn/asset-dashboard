@@ -314,7 +314,6 @@ ${JSON.stringify(context, null, 2)}`;
       model: MODEL_ROLES.structuredSynthesis,
       system: systemPrompt,
       messages: [{ role: 'user', content: question }],
-      temperature: 0.7,
       maxTokens: 1500,
       feature: 'search-chat',
       workspaceId: wsId,

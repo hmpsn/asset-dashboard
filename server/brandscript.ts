@@ -214,7 +214,6 @@ ${rawText}`;
     operation: 'brandscript-import',
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
-    temperature: 0,
     workspaceId,
   });
 
@@ -274,7 +273,6 @@ Return valid JSON with one entry for every requested section, in the same order 
     systemPrompt: system,
     userPrompt,
     maxTokens: 4000,
-    temperature: 0.6,
     workspaceId,
     json: true,
   });

@@ -652,7 +652,6 @@ Return valid JSON: { "variations": ["variation 1 text", "variation 2 text", "var
     systemPrompt: system,
     userPrompt,
     maxTokens: 2000,
-    temperature: 0.85,
     workspaceId,
     json: true,
   });
@@ -697,7 +696,6 @@ Return valid JSON: { "refined": "the refined text" }`;
     systemPrompt: system,
     userPrompt,
     maxTokens: 1000,
-    temperature: 0.75,
     workspaceId,
     json: true,
   });

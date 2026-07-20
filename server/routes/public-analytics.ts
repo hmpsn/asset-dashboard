@@ -161,7 +161,6 @@ Examples:
       },
     ],
     maxTokens: 30,
-    temperature: 0,
     feature: 'intent-classification',
     workspaceId,
   });
@@ -632,7 +631,6 @@ ${hasGrounding ? seoContextBlock : '(No additional workspace intelligence is ava
           ...historyMessages.slice(-10),
           { role: 'user', content: question },
         ],
-        temperature: 0.7,
         maxTokens: 1500,
         workspaceId: ws.id,
       }),

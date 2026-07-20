@@ -102,12 +102,6 @@ export interface CreativeAICallOptions {
   feature?: string;
   workspaceId: string;
   /**
-   * Optional temperature override for the OpenAI fallback only. The Claude
-   * path never sends temperature — sampling params are removed on Opus 4.8
-   * (any value 400s); steer variance via the prompt instead.
-   */
-  temperature?: number;
-  /**
    * When true: enforce JSON output on the GPT fallback via responseFormat,
    * append a "return raw JSON only" reminder to the Claude system prompt, and
    * strip markdown code fences from the returned text. Defaults to false.
@@ -258,7 +252,6 @@ export async function callCreativeAIWithMetadata(
     model: openAIModel,
     ...providerInput,
     maxTokens,
-    temperature: opts.temperature,
     feature,
     workspaceId,
     maxRetries: opts.maxRetries,
@@ -827,7 +820,6 @@ Return valid JSON only:
       system: systemPrompt,
       messages,
       maxTokens: 200,
-      temperature: 0.5,
       workspaceId,
       maxRetries: options.maxRetries,
       signal: options.signal,
@@ -962,7 +954,6 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     ),
     userPrompt: prompt,
     maxTokens,
-    temperature: 0.4,
     feature: 'content-post-unify',
     workspaceId,
     json: true,
@@ -1081,7 +1072,6 @@ Return ONLY valid JSON in this exact format:
     system: systemPrompt,
     messages,
     maxTokens: 500,
-    temperature: 0.3,
     workspaceId,
     maxRetries: options.maxRetries,
     executionChainId: options.executionChainId,

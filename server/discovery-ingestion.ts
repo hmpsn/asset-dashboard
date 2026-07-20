@@ -297,7 +297,6 @@ Extract 8-15 high-quality extractions. Quality over quantity — skip anything g
       operation: 'discovery-extraction',
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 4000,
-      temperature: 0.2,
       workspaceId,
     });
   } catch (err) {

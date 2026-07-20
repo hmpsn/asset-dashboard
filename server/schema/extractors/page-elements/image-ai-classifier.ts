@@ -95,7 +95,6 @@ export async function aiClassifyImages(
       const response = await getClient().chat.completions.create({
         model: MODEL,
         max_completion_tokens: 50,
-        temperature: 0,
         messages: [{
           role: 'user',
           content: [

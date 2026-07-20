@@ -258,7 +258,6 @@ Keep each bullet to 1-2 sentences. Be specific to this page's situation.`;
     model: MODEL_ROLES.utilityExtraction,
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 500,
-    temperature: 0.3,
     workspaceId: ws.id,
   });
 

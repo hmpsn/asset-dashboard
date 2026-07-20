@@ -280,10 +280,24 @@ export async function callOpenAI(opts: OpenAIChatOptions): Promise<OpenAIChatRes
     fallbackUsed,
   } = opts;
 
-  // Some model families accept only their default temperature (gpt-5.5 and its
-  // successor gpt-5.6-sol). The manifest owns that rule; omitting the field
-  // keeps creative fallbacks compatible with those contracts.
-  const requestTemperature = getOpenAIRequestPolicy(model).supportsCustomTemperature ? temperature : undefined;
+  // No currently-supported OpenAI model accepts a non-default temperature (see
+  // the recorded contracts in server/model-manifest.ts); sending one is a 400.
+  // The manifest owns that rule per model — never infer it from lineage.
+  const supportsCustomTemperature = getOpenAIRequestPolicy(model).supportsCustomTemperature;
+  const requestTemperature = supportsCustomTemperature ? temperature : undefined;
+  // Warn only on a temperature the CALLER actually supplied — `temperature`
+  // above carries this function's 0.7 default, so keying the warning off it
+  // would fire on every single call and train everyone to ignore it.
+  if (opts.temperature !== undefined && !supportsCustomTemperature) {
+    // Dropping the caller's parameter silently is what let ~50 dead
+    // `temperature:` args accumulate across the codebase, each asserting a
+    // behavior that never happened. Make the drop observable so the next one
+    // is caught by reading logs rather than by an outage.
+    log.warn(
+      { model, feature, requestedTemperature: temperature },
+      `[${feature}] temperature ignored: ${model} accepts only its default. Steer variance via the prompt and remove the argument.`,
+    );
+  }
 
   // Cancellable requests are per-job work; counting them as explicit bypasses keeps
   // governance telemetry truthful without sharing an abortable promise.
