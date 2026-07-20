@@ -10,6 +10,7 @@ import { parseJsonSafe, parseJsonSafeArray } from './db/json-validation.js';
 import { z } from './middleware/validate.js';
 import {
   BRIEF_PAGE_TYPES,
+  TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT,
   type ContentTemplate,
   type ContentPageType,
   type TemplateVariable,
@@ -68,6 +69,10 @@ export const templateSectionStoredSchema = z.object({
     required: z.boolean(),
   }).optional(),
   optional: z.boolean().optional(),
+  renderAs: z.enum(['prose', 'table']).optional(),
+  internalLinkContract: z.object({
+    minimum: z.number().int().min(1).max(TEMPLATE_INTERNAL_LINK_MINIMUM_LIMIT),
+  }).strict().optional(),
 });
 
 export const stringRecordStoredSchema = z.record(z.string());

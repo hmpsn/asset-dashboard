@@ -309,6 +309,7 @@ function evidenceTexts(value: GenerationEvidenceValue): string[] {
   switch (value.kind) {
     case 'text': return [value.value];
     case 'text_list': return value.value;
+    case 'link_list': return value.value.flatMap(link => [link.anchorText, link.href]);
     case 'number': return [`${value.value}${value.unit ? ` ${value.unit}` : ''}`];
     case 'boolean': return [value.value ? 'confirmed' : 'not confirmed'];
     case 'date': return [value.value];

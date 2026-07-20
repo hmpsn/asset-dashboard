@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto';
 import type { MatrixCell } from '../../../../shared/types/content.js';
 import {
   GENERATION_EVIDENCE_SOURCE_TYPES,
+  GENERATION_INTERNAL_LINK_ANCHOR_MAX_LENGTH,
+  GENERATION_INTERNAL_LINK_HREF_MAX_LENGTH,
+  GENERATION_INTERNAL_LINK_LIMIT,
   STRUCTURAL_ONLY_GENERATION_EVIDENCE_SOURCE_TYPES,
   type GenerationEvidenceRequirement,
   type GenerationFactualEvidenceSourceRef,
@@ -33,6 +36,14 @@ const evidenceValueSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('number'), value: z.number().finite(), unit: z.string().min(1).optional() }).strict(),
   z.object({ kind: z.literal('boolean'), value: z.boolean() }).strict(),
   z.object({ kind: z.literal('text_list'), value: z.array(z.string().min(1)).min(1) }).strict(),
+  z.object({
+    kind: z.literal('link_list'),
+    value: z.array(z.object({
+      href: z.string().trim().min(1).max(GENERATION_INTERNAL_LINK_HREF_MAX_LENGTH)
+        .regex(/^\/(?!\/)[^\s?#]*\/?$/),
+      anchorText: z.string().trim().min(1).max(GENERATION_INTERNAL_LINK_ANCHOR_MAX_LENGTH),
+    }).strict()).min(1).max(GENERATION_INTERNAL_LINK_LIMIT),
+  }).strict(),
   z.object({ kind: z.literal('date'), value: z.string().min(1) }).strict(),
   z.object({ kind: z.literal('url'), value: z.string().url() }).strict(),
 ]);
@@ -352,6 +363,7 @@ function evidenceValueText(value: GenerationEvidenceValue): string {
     case 'number': return `${value.value}${value.unit ? ` ${value.unit}` : ''}`;
     case 'boolean': return value.value ? 'Confirmed' : 'Not confirmed';
     case 'text_list': return value.value.join('; ');
+    case 'link_list': return value.value.map(link => `${link.anchorText} (${link.href})`).join('; ');
     case 'date': return value.value;
     case 'url': return value.value;
   }

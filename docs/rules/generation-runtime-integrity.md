@@ -191,3 +191,15 @@ Before merging generation work, reviewers confirm:
    remains blocked during an active claim or unresolved reconciliation.
 10. Flags cover only new semantics and include OFF/ON/retirement evidence.
 11. Failure tests prove that the prior valid artifact and newer human state are preserved.
+
+## 9. Structured page output is contract driven
+
+Generated page structure that affects meaning or navigation must be explicit authority, not a prompt hint.
+
+- A template block declares structured rendering (for example, a semantic table) and required internal linking in typed contracts before generation.
+- Preserve semantic HTML through every sanitizer, adapter, revision, and persistence boundary. Audit the required structure after the final accepted revision; substantive text alone is not proof that a declared structure survived.
+- Internal links come only from a bounded workspace-census-backed allowlist frozen during free preflight and included in the generation fingerprint. Reject external, unknown, duplicate, and target/self destinations before paid work.
+- A declared internal-link block with fewer than its required verified anchors fails; zero links never pass vacuously. A revision may add or retarget anchors only within the frozen block allowlist.
+- Heading freedom is resolved per block. Literal AEO/question headings remain locked; conversion-oriented blocks may generate branded headings while retaining the template text only as reference/fallback authority.
+- An automatic prose revision uses the same homogeneous provider/model that produced the accepted prose. Mixed or missing prose provenance, provider unavailability, or disabled exact-model dispatch preserves the valid draft and yields an attention state instead of silently crossing models.
+- Post-revision voice review explicitly covers grammatical person, reader address, register, tone boundaries, and anti-patterns in addition to lexical banned/required terms.
