@@ -149,6 +149,60 @@ export interface MatrixGenerationSourceLimitIssue {
   limit: number;
 }
 
+/** Stable caller-facing reasons for preview/start/retry precondition failures. */
+export const MATRIX_GENERATION_PRECONDITION_REASONS = [
+  'feature_disabled',
+  'invalid_selection',
+  'invalid_budget',
+  'source_revision_changed',
+  'preview_fingerprint_stale',
+  'invalid_cursor',
+  'retry_conflict',
+  'artifact_revision_changed',
+  'checkpoint_changed',
+  'active_job_conflict',
+] as const;
+
+export type MatrixGenerationPreconditionReason =
+  (typeof MATRIX_GENERATION_PRECONDITION_REASONS)[number];
+
+export interface MatrixGenerationPreconditionDetails {
+  reason: MatrixGenerationPreconditionReason;
+  retryable: boolean;
+  fieldPath?: string;
+  constraint?: string;
+}
+
+export const MATRIX_GENERATION_CENSUS_FAILURE_STAGES = [
+  'webflow_pages',
+  'base_url',
+  'sitemap',
+] as const;
+
+export type MatrixGenerationCensusFailureStage =
+  (typeof MATRIX_GENERATION_CENSUS_FAILURE_STAGES)[number];
+
+export const MATRIX_GENERATION_CENSUS_FAILURE_CODES = [
+  'provider_error',
+  'incomplete',
+  'invalid_response',
+  'limit_exceeded',
+] as const;
+
+export interface MatrixGenerationCensusFailure {
+  stage: MatrixGenerationCensusFailureStage;
+  code: (typeof MATRIX_GENERATION_CENSUS_FAILURE_CODES)[number];
+  /** Safe provider status only; provider response text is never exposed. */
+  httpStatus?: number;
+}
+
+export interface MatrixGenerationPreviewDiagnostics {
+  requirementsComplete: boolean;
+  sourceLimitIssues: MatrixGenerationSourceLimitIssue[];
+  sourceLimitIssuesTruncated: boolean;
+  censusFailures: MatrixGenerationCensusFailure[];
+}
+
 export type MatrixGenerationSourceKind =
   | 'matrix_definition'
   | 'matrix'
@@ -1137,6 +1191,8 @@ export interface MatrixGenerationPreviewTarget extends ResolvedMatrixStructuralT
   expectedArtifactRevisions: MatrixArtifactRevisionExpectations;
   effectiveInputFingerprint: string;
   blockingRequirementIds: string[];
+  /** Exact evidence rows accepted by preview and consumed by paid stages. */
+  frozenEvidenceResolutionIds: string[];
   estimatedPaidBudget: MatrixGenerationCostEstimate;
   /** Frozen block-scoped destinations verified against the workspace page census. */
   verifiedInternalLinks?: MatrixGenerationVerifiedInternalLinkBlock[];
@@ -1176,6 +1232,7 @@ interface MatrixGenerationPreviewIdentity {
   templateId: string;
   cellId: string;
   sourceRevision: MatrixSourceRevision;
+  diagnostics: MatrixGenerationPreviewDiagnostics;
 }
 
 export type MatrixGenerationPreviewResult =
@@ -1522,6 +1579,16 @@ export interface GetMatrixGenerationRequest {
   runId: string;
   cursor?: string;
   limit?: number;
+  /** Opt-in exact frozen evidence values; bounded across the response. */
+  includeEvidenceValues?: boolean;
+}
+
+export const MATRIX_GENERATION_EVIDENCE_VALUE_READ_LIMIT = 10;
+
+export interface MatrixGenerationEvidenceValueRead {
+  resolution: MatrixGenerationEvidenceResolution;
+  isCurrent: boolean;
+  supersededAt: string | null;
 }
 
 export interface MatrixGenerationItemRead extends Omit<
@@ -1536,6 +1603,8 @@ export interface MatrixGenerationItemRead extends Omit<
   setAuditFindings: MatrixGenerationSetAuditFinding[];
   currentArtifactRevisions: MatrixArtifactRevisionExpectations;
   reusableCheckpointFingerprint: string | null;
+  /** Present only when includeEvidenceValues=true. */
+  evidenceValues?: MatrixGenerationEvidenceValueRead[];
 }
 
 export interface GetMatrixGenerationResult {
