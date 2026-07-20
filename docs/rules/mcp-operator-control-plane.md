@@ -18,15 +18,20 @@ and read models exposed through it.
 - One canonical operator allowlist controls both discovery and invocation.
   Invoking a registered but hidden tool returns the same generic `not_found`
   envelope as a nonexistent tool and never reaches its handler.
-- The canonical profile contains 25 registered names. P1 initially exposed 22;
-  P2 activated the three real read models without placeholder handlers or stubs.
+- The canonical profile contains 25 registered names through P5. P1 initially
+  exposed 22; P2 activated the three real read models without placeholder
+  handlers or stubs. P6 may add only the bounded `get_mcp_usage_report` tool,
+  bringing the profile to 26 names.
 - Compact discovery may replace top-level prose and remove nested JSON-Schema
   `description` metadata. It must preserve names, schema types, properties,
   required fields, enums, bounds, patterns, unions, defaults, and every other
   validation keyword. The full-profile definitions are never mutated.
-- Operator discovery JSON plus initialize instructions is at most 32 KiB UTF-8.
-  Measurement uses the exact JSON-serialized `tools` array and exact instruction
-  string returned by the server.
+- Operator discovery JSON plus initialize instructions is at most 64 KiB UTF-8,
+  with 48 KiB as the optimization target. P3 deliberately supersedes the 32 KiB
+  P1/P2 ceiling because complete self-contained output schemas and annotations
+  cannot fit in the remaining 35 bytes without weakening the contract or
+  splitting the endpoint. Measurement uses the exact JSON-serialized `tools`
+  array and exact instruction string returned by the server.
 
 ## P1 operator tool-name contract
 
@@ -39,6 +44,8 @@ including these three deterministic read models:
 
 No other tool may appear on `/mcp/operator` without amending this rule, the
 program plan, the allowlist census, and the discovery/invocation tests together.
+The single P6 usage-report addition is pre-authorized only when those changes
+land together and the 64 KiB hard ceiling remains green.
 
 ## Cross-phase exports
 

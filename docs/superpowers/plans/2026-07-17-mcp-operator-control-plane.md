@@ -15,18 +15,28 @@ WebSocket events, or UI routes in P1.
 
 ## Dependency graph
 
-Sequential phases:
+The reliability-closure amendment is sequential and staging-first. Every arrow
+means the preceding PR is merged, CI-green, and smoke-verified on staging before
+the next worktree is created:
 
 ```text
 P0 ready-preview repair (complete)
   → P1 compact operator profile
   → P2 deterministic decision/client views
+  → M0 single-cell set-audit consistency
   → P3 structured outputs and annotations
+  → M1-M8 matrix reliability/quality closure
   → P4 workspace alias normalization
   → P5 capability-scoped credentials
   → P6 MCP telemetry and usage reporting
   → P7 desktop workflow prompts
+  → one staging-to-main release
 ```
+
+M0-M8 are defined by the approved MCP and Matrix Reliability Closure Program.
+They preserve the evidence ledger and human approval/send/publication gates. No
+phase syncs a local database from staging, and paid Rinse generation remains an
+explicit owner-confirmed checkpoint after M6.
 
 P1 execution:
 
@@ -102,7 +112,10 @@ a provider, a job starter, a mutation, or a paid-operation counter.
 ### P3 — Structured contracts
 
 Add validated structured outputs, explicit output schemas, and annotations for
-all active operator tools without removing text JSON compatibility.
+all active operator tools without removing text JSON compatibility. The complete
+self-contained contract has a 64 KiB hard ceiling and 48 KiB optimization target;
+the historical 32 KiB P1/P2 ceiling is superseded rather than met with lossy or
+externally unresolved schemas.
 
 ### P4 — Workspace aliases
 
