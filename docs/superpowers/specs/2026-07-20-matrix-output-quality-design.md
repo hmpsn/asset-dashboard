@@ -33,6 +33,7 @@
 - system introduction/conclusion remain unlocked.
 
 Locked blocks must use the manifest-rendered literal. Unlocked blocks must return a non-empty generated heading that agrees between section metadata and the first heading in content and is not silently replaced by the literal fallback.
+An empty `headingTemplate` is neither an unlock nor an internal-ID fallback: it is an explicit no-visible-heading contract. Generation may use a temporary outline scaffold, but stored content, section metadata, deterministic audit, and revision must preserve exact H2 absence.
 
 ### Internal-link authority
 
@@ -87,3 +88,4 @@ No `db:sync-staging`, staging data import, paid generation, approval, send, or p
 - Existing TipTap editing does not register table extensions. This phase must prove generated/read/export markup safety and record editor round-trip support as follow-up unless the current editor already preserves semantic tables without modification.
 - Existing templates receive no inferred internal-link/table contracts. The Rinse template must be explicitly revised and human-approved before a paid regeneration smoke.
 - `generationRole` alone is insufficient for cost-versus-conversion `body` blocks; `aeoContract.required` is the verified discriminator.
+- Matrix budget ceilings delegate to the canonical model manifest pricing table; they do not retain provider-rate copies.

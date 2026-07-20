@@ -45,6 +45,7 @@ Exclusive ownership: template persistence/validation, block manifest, run reposi
 Acceptance:
 
 - Empty headings are not treated as an unlock mechanism.
+- Empty heading templates preserve an explicit no-visible-heading contract through generation, audit, and revision; internal section IDs never reach copy.
 - Rinse-shaped cost/definition/FAQ blocks stay literal; proof/CTA/non-AEO body unlock.
 - Valid semantic tables survive sanitization; unsafe attributes do not.
 
@@ -55,6 +56,7 @@ Exclusive ownership: evidence resolution, preview preparation, workspace page-ce
 - Add stable link evidence requirements for declared included sections.
 - Resolve typed link lists against one complete workspace census read.
 - Reject external, unknown, duplicate, and self destinations before paid work.
+- Duplicate canonical destinations fail explicitly even when the distinct-link minimum would otherwise be satisfied.
 - Freeze per-block links into preview targets/fingerprints.
 - Preserve public read-service response compatibility.
 
@@ -74,6 +76,7 @@ Exclusive ownership: matrix generation stages, item audit, revision operation, A
 - Replace vacuous page-wide link checking with block-scoped minimum/self/allowlist enforcement.
 - Add semantic table structural audit.
 - Route revision to the homogeneous accepted prose provider/model with fallback disabled.
+- Price conservative preview/runtime reservations through the canonical model manifest.
 - Explicitly evaluate grammatical person/register after revision.
 
 Acceptance:

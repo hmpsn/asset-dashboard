@@ -6,7 +6,7 @@ Source: Obsidian `hmpsn studio/Insights Engine/spec-open-work-2026-07-16.md` §2
 
 The five requested findings are real, but three proposed explanations need correction before implementation:
 
-1. An empty `headingTemplate` does **not** create an unlocked heading. The manifest leaves the rendered heading null but still emits `locked: true`, and the later census/audit path is not designed to accept a generated replacement.
+1. An empty `headingTemplate` does **not** create an unlocked heading. The manifest leaves the rendered heading null while retaining `locked: true`; the implemented resolution treats that as an explicit no-visible-heading contract rather than leaking an internal section ID or discovering the mismatch after paid work.
 2. The observed comparison flattening does not prove the model omitted table markup. `sanitizeRichText()` currently removes `table`, `thead`, `tbody`, `tr`, `th`, and `td`, producing the exact concatenated output reported even from valid table HTML.
 3. `internal-paths` has two independent blind spots: zero links pass vacuously, and absolute/protocol-relative links are skipped before workspace-path validation. That allows absolute self-links to pass.
 
