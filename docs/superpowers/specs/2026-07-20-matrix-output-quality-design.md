@@ -53,6 +53,8 @@ Optional sections retain existing `optional_omit` semantics. The contract narrow
 
 Find the accepted prose execution records for introduction, section, conclusion, and unification operations. Revision is allowed only when all accepted prose contributors share one provider/model. Dispatch the revision with that exact pair, no fallback, and provider-aware fingerprints/reservations. Mixed/missing provenance or provider failure preserves the original and produces `needs_attention` rather than paying for a cross-model rewrite.
 
+Every bounded dispatch carries that exact model. Runtime and preview reserve the model-manifest provider request ceiling, including Anthropic adaptive-thinking headroom above the caller's content-token limit, and price the same ceiling through the canonical estimator.
+
 The post-revision audit prompt explicitly checks grammatical person, reader address, register, tone boundaries, and anti-patterns. The deterministic lexical guard remains a fast fail-first check; no unreliable pronoun-ratio heuristic is introduced.
 
 ### Semantic tables

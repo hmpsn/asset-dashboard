@@ -77,6 +77,7 @@ Exclusive ownership: matrix generation stages, item audit, revision operation, A
 - Add semantic table structural audit.
 - Route revision to the homogeneous accepted prose provider/model with fallback disabled.
 - Price conservative preview/runtime reservations through the canonical model manifest.
+- Include manifest-derived provider thinking headroom in both the accepted preview ceiling and each exact runtime reservation.
 - Explicitly evaluate grammatical person/register after revision.
 
 Acceptance:
