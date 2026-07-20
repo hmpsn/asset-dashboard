@@ -1,7 +1,12 @@
 import sanitizeHtml from 'sanitize-html';
 
 const RICH_TEXT_OPTIONS: sanitizeHtml.IOptions = {
-  allowedTags: ['p', 'br', 'strong', 'em', 's', 'u', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'hr'],
+  allowedTags: [
+    'p', 'br', 'strong', 'em', 's', 'u', 'a',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'hr',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  ],
   allowedAttributes: {
     a: ['href', 'target', 'rel'],
   },

@@ -66,6 +66,20 @@ describe('sanitizeRichText', () => {
     const input = '<blockquote>quote</blockquote><code>code snippet</code>';
     expect(sanitizeRichText(input)).toBe('<blockquote>quote</blockquote><code>code snippet</code>');
   });
+
+  it('preserves semantic comparison-table structure while stripping unsafe attributes', () => {
+    const input = [
+      '<table class="comparison" style="display:none" onclick="steal()">',
+      '<thead><tr><th scope="col" class="label">Feature</th><th>In-office</th></tr></thead>',
+      '<tbody><tr data-secret="x"><td style="color:red">Speed</td><td>Faster</td></tr></tbody>',
+      '</table>',
+    ].join('');
+
+    expect(sanitizeRichText(input)).toBe(
+      '<table><thead><tr><th>Feature</th><th>In-office</th></tr></thead>'
+      + '<tbody><tr><td>Speed</td><td>Faster</td></tr></tbody></table>',
+    );
+  });
 });
 
 describe('sanitizePlainText', () => {

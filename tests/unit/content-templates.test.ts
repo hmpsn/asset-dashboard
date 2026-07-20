@@ -158,6 +158,19 @@ describe('content-templates store', () => {
     });
     expect(getTemplate(WS_ID, withOptionalProof.id)?.sections[1]?.optional).toBe(true);
 
+    const withOutputContracts = createServiceTemplate({
+      generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
+      sections: [{
+        ...template.sections[0],
+        renderAs: 'table',
+        internalLinkContract: { minimum: 2 },
+      }],
+    });
+    expect(getTemplate(WS_ID, withOutputContracts.id)?.sections[0]).toMatchObject({
+      renderAs: 'table',
+      internalLinkContract: { minimum: 2 },
+    });
+
     expect(() => createServiceTemplate({
       generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
       sections: [{ ...template.sections[0], optional: true }],
