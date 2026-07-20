@@ -18,7 +18,12 @@
  *
  * Usage:
  *   npm run verify:model-currency
- *   npm run verify:model-currency -- --require-keys   # fail if a key is absent
+ *   npm run verify:model-currency -- --require-keys      # armed (nightly CI)
+ *   npm run verify:model-currency -- --check-sampling    # also re-verify the
+ *       per-model sampling contracts in server/model-manifest.ts against the
+ *       live APIs. Added after the 2026-07-20 P0: a temperature contract that
+ *       was INFERRED from model lineage rather than probed 400'd every brief
+ *       and post generation. A mismatch fails the run.
  *
  * Without a provider's API key that provider's models are SKIPPED gracefully
  * (exit 0) — local/dev without provider creds are not blocked. The nightly
@@ -29,9 +34,10 @@
  * boot (server/model-currency.ts).
  */
 import { ACTIVE_MODEL_IDS } from '../server/model-manifest.js';
-import { checkModelCurrency } from '../server/model-currency.js';
+import { checkModelCurrency, checkSamplingContracts } from '../server/model-currency.js';
 
 const requireKeys = process.argv.includes('--require-keys');
+const checkSampling = process.argv.includes('--check-sampling');
 
 async function main(): Promise<void> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -83,6 +89,28 @@ async function main(): Promise<void> {
 
   const checked = results.length;
   console.log(`\nmodel-currency: ${checked} checked, ${warned} deprecation warning(s), ${failed} retired`);
+
+  // --check-sampling re-verifies every RECORDED sampling contract against the
+  // live provider APIs. Added after the 2026-07-20 P0, where a contract
+  // inferred from model lineage (rather than probed) 400'd all content
+  // generation. A mismatch here means the manifest is lying about a model.
+  if (checkSampling) {
+    const sampling = await checkSamplingContracts();
+    let mismatched = 0;
+    for (const r of sampling) {
+      if (r.status === 'match') {
+        console.log(`✅ ${r.provider}/${r.model}: sampling contract matches (supports=${r.recorded})`);
+      } else if (r.status === 'mismatch') {
+        mismatched += 1;
+        console.error(`❌ ${r.provider}/${r.model}: SAMPLING CONTRACT WRONG — manifest says supports=${r.recorded}, provider says ${r.observed}. Update the contract in server/model-manifest.ts and its pinned fixture in tests/contract/model-sampling-contracts.test.ts.`);
+      } else {
+        console.log(`⚠️  ${r.provider}/${r.model}: sampling probe inconclusive — ${r.detail}`);
+      }
+    }
+    console.log(`sampling-contracts: ${sampling.length} probed, ${mismatched} mismatched`);
+    if (mismatched > 0) process.exit(1);
+  }
+
   if (failed > 0) process.exit(1);
 }
 
