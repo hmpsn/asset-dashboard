@@ -4,6 +4,7 @@ import type { AICallResult } from '../../server/ai.js';
 import {
   auditMatrixGenerationSet,
   isItemBlockingMatrixGenerationSetAuditFinding,
+  isMatrixGenerationSetAuditRequired,
   runDeterministicMatrixGenerationSetAudit,
   type MatrixGenerationSetAuditCandidate,
 } from '../../server/domains/content/matrix-generation/set-audit.js';
@@ -76,6 +77,13 @@ function aiResult(text: string): AICallResult {
 }
 
 describe('content matrix set audit', () => {
+  it('requires cross-page review only when at least two candidates exist', () => {
+    expect(isMatrixGenerationSetAuditRequired(0)).toBe(false);
+    expect(isMatrixGenerationSetAuditRequired(1)).toBe(false);
+    expect(isMatrixGenerationSetAuditRequired(2)).toBe(true);
+    expect(isMatrixGenerationSetAuditRequired(25)).toBe(true);
+  });
+
   it('catches structural collisions without flagging a normal service-by-location pair', () => {
     const austin = candidate({
       id: 'item-austin',
