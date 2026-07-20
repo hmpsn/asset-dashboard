@@ -39,6 +39,7 @@ import {
   extractDbPrepareArg,
   findUnrenderedSliceFields,
   findMissingDeliverableAdapters,
+  findInlineModelIdLiterals,
   compareStudioConstants,
   getChangedFiles,
   getFiles,
@@ -2164,6 +2165,147 @@ describe('Rule: Constants in sync (STUDIO_NAME, STUDIO_URL)', () => {
   it('returns [] when either input is empty (diff-mode short-circuit)', () => {
     expect(compareStudioConstants('', 'anything', 'server/constants.ts')).toEqual([]);
     expect(compareStudioConstants('anything', '', 'server/constants.ts')).toEqual([]);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Rule: Inline model-ID literal (server code + scripts)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Both rules share findInlineModelIdLiterals. These blocks exercise the shared
+// helper through each rule's customCheck (via runRule) AND directly, and their
+// `describe('Rule: <name>')` titles satisfy the P1.5 verified-clean meta-test's
+// fixture-coverage exemption for the two ✓ rules.
+
+describe('Rule: Inline model-ID literal in server code', () => {
+  const RULE = 'Inline model-ID literal in server code';
+
+  it('flags a hard-coded OpenAI model-ID literal', () => {
+    const file = write(
+      uniqPath('rule-model-id-server', 'server/foo.ts'),
+      lines(
+        "async function gen() {",
+        "  return callAI({ model: 'gpt-5.6-terra', messages: [] });", // 2
+        "}",
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('flags a hard-coded Anthropic model-ID literal (incl. a retired 3.5 id)', () => {
+    const file = write(
+      uniqPath('rule-model-id-server', 'server/bar.ts'),
+      lines(
+        "const CLAUDE_MODEL = 'claude-opus-4-8';", //             1
+        "const LEGACY = 'claude-3-5-haiku-20241022';", //         2
+      )
+    );
+    expect(runRule(RULE, [file]).map(h => h.line)).toEqual([1, 2]);
+  });
+
+  it('does NOT flag manifest role usage or a family-prefix capability check', () => {
+    const file = write(
+      uniqPath('rule-model-id-server', 'server/baz.ts'),
+      lines(
+        "import { MODEL_ROLES, DEFAULT_ANTHROPIC_MODEL } from './model-manifest.js';",
+        "const a = { model: MODEL_ROLES.creativeWriter };",
+        "const b = opts.model ?? DEFAULT_ANTHROPIC_MODEL;",
+        "const isGpt5 = model.startsWith('gpt-5') || model === 'chat-latest';",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag a model id mentioned in a comment (line or backtick)', () => {
+    const file = write(
+      uniqPath('rule-model-id-server', 'server/qux.ts'),
+      lines(
+        "// the documented `claude-sonnet-5` escape hatch runs here",
+        "const x = 1; // rare gpt-5.4-mini failure mode: refusal",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('honors the // model-id-ok hatch', () => {
+    const file = write(
+      uniqPath('rule-model-id-server', 'server/hatch.ts'),
+      lines(
+        "const m = 'claude-opus-4-8'; // model-id-ok — manifest-internal reference",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+
+  it('does NOT flag the manifest, the currency checker, or __tests__ files', () => {
+    const manifest = write(
+      uniqPath('rule-model-id-server', 'server/model-manifest.ts'),
+      "export const CREATIVE = 'claude-opus-4-8';",
+    );
+    const currency = write(
+      uniqPath('rule-model-id-server', 'server/model-currency.ts'),
+      "const probe = 'gpt-5.6-luna';",
+    );
+    const test = write(
+      uniqPath('rule-model-id-server', 'server/__tests__/thing.test.ts'),
+      "expect(body.model).toBe('gpt-5.6-terra');",
+    );
+    expect(runRule(RULE, [manifest, currency, test])).toHaveLength(0);
+  });
+});
+
+describe('Rule: Inline model-ID literal in scripts', () => {
+  const RULE = 'Inline model-ID literal in scripts';
+
+  it('flags a hard-coded model-ID literal in a script', () => {
+    const file = write(
+      uniqPath('rule-model-id-scripts', 'scripts/experiment.ts'),
+      lines(
+        "const model = values.get('--model') ?? 'gpt-5.6-sol';", // 1
+      )
+    );
+    const hits = runRule(RULE, [file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].line).toBe(1);
+  });
+
+  it('does NOT flag manifest role usage in a script', () => {
+    const file = write(
+      uniqPath('rule-model-id-scripts', 'scripts/clean.ts'),
+      lines(
+        "import { MODEL_ROLES } from '../server/model-manifest.js';",
+        "const model = MODEL_ROLES.structuredSynthesis;",
+      )
+    );
+    expect(runRule(RULE, [file])).toHaveLength(0);
+  });
+});
+
+describe('findInlineModelIdLiterals (shared helper)', () => {
+  it('matches gpt-image, dotted gpt, and versioned claude ids but not bare families', () => {
+    const flag = write(
+      uniqPath('helper-model-id', 'server/gen.ts'),
+      lines(
+        "const img = { model: 'gpt-image-2' };", //          1  → flag
+        "const nano = 'gpt-5.4-nano';", //                    2  → flag
+        "const haiku = 'claude-haiku-4-5';", //               3  → flag
+        "const bare = 'gpt-5';", //                           4  → no (family prefix)
+        "const alias = 'chat-latest';", //                    5  → no
+      )
+    );
+    expect(findInlineModelIdLiterals([flag]).map(h => h.line)).toEqual([1, 2, 3]);
+  });
+
+  it('preserves the raw line as match text so the runner can apply excludeLines', () => {
+    const file = write(
+      uniqPath('helper-model-id', 'server/gen2.ts'),
+      "  model: 'gpt-5.6-terra',",
+    );
+    const hits = findInlineModelIdLiterals([file]);
+    expect(hits).toHaveLength(1);
+    expect(hits[0].text).toBe("model: 'gpt-5.6-terra',");
   });
 });
 
@@ -6017,6 +6159,9 @@ describe('Meta: customCheck rule name registry', () => {
     // Keyword Command Center crash-hardening follow-up
     'Keyword Command Center read paths must not use full model',
     'Local SEO Evaluated candidates must be explicitly gated',
+    // Model manifest contract (2026-07 model upgrade follow-up)
+    'Inline model-ID literal in server code',
+    'Inline model-ID literal in scripts',
     'Retired normalizePath usage in production code',
     'Local page/path normalizer helper outside tests',
     // P2 expansion rules

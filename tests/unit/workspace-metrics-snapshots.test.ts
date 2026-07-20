@@ -35,7 +35,7 @@ describe('workspace-metrics-snapshots', () => {
 
   describe('recordSnapshot + getSnapshots', () => {
     it('persists a snapshot and reads it back', () => {
-      const snapshotDate = dateKey(30);
+      const snapshotDate = dateKey(7);
       const snap = recordSnapshot({
         workspaceId: WS,
         snapshotDate,
@@ -52,7 +52,7 @@ describe('workspace-metrics-snapshots', () => {
     });
 
     it('upserts on (workspaceId, snapshotDate) — re-records overwrite', () => {
-      const snapshotDate = dateKey(30);
+      const snapshotDate = dateKey(7);
       recordSnapshot({ workspaceId: WS, snapshotDate, metrics: { totalClicks: 50 } });
       const second = recordSnapshot({ workspaceId: WS, snapshotDate, metrics: { totalClicks: 75 } });
       expect(second.totalClicks).toBe(75);
@@ -64,7 +64,7 @@ describe('workspace-metrics-snapshots', () => {
     it('persists nulls for unset metrics', () => {
       recordSnapshot({
         workspaceId: WS,
-        snapshotDate: dateKey(30),
+        snapshotDate: dateKey(7),
         metrics: { totalClicks: 100 }, // others omitted
       });
       const list = getSnapshots(WS, 90);
