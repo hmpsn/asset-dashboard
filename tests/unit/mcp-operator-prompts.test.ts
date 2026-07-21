@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   getMcpOperatorPrompt,
@@ -101,5 +103,26 @@ describe('MCP operator prompt contracts', () => {
     expect(text).toContain('Stop at human review');
     expect(text).toContain('Never approve, send, or publish');
   });
-});
 
+  it('keeps the copyable desktop fallback aligned with the native workflows', () => {
+    const starters = readFileSync(fileURLToPath(new URL(
+      '../../docs/workflows/mcp-operator-workflow-starters.md',
+      import.meta.url,
+    )), 'utf8');
+    const normalized = starters.replace(/\s+/g, ' ');
+    for (const heading of [
+      'Triage the studio portfolio',
+      'Review a workspace as the client',
+      'Run content matrix generation safely',
+    ]) expect(normalized).toContain(heading);
+    for (const safetyClause of [
+      'sole client-safe projection',
+      'stop on every blocker',
+      'fresh explicit human confirmation',
+      'invalidates prior confirmation',
+      'Never retry automatically',
+      'Stop at human review',
+      'Never approve, send, or publish',
+    ]) expect(normalized).toContain(safetyClause);
+  });
+});
