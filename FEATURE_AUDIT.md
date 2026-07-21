@@ -10272,3 +10272,21 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Unit coverage pins the frozen prompt census, strict own-property argument validation, deterministic rendering, operator-tool references, safety clauses, and copyable fallback parity. Real HTTP integration coverage pins operator-only capability negotiation, all three `prompts/list`/`prompts/get` flows, generic failures, unchanged full-profile capabilities, and the existing 25-tool operator catalog.
 
 **Files:** shared MCP prompt vocabulary; operator prompt registry and transport handlers; focused unit/integration tests; copyable workflow guide and MCP README; operator-control-plane spec, plan, and rule; roadmap and feature audit.
+
+### 723. Canonical SEO copy generation operations 2026-07-21
+
+**Status:** Complete locally. Independent review, full repository gates, CI, and staging smoke are required before release. No paid generation was invoked.
+
+**What changed:** Single-page SEO title/meta rewrites, legacy synchronous bulk rewrites, and the active background bulk worker now render and validate one canonical `seo-metadata-variations` task instead of maintaining three drifting prompts and parsers. The richer Page Intelligence SEO copy set now uses the separate named `seo-page-copy-set` operation. Both route through the model manifest's creative-writer role with the existing OpenAI fallback, rather than using a utility extraction model for H1, introduction, title, and description prose.
+
+**Grounding and voice:** The shared `seo-health` service bounds and sanitizes page evidence, preserves calibrated DNA/guardrails in the system layer, renders voice examples exactly once in user authority, and allows concrete specificity only when structured proof/differentiators/locations or human-maintained approved knowledge are supplied. Missing authority produces restrained copy rather than invented results, credentials, offers, or locations.
+
+**Output safety:** Title and description outputs use strict root-object Zod contracts and deterministic 60/160-character enforcement. Malformed or partial structured output produces no suggestion. Page-copy internal links are limited to normalized page-map destinations and remove unknown, external, malformed, and self-referential targets. Generation itself performs no DB, job, Webflow, approval, send, or publication write.
+
+**Compatibility:** Existing HTTP success shapes, saved `seo_suggestions`, background progress/results, activity/broadcast behavior, and human-selection/Webflow-apply boundaries remain unchanged. The OpenAI-only precondition was removed from creative routes so Anthropic-only configuration can use the canonical writer; a missing/failing provider returns a generic failure, and an all-failed bulk job terminalizes as an error rather than success. Direct auto-apply bulk fixes, audit recommendation generation, rewrite chat, Copy Pipeline, and post SEO metadata remain separate because their adoption/source contracts differ.
+
+**Measurement gate:** The six-case private benchmark remains `no_recommendation`/`not_run`: this environment has no authenticated metadata-only source inventory, and the owner has not attested six exact sources spanning three page types with one provenance-sensitive case. Therefore no Copy Pipeline context expansion, page-level review, or model switch is included.
+
+**Tests:** Focused unit, contract, and integration coverage pins adapter parity, named creative roles, strict parsing, evidence-conditional specificity, deterministic limits, verified links, provider failure, truthful background terminal state, and backward-compatible success payloads. The deterministic AI quality registry and trace map now cover the canonical service and report 100.
+
+**Files:** named-operation registry; canonical SEO copy service; single/page-copy/bulk/background adapters; focused tests; SEO copy rule; AI reliability registry/trace map; roadmap, feature inventory, and feature audit.
