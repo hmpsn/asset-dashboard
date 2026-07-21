@@ -188,7 +188,15 @@ export function evaluateCandidateHtml(candidate: ContentQualityBenchmarkCandidat
         : 'pass' as const,
     message: `Canonical matrix audit result: ${item.result}.`,
   })) ?? [];
-  return [...genericChecks, ...runtimeChecks];
+  const runtimeVerdictCheck = candidate.runtimeAudit
+    ? [check(
+      'matrix:verdict',
+      candidate.runtimeAudit.verdict === 'ready_for_human_review',
+      'The canonical matrix audit is ready for human review.',
+      `The canonical matrix audit verdict is ${candidate.runtimeAudit.verdict}.`,
+    )]
+    : [];
+  return [...genericChecks, ...runtimeVerdictCheck, ...runtimeChecks];
 }
 
 function sha256(value: string): string {
@@ -229,13 +237,28 @@ function validateComparison(casesFile: BenchmarkCasesFile, ratingsFile: Benchmar
   }
 }
 
+interface InternalCandidateAggregate extends ContentQualityBenchmarkCandidateAggregate {
+  gateMetrics: {
+    preferenceRate: number;
+    meanRatings: Record<(typeof CONTENT_QUALITY_BENCHMARK_HUMAN_DIMENSIONS)[number], number>;
+    meanEstimatedCostUsd: number;
+    meanDurationMs: number;
+    meanPromptTokens: number;
+  };
+}
+
+function rawMean(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
 function aggregateCandidate(
   label: string,
   cases: ContentQualityBenchmarkCase[],
   ratingsByCase: Map<string, BenchmarkRatingsFile['cases'][number]>,
   checksByCase: Map<string, Record<string, ContentQualityBenchmarkDeterministicCheck[]>>,
   preferenceDenominator: number,
-): ContentQualityBenchmarkCandidateAggregate {
+): InternalCandidateAggregate {
   const candidates = cases.map(testCase => testCase.candidateVariants.find(candidate => candidate.anonymousLabel === label)!);
   const ratings = cases.flatMap(testCase => ratingsByCase.get(testCase.caseId)?.humanRatings.filter(rating => rating.anonymousLabel === label) ?? []);
   const preferences = cases.filter(testCase => {
@@ -243,21 +266,37 @@ function aggregateCandidate(
     return ratings?.preferredCandidate === label
       && ratings.humanRatings.length === testCase.candidateVariants.length;
   }).length;
+  const rawMeanRatings = Object.fromEntries(CONTENT_QUALITY_BENCHMARK_HUMAN_DIMENSIONS.map(dimension => [
+    dimension,
+    rawMean(ratings.map(rating => rating.ratings[dimension])),
+  ])) as ContentQualityBenchmarkCandidateAggregate['meanRatings'];
   const meanRatings = Object.fromEntries(CONTENT_QUALITY_BENCHMARK_HUMAN_DIMENSIONS.map(dimension => [
     dimension,
-    mean(ratings.map(rating => rating.ratings[dimension])),
+    Math.round(rawMeanRatings[dimension] * 100) / 100,
   ])) as ContentQualityBenchmarkCandidateAggregate['meanRatings'];
+  const rawPreferenceRate = preferenceDenominator === 0 ? 0 : (preferences / preferenceDenominator) * 100;
+  const rawEstimatedCostUsd = rawMean(candidates.map(candidate => candidate.provenance.estimatedCostUsd));
+  const rawDurationMs = rawMean(candidates.map(candidate => candidate.provenance.durationMs));
+  const rawPromptTokens = rawMean(candidates.map(candidate => candidate.provenance.promptTokens));
   return {
     anonymousLabel: label,
     caseCount: candidates.length,
-    preferenceRate: preferenceDenominator === 0 ? 0 : Math.round((preferences / preferenceDenominator) * 10_000) / 100,
+    preferenceRate: Math.round(rawPreferenceRate * 100) / 100,
     meanRatings,
+    factualNeedsReview: ratings.filter(rating => rating.factualDiscipline === 'needs_review').length,
     factualFailures: ratings.filter(rating => rating.factualDiscipline === 'fail').length,
     deterministicFailures: cases.reduce((total, testCase) => total + (checksByCase.get(testCase.caseId)?.[label] ?? []).filter(item => item.status === 'fail').length, 0),
     meanEstimatedCostUsd: mean(candidates.map(candidate => candidate.provenance.estimatedCostUsd)),
     meanDurationMs: mean(candidates.map(candidate => candidate.provenance.durationMs)),
     meanPromptTokens: mean(candidates.map(candidate => candidate.provenance.promptTokens)),
     meanCompletionTokens: mean(candidates.map(candidate => candidate.provenance.completionTokens)),
+    gateMetrics: {
+      preferenceRate: rawPreferenceRate,
+      meanRatings: rawMeanRatings,
+      meanEstimatedCostUsd: rawEstimatedCostUsd,
+      meanDurationMs: rawDurationMs,
+      meanPromptTokens: rawPromptTokens,
+    },
   };
 }
 
@@ -286,19 +325,25 @@ export function buildBenchmarkReport(
   ));
   const baseline = internalAggregates.find(candidate => candidate.anonymousLabel === baselineLabel)!;
   const eligible = internalAggregates.filter(candidate => candidate.anonymousLabel !== baselineLabel
-    && candidate.preferenceRate >= 70
-    && candidate.meanRatings.brand_fidelity >= 4
-    && candidate.meanRatings.intent_satisfaction >= 4
+    && candidate.gateMetrics.preferenceRate >= 70
+    && candidate.gateMetrics.meanRatings.brand_fidelity >= 4
+    && candidate.gateMetrics.meanRatings.intent_satisfaction >= 4
+    && candidate.factualNeedsReview === 0
     && candidate.factualFailures === 0
     && candidate.deterministicFailures === 0
-    && candidate.meanEstimatedCostUsd <= baseline.meanEstimatedCostUsd
-    && candidate.meanPromptTokens <= baseline.meanPromptTokens)
+    && candidate.gateMetrics.meanEstimatedCostUsd <= baseline.gateMetrics.meanEstimatedCostUsd
+    && candidate.gateMetrics.meanPromptTokens <= baseline.gateMetrics.meanPromptTokens
+    && candidate.gateMetrics.meanDurationMs <= baseline.gateMetrics.meanDurationMs)
     .sort((a, b) => b.preferenceRate - a.preferenceRate
       || b.meanRatings.brand_fidelity - a.meanRatings.brand_fidelity
       || a.anonymousLabel.localeCompare(b.anonymousLabel));
-  const enoughRatings = casesFile.cases.length >= 6 && allCasesComplete;
+  const representativeCorpus = new Set(casesFile.cases.map(testCase => testCase.pageType)).size >= 3
+    && casesFile.cases.some(testCase => testCase.verticalSensitivity === 'provenance_sensitive');
+  const enoughRatings = casesFile.cases.length >= 6 && allCasesComplete && representativeCorpus;
   const winner = enoughRatings ? eligible[0] : undefined;
-  const baselineSafe = baseline.factualFailures === 0 && baseline.deterministicFailures === 0;
+  const baselineSafe = baseline.factualNeedsReview === 0
+    && baseline.factualFailures === 0
+    && baseline.deterministicFailures === 0;
   const recommendation = !enoughRatings
     ? 'no_recommendation'
     : winner
@@ -307,7 +352,7 @@ export function buildBenchmarkReport(
         ? 'baseline'
         : 'no_recommendation';
   const recommendationReason = !enoughRatings
-    ? 'At least six cases with complete blinded ratings and a recorded preference are required.'
+    ? 'At least six complete blinded cases spanning three page types and one provenance-sensitive case are required.'
     : winner
       ? `${winner.anonymousLabel} meets every advisory quality, safety, cost, and prompt-token threshold.`
       : baselineSafe
@@ -322,7 +367,7 @@ export function buildBenchmarkReport(
       / (casesFile.cases.length * labels.length)) * 10_000) / 100,
     recommendation,
     recommendationReason,
-    candidates: internalAggregates,
+    candidates: internalAggregates.map(({ gateMetrics: _gateMetrics, ...aggregate }) => aggregate),
     cases: casesFile.cases.map(testCase => {
       const ratings = ratingsByCase.get(testCase.caseId);
       const checks = checksByCase.get(testCase.caseId)!;
@@ -332,6 +377,7 @@ export function buildBenchmarkReport(
         referenceContentSha256: testCase.reference.contentSha256,
         ratedCandidateCount: ratings?.humanRatings.length ?? 0,
         deterministicFailureCount: Object.values(checks).flat().filter(item => item.status === 'fail').length,
+        factualNeedsReviewCount: ratings?.humanRatings.filter(rating => rating.factualDiscipline === 'needs_review').length ?? 0,
         factualFailureCount: ratings?.humanRatings.filter(rating => rating.factualDiscipline === 'fail').length ?? 0,
       };
     }),

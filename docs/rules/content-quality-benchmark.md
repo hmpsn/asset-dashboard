@@ -17,7 +17,7 @@ The content-quality benchmark measures whether generation changes improve approv
 - Persistence, approval, send, publish, and database-sync flags are rejected.
 - Deterministic checks reuse canonical matrix contracts for headings, semantic tables, verified non-self internal links, placeholders, evidence, primary-keyword placement, and final word count wherever possible.
 - Subjective ratings are blinded. Candidate labels must not expose provider, model, or variant identity to the reviewer.
-- A factual-discipline failure cannot be hidden by a composite prose score.
+- A factual-discipline failure or unresolved `needs_review` verdict cannot be hidden by a composite prose score.
 
 ### Local workflow
 
@@ -37,13 +37,15 @@ The default output is `artifacts/content-quality-benchmark/report.json`. An expl
 
 ## Recommendation gate
 
-A report returns `no_recommendation` unless it includes at least six rated cases and complete ratings for every compared candidate. A candidate may be recommended only when:
+A report returns `no_recommendation` unless it includes at least six rated cases, complete ratings for every compared candidate, at least three page types, and at least one provenance-sensitive case. A candidate may be recommended only when:
 
 - it receives at least 70% of recorded preferences;
 - mean brand-fidelity and intent-satisfaction ratings are at least 4/5;
-- it has zero factual-discipline failures;
+- every factual-discipline verdict passes, with no failures or unresolved reviews;
 - it has zero deterministic contract failures; and
-- its mean estimated cost and prompt-token use do not exceed the baseline.
+- its unrounded mean estimated cost, prompt-token use, and latency do not exceed the baseline.
+
+Rounded values are display-only. Promotion decisions always use the underlying unrounded aggregates.
 
 All recommendations remain advisory until the owner accepts the blinded comparison. Model changes remain operation-specific canaries and never follow automatically from benchmark output.
 

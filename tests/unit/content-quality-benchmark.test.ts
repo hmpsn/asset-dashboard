@@ -24,6 +24,7 @@ function digest(value: string): string {
 function candidate(anonymousLabel: string, options: {
   html?: string;
   cost?: number;
+  durationMs?: number;
   promptTokens?: number;
 } = {}) {
   return {
@@ -34,7 +35,7 @@ function candidate(anonymousLabel: string, options: {
       provider: SECRET_PROVIDER,
       model: SECRET_MODEL,
       inputFingerprint: 'b'.repeat(64),
-      durationMs: 1_000,
+      durationMs: options.durationMs ?? 1_000,
       promptTokens: options.promptTokens ?? 1_000,
       completionTokens: 500,
       estimatedCostUsd: options.cost ?? 1,
@@ -46,7 +47,7 @@ function benchmarkCase(index: number, candidateB: Parameters<typeof candidate>[1
   return {
     schemaVersion: 1,
     caseId: `case_${String(index).padStart(3, '0')}`,
-    pageType: 'service',
+    pageType: (['service', 'location', 'landing'] as const)[(index - 1) % 3],
     generationRoleCoverage: ['proof', 'faq', 'cta'],
     verticalSensitivity: 'provenance_sensitive',
     searchIntent: 'transactional',
@@ -109,6 +110,7 @@ describe('content quality benchmark evaluator', () => {
     expect(report.ratingCoverage).toBe(100);
     expect(report.candidates.find(item => item.anonymousLabel === 'candidate_b')).toMatchObject({
       preferenceRate: 100,
+      factualNeedsReview: 0,
       factualFailures: 0,
       deterministicFailures: 0,
       meanEstimatedCostUsd: 1.5,
@@ -134,6 +136,13 @@ describe('content quality benchmark evaluator', () => {
     const incomplete = buildBenchmarkReport(sixCases.cases, sixCases.ratings, 'candidate_a');
     expect(incomplete.recommendation).toBe('no_recommendation');
     expect(incomplete.ratingCoverage).toBeLessThan(100);
+
+    const undiverse = comparison(6);
+    undiverse.cases.cases.forEach(testCase => { testCase.pageType = 'service'; });
+    expect(buildBenchmarkReport(undiverse.cases, undiverse.ratings, 'candidate_a')).toMatchObject({
+      recommendation: 'no_recommendation',
+      recommendationReason: expect.stringMatching(/three page types/i),
+    });
   });
 
   it('keeps the baseline when factual or deterministic safety fails', () => {
@@ -147,6 +156,44 @@ describe('content quality benchmark evaluator', () => {
       factualFailures: 1,
       deterministicFailures: 3,
     });
+  });
+
+  it('treats factual uncertainty and non-ready runtime verdicts as blocking safety results', () => {
+    const uncertain = comparison();
+    uncertain.ratings.cases[0].humanRatings[1] = humanRating('candidate_b', 'needs_review');
+    const uncertainReport = buildBenchmarkReport(uncertain.cases, uncertain.ratings, 'candidate_a');
+    expect(uncertainReport.recommendation).toBe('baseline');
+    expect(uncertainReport.candidates.find(item => item.anonymousLabel === 'candidate_b')).toMatchObject({
+      factualNeedsReview: 1,
+    });
+
+    const runtimeBlocked = comparison();
+    runtimeBlocked.cases.cases[0].candidateVariants[1].runtimeAudit = {
+      authorityFingerprint: 'c'.repeat(64),
+      verdict: 'needs_attention',
+      deterministicChecks: [],
+    };
+    const runtimeReport = buildBenchmarkReport(runtimeBlocked.cases, runtimeBlocked.ratings, 'candidate_a');
+    expect(runtimeReport.recommendation).toBe('baseline');
+    expect(runtimeReport.cases[0].deterministicFailureCount).toBe(1);
+  });
+
+  it('uses unrounded cost and latency metrics for promotion decisions', () => {
+    const costlier = comparison();
+    costlier.cases.cases.forEach(testCase => {
+      testCase.candidateVariants[0].provenance.estimatedCostUsd = 2.001;
+      testCase.candidateVariants[1].provenance.estimatedCostUsd = 2.004;
+    });
+    const costReport = buildBenchmarkReport(costlier.cases, costlier.ratings, 'candidate_a');
+    expect(costReport.candidates.map(item => item.meanEstimatedCostUsd)).toEqual([2, 2]);
+    expect(costReport.recommendation).toBe('baseline');
+
+    const slower = comparison();
+    slower.cases.cases.forEach(testCase => {
+      testCase.candidateVariants[0].provenance.durationMs = 1_000;
+      testCase.candidateVariants[1].provenance.durationMs = 1_001;
+    });
+    expect(buildBenchmarkReport(slower.cases, slower.ratings, 'candidate_a').recommendation).toBe('baseline');
   });
 
   it('uses canonical HTML extraction for generic safety checks', () => {
@@ -171,6 +218,7 @@ describe('content quality benchmark evaluator', () => {
       ],
     };
     expect(evaluateCandidateHtml(canonical)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'matrix:verdict', status: 'fail' }),
       expect.objectContaining({ id: 'matrix:internal-paths', status: 'fail' }),
       expect.objectContaining({ id: 'matrix:factual-accuracy', status: 'review' }),
     ]));

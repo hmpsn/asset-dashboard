@@ -129,6 +129,15 @@ describe('content quality benchmark source qualification', () => {
   it.each([
     { label: 'review-ready only', item: item({ approvalEvidence: null }) },
     { label: 'stale revision', item: item(), post: post({ generationRevision: 8 }) },
+    {
+      label: 'stale source revision',
+      item: item({
+        approvalEvidence: {
+          ...item().approvalEvidence!,
+          sourceRevision: { matrixRevision: 1, templateRevision: 2, cellRevision: 2 },
+        },
+      }),
+    },
     { label: 'unapproved post', item: item(), post: post({ status: 'review' }) },
     { label: 'cross-workspace row', item: item({ workspaceId: 'ws-2' }) },
   ])('fails closed for a $label matrix source', ({ item: matrixItem, post: matrixPost = post() }) => {
@@ -298,6 +307,53 @@ describe('content quality benchmark source qualification', () => {
       workspaceId: 'ws-1', itemId: 'item-1', postId: 'post-1', anonymousLabel: 'candidate_a',
       usage: { promptTokens: -1, completionTokens: 1, estimatedCostUsd: 0 },
     }, readers)).toThrow(ContentQualityBenchmarkSourceError);
+  });
+
+  it.each([
+    { label: 'invalid post timestamp', postOverrides: { updatedAt: 'not-a-date' } },
+    {
+      label: 'invalid audit timestamp',
+      itemOverrides: {
+        auditReport: {
+          verdict: 'ready_for_human_review', deterministicChecks: [], modelFindings: [],
+          humanRequiredChecks: [], revisionCount: 0, auditedAt: 'not-a-date', unresolvedRequirementIds: [],
+        },
+      },
+    },
+    {
+      label: 'invalid provenance timestamp',
+      postOverrides: {
+        generationProvenance: {
+          runId: 'run', operation: 'op', provider: 'anthropic', model: 'model', inputFingerprint: 'b'.repeat(64),
+          startedAt: 'not-a-date', completedAt: approvedAt,
+        },
+      },
+    },
+  ])('rejects a candidate with $label', ({ itemOverrides = {}, postOverrides = {} }) => {
+    const matrixItem = item({
+      previewTarget: {
+        workspaceId: 'ws-1', matrixId: 'matrix-1', cellId: 'cell-1', effectiveInputFingerprint: 'a'.repeat(64),
+      } as MatrixGenerationItem['previewTarget'],
+      auditReport: {
+        verdict: 'ready_for_human_review', deterministicChecks: [], modelFindings: [],
+        humanRequiredChecks: [], revisionCount: 0, auditedAt: approvedAt, unresolvedRequirementIds: [],
+      },
+      ...itemOverrides,
+    });
+    const generatedPost = post({
+      generationProvenance: {
+        runId: 'run', operation: 'op', provider: 'anthropic', model: 'model', inputFingerprint: 'b'.repeat(64),
+        startedAt: approvedAt, completedAt: approvedAt,
+      },
+      ...postOverrides,
+    });
+    expect(() => qualifyMatrixBenchmarkCandidate({
+      workspaceId: 'ws-1', itemId: 'item-1', postId: 'post-1', anonymousLabel: 'candidate_a',
+      usage: { promptTokens: 1, completionTokens: 1, estimatedCostUsd: 0 },
+    }, {
+      getMatrixGenerationItem: () => matrixItem,
+      getPost: () => generatedPost,
+    })).toThrow(ContentQualityBenchmarkSourceError);
   });
 
   it('exports only explicitly selected approved copy sections in caller order', () => {

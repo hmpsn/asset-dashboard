@@ -117,6 +117,15 @@ function requireNonnegativeFinite(value: number, field: string, integer = false)
   return value;
 }
 
+function sameSourceRevision(
+  left: MatrixGenerationItem['sourceRevision'],
+  right: MatrixGenerationItem['sourceRevision'],
+): boolean {
+  return left.matrixRevision === right.matrixRevision
+    && left.templateRevision === right.templateRevision
+    && left.cellRevision === right.cellRevision;
+}
+
 function renderPostCopy(post: GeneratedPost): string {
   const sections = post.sections.map(section => section.content).filter(Boolean);
   return requirePrivateHtml([
@@ -166,6 +175,7 @@ export function qualifyMatrixApprovedPost(
     || approval.runId !== item.runId
     || approval.matrixId !== item.matrixId
     || approval.cellId !== item.cellId
+    || !sameSourceRevision(approval.sourceRevision, item.sourceRevision)
     || approval.postId !== postId
     || approval.postRevision !== post.generationRevision
   ) {
@@ -212,6 +222,12 @@ export function qualifyMatrixBenchmarkCandidate(
   const preview = item?.previewTarget;
   const audit = item?.auditReport;
   const provenance = post?.generationProvenance;
+  if (post) requireIsoTimestamp(post.updatedAt, 'post.updatedAt');
+  if (audit) requireIsoTimestamp(audit.auditedAt, 'auditReport.auditedAt');
+  if (provenance) {
+    requireIsoTimestamp(provenance.startedAt, 'generationProvenance.startedAt');
+    requireIsoTimestamp(provenance.completedAt, 'generationProvenance.completedAt');
+  }
   if (
     !item
     || item.workspaceId !== workspaceId

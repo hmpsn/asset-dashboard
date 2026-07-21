@@ -141,6 +141,7 @@ export interface ContentQualityBenchmarkCandidateAggregate {
   /** Already a percentage from 0–100. Do not multiply by 100. */
   preferenceRate: number;
   meanRatings: Record<ContentQualityBenchmarkHumanDimension, number>;
+  factualNeedsReview: number;
   factualFailures: number;
   deterministicFailures: number;
   meanEstimatedCostUsd: number;
@@ -166,6 +167,7 @@ export interface ContentQualityBenchmarkAggregateReport {
     referenceContentSha256: string;
     ratedCandidateCount: number;
     deterministicFailureCount: number;
+    factualNeedsReviewCount: number;
     factualFailureCount: number;
   }>;
 }
