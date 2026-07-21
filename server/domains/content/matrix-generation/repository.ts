@@ -63,6 +63,7 @@ import {
 } from '../../../state-machines.js';
 import { assertPreviewIdentityCurrent } from './preview.js';
 import { generationProvenanceSchema } from '../../../schemas/generation-provenance.js';
+import { synchronizeMatrixGenerationPostHeadings } from './heading-contract.js';
 
 interface MatrixGenerationRunRow {
   id: string;
@@ -1874,9 +1875,13 @@ export function commitMatrixGenerationDraft(input: {
       throw new MatrixGenerationPersistenceContractError('Generated candidate IDs must be insert-only');
     }
     assertPreviewIdentityCurrent(input.workspaceId, input.target);
+    const synchronizedPost = synchronizeMatrixGenerationPostHeadings(
+      input.target.blockManifest,
+      input.post,
+    );
 
     const brief = persistGeneratedBrief(input.workspaceId, input.brief);
-    const post = persistGeneratedPost(input.workspaceId, input.post);
+    const post = persistGeneratedPost(input.workspaceId, synchronizedPost);
     const updatedMatrix = updateMatrixCell(
       input.workspaceId,
       input.target.matrixId,
@@ -1954,9 +1959,13 @@ export function commitMatrixGenerationRevision(input: {
     ) {
       throw new MatrixGenerationRevisionConflictError('item', input.itemId);
     }
+    const synchronizedReplacement = synchronizeMatrixGenerationPostHeadings(
+      target.blockManifest,
+      input.replacement,
+    );
     const post = replacePostWithSnapshot(
       input.workspaceId,
-      input.replacement,
+      synchronizedReplacement,
       input.expectedPostRevision,
       'bulk_regenerate',
       `matrix_generation_item:${item.id}`,

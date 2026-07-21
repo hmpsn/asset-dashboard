@@ -25,7 +25,7 @@ import {
   parseMatrixGenerationRevisionAIOutput,
 } from '../../server/domains/content/matrix-generation/output-schemas.js';
 import { matrixGenerationProviderReservation } from '../../server/domains/content/matrix-generation/budget.js';
-import type { BoundedProviderDispatch } from '../../server/content-posts-ai.js';
+import { countHtmlWords, type BoundedProviderDispatch } from '../../server/content-posts-ai.js';
 
 const NOW = '2026-07-14T12:00:00.000Z';
 const LOCATION_REQUIREMENT = 'matrix-cell:cell-1:location-relevance';
@@ -207,7 +207,8 @@ function post(targetValue = target()): GeneratedPost {
   const sectionHtml = (index: number, body: string) => (
     `<h2>${sections[index]?.heading.renderedText ?? ''}</h2>${body}`
   );
-  return {
+  const bodyPadding = (word: string) => `<p>${Array.from({ length: 40 }, () => word).join(' ')}</p>`;
+  const candidate: GeneratedPost = {
     id: 'post-1',
     workspaceId: targetValue.workspaceId,
     briefId: 'brief-1',
@@ -221,8 +222,8 @@ function post(targetValue = target()): GeneratedPost {
       {
         index: 0,
         heading: sections[0]?.heading.renderedText ?? '',
-        content: sectionHtml(0, '<p>SEO consulting in Austin starts with a direct review of the pages people use to understand a service. The work focuses on clear priorities, useful explanations, and measurable search improvements for the client.</p>'),
-        wordCount: 32,
+        content: sectionHtml(0, `<p>SEO consulting in Austin starts with a direct review of the pages people use to understand a service. The work focuses on clear priorities, useful explanations, and measurable search improvements for the client.</p>${bodyPadding('strategy')}`),
+        wordCount: 0,
         targetWordCount: 80,
         keywords: [targetValue.targetKeyword.value],
         status: 'done',
@@ -230,8 +231,8 @@ function post(targetValue = target()): GeneratedPost {
       {
         index: 1,
         heading: sections[1]?.heading.renderedText ?? '',
-        content: sectionHtml(1, '<p>What does an SEO consulting engagement include?</p><p>It includes a focused review, an ordered plan, and clear recommendations the client can evaluate before deciding what to implement.</p>'),
-        wordCount: 27,
+        content: sectionHtml(1, `<p>What does an SEO consulting engagement include?</p><p>It includes a focused review, an ordered plan, and clear recommendations the client can evaluate before deciding what to implement.</p>${bodyPadding('question')}`),
+        wordCount: 0,
         targetWordCount: 80,
         keywords: [],
         status: 'done',
@@ -239,15 +240,15 @@ function post(targetValue = target()): GeneratedPost {
       {
         index: 2,
         heading: sections[2]?.heading.renderedText ?? '',
-        content: sectionHtml(2, '<p>Serving Austin businesses with on-site workshops in the verified downtown service area. <a href="https://example.com/contact">Schedule an SEO consulting conversation</a> when the timing is right.</p>'),
-        wordCount: 25,
+        content: sectionHtml(2, `<p>Serving Austin businesses with on-site workshops in the verified downtown service area. <a href="https://example.com/contact">Schedule an SEO consulting conversation</a> when the timing is right.</p>${bodyPadding('action')}`),
+        wordCount: 0,
         targetWordCount: 50,
         keywords: [],
         status: 'done',
       },
     ],
-    conclusion: '<p>Review the priorities, ask questions, and choose the next step that makes sense for your organization.</p>',
-    totalWordCount: 120,
+    conclusion: '<h2>Next</h2><p>Review the priorities, ask questions, and choose the next step that makes sense for your organization.</p>',
+    totalWordCount: 0,
     targetWordCount: targetValue.blockManifest.totalWordCountTarget,
     status: 'draft',
     generationProvenance: {
@@ -282,6 +283,31 @@ function post(targetValue = target()): GeneratedPost {
     createdAt: NOW,
     updatedAt: NOW,
   };
+  candidate.sections = candidate.sections.map(section => ({
+    ...section,
+    wordCount: countHtmlWords(section.content),
+  }));
+  candidate.totalWordCount = countHtmlWords(candidate.introduction)
+    + candidate.sections.reduce((sum, section) => sum + section.wordCount, 0)
+    + countHtmlWords(candidate.conclusion);
+  return candidate;
+}
+
+function setBodyWordTotal(candidate: GeneratedPost, total: number): void {
+  const base = Math.floor(total / candidate.sections.length);
+  let remainder = total % candidate.sections.length;
+  candidate.sections = candidate.sections.map((section, index) => {
+    const targetWords = base + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder -= 1;
+    const heading = section.heading || `Section ${index + 1}`;
+    const headingWords = countHtmlWords(`<h2>${heading}</h2>`);
+    const contentWords = Math.max(0, targetWords - headingWords);
+    const content = `<h2>${heading}</h2><p>${Array.from({ length: contentWords }, () => `detail${index}`).join(' ')}</p>`;
+    return { ...section, content, wordCount: countHtmlWords(content) };
+  });
+  candidate.totalWordCount = countHtmlWords(candidate.introduction)
+    + candidate.sections.reduce((sum, section) => sum + section.wordCount, 0)
+    + countHtmlWords(candidate.conclusion);
 }
 
 function evidence(
@@ -335,6 +361,54 @@ describe('content matrix generation deterministic audit', () => {
       expect.objectContaining({ id: 'factual-accuracy', result: 'needs_human_review' }),
       expect.objectContaining({ id: 'no-hallucinations', result: 'needs_human_review' }),
     ]));
+  });
+
+  it('audits exact stored counts and the inclusive body-only target band', () => {
+    const targetValue = target();
+    const candidate = post(targetValue);
+    const targetWords = targetValue.blockManifest.totalWordCountTarget;
+
+    setBodyWordTotal(candidate, Math.ceil(targetWords * 0.9));
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-integrity'))
+      .toBe('passed');
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-target'))
+      .toBe('passed');
+
+    setBodyWordTotal(candidate, Math.floor(targetWords * 1.1));
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-target'))
+      .toBe('passed');
+
+    setBodyWordTotal(candidate, Math.floor(targetWords * 0.9) - 1);
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-target'))
+      .toBe('failed');
+
+    setBodyWordTotal(candidate, Math.ceil(targetWords * 1.1) + 1);
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-target'))
+      .toBe('failed');
+  });
+
+  it('keeps the target body-scoped while requiring truthful full-page and section counts', () => {
+    const targetValue = target();
+    const candidate = post(targetValue);
+    setBodyWordTotal(candidate, targetValue.blockManifest.totalWordCountTarget);
+    candidate.introduction = `<p>${Array.from({ length: 300 }, () => 'intro').join(' ')}</p>`;
+    candidate.conclusion = `<h2>Next</h2><p>${Array.from({ length: 300 }, () => 'close').join(' ')}</p>`;
+    candidate.totalWordCount = countHtmlWords(candidate.introduction)
+      + candidate.sections.reduce((sum, section) => sum + section.wordCount, 0)
+      + countHtmlWords(candidate.conclusion);
+
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-target'))
+      .toBe('passed');
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-integrity'))
+      .toBe('passed');
+
+    candidate.sections[0].wordCount -= 1;
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-integrity'))
+      .toBe('failed');
+    candidate.sections[0].wordCount += 1;
+    candidate.totalWordCount -= 1;
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'word-count-integrity'))
+      .toBe('failed');
   });
 
   it('fails locked structure, key-position coverage, CTA/AEO roles, and nonexistent paths deterministically', () => {
@@ -458,6 +532,15 @@ describe('content matrix generation deterministic audit', () => {
       .toBe('failed');
   });
 
+  it('keeps the deterministic audit as a redundant multiple-H2 backstop', () => {
+    const targetValue = target();
+    const candidate = post(targetValue);
+    candidate.sections[2].content += '<h2>Unexpected second section heading</h2>';
+
+    expect(checkResult(audit({ target: targetValue, post: candidate }), 'template-block-census'))
+      .toBe('failed');
+  });
+
   it('accepts exact heading absence for headingless blocks and preserves it through revision', () => {
     const targetValue = target();
     const templateBlocks = targetValue.blockManifest.blocks.filter(block => block.source === 'template');
@@ -480,7 +563,9 @@ describe('content matrix generation deterministic audit', () => {
         targetId: block.id,
         html: block.source === 'template'
           ? `<p>SEO consulting in Austin remains grounded and direct in block ${index + 1}.</p>`
-          : `<p>Revised grounded block ${index + 1}.</p>`,
+          : block.generationRole === 'conclusion'
+            ? `<h2>Next</h2><p>Revised grounded block ${index + 1}.</p>`
+            : `<p>Revised grounded block ${index + 1}.</p>`,
       })),
     });
     expect(revised.sections[0].heading).toBe('');
@@ -497,9 +582,11 @@ describe('content matrix generation deterministic audit', () => {
           ? '<h2>answer</h2><p>Leaked internal heading.</p>'
           : block.source === 'template'
             ? `<h2>${block.heading.renderedText}</h2><p>Revised grounded block ${index + 1}.</p>`
-            : `<p>Revised grounded block ${index + 1}.</p>`,
+            : block.generationRole === 'conclusion'
+              ? `<h2>Next</h2><p>Revised grounded block ${index + 1}.</p>`
+              : `<p>Revised grounded block ${index + 1}.</p>`,
       })),
-    })).toThrow(/changed or omitted a frozen section heading/i);
+    })).toThrow(/headings do not match the accepted block manifest/i);
   });
 
   it('requires frozen block-scoped internal anchors and rejects absolute self-links', () => {
@@ -687,6 +774,39 @@ describe('content matrix generation model audit merge', () => {
 });
 
 describe('content matrix generation structured operation contracts', () => {
+  it('gates welded geo/service revision guidance without changing the legacy audit prompt', () => {
+    const baseInput = {
+      workspaceId: 'ws-1',
+      target: target(),
+      post: post() as never,
+      authority: {
+        voiceSnapshot: {
+          voiceVersion: 1,
+          profileRevision: 1,
+          voiceDNA: voiceGuardrails as never,
+          guardrails: voiceGuardrails,
+          contextModifiers: [],
+          anchors: [],
+        },
+        approvedIdentity: [],
+        evidenceResolutions: [],
+      } as never,
+      deterministicReport: audit(),
+      executionChainId: 'matrix-output-quality-audit',
+    };
+    const legacy = prepareMatrixGenerationAuditOperation(baseInput);
+    const canary = prepareMatrixGenerationAuditOperation({
+      ...baseInput,
+      outputQualityV2: true,
+    });
+
+    expect(legacy.system).not.toContain('welded_geo_service_phrase');
+    expect(canary.system).toContain('welded_geo_service_phrase');
+    expect(canary.system).toContain('warning severity');
+    expect(canary.system).toContain('requiresHumanReview=false');
+    expect(canary.system).toContain('recommend revision');
+  });
+
   it('derives automatic revision from homogeneous prose executions, not top-level SEO metadata', () => {
     const candidate = post() as GeneratedPost & { generationProvenance: NonNullable<GeneratedPost['generationProvenance']> };
     expect(resolveMatrixGenerationRevisionDispatch(candidate as never)).toEqual({
@@ -830,8 +950,8 @@ describe('content matrix generation structured operation contracts', () => {
     expect(prepared.system).toContain('Never narrate internal evidence');
     expect(prepared.system).toContain('Never create or preserve an unauthorized placeholder');
     expect(prepared.system).toContain('Do not return detached heading fields');
-    expect(prepared.system).toContain('locked=true exactly');
-    expect(prepared.system).toContain('locked=false blocks');
+    expect(prepared.system).toContain('locked=true byte-for-byte');
+    expect(prepared.system).toContain('locked=false visible blocks');
     expect(JSON.parse(prepared.messages[0].content)).toMatchObject({
       authorizedPlaceholderTokens: [],
     });
@@ -857,7 +977,9 @@ describe('content matrix generation structured operation contracts', () => {
         targetId: block.id,
         html: block.source === 'template'
           ? `<h2>${block.heading.renderedText}</h2><p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`
-          : `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
+          : block.generationRole === 'conclusion'
+            ? `<h2>Next</h2><p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`
+            : `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
       })),
     }));
 
@@ -907,6 +1029,36 @@ describe('content matrix generation structured operation contracts', () => {
       .toMatch(/<a href="https:\/\/example\.com\/contact"[^>]*>Schedule an SEO consulting conversation<\/a>/);
   });
 
+  it('recomputes final revision counts and replaces the stale unification note', () => {
+    const targetValue = target();
+    const candidate = post(targetValue) as ReturnType<typeof post>;
+    candidate.unificationStatus = 'success';
+    candidate.unificationNote = 'Unified before revision.';
+    const revised = applyMatrixGenerationRevision(targetValue, candidate as never, {
+      blocks: targetValue.blockManifest.blocks.map((block, index) => ({
+        targetId: block.id,
+        html: block.source === 'template'
+          ? `<h2>${block.heading.renderedText}</h2><p>${Array.from({ length: 65 }, () => `revised${index}`).join(' ')}</p>`
+          : block.generationRole === 'conclusion'
+            ? '<h2>Next</h2><p>Take the next step.</p>'
+            : '<p>SEO consulting in Austin begins with clear priorities.</p>',
+      })),
+    });
+
+    expect(revised.sections.length).toBeGreaterThan(0);
+    expect(revised.sections.every(section => ( // every-ok -- guarded by the non-empty assertion above
+      section.wordCount === countHtmlWords(section.content)
+    ))).toBe(true);
+    expect(revised.totalWordCount).toBe(
+      countHtmlWords(revised.introduction)
+        + revised.sections.reduce((sum, section) => sum + countHtmlWords(section.content), 0)
+        + countHtmlWords(revised.conclusion),
+    );
+    expect(revised.unificationStatus).toBe('success');
+    expect(revised.unificationNote).toContain('Final persisted counts after automatic matrix revision');
+    expect(revised.unificationNote).not.toContain('Unified before revision');
+  });
+
   it('preserves an accepted query-string link through revision sanitization', () => {
     const targetValue = target();
     const candidate = post(targetValue);
@@ -919,7 +1071,9 @@ describe('content matrix generation structured operation contracts', () => {
           ? '<h2>Schedule SEO consulting</h2><p><a href="https://example.com/contact?source=matrix&amp;medium=cta">Contact the team</a>.</p>'
           : block.source === 'template'
             ? `<h2>${block.heading.renderedText}</h2><p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`
-            : `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
+            : block.generationRole === 'conclusion'
+              ? `<h2>Next</h2><p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`
+              : `<p>Revised grounded block ${index + 1} for SEO consulting in Austin.</p>`,
       })),
     });
 

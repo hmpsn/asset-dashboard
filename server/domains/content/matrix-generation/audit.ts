@@ -18,6 +18,7 @@ import { countHtmlWords, stripHtml } from '../../../content-posts-ai.js';
 import { extractLinks } from '../../../seo-audit-html.js';
 import type { MatrixGenerationModelAuditAIOutput } from './output-schemas.js';
 import { canonicalizeMatrixPath, validateRenderedMatrixPath } from './renderer.js';
+import { inspectMatrixGenerationPostHeadings } from './heading-contract.js';
 
 export interface MatrixGenerationDeterministicAuditInput {
   target: MatrixGenerationPreviewTarget;
@@ -140,45 +141,23 @@ function pageHtml(post: GeneratedPost): string {
     .join('\n');
 }
 
-function firstH2(html: string): string {
-  const $ = cheerio.load(html, null, false);
-  return $('h2').first().text().replace(/\s+/g, ' ').trim();
-}
-
-function normalizeHeading(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
-}
-
 function templateCensusCheck(
   target: MatrixGenerationPreviewTarget,
   post: GeneratedPost,
 ): GenerationAuditCheck {
   const bodyContracts = target.blockManifest.blocks.filter(block => block.source === 'template');
+  const headingInspection = inspectMatrixGenerationPostHeadings(target.blockManifest, post);
   const passed = countHtmlWords(post.introduction) > 0
     && countHtmlWords(post.conclusion) > 0
     && post.sections.length === bodyContracts.length
+    && headingInspection.issues.length === 0
     && post.sections.every((section, index) => {
       const contract = bodyContracts[index];
-      const renderedH2 = firstH2(section.content);
       if (!contract) return false;
-      if (contract.heading.renderedText === null) {
-        return section.index === index
-          && section.status === 'done'
-          && countHtmlWords(section.content) > 0
-          && section.heading === ''
-          && renderedH2 === '';
-      }
-      if (!renderedH2) return false;
-      const headingAgrees = normalizeHeading(section.heading) === normalizeHeading(renderedH2);
-      const lockedHeadingAgrees = !contract.heading.locked || (
-        contract.heading.renderedText !== null
-        && normalizeHeading(renderedH2) === normalizeHeading(contract.heading.renderedText)
-      );
       return section.index === index
         && section.status === 'done'
         && countHtmlWords(section.content) > 0
-        && headingAgrees
-        && lockedHeadingAgrees;
+        && section.heading === headingInspection.synchronizedPost.sections[index]?.heading;
     });
   return check(
     'template-block-census',
@@ -187,6 +166,41 @@ function templateCensusCheck(
     'The draft preserves every block and order, keeps literal headings locked, and binds generated headings to their first H2.',
     'The draft added, removed, reordered, emptied, or mismatched a section heading and its first H2.',
   );
+}
+
+function wordCountChecks(
+  target: MatrixGenerationPreviewTarget,
+  post: GeneratedPost,
+): GenerationAuditCheck[] {
+  const actualSectionCounts = post.sections.map(section => countHtmlWords(section.content));
+  const bodyWords = actualSectionCounts.reduce((sum, count) => sum + count, 0);
+  const actualTotal = countHtmlWords(post.introduction)
+    + bodyWords
+    + countHtmlWords(post.conclusion);
+  const storedCountsMatch = post.sections.every((section, index) => (
+    section.wordCount === actualSectionCounts[index]
+  )) && post.totalWordCount === actualTotal;
+  const targetWords = target.blockManifest.totalWordCountTarget;
+  const withinBodyTarget = Number.isFinite(targetWords)
+    && targetWords > 0
+    && bodyWords >= targetWords * 0.9
+    && bodyWords <= targetWords * 1.1;
+  return [
+    check(
+      'word-count-integrity',
+      'quality',
+      storedCountsMatch,
+      'Every stored section count and the stored page total match the final persisted HTML.',
+      'A stored section count or the stored page total does not match the final persisted HTML.',
+    ),
+    check(
+      'word-count-target',
+      'quality',
+      withinBodyTarget,
+      'The final template-section body is within 90–110% of the accepted body-word target.',
+      'The final template-section body is outside 90–110% of the accepted body-word target.',
+    ),
+  ];
 }
 
 function urlCheck(target: MatrixGenerationPreviewTarget): GenerationAuditCheck {
@@ -683,6 +697,7 @@ export function runMatrixGenerationDeterministicAudit(
   const blocks = candidateBlocks(input.target, input.post);
   const checks = [
     templateCensusCheck(input.target, input.post),
+    ...wordCountChecks(input.target, input.post),
     urlCheck(input.target),
     metadataCheck(input.target, input.post),
     metadataLengthCheck(input.post),

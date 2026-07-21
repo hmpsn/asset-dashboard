@@ -109,6 +109,7 @@ describe('matrix generation post stage', () => {
       context: {} as ContentGenerationContextV2Result,
       executionChainId: 'chain-frozen-evidence',
       assertAuthority: vi.fn(),
+      outputQualityV2: true,
     };
     vi.mocked(generateBrief).mockResolvedValue({
       id: 'brief-frozen-evidence',
@@ -143,7 +144,7 @@ describe('matrix generation post stage', () => {
         keywords: [],
         status: 'done',
       }],
-      conclusion: '<p>Next step.</p>',
+      conclusion: '<h2>Next</h2><p>Next step.</p>',
       totalWordCount: 8,
       targetWordCount: 300,
       status: 'draft',
@@ -151,6 +152,10 @@ describe('matrix generation post stage', () => {
       updatedAt: '2026-07-14T12:00:00.000Z',
     });
     await generateMatrixPostStage(brief, options);
+
+    expect(vi.mocked(generatePost).mock.calls.at(-1)?.[3]).toMatchObject({
+      outputQualityV2: true,
+    });
 
     expect(readFrozenMatrixCellEvidence).toHaveBeenCalledTimes(2);
     expect(readFrozenMatrixCellEvidence).toHaveBeenNthCalledWith(1, {
@@ -164,6 +169,62 @@ describe('matrix generation post stage', () => {
       matrixId: 'matrix-1',
       cellId: 'cell-1',
       evidenceResolutionIds: ['evidence-preview-frozen'],
+    });
+  });
+
+  it('synchronizes unlocked heading metadata and rejects multiple visible H2s before return', async () => {
+    const unlockedTarget = target();
+    unlockedTarget.evidenceRequirements = [];
+    const bodyBlock = unlockedTarget.blockManifest.blocks.find(block => block.id === 'template:body');
+    if (!bodyBlock || bodyBlock.source !== 'template') throw new Error('Missing body block');
+    bodyBlock.heading = { level: 2, renderedText: 'Literal fallback', locked: false };
+    const options = {
+      workspaceId: 'ws-1',
+      target: unlockedTarget,
+      context: {} as ContentGenerationContextV2Result,
+      executionChainId: 'chain-unlocked-heading',
+      assertAuthority: vi.fn(),
+    };
+    const brief = { toneAndStyle: 'Warm.' } as ContentBrief;
+    const candidate: GeneratedPost = {
+      id: 'post-unlocked-heading',
+      workspaceId: 'ws-1',
+      briefId: 'brief-unlocked-heading',
+      targetKeyword: unlockedTarget.targetKeyword.value,
+      title: unlockedTarget.title,
+      metaDescription: unlockedTarget.metaDescription,
+      introduction: '<p>Introduction.</p>',
+      sections: [{
+        index: 0,
+        heading: 'Stale metadata',
+        content: '<h2>Confidence without the hard sell</h2><p>Service details.</p>',
+        wordCount: 7,
+        targetWordCount: 300,
+        keywords: [],
+        status: 'done',
+      }],
+      conclusion: '<h2>Next</h2><p>Next step.</p>',
+      totalWordCount: 10,
+      targetWordCount: 300,
+      status: 'draft',
+      createdAt: '2026-07-14T12:00:00.000Z',
+      updatedAt: '2026-07-14T12:00:00.000Z',
+    };
+    vi.mocked(generatePost).mockResolvedValue(candidate);
+
+    const synchronized = await generateMatrixPostStage(brief, options);
+    expect(synchronized.sections[0].heading).toBe('Confidence without the hard sell');
+
+    vi.mocked(generatePost).mockResolvedValue({
+      ...candidate,
+      sections: [{
+        ...candidate.sections[0],
+        content: '<h2>First</h2><p>Service details.</p><h2>Second</h2>',
+      }],
+    });
+    await expect(generateMatrixPostStage(brief, options)).rejects.toMatchObject({
+      code: 'matrix_heading_contract_failed',
+      issues: [expect.objectContaining({ reason: 'heading_multiple' })],
     });
   });
 
@@ -228,7 +289,7 @@ describe('matrix generation post stage', () => {
         keywords: [],
         status: 'done',
       }],
-      conclusion: '<p>Next step.</p>',
+      conclusion: '<h2>Next</h2><p>Next step.</p>',
       totalWordCount: 10,
       targetWordCount: 300,
       status: 'draft',
@@ -241,7 +302,7 @@ describe('matrix generation post stage', () => {
     expect(result.sections[0].content).not.toContain('body</h2>');
     expect(result.sections[0].content).toContain('Useful service detail.');
     expect(result.sections[0].wordCount).toBe(5);
-    expect(result.totalWordCount).toBe(8);
+    expect(result.totalWordCount).toBe(9);
   });
 
   it('keeps internal evidence mechanics out of every reader-facing generation stage', async () => {
@@ -307,13 +368,13 @@ describe('matrix generation post stage', () => {
       sections: [{
         index: 0,
         heading: 'SEO Consulting in Austin',
-        content: '<p>Service details.</p>',
+        content: '<h2>SEO Consulting in Austin</h2><p>Service details.</p>',
         wordCount: 2,
         targetWordCount: 300,
         keywords: [],
         status: 'done',
       }],
-      conclusion: '<p>Next step.</p>',
+      conclusion: '<h2>Next</h2><p>Next step.</p>',
       totalWordCount: 5,
       targetWordCount: 300,
       status: 'draft',
@@ -341,13 +402,13 @@ describe('matrix generation post stage', () => {
       sections: [{
         index: 0,
         heading: 'SEO Consulting in Austin',
-        content: '<p>Service details.</p>',
+        content: '<h2>SEO Consulting in Austin</h2><p>Service details.</p>',
         wordCount: 2,
         targetWordCount: 300,
         keywords: [],
         status: 'done',
       }],
-      conclusion: '<p>Next step.</p>',
+      conclusion: '<h2>Next</h2><p>Next step.</p>',
       totalWordCount: 5,
       targetWordCount: 300,
       status: 'draft',

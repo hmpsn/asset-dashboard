@@ -317,6 +317,10 @@ export async function generateMatrixRunItem(
       signal: request.signal,
       assertAuthority,
       beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
+      outputQualityV2: isFeatureEnabled(
+        'content-matrix-output-quality-v2',
+        request.workspaceId,
+      ),
     });
     if (post.status !== 'draft' || !post.generationProvenance) {
       throw new Error('Post generation did not produce a complete draft with provenance');

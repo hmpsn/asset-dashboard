@@ -43,3 +43,14 @@ pr-check, hook lint, platform quick verification, and full Vitest. Two independe
 must approve runtime/spec/security and quality/backward-compatibility/performance before push.
 Staging paid generation still requires a fresh preview and explicit owner confirmation; stop at
 human review and never retry automatically.
+
+## Implementation result
+
+- Task 1 complete: shared heading inspection/synchronization is enforced before initial persistence,
+  at both repository commit seams, after automatic revision, and in deterministic audit.
+- Task 2 complete: unification outcomes are typed; the pre-unification draft is retained atomically;
+  the natural-keyword and symmetric correction prompt is isolated behind the default-OFF canary flag.
+- Task 3 complete: sanitized body counts use the frozen manifest's body-only target, stored section and
+  page totals are exact, revision notes are recomputed, and welded phrasing is revision-driving under
+  the canary policy.
+- Paid staging acceptance remains intentionally pending owner confirmation and is not part of local CI.

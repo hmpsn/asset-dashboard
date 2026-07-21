@@ -134,6 +134,18 @@ describe('matrix heading metadata/body contract', () => {
     expectReason(() => synchronizeMatrixGenerationPostHeadings(manifest(), candidate), 'heading_multiple');
   });
 
+  it('rejects a blank visible H2', () => {
+    const candidate = post();
+    candidate.sections[1].content = '<h2>   </h2><p>Proof.</p>';
+    expectReason(() => synchronizeMatrixGenerationPostHeadings(manifest(), candidate), 'heading_blank');
+  });
+
+  it('rejects visible copy before the required leading H2', () => {
+    const candidate = post();
+    candidate.sections[1].content = '<p>Orphan lead copy.</p><h2>Built Around Your Goals</h2><p>Proof.</p>';
+    expectReason(() => synchronizeMatrixGenerationPostHeadings(manifest(), candidate), 'heading_not_leading');
+  });
+
   it('requires byte-exact locked heading text', () => {
     const candidate = post();
     candidate.sections[0].content = '<h2>What does this service cost? </h2><p>Answer.</p>';
@@ -144,5 +156,11 @@ describe('matrix heading metadata/body contract', () => {
     const candidate = post();
     candidate.conclusion = '<p>Take the next step.</p>';
     expectReason(() => synchronizeMatrixGenerationPostHeadings(manifest(), candidate), 'heading_absent');
+  });
+
+  it('rejects a post section census that cannot map to the frozen manifest', () => {
+    const candidate = post();
+    candidate.sections.pop();
+    expectReason(() => synchronizeMatrixGenerationPostHeadings(manifest(), candidate), 'block_census_mismatch');
   });
 });

@@ -11,7 +11,7 @@ const generationState = vi.hoisted(() => ({
   failVoiceContext: false,
   failStage: null as 'introduction' | 'section' | 'conclusion' | 'all' | null,
   emptyStage: null as 'introduction' | 'section' | 'conclusion' | null,
-  unificationResult: 'none' as 'none' | 'empty' | 'mixed-invalid' | 'wrong-size',
+  unificationResult: 'none' as 'none' | 'empty' | 'mixed-invalid' | 'wrong-size' | 'invalid-schema' | 'provider-error',
   executionCount: 0,
   onStage: null as null | ((stage: 'context' | 'introduction' | 'section' | 'conclusion' | 'unification' | 'seo') => void | Promise<void>),
 }));
@@ -118,27 +118,34 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
       return '<p>Draft conclusion with a clear next step.</p>';
     }),
     unifyPost: vi.fn(async (...args: unknown[]) => {
-      emitExecution('content-post-unify', args[4] as Parameters<typeof emitExecution>[1]);
       generationState.onStage?.('unification');
+      if (generationState.unificationResult === 'provider-error') {
+        throw new Error('provider secret response body');
+      }
+      emitExecution('content-post-unify', args[4] as Parameters<typeof emitExecution>[1]);
       if (generationState.unificationResult === 'empty') {
-        return { introduction: '<p></p>', sections: ['<div>&nbsp;</div>'], conclusion: '<span></span>' };
+        return {
+          status: 'candidate' as const,
+          candidate: { introduction: '<p></p>', sections: ['<div>&nbsp;</div>'], conclusion: '<span></span>' },
+        };
       }
       if (generationState.unificationResult === 'mixed-invalid') {
         return {
-          introduction: '<p>Rewritten introduction that must not persist.</p>',
-          sections: ['<div>&nbsp;</div>'],
-          conclusion: '<p>Rewritten conclusion that must not persist.</p>',
+          status: 'candidate' as const,
+          candidate: {
+            introduction: '<p>Rewritten introduction that must not persist.</p>',
+            sections: ['<div>&nbsp;</div>'],
+            conclusion: '<p>Rewritten conclusion that must not persist.</p>',
+          },
         };
       }
       if (generationState.unificationResult === 'wrong-size') {
-        return {
-          introduction: '<p>Rewritten introduction that must not persist.</p>',
-          sections: ['<p>First rewrite</p>', '<p>Unexpected extra rewrite</p>'],
-          conclusion: '<p>Rewritten conclusion that must not persist.</p>',
-          invalidReason: 'section_census_mismatch' as const,
-        };
+        return { status: 'invalid' as const, reason: 'section_census_mismatch' as const };
       }
-      return null;
+      if (generationState.unificationResult === 'invalid-schema') {
+        return { status: 'invalid' as const, reason: 'schema_validation_failed' as const };
+      }
+      return { status: 'skipped' as const, reason: 'short_input' as const };
     }),
     generateSeoMeta: vi.fn(async (...args: unknown[]) => {
       emitExecution('content-post-seo-meta', args[3] as Parameters<typeof emitExecution>[1]);
@@ -762,7 +769,24 @@ describe('content post generation mutation safety', () => {
     expect(post?.sections[0].content).toContain('practical guidance');
   });
 
-  it.each(['mixed-invalid', 'wrong-size'] as const)(
+  it('records a typed short-input unification skip truthfully', async () => {
+    const briefId = 'brief-short-unifier';
+    seedBrief(briefId);
+
+    const startRes = await startGenerationRequest(briefId);
+    const started = await startRes.json() as { id: string; jobId: string };
+    const job = await waitForJob(started.jobId);
+    const post = getPost(workspaceId, started.id);
+
+    expect(job.status).toBe('done');
+    expect(post).toMatchObject({
+      status: 'draft',
+      unificationStatus: 'skipped',
+      unificationNote: 'Unification skipped because the assembled draft is below the minimum useful editing length.',
+    });
+  });
+
+  it.each(['mixed-invalid'] as const)(
     'applies unification atomically when the candidate is %s',
     async (unificationResult) => {
       const briefId = `brief-unifier-${unificationResult}`;
@@ -788,6 +812,55 @@ describe('content post generation mutation safety', () => {
       expect(post?.conclusion).not.toContain('Rewritten');
     },
   );
+
+  it.each([
+    ['wrong-size', 'Unification output was rejected because its section count did not match the draft; the valid pre-unification draft was retained.'],
+    ['invalid-schema', 'Unification output was rejected because it did not match the required schema; the valid pre-unification draft was retained.'],
+  ] as const)(
+    'preserves the pre-unification draft for typed invalid output: %s',
+    async (unificationResult, expectedNote) => {
+      const briefId = `brief-unifier-${unificationResult}`;
+      seedBrief(briefId);
+      generationState.unificationResult = unificationResult;
+
+      const startRes = await startGenerationRequest(briefId);
+      const started = await startRes.json() as { id: string; jobId: string };
+      const job = await waitForJob(started.jobId);
+      const post = getPost(workspaceId, started.id);
+
+      expect(job.status).toBe('done');
+      expect(post).toMatchObject({
+        status: 'draft',
+        introduction: '<p>Draft introduction for the generated post.</p>',
+        conclusion: '<p>Draft conclusion with a clear next step.</p>',
+        unificationStatus: 'failed',
+        unificationNote: expectedNote,
+      });
+      expect(post?.sections).toHaveLength(1);
+      expect(post?.sections[0].content).toContain('practical guidance');
+    },
+  );
+
+  it('keeps provider failure details out of the persisted unification note', async () => {
+    const briefId = 'brief-unifier-provider-error';
+    seedBrief(briefId);
+    generationState.unificationResult = 'provider-error';
+
+    const startRes = await startGenerationRequest(briefId);
+    const started = await startRes.json() as { id: string; jobId: string };
+    const job = await waitForJob(started.jobId);
+    const post = getPost(workspaceId, started.id);
+
+    expect(job.status).toBe('done');
+    expect(post).toMatchObject({
+      status: 'draft',
+      introduction: '<p>Draft introduction for the generated post.</p>',
+      conclusion: '<p>Draft conclusion with a clear next step.</p>',
+      unificationStatus: 'failed',
+      unificationNote: 'Unification provider request failed; the valid pre-unification draft was retained.',
+    });
+    expect(post?.unificationNote).not.toContain('secret');
+  });
 
   it('persists an unusable initial generation as error without success semantics', async () => {
     const briefId = 'brief-unusable';

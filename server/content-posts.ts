@@ -261,6 +261,8 @@ export interface GeneratePostOptions {
   allowProviderFallback?: boolean;
   /** Durable reservation hook invoked before every provider dispatch. */
   beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void | Promise<void>;
+  /** Opt-in natural-keyword and symmetric word-count policy for matrix output canaries. */
+  outputQualityV2?: boolean;
 }
 
 export function notifyContentUpdated(workspaceId: string, payload: Record<string, unknown>) {
@@ -918,6 +920,7 @@ export async function generatePost(
       signal: options.signal,
       executionChainId,
       promptAuthority,
+      outputQualityV2: options.outputQualityV2,
       onExecution: execution => { introductionExecution = execution; },
     });
     assertCurrentAuthority();
@@ -968,6 +971,7 @@ export async function generatePost(
           signal: options.signal,
           executionChainId,
           promptAuthority,
+          outputQualityV2: options.outputQualityV2,
           onExecution: execution => { sectionExecution = execution; },
         },
       );
@@ -1015,6 +1019,7 @@ export async function generatePost(
       signal: options.signal,
       executionChainId,
       promptAuthority,
+      outputQualityV2: options.outputQualityV2,
       onExecution: execution => { conclusionExecution = execution; },
     });
     assertCurrentAuthority();
@@ -1082,29 +1087,31 @@ export async function generatePost(
       signal: options.signal,
       executionChainId,
       promptAuthority,
+      outputQualityV2: options.outputQualityV2,
       onExecution: execution => { unificationExecution = execution; },
     });
     assertCurrentAuthority();
-    if (unified) {
-      let invalidReplacement = unified.invalidReason !== undefined;
+    if (unified.status === 'candidate') {
+      const candidate = unified.candidate;
+      let invalidReplacement = false;
       let replacementCount = 0;
       let nextIntroduction = post.introduction;
       let nextConclusion = post.conclusion;
       const nextSections = post.sections.map(section => ({ ...section }));
 
-      if (unified.introduction !== undefined) {
-        const safeIntroduction = sanitizeRichText(unified.introduction);
+      if (candidate.introduction !== undefined) {
+        const safeIntroduction = sanitizeRichText(candidate.introduction);
         if (countHtmlWords(safeIntroduction) > 0) {
           nextIntroduction = safeIntroduction;
           replacementCount += 1;
         } else invalidReplacement = true;
       }
-      if (unified.sections !== undefined) {
-        if (unified.sections.length !== post.sections.length) {
+      if (candidate.sections !== undefined) {
+        if (candidate.sections.length !== post.sections.length) {
           invalidReplacement = true;
         } else {
-          for (let i = 0; i < unified.sections.length; i += 1) {
-            const safeSection = sanitizeRichText(unified.sections[i]);
+          for (let i = 0; i < candidate.sections.length; i += 1) {
+            const safeSection = sanitizeRichText(candidate.sections[i]);
             const wordCount = countHtmlWords(safeSection);
             if (wordCount > 0) {
               nextSections[i].content = safeSection;
@@ -1114,8 +1121,8 @@ export async function generatePost(
           }
         }
       }
-      if (unified.conclusion !== undefined) {
-        const safeConclusion = sanitizeRichText(unified.conclusion);
+      if (candidate.conclusion !== undefined) {
+        const safeConclusion = sanitizeRichText(candidate.conclusion);
         if (countHtmlWords(safeConclusion) > 0) {
           nextConclusion = safeConclusion;
           replacementCount += 1;
@@ -1138,15 +1145,21 @@ export async function generatePost(
           ? `Unified: ${preUnifyWords} → ${postUnifyWords} words (target: ${post.targetWordCount})`
           : 'Unification returned no replacements; the original draft was retained.';
       log.info(`${post.unificationNote}`);
+    } else if (unified.status === 'invalid') {
+      post.unificationStatus = 'failed';
+      post.unificationNote = unified.reason === 'section_census_mismatch'
+        ? 'Unification output was rejected because its section count did not match the draft; the valid pre-unification draft was retained.'
+        : 'Unification output was rejected because it did not match the required schema; the valid pre-unification draft was retained.';
+      log.warn({ reason: unified.reason, postId }, 'Unification output rejected');
     } else {
       post.unificationStatus = 'skipped';
-      post.unificationNote = 'Unification returned null — post too short or JSON parse failed';
-      log.warn(`Unification skipped for ${postId}`);
+      post.unificationNote = 'Unification skipped because the assembled draft is below the minimum useful editing length.';
+      log.info({ reason: unified.reason, postId }, 'Unification skipped');
     }
   } catch (err) {
     if (isAbortSignalAborted(options.signal) || err instanceof GenerationRevisionConflictError) throw err;
     post.unificationStatus = 'failed';
-    post.unificationNote = `Unification error: ${err instanceof Error ? err.message : 'Unknown'}`;
+    post.unificationNote = 'Unification provider request failed; the valid pre-unification draft was retained.';
     log.error({ err: err }, `Unification pass failed (non-critical):`);
     // Non-critical — the post is still usable without unification
   }
