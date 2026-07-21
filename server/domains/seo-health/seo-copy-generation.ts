@@ -203,7 +203,7 @@ function normalizeRelativeInternalPath(value: string): string | null {
     if (parsed.origin !== 'https://internal.invalid' || parsed.search || parsed.hash) return null;
     const normalized = normalizePageUrl(parsed.pathname);
     return normalized.startsWith('/') && !normalized.startsWith('//') ? normalized : null;
-  } catch {
+  } catch { // catch-ok -- malformed candidate paths are rejected below
     return null;
   }
 }
