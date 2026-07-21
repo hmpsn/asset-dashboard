@@ -15,7 +15,7 @@
           "status": "pending",
           "createdAt": "2026-07-20",
           "owner": "content",
-          "notes": "Combines former M5 and essential M6. Stop after one explicit-owner-confirmed Rinse canary reaches human review; never approve, send, publish, or automatically retry."
+          "notes": "Implementation complete locally 2026-07-20: heading/body metadata synchronization, exact final counts, body-only ±10% audit, typed unification, and canary-gated natural keyword correction. Keep pending until staging CI/smoke and one explicit-owner-confirmed Rinse generation reach human review; never approve, send, publish, or automatically retry."
         },
         {
           "id": "matrix-retry-budget-top-up",

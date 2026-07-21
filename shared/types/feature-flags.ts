@@ -14,6 +14,10 @@ export const FEATURE_FLAGS = {
   // any paid-run start gate or product UI is wired. Correctness, authorization, CAS, and failure
   // truth remain unflagged; these flags will gate only paid generation starts in their owner phases.
   'content-matrix-generation': false,
+  // M6 — canary the matrix-only prompt/target semantics (topical secondary keywords,
+  // symmetric word-count guidance, and welded geo/service revision guidance). Correctness
+  // fixes for stored counts, heading synchronization, and typed outcomes remain unflagged.
+  'content-matrix-output-quality-v2': false,
   // C3 — one budgeted, exact-once context projection for brief/post/MCP generation.
   // OFF preserves the current prompt/context call sequence byte-for-byte.
   'content-generation-context-v2': false,
@@ -215,6 +219,20 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
       linkedRoadmapItemId: 'mcp-content-matrix-generation',
       staleAuditCadence: 'weekly',
       lastReviewedAt: '2026-07-14',
+    },
+  },
+  'content-matrix-output-quality-v2': {
+    label: 'Content matrix — output quality v2',
+    group: 'Platform Intelligence Enhancements',
+    lifecycle: {
+      owner: 'content-pipeline',
+      status: 'active',
+      createdAt: '2026-07-20',
+      rolloutTarget: 'staging-validation',
+      removalCondition: 'Retire after the owner-confirmed Rinse canary reaches human review with truthful word counts and natural keyword phrasing, then the guarded prompt policy becomes the supported default.',
+      linkedRoadmapItemId: 'matrix-output-integrity-closure',
+      staleAuditCadence: 'weekly',
+      lastReviewedAt: '2026-07-20',
     },
   },
   'content-generation-context-v2': {
@@ -526,7 +544,7 @@ export const FEATURE_FLAG_CATALOG: Record<FeatureFlagKey, FeatureFlagCatalogEntr
 export const FEATURE_FLAG_GROUPS: Array<{ label: FeatureFlagGroupLabel; keys: FeatureFlagKey[] }> = [
   {
     label: 'Platform Intelligence Enhancements',
-    keys: ['content-matrix-generation', 'content-generation-context-v2', 'brand-deliverable-generation'],
+    keys: ['content-matrix-generation', 'content-matrix-output-quality-v2', 'content-generation-context-v2', 'brand-deliverable-generation'],
   },
   {
     label: 'Client Insights Briefing',

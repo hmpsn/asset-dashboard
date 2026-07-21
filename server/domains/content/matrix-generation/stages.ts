@@ -18,6 +18,7 @@ import {
   readFrozenMatrixCellEvidence,
   renderMatrixCellEvidencePrompt,
 } from './evidence.js';
+import { synchronizeMatrixGenerationPostHeadings } from './heading-contract.js';
 
 export interface MatrixGenerationStageOptions {
   workspaceId: string;
@@ -27,6 +28,8 @@ export interface MatrixGenerationStageOptions {
   signal?: AbortSignal;
   assertAuthority: () => void;
   beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void;
+  /** Matrix-only output policy resolved once by the worker. */
+  outputQualityV2?: boolean;
 }
 
 function placeholderToken(requirement: MatrixGenerationPreviewTarget['evidenceRequirements'][number]): string {
@@ -210,6 +213,7 @@ export async function generateMatrixPostStage(
     assertAuthority: options.assertAuthority,
     maxRetries: 0,
     beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
+    outputQualityV2: options.outputQualityV2,
   });
   const bodyBlocks = options.target.blockManifest.blocks
     .filter(block => block.source === 'template');
@@ -253,5 +257,5 @@ export async function generateMatrixPostStage(
   post.totalWordCount = countHtmlWords(post.introduction)
     + post.sections.reduce((sum, section) => sum + countHtmlWords(section.content), 0)
     + countHtmlWords(post.conclusion);
-  return post;
+  return synchronizeMatrixGenerationPostHeadings(options.target.blockManifest, post);
 }

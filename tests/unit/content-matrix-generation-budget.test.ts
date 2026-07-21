@@ -568,7 +568,7 @@ describe('content matrix preview budget', () => {
     ).join(' ');
     const blockHtml = target.blockManifest.blocks.map(block => ({
       targetId: block.id,
-      html: block.source === 'template'
+      html: block.heading.renderedText !== null
         ? `<h2>${block.heading.renderedText}</h2><p>${groundedWords}</p>`
         : `<p>${groundedWords}</p>`,
     }));

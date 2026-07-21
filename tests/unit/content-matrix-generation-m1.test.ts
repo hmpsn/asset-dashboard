@@ -448,13 +448,13 @@ function candidates(
     sections: [{
       index: 0,
       heading: target.renderedHeadings[0] ?? target.title,
-      content: '<p>Verified service details for this page.</p>',
+      content: `<h2>${target.renderedHeadings[0] ?? target.title}</h2><p>Verified service details for this page.</p>`,
       wordCount: 7,
       targetWordCount: 300,
       keywords: [target.targetKeyword.value],
       status: 'done',
     }],
-    conclusion: '<p>Contact the team when you are ready.</p>',
+    conclusion: '<h2>Next</h2><p>Contact the team when you are ready.</p>',
     totalWordCount: 20,
     targetWordCount: 500,
     status: 'draft',
@@ -1125,6 +1125,35 @@ describe('content matrix generation M1', () => {
     expect(ready.estimatedPaidBudget).toMatchObject({ maxConcurrency: 1 });
   });
 
+  it('rejects invalid headings before any draft artifact or matrix state is committed', async () => {
+    const fixture = createFixture(['Austin']);
+    seedBrandAuthority(fixture.workspaceId);
+    const cell = fixture.matrix.cells[0];
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+    const targetValue = await readyTarget(fixture, cell.id);
+    const execution = runAtGeneratingPost(fixture, targetValue, `matrix-run-${randomUUID()}`);
+    const generated = candidates(fixture.workspaceId, targetValue);
+    generated.post.sections[0].content += '<h2>Duplicate model heading</h2>';
+
+    expect(() => commitMatrixGenerationDraft({
+      workspaceId: fixture.workspaceId,
+      itemId: execution.item.id,
+      expectedItemRevision: execution.item.revision,
+      target: targetValue,
+      ...generated,
+    })).toThrow(/headings do not match the accepted block manifest/i);
+    expect(getBrief(fixture.workspaceId, generated.brief.id)).toBeUndefined();
+    expect(getPost(fixture.workspaceId, generated.post.id)).toBeUndefined();
+    expect(getMatrixGenerationItem(fixture.workspaceId, execution.item.id)).toMatchObject({
+      status: 'generating_post',
+      briefId: null,
+      postId: null,
+    });
+    expect(getMatrix(fixture.workspaceId, fixture.matrix.id)?.cells[0]).toMatchObject({
+      status: 'planned',
+    });
+  });
+
   it('commits a complete draft atomically, replays the exact start, and rolls back stale work', async () => {
     const fixture = createFixture();
     seedBrandAuthority(fixture.workspaceId);
@@ -1137,6 +1166,7 @@ describe('content matrix generation M1', () => {
     const firstKey = `matrix-run-${randomUUID()}`;
     const firstExecution = runAtGeneratingPost(fixture, firstTarget, firstKey);
     const firstCandidates = candidates(fixture.workspaceId, firstTarget);
+    firstCandidates.post.sections[0].heading = 'Stale pre-commit metadata';
     const committed = commitMatrixGenerationDraft({
       workspaceId: fixture.workspaceId,
       itemId: firstExecution.item.id,
@@ -1151,6 +1181,7 @@ describe('content matrix generation M1', () => {
     });
     expect(committed.brief.generationRevision).toBe(1);
     expect(committed.post.generationRevision).toBe(1);
+    expect(committed.post.sections[0].heading).toBe(firstTarget.renderedHeadings[0]);
     expect(getMatrix(fixture.workspaceId, fixture.matrix.id)?.cells.find(candidate => (
       candidate.id === firstCell.id
     ))).toMatchObject({

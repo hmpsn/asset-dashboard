@@ -54,6 +54,7 @@ import {
   getVoiceProfile,
 } from '../../server/voice-calibration.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { countHtmlWords } from '../../server/content-posts-ai.js';
 
 const cleanupWorkspaceIds = new Set<string>();
 
@@ -300,6 +301,14 @@ function candidates(
     ? `[NEEDS CLIENT INPUT: ${unresolvedCta.clientSafePrompt ?? unresolvedCta.reason}]`
     : '';
   const briefId = `brief_${randomUUID()}`;
+  const introduction = '<p>SEO consulting in Austin gives organizations a calm, practical path to clearer search priorities and useful decisions without inflated promises.</p>';
+  const sectionBody = `<h2>${templateBlocks[0].heading.renderedText}</h2><p>SEO consulting in Austin starts with a focused review of the pages people use to understand the organization. The client receives clear priorities, direct explanations, and a practical sequence for deciding what should change first.</p><p>${Array.from({ length: 70 }, () => 'strategy').join(' ')}</p>`;
+  const sectionCta = placeholder
+    ? `<h2>${templateBlocks[1].heading.renderedText}</h2><p>Contact the team to discuss SEO consulting when the timing is right. ${placeholder}</p><p>${Array.from({ length: 70 }, () => 'action').join(' ')}</p>`
+    : `<h2>${templateBlocks[1].heading.renderedText}</h2><p><a href="https://example.com/contact">Contact the team</a> to discuss SEO consulting when the timing is right.</p><p>${Array.from({ length: 70 }, () => 'action').join(' ')}</p>`;
+  const conclusion = '<h2>Next</h2><p>Review the priorities, ask questions, and choose the next step that makes sense.</p>';
+  const sectionBodyWords = countHtmlWords(sectionBody);
+  const sectionCtaWords = countHtmlWords(sectionCta);
   return {
     brief: {
       id: briefId,
@@ -334,13 +343,13 @@ function candidates(
       metaDescription: target.metaDescription,
       seoTitle: target.title,
       seoMetaDescription: target.metaDescription,
-      introduction: '<p>SEO consulting in Austin gives organizations a calm, practical path to clearer search priorities and useful decisions without inflated promises.</p>',
+      introduction,
       sections: [
         {
           index: 0,
           heading: templateBlocks[0].heading.renderedText ?? '',
-          content: `<h2>${templateBlocks[0].heading.renderedText}</h2><p>SEO consulting in Austin starts with a focused review of the pages people use to understand the organization. The client receives clear priorities, direct explanations, and a practical sequence for deciding what should change first.</p>`,
-          wordCount: 34,
+          content: sectionBody,
+          wordCount: sectionBodyWords,
           targetWordCount: 150,
           keywords: [target.targetKeyword.value],
           status: 'done',
@@ -348,17 +357,18 @@ function candidates(
         {
           index: 1,
           heading: templateBlocks[1].heading.renderedText ?? '',
-          content: placeholder
-            ? `<h2>${templateBlocks[1].heading.renderedText}</h2><p>Contact the team to discuss SEO consulting when the timing is right. ${placeholder}</p>`
-            : `<h2>${templateBlocks[1].heading.renderedText}</h2><p><a href="https://example.com/contact">Contact the team</a> to discuss SEO consulting when the timing is right.</p>`,
-          wordCount: 14,
+          content: sectionCta,
+          wordCount: sectionCtaWords,
           targetWordCount: 50,
           keywords: [],
           status: 'done',
         },
       ],
-      conclusion: '<p>Review the priorities, ask questions, and choose the next step that makes sense.</p>',
-      totalWordCount: 86,
+      conclusion,
+      totalWordCount: countHtmlWords(introduction)
+        + sectionBodyWords
+        + sectionCtaWords
+        + countHtmlWords(conclusion),
       targetWordCount: target.blockManifest.totalWordCountTarget,
       status: 'draft',
       generationProvenance: postProvenance(),
@@ -763,7 +773,21 @@ describe('auditMatrixGenerationItem', () => {
     expect(result.automaticRevisionApplied).toBe(true);
     expect(auditCalls).toBe(2);
     expect(revisionCalls).toBe(1);
-    expect(getPost(committed.fixture.workspaceId, committed.post.id)?.generationRevision).toBe(2);
+    const durablePost = getPost(committed.fixture.workspaceId, committed.post.id);
+    expect(durablePost?.generationRevision).toBe(2);
+    expect(durablePost?.sections.length).toBeGreaterThan(0);
+    expect(durablePost?.sections.every(section => ( // every-ok -- guarded by the non-empty assertion above
+      section.wordCount === countHtmlWords(section.content)
+    ))).toBe(true);
+    expect(durablePost?.totalWordCount).toBe(
+      countHtmlWords(durablePost?.introduction ?? '')
+        + (durablePost?.sections.reduce((sum, section) => sum + countHtmlWords(section.content), 0) ?? 0)
+        + countHtmlWords(durablePost?.conclusion ?? ''),
+    );
+    expect(result.item.auditReport?.deterministicChecks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'word-count-integrity', result: 'passed' }),
+      expect.objectContaining({ id: 'word-count-target', result: 'passed' }),
+    ]));
 
     const attempts = listMatrixGenerationAttempts(
       committed.fixture.workspaceId,
@@ -792,6 +816,107 @@ describe('auditMatrixGenerationItem', () => {
     }, overrides)).rejects.toThrow(/changed since it was read/i);
     expect(auditCalls).toBe(2);
     expect(revisionCalls).toBe(1);
+  });
+
+  it('stops after one revision when the final body remains outside the accepted target band', async () => {
+    const committed = await committedFixture(true);
+    let auditCalls = 0;
+    let revisionCalls = 0;
+    const result = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-word-target-revision-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => {
+        auditCalls += 1;
+        return operationResult(input, 'content-matrix-item-audit', {
+          revisionRecommended: true,
+          findings: [{
+            code: 'voice_specificity',
+            severity: 'warning' as const,
+            message: 'Tighten the explanation without changing facts.',
+            affectedTargetIds: ['template:body'],
+            requiresHumanReview: false,
+          }],
+        });
+      },
+      reviseCandidate: async input => {
+        revisionCalls += 1;
+        const blocks = revisedBlocks(input);
+        const body = blocks.find(block => block.targetId === 'template:body');
+        if (!body) throw new Error('Expected body block');
+        body.html = '<h2>SEO consulting in Austin</h2><p>Clear priorities for the client.</p>';
+        return operationResult(input, 'content-matrix-item-revise', { blocks });
+      },
+    });
+
+    expect(result.item).toMatchObject({
+      status: 'needs_attention',
+      automaticRevisionCount: 1,
+      auditReport: {
+        verdict: 'needs_attention',
+        deterministicChecks: expect.arrayContaining([
+          expect.objectContaining({ id: 'word-count-target', result: 'failed' }),
+        ]),
+      },
+    });
+    expect(result.providerCalls).toBe(2);
+    expect(result.automaticRevisionApplied).toBe(true);
+    expect(auditCalls).toBe(1);
+    expect(revisionCalls).toBe(1);
+    expect(result.post.sections.length).toBeGreaterThan(0);
+    expect(result.post.sections.every(section => ( // every-ok -- guarded by the non-empty assertion above
+      section.wordCount === countHtmlWords(section.content)
+    ))).toBe(true);
+  });
+
+  it('preserves the accepted artifact when automatic revision returns multiple H2s', async () => {
+    const committed = await committedFixture(true);
+    const acceptedContent = committed.post.sections[0].content;
+    const result = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-heading-regression-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => operationResult(input, 'content-matrix-item-audit', {
+        revisionRecommended: true,
+        findings: [{
+          code: 'voice_specificity',
+          severity: 'warning' as const,
+          message: 'Make the service explanation more specific without adding facts.',
+          affectedTargetIds: ['template:body'],
+          requiresHumanReview: false,
+        }],
+      }),
+      reviseCandidate: async input => {
+        const blocks = revisedBlocks(input);
+        const body = blocks.find(block => block.targetId === 'template:body');
+        if (!body) throw new Error('Expected body block');
+        body.html += '<h2>Unexpected duplicate heading</h2>';
+        return operationResult(input, 'content-matrix-item-revise', { blocks });
+      },
+    });
+
+    expect(result.item).toMatchObject({
+      status: 'needs_attention',
+      automaticRevisionCount: 0,
+      error: { code: 'matrix_generation_revision_failed', retryable: true },
+    });
+    expect(result.automaticRevisionApplied).toBe(false);
+    expect(result.providerCalls).toBe(2);
+    const durablePost = getPost(committed.fixture.workspaceId, committed.post.id);
+    expect(durablePost?.generationRevision).toBe(committed.post.generationRevision);
+    expect(durablePost?.sections[0].content).toBe(acceptedContent);
+    expect(listMatrixGenerationAttempts(
+      committed.fixture.workspaceId,
+      committed.item.id,
+    ).at(-1)).toMatchObject({ stage: 'revision', status: 'failed' });
   });
 
   it('routes a human-only model finding to review without automatic revision', async () => {
