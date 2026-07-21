@@ -77,6 +77,15 @@ describe('MCP operator prompt contracts', () => {
     expect(() => getMcpOperatorPrompt('triage_studio_portfolio', {
       [Symbol('secret')]: 'value',
     })).toThrow('Invalid prompt arguments.');
+
+    expect(() => getMcpOperatorPrompt(
+      'triage_studio_portfolio',
+      JSON.parse('{"__proto__":"secret"}') as unknown,
+    )).toThrow('Invalid prompt arguments.');
+    expect(() => getMcpOperatorPrompt(
+      'review_workspace_as_client',
+      JSON.parse('{"workspace_id":"ws_safe","__proto__":"secret"}') as unknown,
+    )).toThrow('Invalid prompt arguments.');
   });
 
   it('renders deterministic read-only triage and exact client-safe review workflows', () => {

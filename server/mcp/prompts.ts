@@ -70,7 +70,7 @@ function ownDataRecord(value: unknown): Record<string, unknown> {
       invalidPromptArguments();
     }
 
-    const record: Record<string, unknown> = {};
+    const record = Object.create(null) as Record<string, unknown>;
     for (const key of Reflect.ownKeys(value)) {
       if (typeof key !== 'string') invalidPromptArguments();
       const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
