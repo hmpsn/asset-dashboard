@@ -1,8 +1,20 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 718** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 719** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
+
+---
+
+### 719. Content-matrix pre-paid reliability closure 2026-07-20
+
+**What it does:** Makes preview, paid-start preflight, durable run reads, restart recovery, and template creation agree on one safe contract before any provider spend. Disabled features fail before census work; stale authority, invalid limits/cursors, retry conflicts, and known context ceilings return stable reason codes with truthful retryability. Preview diagnostics state whether requirements are complete and expose only bounded source-limit and provider stage/code/status metadata. Direct contract-v1 templates validate URL, keyword, title, and metadata patterns through the canonical renderer and can become generation-ready without an upgrade round trip.
+
+**Evidence and job integrity:** Preview freezes the exact accepted evidence row IDs into its fingerprint and durable target. Brief, draft, audit, and opt-in run reads consume those rows even after supersession, never a newer substitute; value reads cap each response at ten, continue through a mode-bound cursor until every row is reachable, and fail closed across workspace/matrix/cell scope. Legacy runs recover the same IDs from persisted verified source refs. DB-fresh job reads authorize and project one durable record, refresh process cache, and restart recovery records an explicit retryable interruption on every unfinished item.
+
+**Why it matters:** Operators get actionable failures before spending money, reliable status after restarts, and auditable proof of exactly which facts a generated page consumed. The change preserves evidence, voice finalization, human review, paid confirmation, send, approval, and publication gates. It adds no UI, local/staging database sync, provider call, or automatic paid retry.
+
+**Verification:** Deterministic unit, contract, HTTP integration, real Webflow-adapter seam, workspace-isolation, persistence-compatibility, and restart-state coverage; typecheck and the full platform PR gates run before release.
 
 ---
 
@@ -10185,7 +10197,7 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 
 ### 718. Content-matrix output quality contracts 2026-07-20
 
-**Status:** Complete locally; staging acceptance remains owner-controlled because it requires an explicit template revision and separately authorized paid regeneration.
+**Status:** Complete locally, including the output-integrity closure. Staging acceptance remains owner-controlled because it requires a fresh preview and separately authorized paid regeneration.
 
 **What changed:** Matrix templates now resolve literal AEO headings separately from conversion headings: required AEO, answer-first, definition, FAQ, process, and cost-shaped blocks remain locked, while proof, CTA, and non-AEO body blocks may generate branded H2s. Empty heading templates are explicit no-visible-heading contracts—not unlocks or internal-ID fallbacks—and exact H2 absence survives generation, audit, and revision. Section metadata must agree with the first rendered H2 when present, and revision preserves locked headings while allowing only frozen-voice refinement of unlocked headings.
 
@@ -10193,8 +10205,26 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 
 **Voice, budgets, and tables:** Automatic revision now runs only on the single homogeneous active provider/model recorded by the accepted prose executions, with no cross-provider fallback; absent, stale, or mixed provenance preserves the original and routes to human attention without revision spend. Every bounded dispatch carries its exact model, and preview/runtime reservations include model-manifest adaptive-thinking headroom and exact canonical pricing before paid work. The model audit explicitly evaluates grammatical person, direct reader address, register, tone boundaries, and anti-patterns after revision. Semantic table tags survive rich-text sanitization without unsafe attributes, and table-designated blocks must contain one table with header cells, data cells, and at least two rows.
 
+**Output-integrity closure:** Initial generation, both persistence seams, automatic revision, and the deterministic audit now share one heading contract. Headingless blocks reject H2s, visible blocks require exactly one nonblank H2, locked headings preserve exact authority, and unlocked metadata is derived from rendered HTML. Final sanitized template-section HTML must remain within ±10% of the accepted body-only manifest target, while each stored section count and the full persisted page total must exactly match rendered HTML. Revision recomputes final notes and counts. Unification now distinguishes short-input skips, invalid structured output, and provider failure without persisting raw provider details; the valid pre-unification draft survives every non-candidate outcome atomically.
+
+**Guarded quality policy:** `content-matrix-output-quality-v2` is default OFF. When enabled for a staging canary, secondary keywords become natural topical targets rather than mandatory exact strings, under- and over-target drafts receive symmetric grounded correction guidance, and welded geo/service phrasing is a revision-driving warning when it is safe to repair. Deterministic primary-keyword placement, mixed-model revision prevention, never-invent placeholders, and the one-revision ceiling are unchanged.
+
+**Release authority closure:** Preview resolves the guarded quality policy once, includes it in the owner-accepted fingerprint, and persists it with the durable target. Paid generation, model audit, recovery, and retry consume only that frozen value; legacy targets resolve to the default-OFF policy. Single-cell human approval also ignores stale pre-M0 set-audit findings that are no longer authoritative, while every multi-cell set-audit gate remains fail-closed.
+
 **Safety and compatibility:** Existing stored templates and runs remain valid because all contracts are additive and optional. The evidence ledger, never-invent placeholders, exact frozen authority, version-conditional commits, paid preview/start boundary, HTTP-only human approval, client send, and publication gates are unchanged. No UI or database migration was added. Generated/read/export table safety is covered; TipTap editing round-trip support is recorded as a separate UI follow-up because the current editor has no table extensions.
 
-**Verification:** Focused contract, manifest, sanitizer, preview, evidence, generation-audit, revision-provenance, budget, MCP profile, and compatibility suites cover the new contracts and legacy absence behavior. Independent review found and closed headingless post-spend failure, silent duplicate-destination acceptance, forked pricing-table, and Anthropic thinking-headroom under-reservation risks. Full repository gates and two final independent approvals are required before release.
+**Verification:** Focused contract, manifest, sanitizer, preview, evidence, generation-audit, revision-provenance, budget, MCP profile, compatibility, heading synchronization, typed unification, mutation-safety, and final word-count suites cover the new contracts and legacy behavior. The closure adds atomic pre-persistence rejection and prior-artifact preservation tests. Full repository gates and two final independent approvals are required before release.
 
 **Files:** shared matrix/evidence contracts; template schemas and persistence; block manifest; workspace census sidecar; evidence/preview/start preparation; generation stages and audits; AI operation/budget policy; rich-text sanitizer; MCP contracts/instructions; focused tests; runtime rules, design/implementation records, feature catalog, roadmap, and feature audit.
+
+### 719. Single-cell matrix set-audit consistency 2026-07-20
+
+**Status:** Complete locally. Staging smoke is required before the next MCP closure phase begins; no paid generation was invoked.
+
+**What changed:** One shared cardinality policy now defines cross-page set review as required only when the original run selection contains at least two candidates. Preview estimation uses that policy for its zero-or-two provider-call reservation, the worker skips both set-audit dispatch and missing-report demotion for one-cell runs, restart recovery preserves a review-ready one-cell result without a report, and human approval no longer requires an impossible report for that same run shape. Multi-page estimation, dispatch, restart demotion, blocking findings, and approval requirements remain unchanged.
+
+**Safety correction:** Restart recovery keys the decision to the durable original selection census rather than the currently visible item list, so a partial multi-page run cannot masquerade as a one-page run. Any blocking set report that is present still blocks the affected page. The HTTP-only human approval path continues to record review readiness only and creates no send or publication job.
+
+**Verification:** Focused policy, budget, real worker, recovery, and item-approval suites cover one- and two-candidate behavior. The worker test proves a one-cell run neither dispatches nor persists a set audit and still terminalizes truthfully, while the two-cell control continues to dispatch and persist one. All focused tests and project typecheck pass without provider access or database synchronization.
+
+**Files:** matrix-generation set-audit policy, preview estimator, worker, restart recovery, human-approval readiness, focused unit tests, runtime/control-plane guardrails, roadmap, and feature audit.

@@ -65,8 +65,12 @@ export interface UnifiedPostCandidate {
   introduction?: string;
   sections?: string[];
   conclusion?: string;
-  invalidReason?: 'section_census_mismatch';
 }
+
+export type UnificationOutcome =
+  | { status: 'candidate'; candidate: UnifiedPostCandidate }
+  | { status: 'skipped'; reason: 'short_input' }
+  | { status: 'invalid'; reason: 'schema_validation_failed' | 'section_census_mismatch' };
 
 const voiceScoringResponseSchema = z.object({
   voiceScore: z.number().finite(),
@@ -306,6 +310,8 @@ export interface ContentAIGenerationOptions {
   onExecution?: (execution: AcceptedGenerationExecution) => void;
   /** Captured once by content-generation-context-v2 and reused across every stage. */
   promptAuthority?: SystemPromptAuthority;
+  /** Opt-in natural-keyword and symmetric word-count policy for matrix output canaries. */
+  outputQualityV2?: boolean;
 }
 
 function buildContentSystemPrompt(
@@ -490,6 +496,9 @@ export async function generateIntroduction(
   const pageTypeContract = getPageTypeCopyContract(pageType);
   const generationStyleContract = getContentGenerationStyleContract(brief.generationStyle);
   const briefContext = buildBriefContextBlock(brief, siteDomain);
+  const secondaryKeywordContext = options.outputQualityV2
+    ? `SECONDARY KEYWORD TOPICS (optional concepts; synonyms and close variants are allowed—never force exact phrases): ${brief.secondaryKeywords.join(', ')}`
+    : `SECONDARY KEYWORDS: ${brief.secondaryKeywords.join(', ')}`;
 
   const prompt = `${role}
 
@@ -499,7 +508,7 @@ TOTAL ARTICLE WORD BUDGET: ${totalBudget} words. Your intro is a small portion �
 
 TITLE: ${brief.suggestedTitle}
 TARGET KEYWORD: "${brief.targetKeyword}"
-SECONDARY KEYWORDS: ${brief.secondaryKeywords.join(', ')}
+${secondaryKeywordContext}
 AUDIENCE: ${brief.audience}
 INTENT: ${brief.intent}
 ${brief.contentFormat ? `FORMAT: ${brief.contentFormat}` : ''}
@@ -573,6 +582,12 @@ export async function generateSection(
   const pageTypeContract = getPageTypeCopyContract(pageType);
   const generationStyleContract = getContentGenerationStyleContract(brief.generationStyle);
   const briefContext = buildBriefContextBlock(brief, siteDomain);
+  const secondaryKeywordContext = options.outputQualityV2
+    ? `SECONDARY KEYWORD TOPICS (optional concepts; synonyms and close variants are allowed—never force exact phrases): ${brief.secondaryKeywords.join(', ')}`
+    : `SECONDARY KEYWORDS: ${brief.secondaryKeywords.join(', ')}`;
+  const sectionKeywordContext = options.outputQualityV2
+    ? `- Topical concepts to cover naturally when relevant (exact strings are optional; synonyms and close variants are allowed): ${section.keywords?.join(', ') || brief.secondaryKeywords.slice(0, 3).join(', ')}`
+    : `- Keywords to include naturally: ${section.keywords?.join(', ') || brief.secondaryKeywords.slice(0, 3).join(', ')}`;
 
   const prevContext = previousSections.length > 0
     ? `\n\nPREVIOUS SECTIONS WRITTEN (for continuity — do NOT repeat these points, examples, case studies, or phrases):\n${previousSections.map((s, i) => `--- Section ${i + 1} ---\n${s.slice(0, 800)}`).join('\n')}\n\nCRITICAL: Do NOT re-use any example, case study, statistic, or metaphor that already appeared above. Use a DIFFERENT example or angle. If you have no new example, teach with actionable specifics instead.`
@@ -595,7 +610,7 @@ TOTAL ARTICLE WORD BUDGET: ${totalBudget} words. This section's allocation is ${
 
 ARTICLE TITLE: ${brief.suggestedTitle}
 TARGET KEYWORD: "${brief.targetKeyword}"
-SECONDARY KEYWORDS: ${brief.secondaryKeywords.join(', ')}
+${secondaryKeywordContext}
 AUDIENCE: ${brief.audience}
 ${brief.toneAndStyle ? `TONE & STYLE: ${brief.toneAndStyle}` : ''}
 ${BRAND_CONTEXT_HIERARCHY}
@@ -609,7 +624,7 @@ THIS SECTION:
 ${section.subheadings?.length ? `- Suggested H3 subheadings: ${section.subheadings.join(', ')}` : '- Create 2-3 H3 subheadings to break this section into scannable subtopics'}
 - Guidance: ${section.notes}
 - STRICT target word count: ${sectionTarget} words (do NOT exceed ${Math.round(sectionTarget * 1.1)} words)
-- Keywords to include naturally: ${section.keywords?.join(', ') || brief.secondaryKeywords.slice(0, 3).join(', ')}
+${sectionKeywordContext}
 ${relevantPAA.length > 0 ? `- Questions to answer in this section:\n${relevantPAA.map(q => `  • ${q}`).join('\n')}` : ''}
 ${prevContext}
 
@@ -856,7 +871,7 @@ export async function unifyPost(
   voiceCtx: string,
   workspaceId: string,
   options: ContentAIGenerationOptions = {},
-): Promise<UnifiedPostCandidate | null> {
+): Promise<UnificationOutcome> {
   const pageType = brief.pageType || 'blog';
   const role = PAGE_TYPE_WRITER_ROLE[pageType] || PAGE_TYPE_WRITER_ROLE.blog;
   const targetTotal = brief.wordCountTarget || 1800;
@@ -873,14 +888,39 @@ export async function unifyPost(
 
   // If the post is very short, skip unification (not worth the cost)
   const currentWords = countHtmlWords(post.introduction) + post.sections.reduce((sum, s) => sum + s.wordCount, 0) + countHtmlWords(post.conclusion);
-  if (currentWords < 400) return null;
+  if (currentWords < 400) return { status: 'skipped', reason: 'short_input' };
 
-  const overBudget = currentWords > targetTotal * 1.1;
-  const wordBudgetInstruction = overBudget
+  const currentBodyWords = post.sections.reduce(
+    (sum, section) => sum + countHtmlWords(section.content),
+    0,
+  );
+  const budgetWords = options.outputQualityV2 ? currentBodyWords : currentWords;
+  const overBudget = budgetWords > targetTotal * 1.1;
+  const underBudget = options.outputQualityV2 === true && budgetWords < targetTotal * 0.9;
+  const legacyWordBudgetInstruction = overBudget
     ? `\n\nWORD COUNT CORRECTION REQUIRED:\n- Current total: ~${currentWords} words\n- Target total: ${targetTotal} words (from the content brief)\n- You MUST trim each section proportionally to bring the total within ±5% of ${targetTotal} words.\n- Cut filler, redundant examples, verbose phrasing, and tangential points. Preserve core arguments and actionable advice.\n- Section word budget targets:\n  - Introduction: ~${Math.round(targetTotal * 0.08)} words\n${post.sections.map((s, i) => `  - Section ${i + 1} (${s.heading}): ~${s.targetWordCount} words`).join('\n')}\n  - Conclusion: ~${Math.round(targetTotal * 0.07)} words`
     : densityReview
       ? `\n\nPAGE-TYPE DENSITY REVIEW REQUIRED:\n- Current total: ~${currentWords} words\n- Target total: ${targetTotal} words (from the content brief)\n- Even if the draft is within target, trim any duplicate CTA, repeated proof point, repeated brand mention, SEO-operational explanation, or section that reads like article padding.\n- Preserve useful specifics, proof, and conversion clarity; cut extra narrative created by brand context.\n- Section word budget targets remain ceilings, not minimums:\n  - Introduction: ~${Math.round(targetTotal * 0.08)} words\n${post.sections.map((s, i) => `  - Section ${i + 1} (${s.heading}): ~${s.targetWordCount} words`).join('\n')}\n  - Conclusion: ~${Math.round(targetTotal * 0.07)} words`
       : `\n\nWORD COUNT: Current total (~${currentWords} words) is within the ${targetTotal}-word target. Preserve depth — do not inflate or significantly reduce.`;
+  const v2WordBudgetInstruction = underBudget
+    ? `\n\nWORD COUNT EXPANSION REQUIRED:\n- Current template-section body: ~${currentBodyWords} words\n- Accepted template-section body target: ${targetTotal} words (from the content brief)\n- Expand the template sections proportionally until their combined body is within 90–110% of ${targetTotal} words.\n- Do not expand the introduction or conclusion to satisfy this body-only target.\n- Add useful explanation only where the supplied draft, brief, voice authority, or verified evidence already supports it.\n- Do not invent facts, examples, proof, offers, or claims. Preserve typed placeholders when authority is missing.\n- Section word budget targets:\n${post.sections.map((s, i) => `  - Section ${i + 1} (${s.heading}): ~${s.targetWordCount} words`).join('\n')}`
+    : overBudget
+      ? `\n\nWORD COUNT TRIM REQUIRED:\n- Current template-section body: ~${currentBodyWords} words\n- Accepted template-section body target: ${targetTotal} words (from the content brief)\n- Trim the template sections proportionally until their combined body is within 90–110% of ${targetTotal} words.\n- Do not trim the introduction or conclusion to satisfy this body-only target.\n- Cut filler, redundant examples, verbose phrasing, and tangential points. Preserve verified facts, core arguments, typed placeholders, and actionable advice.\n- Section word budget targets:\n${post.sections.map((s, i) => `  - Section ${i + 1} (${s.heading}): ~${s.targetWordCount} words`).join('\n')}`
+      : densityReview
+        ? `\n\nPAGE-TYPE DENSITY REVIEW:\n- Current template-section body: ~${currentBodyWords} words\n- Accepted template-section body target: ${targetTotal} words (from the content brief)\n- The body is already within the accepted word-count band. Remove only genuine duplicate CTAs, proof points, brand mentions, SEO-operational explanations, or article padding; do not force a word-count change.`
+        : `\n\nWORD COUNT: The template-section body (~${currentBodyWords} words) is within the accepted 90–110% band around the ${targetTotal}-word body target. Preserve depth — do not inflate or significantly reduce.`;
+  const wordBudgetInstruction = options.outputQualityV2
+    ? v2WordBudgetInstruction
+    : legacyWordBudgetInstruction;
+  const keywordCoverageInstruction = options.outputQualityV2
+    ? `- PRIMARY KEYWORD COVERAGE: The target keyword "${brief.targetKeyword}" MUST appear at least once in the final article. Preserve its existing required placement and integrate it naturally without stuffing.\n- SECONDARY KEYWORD TOPICS: Treat these as topical targets, not mandatory exact strings: ${brief.secondaryKeywords.map(keyword => `"${keyword}"`).join(', ')}. Cover the relevant concepts naturally with synonyms or close variants when they fit; do not force exact-string matches.`
+    : `- KEYWORD COVERAGE CHECK: The following keywords from the brief MUST each appear at least once in the final article. If any are missing, weave them into the most relevant section naturally (do not force or stuff): ${[brief.targetKeyword, ...brief.secondaryKeywords].map(k => `"${k}"`).join(', ')}`;
+  const wordCountRiskLines = options.outputQualityV2
+    ? `${overBudget ? '- WORD COUNT BLOAT — the article significantly exceeds its target word count' : ''}\n${underBudget ? '- WORD COUNT SHORTFALL — the article is significantly below its target word count' : ''}\n${densityReview ? '- PAGE-TYPE DENSITY RISK - conversion pages often drift into duplicate CTAs, salesy repetition, or article-style sprawl' : ''}`
+    : `${overBudget ? '- WORD COUNT BLOAT — the article significantly exceeds its target word count' : ''}\n${densityReview ? '- PAGE-TYPE DENSITY RISK - conversion pages often drift into duplicate CTAs, salesy repetition, or article-style sprawl' : ''}`;
+  const taskCorrectionInstruction = options.outputQualityV2
+    ? `${overBudget ? ' You must also trim to the accepted target band.' : ''}${underBudget ? ' You must also expand to the accepted target band without inventing unsupported material.' : ''}`
+    : `${overBudget ? ' You must also trim to the target word count.' : ''}${densityReview ? ' For this page type, trim duplicate or bloated material even when the current word count is technically within range.' : ''}`;
 
   const prompt = `${role}
 
@@ -889,10 +929,9 @@ You are performing a UNIFICATION PASS on a fully written piece of content. Each 
 - Subtle repetition of the same points, phrases, or examples across sections
 - Inconsistent tone or voice shifts between sections
 - Disconnected narrative — the intro promises one thing but sections deliver another
-${overBudget ? '- WORD COUNT BLOAT — the article significantly exceeds its target word count' : ''}
-${densityReview ? '- PAGE-TYPE DENSITY RISK - conversion pages often drift into duplicate CTAs, salesy repetition, or article-style sprawl' : ''}
+${wordCountRiskLines}
 
-YOUR TASK: Refine each section to create a cohesive, unified piece that reads as if written in a single sitting by one expert author.${overBudget ? ' You must also trim to the target word count.' : ''}${densityReview ? ' For this page type, trim duplicate or bloated material even when the current word count is technically within range.' : ''}
+YOUR TASK: Refine each section to create a cohesive, unified piece that reads as if written in a single sitting by one expert author.${taskCorrectionInstruction}
 
 TITLE: ${post.title}
 TARGET KEYWORD: "${brief.targetKeyword}"
@@ -923,7 +962,7 @@ RULES:
 - Sections array: return the FULL section HTML including its <h2> heading
 - Introduction: return HTML paragraphs only (no heading)
 - Conclusion: return full HTML including its <h2> heading
-- KEYWORD COVERAGE CHECK: The following keywords from the brief MUST each appear at least once in the final article. If any are missing, weave them into the most relevant section naturally (do not force or stuff): ${[brief.targetKeyword, ...brief.secondaryKeywords].map(k => `"${k}"`).join(', ')}
+${keywordCoverageInstruction}
 - KEYWORD DENSITY CAP: No keyword phrase should appear more than 4 times in the full article. Count occurrences of each keyword from the brief. Where any exceeds 4, replace the excess with a synonym or rephrase to refer to the concept implicitly — do not simply delete the passage.
 - STRUCTURAL VARIETY: Review how each section is shaped (opening sentence type, prose vs. bullet list, example-first vs. definition-first, etc.). If more than 2 consecutive sections follow the same pattern, rewrite the middle one using a different approach — straight prose, an example-first opening, a comparison, or a short Q&A exchange. Variety should feel natural, not forced.
 
@@ -973,12 +1012,12 @@ Return ONLY valid JSON, no markdown fences, no comments.`;
     // converting it to an omitted field.
     if (parsed.sections && parsed.sections.length !== post.sections.length) {
       log.warn(`Unification returned ${parsed.sections.length} sections but expected ${post.sections.length} — rejecting candidate`);
-      return { ...parsed, invalidReason: 'section_census_mismatch' };
+      return { status: 'invalid', reason: 'section_census_mismatch' };
     }
-    return parsed;
+    return { status: 'candidate', candidate: parsed };
   } catch (err) {
     log.warn({ err: err }, 'Failed to parse unification JSON');
-    return null;
+    return { status: 'invalid', reason: 'schema_validation_failed' };
   }
 }
 

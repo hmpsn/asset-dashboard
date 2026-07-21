@@ -15,9 +15,10 @@ import { countHtmlWords } from '../../../content-posts-ai.js';
 import type { BoundedProviderDispatch } from '../../../content-posts-ai.js';
 import { MATRIX_READER_FACING_PROSE_CONTRACT } from './audit.js';
 import {
-  listCurrentMatrixCellEvidence,
+  readFrozenMatrixCellEvidence,
   renderMatrixCellEvidencePrompt,
 } from './evidence.js';
+import { synchronizeMatrixGenerationPostHeadings } from './heading-contract.js';
 
 export interface MatrixGenerationStageOptions {
   workspaceId: string;
@@ -27,6 +28,8 @@ export interface MatrixGenerationStageOptions {
   signal?: AbortSignal;
   assertAuthority: () => void;
   beforeBoundedProviderDispatch?: (dispatch: BoundedProviderDispatch) => void;
+  /** Matrix-only output policy resolved once by the worker. */
+  outputQualityV2?: boolean;
 }
 
 function placeholderToken(requirement: MatrixGenerationPreviewTarget['evidenceRequirements'][number]): string {
@@ -91,11 +94,12 @@ export async function generateMatrixBriefStage(
   options: MatrixGenerationStageOptions,
 ): Promise<ContentBrief> {
   const { target } = options;
-  const resolutions = listCurrentMatrixCellEvidence(
-    options.workspaceId,
-    target.matrixId,
-    target.cellId,
-  );
+  const resolutions = readFrozenMatrixCellEvidence({
+    workspaceId: options.workspaceId,
+    matrixId: target.matrixId,
+    cellId: target.cellId,
+    evidenceResolutionIds: target.frozenEvidenceResolutionIds,
+  }).map(read => read.resolution);
   const evidencePrompt = renderMatrixCellEvidencePrompt(
     target.evidenceRequirements,
     resolutions,
@@ -179,11 +183,12 @@ export async function generateMatrixPostStage(
   brief: ContentBrief,
   options: MatrixGenerationStageOptions,
 ): Promise<GeneratedPost> {
-  const resolutions = listCurrentMatrixCellEvidence(
-    options.workspaceId,
-    options.target.matrixId,
-    options.target.cellId,
-  );
+  const resolutions = readFrozenMatrixCellEvidence({
+    workspaceId: options.workspaceId,
+    matrixId: options.target.matrixId,
+    cellId: options.target.cellId,
+    evidenceResolutionIds: options.target.frozenEvidenceResolutionIds,
+  }).map(read => read.resolution);
   const evidencePrompt = renderMatrixCellEvidencePrompt(
     options.target.evidenceRequirements,
     resolutions,
@@ -208,6 +213,7 @@ export async function generateMatrixPostStage(
     assertAuthority: options.assertAuthority,
     maxRetries: 0,
     beforeBoundedProviderDispatch: options.beforeBoundedProviderDispatch,
+    outputQualityV2: options.outputQualityV2,
   });
   const bodyBlocks = options.target.blockManifest.blocks
     .filter(block => block.source === 'template');
@@ -251,5 +257,5 @@ export async function generateMatrixPostStage(
   post.totalWordCount = countHtmlWords(post.introduction)
     + post.sections.reduce((sum, section) => sum + countHtmlWords(section.content), 0)
     + countHtmlWords(post.conclusion);
-  return post;
+  return synchronizeMatrixGenerationPostHeadings(options.target.blockManifest, post);
 }

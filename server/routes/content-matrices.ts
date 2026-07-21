@@ -57,7 +57,10 @@ import {
   MatrixGenerationEvidenceError,
   resolveContentMatrixEvidence,
 } from '../domains/content/matrix-generation/evidence.js';
-import { previewMatrixGeneration } from '../domains/content/matrix-generation/preview.js';
+import {
+  MatrixGenerationPreviewStageError,
+  previewMatrixGeneration,
+} from '../domains/content/matrix-generation/preview.js';
 import { MatrixReadServiceError } from '../domains/content/matrix-generation/read-service.js';
 import {
   getMatrixGeneration,
@@ -352,6 +355,59 @@ function notifyContentPlanUpdated(workspaceId: string, payload: Record<string, u
   broadcastToWorkspace(workspaceId, WS_EVENTS.CONTENT_UPDATED, { domain: 'content-plan', ...payload });
 }
 
+export interface MatrixGenerationHttpErrorProjection {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+/** Safe shared HTTP projection for preview/read failures, including paid-start re-preflight. */
+export function projectMatrixGenerationHttpError(
+  error: unknown,
+): MatrixGenerationHttpErrorProjection | null {
+  if (error instanceof MatrixReadServiceError) {
+    return {
+      status: error.code === 'not_found' ? 404 : error.code === 'conflict' ? 409 : 422,
+      body: {
+        error: error.message,
+        code: error.code,
+        retryable: error.details?.retryable === true,
+        ...(error.details ? { details: error.details } : {}),
+      },
+    };
+  }
+  if (error instanceof MatrixGenerationPreviewStageError) {
+    if (error.code === 'precondition_failed'
+      && error.reason
+      && error.fieldPath
+      && error.constraint) {
+      return {
+        status: 422,
+        body: {
+          error: 'The matrix generation preview exceeds a safe generation limit.',
+          code: 'precondition_failed',
+          retryable: false,
+          details: {
+            reason: error.reason,
+            fieldPath: error.fieldPath,
+            constraint: error.constraint,
+            stage: error.stage,
+            cellId: error.cellId,
+          },
+        },
+      };
+    }
+    return {
+      status: 500,
+      body: {
+        error: 'The matrix generation preview could not complete.',
+        code: 'internal_error',
+        retryable: false,
+      },
+    };
+  }
+  return null;
+}
+
 router.post(
   '/api/content-matrices/:workspaceId/:matrixId/generation-preview',
   requireWorkspaceAccess('workspaceId'),
@@ -365,9 +421,15 @@ router.post(
       });
       res.json(result);
     } catch (err) {
-      if (err instanceof MatrixReadServiceError) {
-        const status = err.code === 'not_found' ? 404 : err.code === 'conflict' ? 409 : 422;
-        res.status(status).json({ error: err.message, code: err.code });
+      const projected = projectMatrixGenerationHttpError(err);
+      if (projected) {
+        if (err instanceof MatrixGenerationPreviewStageError) {
+          log.warn({
+            stage: err.stage,
+            classification: err.classification,
+          }, 'Matrix generation preview stage failed');
+        }
+        res.status(projected.status).json(projected.body);
         return;
       }
       log.error({ err }, 'Failed to preview matrix generation');
@@ -415,11 +477,32 @@ router.post(
       }
       res.status(result.existing ? 200 : 202).json(result);
     } catch (err) {
+      const projected = projectMatrixGenerationHttpError(err);
+      if (projected) {
+        if (err instanceof MatrixGenerationPreviewStageError) {
+          log.warn({
+            stage: err.stage,
+            classification: err.classification,
+          }, 'Matrix generation start preflight stage failed');
+        }
+        return res.status(projected.status).json(projected.body);
+      }
       if (err instanceof ActiveJobResourceConflict) {
-        return res.status(409).json({ error: err.message, code: err.code, jobId: err.jobId });
+        return res.status(409).json({
+          error: err.message,
+          code: err.code,
+          jobId: err.jobId,
+          retryable: true,
+          details: { reason: 'active_job_conflict', activeJobId: err.jobId },
+        });
       }
       if (err instanceof MatrixGenerationBatchPreconditionError) {
-        return res.status(422).json({ error: err.message, code: err.code });
+        return res.status(422).json({
+          error: err.message,
+          code: err.code,
+          retryable: err.details.retryable,
+          details: err.details,
+        });
       }
       log.error({ err }, 'Failed to start matrix generation');
       res.status(500).json({ error: 'Failed to start matrix generation' });
@@ -434,6 +517,7 @@ router.get(
     const query = z.object({
       cursor: z.string().min(1).max(2_048).optional(),
       limit: z.coerce.number().int().min(1).max(100).optional(),
+      includeEvidenceValues: z.enum(['true', 'false']).transform(value => value === 'true').optional(),
     }).safeParse(req.query);
     if (!query.success) return res.status(400).json({ error: 'Invalid generation-run query' });
     try {
@@ -442,16 +526,35 @@ router.get(
         runId: req.params.runId,
         cursor: query.data.cursor,
         limit: query.data.limit,
+        includeEvidenceValues: query.data.includeEvidenceValues,
       }));
     } catch (err) {
       if (err instanceof ActiveJobResourceConflict) {
-        return res.status(409).json({ error: err.message, code: err.code, jobId: err.jobId });
+        return res.status(409).json({
+          error: err.message,
+          code: err.code,
+          jobId: err.jobId,
+          retryable: true,
+          details: { reason: 'active_job_conflict', activeJobId: err.jobId },
+        });
       }
       if (err instanceof MatrixGenerationBatchNotFoundError) {
         return res.status(404).json({ error: err.message, code: err.code });
       }
+      if (err instanceof MatrixGenerationEvidenceError) {
+        return res.status(err.code === 'not_found' ? 404 : 422).json({
+          error: err.message,
+          code: err.code,
+          retryable: false,
+        });
+      }
       if (err instanceof MatrixGenerationBatchPreconditionError) {
-        return res.status(409).json({ error: err.message, code: err.code });
+        return res.status(409).json({
+          error: err.message,
+          code: err.code,
+          retryable: err.details.retryable,
+          details: err.details,
+        });
       }
       log.error({ err }, 'Failed to read matrix generation run');
       res.status(500).json({ error: 'Failed to read matrix generation run' });
@@ -498,13 +601,24 @@ router.post(
       res.status(result.existing ? 200 : 202).json(result);
     } catch (err) {
       if (err instanceof ActiveJobResourceConflict) {
-        return res.status(409).json({ error: err.message, code: err.code, jobId: err.jobId });
+        return res.status(409).json({
+          error: err.message,
+          code: err.code,
+          jobId: err.jobId,
+          retryable: true,
+          details: { reason: 'active_job_conflict', activeJobId: err.jobId },
+        });
       }
       if (err instanceof MatrixGenerationBatchNotFoundError) {
         return res.status(404).json({ error: err.message, code: err.code });
       }
       if (err instanceof MatrixGenerationBatchPreconditionError) {
-        return res.status(409).json({ error: err.message, code: err.code });
+        return res.status(409).json({
+          error: err.message,
+          code: err.code,
+          retryable: err.details.retryable,
+          details: err.details,
+        });
       }
       log.error({ err }, 'Failed to retry matrix generation');
       res.status(500).json({ error: 'Failed to retry matrix generation' });

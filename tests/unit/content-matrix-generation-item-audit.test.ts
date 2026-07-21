@@ -19,6 +19,7 @@ import { createMatrix, getMatrix } from '../../server/content-matrices.js';
 import { createTemplate } from '../../server/content-templates.js';
 import { getPost, updatePostField } from '../../server/content-posts-db.js';
 import { listJobs } from '../../server/jobs.js';
+import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import {
   approveMatrixPageForPublishReadiness,
 } from '../../server/domains/content/matrix-generation/approval-service.js';
@@ -28,6 +29,7 @@ import {
 import {
   auditMatrixGenerationItem,
 } from '../../server/domains/content/matrix-generation/item-audit.js';
+import { getMatrixGeneration } from '../../server/domains/content/matrix-generation/batch-service.js';
 import type {
   MatrixGenerationItemAuditDependencies,
 } from '../../server/domains/content/matrix-generation/item-audit.js';
@@ -53,11 +55,16 @@ import {
   getVoiceProfile,
 } from '../../server/voice-calibration.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
+import { countHtmlWords } from '../../server/content-posts-ai.js';
 
 const cleanupWorkspaceIds = new Set<string>();
 
 afterEach(() => {
-  for (const workspaceId of cleanupWorkspaceIds) deleteWorkspace(workspaceId);
+  for (const workspaceId of cleanupWorkspaceIds) {
+    setWorkspaceFlagOverride('content-matrix-generation', workspaceId, null);
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', workspaceId, null);
+    deleteWorkspace(workspaceId);
+  }
   cleanupWorkspaceIds.clear();
 });
 
@@ -67,9 +74,10 @@ interface Fixture {
   matrix: ContentMatrix;
 }
 
-function createFixture(): Fixture {
+function createFixture(candidateCount = 1): Fixture {
   const workspaceId = createWorkspace(`M2 matrix audit ${randomUUID()}`).id;
   cleanupWorkspaceIds.add(workspaceId);
+  setWorkspaceFlagOverride('content-matrix-generation', workspaceId, true);
   const template = createTemplate(workspaceId, {
     name: 'Audited service template',
     pageType: 'service',
@@ -112,7 +120,12 @@ function createFixture(): Fixture {
     templateId: template.id,
     dimensions: [
       { variableName: 'service', values: ['SEO consulting'] },
-      { variableName: 'city', values: ['Austin'] },
+      {
+        variableName: 'city',
+        values: Array.from({ length: candidateCount }, (_, index) => (
+          index === 0 ? 'Austin' : `Austin ${index + 1}`
+        )),
+      },
     ],
     urlPattern: template.urlPattern,
     keywordPattern: template.keywordPattern,
@@ -228,6 +241,7 @@ function structuralTarget(target: MatrixGenerationPreviewTarget): ResolvedMatrix
     expectedArtifactRevisions: _expectedArtifactRevisions,
     effectiveInputFingerprint: _effectiveInputFingerprint,
     blockingRequirementIds: _blockingRequirementIds,
+    frozenEvidenceResolutionIds: _frozenEvidenceResolutionIds,
     estimatedPaidBudget: _estimatedPaidBudget,
     ...resolved
   } = target;
@@ -289,6 +303,14 @@ function candidates(
     ? `[NEEDS CLIENT INPUT: ${unresolvedCta.clientSafePrompt ?? unresolvedCta.reason}]`
     : '';
   const briefId = `brief_${randomUUID()}`;
+  const introduction = '<p>SEO consulting in Austin gives organizations a calm, practical path to clearer search priorities and useful decisions without inflated promises.</p>';
+  const sectionBody = `<h2>${templateBlocks[0].heading.renderedText}</h2><p>SEO consulting in Austin starts with a focused review of the pages people use to understand the organization. The client receives clear priorities, direct explanations, and a practical sequence for deciding what should change first.</p><p>${Array.from({ length: 70 }, () => 'strategy').join(' ')}</p>`;
+  const sectionCta = placeholder
+    ? `<h2>${templateBlocks[1].heading.renderedText}</h2><p>Contact the team to discuss SEO consulting when the timing is right. ${placeholder}</p><p>${Array.from({ length: 70 }, () => 'action').join(' ')}</p>`
+    : `<h2>${templateBlocks[1].heading.renderedText}</h2><p><a href="https://example.com/contact">Contact the team</a> to discuss SEO consulting when the timing is right.</p><p>${Array.from({ length: 70 }, () => 'action').join(' ')}</p>`;
+  const conclusion = '<h2>Next</h2><p>Review the priorities, ask questions, and choose the next step that makes sense.</p>';
+  const sectionBodyWords = countHtmlWords(sectionBody);
+  const sectionCtaWords = countHtmlWords(sectionCta);
   return {
     brief: {
       id: briefId,
@@ -323,13 +345,13 @@ function candidates(
       metaDescription: target.metaDescription,
       seoTitle: target.title,
       seoMetaDescription: target.metaDescription,
-      introduction: '<p>SEO consulting in Austin gives organizations a calm, practical path to clearer search priorities and useful decisions without inflated promises.</p>',
+      introduction,
       sections: [
         {
           index: 0,
           heading: templateBlocks[0].heading.renderedText ?? '',
-          content: `<h2>${templateBlocks[0].heading.renderedText}</h2><p>SEO consulting in Austin starts with a focused review of the pages people use to understand the organization. The client receives clear priorities, direct explanations, and a practical sequence for deciding what should change first.</p>`,
-          wordCount: 34,
+          content: sectionBody,
+          wordCount: sectionBodyWords,
           targetWordCount: 150,
           keywords: [target.targetKeyword.value],
           status: 'done',
@@ -337,17 +359,18 @@ function candidates(
         {
           index: 1,
           heading: templateBlocks[1].heading.renderedText ?? '',
-          content: placeholder
-            ? `<h2>${templateBlocks[1].heading.renderedText}</h2><p>Contact the team to discuss SEO consulting when the timing is right. ${placeholder}</p>`
-            : `<h2>${templateBlocks[1].heading.renderedText}</h2><p><a href="https://example.com/contact">Contact the team</a> to discuss SEO consulting when the timing is right.</p>`,
-          wordCount: 14,
+          content: sectionCta,
+          wordCount: sectionCtaWords,
           targetWordCount: 50,
           keywords: [],
           status: 'done',
         },
       ],
-      conclusion: '<p>Review the priorities, ask questions, and choose the next step that makes sense.</p>',
-      totalWordCount: 86,
+      conclusion,
+      totalWordCount: countHtmlWords(introduction)
+        + sectionBodyWords
+        + sectionCtaWords
+        + countHtmlWords(conclusion),
       targetWordCount: target.blockManifest.totalWordCountTarget,
       status: 'draft',
       generationProvenance: postProvenance(),
@@ -360,8 +383,9 @@ function candidates(
 async function committedFixture(
   resolveCta: boolean,
   mutatePost?: (post: GeneratedPost) => void,
+  candidateCount = 1,
 ) {
-  const fixture = createFixture();
+  const fixture = createFixture(candidateCount);
   seedBrandAuthority(fixture.workspaceId);
   const cellId = fixture.matrix.cells[0].id;
   await resolveEvidence(
@@ -404,7 +428,17 @@ async function committedFixture(
     templateId: fixture.template.id,
     idempotencyKey: `run-${randomUUID()}`,
     selectionFingerprint: target.effectiveInputFingerprint,
-    selections: [selection],
+    selections: [
+      selection,
+      ...fixture.matrix.cells.slice(1).map(cell => ({
+        ...selection,
+        cellId: cell.id,
+        sourceRevision: {
+          ...selection.sourceRevision,
+          cellRevision: cell.revision ?? 0,
+        },
+      })),
+    ],
     createdBy: { actorType: 'operator', actorId: 'matrix-audit-operator' },
     mcpExecutionContext: null,
   }).run;
@@ -503,8 +537,176 @@ function revisedBlocks(input: ReviseMatrixGenerationCandidateInput) {
 }
 
 describe('auditMatrixGenerationItem', () => {
-  it('requires the set audit before human approval and never queues publication', async () => {
+  it('audits the exact preview-frozen evidence row after a newer value supersedes it', async () => {
     const committed = await committedFixture(true);
+    const frozenIds = committed.target.frozenEvidenceResolutionIds;
+    const supersededId = frozenIds[0];
+    if (!supersededId) throw new Error('Expected frozen evidence');
+    const replacementId = `mce_${randomUUID()}`;
+    const supersededAt = new Date().toISOString();
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE content_matrix_cell_evidence
+        SET is_current = 0, superseded_at = ?
+        WHERE id = ? AND workspace_id = ?
+      `).run(supersededAt, supersededId, committed.fixture.workspaceId);
+      db.prepare(`
+        INSERT INTO content_matrix_cell_evidence (
+          id, workspace_id, matrix_id, cell_id, requirement_id,
+          matrix_revision, template_revision, cell_revision,
+          value, source_ref, resolved_by, expected_artifact_revisions,
+          idempotency_key, supersedes_id, is_current, created_at, superseded_at
+        )
+        SELECT
+          ?, workspace_id, matrix_id, cell_id, requirement_id,
+          matrix_revision, template_revision, cell_revision,
+          value, source_ref, resolved_by, expected_artifact_revisions,
+          ?, id, 1, ?, NULL
+        FROM content_matrix_cell_evidence
+        WHERE id = ? AND workspace_id = ?
+      `).run(
+        replacementId,
+        `replacement-${randomUUID()}`,
+        supersededAt,
+        supersededId,
+        committed.fixture.workspaceId,
+      );
+    }).immediate();
+
+    let auditedEvidenceIds: string[] = [];
+    const result = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-frozen-evidence-audit-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => {
+        auditedEvidenceIds = input.authority.evidenceResolutions.map(item => item.id);
+        return operationResult(
+          input,
+          'content-matrix-item-audit',
+          { revisionRecommended: false, findings: [] },
+        );
+      },
+    });
+
+    expect(result.item.status).toBe('ready_for_human_review');
+    expect(auditedEvidenceIds).toEqual(frozenIds);
+    expect(auditedEvidenceIds).toContain(supersededId);
+    expect(auditedEvidenceIds).not.toContain(replacementId);
+  });
+
+  it('allows a one-cell run to reach human approval without a set audit and never queues publication', async () => {
+    const committed = await committedFixture(true);
+    const audited = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-single-approval-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => operationResult(
+        input,
+        'content-matrix-item-audit',
+        { revisionRecommended: false, findings: [] },
+      ),
+    });
+    const run = getPersistedMatrixGenerationRun(
+      committed.fixture.workspaceId,
+      audited.item.runId,
+    )!;
+    expect(run.selections).toHaveLength(1);
+    expect(run.setAuditReport).toBeNull();
+    const publishJobsBefore = listJobs(committed.fixture.workspaceId)
+      .filter(job => job.type === 'content-publish').length;
+
+    const approved = approveMatrixPageForPublishReadiness({
+      workspaceId: committed.fixture.workspaceId,
+      runId: run.id,
+      itemId: audited.item.id,
+      expectedRunRevision: run.revision,
+      expectedItemRevision: audited.item.revision,
+      expectedPostRevision: audited.post.generationRevision,
+      approvedBy: { actorType: 'operator', actorId: 'matrix-approver' },
+    });
+
+    expect(approved.item.approvalEvidence).toMatchObject({
+      postId: audited.post.id,
+      approvedBy: { actorType: 'operator', actorId: 'matrix-approver' },
+    });
+    expect(listJobs(committed.fixture.workspaceId)
+      .filter(job => job.type === 'content-publish')).toHaveLength(publishJobsBefore);
+  });
+
+  it('ignores a legacy blocking set report when a one-cell run reaches human approval', async () => {
+    const committed = await committedFixture(true);
+    const audited = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-legacy-single-set-audit-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => operationResult(
+        input,
+        'content-matrix-item-audit',
+        { revisionRecommended: false, findings: [] },
+      ),
+    });
+    const currentRun = getPersistedMatrixGenerationRun(
+      committed.fixture.workspaceId,
+      audited.item.runId,
+    )!;
+    expect(currentRun.selections).toHaveLength(1);
+    const runWithLegacyReport = saveMatrixGenerationSetAuditReport({
+      workspaceId: committed.fixture.workspaceId,
+      runId: currentRun.id,
+      expectedRunRevision: currentRun.revision,
+      report: {
+        verdict: 'source_correction_required',
+        findings: [{
+          id: 'mgsf-legacy-single-blocker',
+          source: 'model',
+          kind: 'provenance',
+          code: 'legacy_single_cell_blocker',
+          severity: 'error',
+          message: 'A pre-M0 set report that is no longer authoritative.',
+          affectedItemIds: [audited.item.id],
+          affectedTargetIds: [],
+          requiresHumanReview: false,
+        }],
+        passCount: 1,
+        modelProvenance: provenance('content-matrix-set-audit'),
+        auditedAt: new Date().toISOString(),
+      },
+    });
+    const legacyRead = getMatrixGeneration({
+      workspaceId: committed.fixture.workspaceId,
+      runId: runWithLegacyReport.id,
+      limit: 1,
+    });
+    expect(legacyRead.run.setAuditReport).toBeNull();
+    expect(legacyRead.items.items[0]?.setAuditFindings).toEqual([]);
+
+    const approved = approveMatrixPageForPublishReadiness({
+      workspaceId: committed.fixture.workspaceId,
+      runId: runWithLegacyReport.id,
+      itemId: audited.item.id,
+      expectedRunRevision: runWithLegacyReport.revision,
+      expectedItemRevision: audited.item.revision,
+      expectedPostRevision: audited.post.generationRevision,
+      approvedBy: { actorType: 'operator', actorId: 'matrix-approver' },
+    });
+
+    expect(approved.item.approvalEvidence).toMatchObject({ postId: audited.post.id });
+  });
+
+  it('requires a nonblocking set audit before human approval for a multi-cell run', async () => {
+    const committed = await committedFixture(true, undefined, 2);
     const audited = await auditMatrixGenerationItem({
       workspaceId: committed.fixture.workspaceId,
       itemId: committed.item.id,
@@ -559,6 +761,15 @@ describe('auditMatrixGenerationItem', () => {
         auditedAt: new Date().toISOString(),
       },
     });
+    const setAuditRead = getMatrixGeneration({
+      workspaceId: committed.fixture.workspaceId,
+      runId: run.id,
+      limit: 2,
+    });
+    expect(setAuditRead.run.setAuditReport).toMatchObject({ verdict: 'passed' });
+    expect(setAuditRead.items.items[0]?.setAuditFindings).toEqual([
+      expect.objectContaining({ id: 'mgsf-human-review' }),
+    ]);
     const publishJobsBefore = listJobs(committed.fixture.workspaceId)
       .filter(job => job.type === 'content-publish').length;
     const approved = approveMatrixPageForPublishReadiness({
@@ -637,7 +848,21 @@ describe('auditMatrixGenerationItem', () => {
     expect(result.automaticRevisionApplied).toBe(true);
     expect(auditCalls).toBe(2);
     expect(revisionCalls).toBe(1);
-    expect(getPost(committed.fixture.workspaceId, committed.post.id)?.generationRevision).toBe(2);
+    const durablePost = getPost(committed.fixture.workspaceId, committed.post.id);
+    expect(durablePost?.generationRevision).toBe(2);
+    expect(durablePost?.sections.length).toBeGreaterThan(0);
+    expect(durablePost?.sections.every(section => ( // every-ok -- guarded by the non-empty assertion above
+      section.wordCount === countHtmlWords(section.content)
+    ))).toBe(true);
+    expect(durablePost?.totalWordCount).toBe(
+      countHtmlWords(durablePost?.introduction ?? '')
+        + (durablePost?.sections.reduce((sum, section) => sum + countHtmlWords(section.content), 0) ?? 0)
+        + countHtmlWords(durablePost?.conclusion ?? ''),
+    );
+    expect(result.item.auditReport?.deterministicChecks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'word-count-integrity', result: 'passed' }),
+      expect.objectContaining({ id: 'word-count-target', result: 'passed' }),
+    ]));
 
     const attempts = listMatrixGenerationAttempts(
       committed.fixture.workspaceId,
@@ -666,6 +891,107 @@ describe('auditMatrixGenerationItem', () => {
     }, overrides)).rejects.toThrow(/changed since it was read/i);
     expect(auditCalls).toBe(2);
     expect(revisionCalls).toBe(1);
+  });
+
+  it('stops after one revision when the final body remains outside the accepted target band', async () => {
+    const committed = await committedFixture(true);
+    let auditCalls = 0;
+    let revisionCalls = 0;
+    const result = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-word-target-revision-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => {
+        auditCalls += 1;
+        return operationResult(input, 'content-matrix-item-audit', {
+          revisionRecommended: true,
+          findings: [{
+            code: 'voice_specificity',
+            severity: 'warning' as const,
+            message: 'Tighten the explanation without changing facts.',
+            affectedTargetIds: ['template:body'],
+            requiresHumanReview: false,
+          }],
+        });
+      },
+      reviseCandidate: async input => {
+        revisionCalls += 1;
+        const blocks = revisedBlocks(input);
+        const body = blocks.find(block => block.targetId === 'template:body');
+        if (!body) throw new Error('Expected body block');
+        body.html = '<h2>SEO consulting in Austin</h2><p>Clear priorities for the client.</p>';
+        return operationResult(input, 'content-matrix-item-revise', { blocks });
+      },
+    });
+
+    expect(result.item).toMatchObject({
+      status: 'needs_attention',
+      automaticRevisionCount: 1,
+      auditReport: {
+        verdict: 'needs_attention',
+        deterministicChecks: expect.arrayContaining([
+          expect.objectContaining({ id: 'word-count-target', result: 'failed' }),
+        ]),
+      },
+    });
+    expect(result.providerCalls).toBe(2);
+    expect(result.automaticRevisionApplied).toBe(true);
+    expect(auditCalls).toBe(1);
+    expect(revisionCalls).toBe(1);
+    expect(result.post.sections.length).toBeGreaterThan(0);
+    expect(result.post.sections.every(section => ( // every-ok -- guarded by the non-empty assertion above
+      section.wordCount === countHtmlWords(section.content)
+    ))).toBe(true);
+  });
+
+  it('preserves the accepted artifact when automatic revision returns multiple H2s', async () => {
+    const committed = await committedFixture(true);
+    const acceptedContent = committed.post.sections[0].content;
+    const result = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-heading-regression-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => operationResult(input, 'content-matrix-item-audit', {
+        revisionRecommended: true,
+        findings: [{
+          code: 'voice_specificity',
+          severity: 'warning' as const,
+          message: 'Make the service explanation more specific without adding facts.',
+          affectedTargetIds: ['template:body'],
+          requiresHumanReview: false,
+        }],
+      }),
+      reviseCandidate: async input => {
+        const blocks = revisedBlocks(input);
+        const body = blocks.find(block => block.targetId === 'template:body');
+        if (!body) throw new Error('Expected body block');
+        body.html += '<h2>Unexpected duplicate heading</h2>';
+        return operationResult(input, 'content-matrix-item-revise', { blocks });
+      },
+    });
+
+    expect(result.item).toMatchObject({
+      status: 'needs_attention',
+      automaticRevisionCount: 0,
+      error: { code: 'matrix_generation_revision_failed', retryable: true },
+    });
+    expect(result.automaticRevisionApplied).toBe(false);
+    expect(result.providerCalls).toBe(2);
+    const durablePost = getPost(committed.fixture.workspaceId, committed.post.id);
+    expect(durablePost?.generationRevision).toBe(committed.post.generationRevision);
+    expect(durablePost?.sections[0].content).toBe(acceptedContent);
+    expect(listMatrixGenerationAttempts(
+      committed.fixture.workspaceId,
+      committed.item.id,
+    ).at(-1)).toMatchObject({ stage: 'revision', status: 'failed' });
   });
 
   it('routes a human-only model finding to review without automatic revision', async () => {

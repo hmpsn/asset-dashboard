@@ -25,6 +25,67 @@ afterEach(() => {
 });
 
 describe('content matrix generation restart recovery', () => {
+  it('records the explicit interruption error for every attemptless nonterminal item path', () => {
+    const workspaceId = createWorkspace(`Matrix exhaustive recovery ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    const statusPaths = [
+      [] as const,
+      ['preflighting'] as const,
+      ['preflighting', 'preflighted'] as const,
+      ['preflighting', 'preflighted', 'generating_brief'] as const,
+      ['preflighting', 'preflighted', 'generating_brief', 'generating_post'] as const,
+      ['preflighting', 'preflighted', 'generating_brief', 'generating_post', 'auditing_deterministic'] as const,
+      ['preflighting', 'preflighted', 'generating_brief', 'generating_post', 'auditing_deterministic', 'auditing_model'] as const,
+      ['preflighting', 'preflighted', 'generating_brief', 'generating_post', 'auditing_deterministic', 'revising'] as const,
+    ];
+    let run = createMatrixGenerationRun({
+      workspaceId,
+      matrixId: 'matrix-exhaustive-recovery',
+      templateId: 'template-exhaustive-recovery',
+      idempotencyKey: `run-${randomUUID()}`,
+      selectionFingerprint: '9'.repeat(64),
+      selections: statusPaths.map((_, index) => ({
+        matrixId: 'matrix-exhaustive-recovery',
+        cellId: `cell-exhaustive-${index}`,
+        sourceRevision: { matrixRevision: 1, templateRevision: 1, cellRevision: 1 },
+        structuralFingerprint: index.toString(16).repeat(64),
+        previewFingerprint: ((index + 8) % 16).toString(16).repeat(64),
+      })),
+      createdBy: { actorType: 'operator', actorId: 'operator-1' },
+      mcpExecutionContext: null,
+    }).run;
+    run = transitionMatrixGenerationRun({
+      workspaceId,
+      runId: run.id,
+      expectedRevision: run.revision,
+      nextStatus: 'running',
+    });
+    const items = listMatrixGenerationItems(workspaceId, run.id);
+    for (const [index, path] of statusPaths.entries()) {
+      let item = items[index];
+      for (const nextStatus of path) {
+        item = transitionMatrixGenerationItem({
+          workspaceId,
+          itemId: item.id,
+          expectedRevision: item.revision,
+          nextStatus,
+        });
+      }
+    }
+
+    expect(reconcileMatrixGenerationRunsAfterRestart()).toBe(1);
+    expect(listMatrixGenerationItems(workspaceId, run.id)).toEqual(statusPaths.map(() => (
+      expect.objectContaining({
+        status: 'failed',
+        error: expect.objectContaining({
+          code: 'matrix_generation_restart_interrupted',
+          retryable: true,
+        }),
+      })
+    )));
+    expect(getPersistedMatrixGenerationRun(workspaceId, run.id)?.status).toBe('failed');
+  });
+
   it('records interrupted work as retryable failure without repeating it', () => {
     const workspaceId = createWorkspace(`Matrix recovery ${randomUUID()}`).id;
     cleanupWorkspaceIds.add(workspaceId);
@@ -78,7 +139,7 @@ describe('content matrix generation restart recovery', () => {
     expect(reconcileMatrixGenerationRunsAfterRestart()).toBe(0);
   });
 
-  it('demotes a ready page when restart interrupts the required set audit', () => {
+  it('preserves a ready single page because cross-page set audit is not required', () => {
     const workspaceId = createWorkspace(`Matrix set-audit recovery ${randomUUID()}`).id;
     cleanupWorkspaceIds.add(workspaceId);
     let run = createMatrixGenerationRun({
@@ -121,10 +182,80 @@ describe('content matrix generation restart recovery', () => {
     }
 
     expect(reconcileMatrixGenerationRunsAfterRestart()).toBe(1);
-    expect(listMatrixGenerationItems(workspaceId, run.id)[0]).toMatchObject({
-      status: 'needs_attention',
-      error: { code: 'matrix_generation_set_audit_incomplete', retryable: true },
+    expect(listMatrixGenerationItems(workspaceId, run.id)[0]?.status)
+      .toBe('ready_for_human_review');
+    expect(getPersistedMatrixGenerationRun(workspaceId, run.id)?.status).toBe('completed');
+  });
+
+  it('demotes ready pages when restart interrupts a required multi-page set audit', () => {
+    const workspaceId = createWorkspace(`Matrix set-audit recovery ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    let run = createMatrixGenerationRun({
+      workspaceId,
+      matrixId: 'matrix-set-recovery',
+      templateId: 'template-set-recovery',
+      idempotencyKey: `run-${randomUUID()}`,
+      selectionFingerprint: 'e'.repeat(64),
+      selections: [
+        {
+          matrixId: 'matrix-set-recovery',
+          cellId: 'cell-set-recovery-one',
+          sourceRevision: { matrixRevision: 1, templateRevision: 1, cellRevision: 1 },
+          structuralFingerprint: 'f'.repeat(64),
+          previewFingerprint: 'a'.repeat(64),
+        },
+        {
+          matrixId: 'matrix-set-recovery',
+          cellId: 'cell-set-recovery-two',
+          sourceRevision: { matrixRevision: 1, templateRevision: 1, cellRevision: 1 },
+          structuralFingerprint: 'b'.repeat(64),
+          previewFingerprint: 'c'.repeat(64),
+        },
+      ],
+      createdBy: { actorType: 'operator', actorId: 'operator-1' },
+      mcpExecutionContext: null,
+    }).run;
+    run = transitionMatrixGenerationRun({
+      workspaceId,
+      runId: run.id,
+      expectedRevision: run.revision,
+      nextStatus: 'running',
     });
+    for (let item of listMatrixGenerationItems(workspaceId, run.id)) {
+      for (const nextStatus of [
+        'preflighting',
+        'preflighted',
+        'generating_brief',
+        'generating_post',
+        'auditing_deterministic',
+        'ready_for_human_review',
+      ] as const) {
+        item = transitionMatrixGenerationItem({
+          workspaceId,
+          itemId: item.id,
+          expectedRevision: item.revision,
+          nextStatus,
+        });
+      }
+    }
+
+    expect(reconcileMatrixGenerationRunsAfterRestart()).toBe(1);
+    expect(listMatrixGenerationItems(workspaceId, run.id)).toEqual([
+      expect.objectContaining({
+        status: 'needs_attention',
+        error: expect.objectContaining({
+          code: 'matrix_generation_set_audit_incomplete',
+          retryable: true,
+        }),
+      }),
+      expect.objectContaining({
+        status: 'needs_attention',
+        error: expect.objectContaining({
+          code: 'matrix_generation_set_audit_incomplete',
+          retryable: true,
+        }),
+      }),
+    ]);
     expect(getPersistedMatrixGenerationRun(workspaceId, run.id)?.status)
       .toBe('completed_with_errors');
   });

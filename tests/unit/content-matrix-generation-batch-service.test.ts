@@ -28,9 +28,12 @@ vi.mock('../../server/domains/content/matrix-generation/worker.js', () => ({
 import {
   retryMatrixGeneration,
   getMatrixGeneration,
-  MatrixGenerationBatchPreconditionError,
   startMatrixGeneration,
 } from '../../server/domains/content/matrix-generation/batch-service.js';
+import {
+  computeBlockManifestFingerprint,
+  computeStructuralTargetFingerprint,
+} from '../../server/domains/content/matrix-generation/fingerprint.js';
 import {
   getPersistedMatrixGenerationRun,
   createMatrixGenerationRun,
@@ -53,14 +56,79 @@ const cleanupWorkspaceIds = new Set<string>();
 const cleanupJobIds = new Set<string>();
 
 function previewTarget(workspaceId: string): MatrixGenerationPreviewTarget {
-  return {
+  const target: MatrixGenerationPreviewTarget = {
     workspaceId,
     matrixId: 'matrix-1',
     templateId: 'template-1',
     cellId: 'cell-1',
     sourceRevision: { matrixRevision: 2, templateRevision: 3, cellRevision: 4 },
-    structuralFingerprint: 'a'.repeat(64),
+    variableValues: { service: 'SEO consulting', city: 'Austin' },
+    slugSubstitutions: { service: 'seo-consulting', city: 'austin' },
+    proseSubstitutions: { service: 'SEO consulting', city: 'Austin' },
+    targetKeyword: { value: 'SEO consulting Austin', source: 'target', evidenceRefs: [] },
+    plannedUrl: '/austin/seo-consulting',
+    title: 'SEO Consulting in Austin',
+    metaDescription: 'Grounded SEO consulting for Austin organizations.',
+    renderedHeadings: ['SEO Consulting in Austin'],
+    pageType: 'service',
+    schemaTypes: ['Service'],
+    blockManifest: {
+      generationContractVersion: 1,
+      blocks: [
+        {
+          id: 'system:introduction', source: 'system', generationRole: 'introduction', order: 0,
+          heading: { level: null, renderedText: null, locked: true }, guidance: '',
+          wordCountTarget: 80, aeoContract: { modes: [], required: false },
+          ctaContract: { role: 'none', required: false },
+        },
+        {
+          id: 'template:body', source: 'template', sourceSectionId: 'body',
+          generationRole: 'body', order: 1,
+          heading: { level: 2, renderedText: 'SEO Consulting in Austin', locked: true },
+          guidance: 'Use only verified service evidence.', wordCountTarget: 220,
+          aeoContract: { modes: [], required: false },
+          ctaContract: { role: 'none', required: false },
+        },
+        {
+          id: 'system:conclusion', source: 'system', generationRole: 'conclusion', order: 2,
+          heading: { level: 2, renderedText: 'Next Steps', locked: true }, guidance: '',
+          wordCountTarget: 80, aeoContract: { modes: [], required: false },
+          ctaContract: { role: 'primary', required: true },
+        },
+      ],
+      totalWordCountTarget: 220,
+      fingerprint: '',
+    },
+    generationContractVersion: 1,
+    structuralRequirements: [],
+    structuralBlockingRequirementIds: [],
+    structuralFingerprint: '',
+    outputQualityV2: true,
+    voiceSnapshot: {
+      voiceProfileId: 'voice-1',
+      voiceVersion: 1,
+      finalizedBy: { actorType: 'operator', actorId: 'operator-1' },
+      finalizedAt: '2026-07-20T12:00:00.000Z',
+      fingerprint: 'd'.repeat(64),
+      anchorEvidenceRefs: [{
+        sourceType: 'client_submission',
+        sourceId: 'voice-anchor-1',
+        capturedAt: '2026-07-20T11:00:00.000Z',
+        selectedBy: { actorType: 'operator', actorId: 'operator-1' },
+        selectedAt: '2026-07-20T12:00:00.000Z',
+      }],
+    },
+    identitySnapshot: [],
+    evidenceRequirements: [],
+    evidenceCapturedAt: '2026-07-20T12:00:00.000Z',
+    evidenceFreshThrough: '2026-07-20T12:00:00.000Z',
+    expectedArtifactRevisions: {
+      brief: { artifactType: 'content_brief', artifactId: null, generationRevision: 0 },
+      post: { artifactType: 'generated_post', artifactId: null, generationRevision: 0 },
+    },
     effectiveInputFingerprint: 'b'.repeat(64),
+    blockingRequirementIds: [],
+    frozenEvidenceResolutionIds: [],
     estimatedPaidBudget: {
       providerCalls: 10,
       inputTokens: 1_000,
@@ -68,7 +136,10 @@ function previewTarget(workspaceId: string): MatrixGenerationPreviewTarget {
       estimatedUsd: 0.02,
       maxConcurrency: 1,
     },
-  } as MatrixGenerationPreviewTarget;
+  };
+  target.blockManifest.fingerprint = computeBlockManifestFingerprint(target.blockManifest);
+  target.structuralFingerprint = computeStructuralTargetFingerprint(target);
+  return target;
 }
 
 function request(workspaceId: string): StartMatrixGenerationRequest {
@@ -102,6 +173,7 @@ afterEach(() => {
   for (const jobId of cleanupJobIds) cancelJob(jobId);
   for (const workspaceId of cleanupWorkspaceIds) {
     setWorkspaceFlagOverride('content-matrix-generation', workspaceId, null);
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', workspaceId, null);
     deleteWorkspace(workspaceId);
   }
   cleanupJobIds.clear();
@@ -109,6 +181,59 @@ afterEach(() => {
 });
 
 describe('content matrix batch start', () => {
+  it.each([
+    {
+      status: 'upgrade_required' as const,
+      result: {
+        status: 'upgrade_required' as const,
+        matrixId: 'matrix-1',
+        templateId: 'template-1',
+        cellId: 'cell-1',
+        sourceRevision: { matrixRevision: 2, templateRevision: 3, cellRevision: 4 },
+        proposal: {
+          templateId: 'template-1',
+          expectedTemplateRevision: 3,
+          proposalFingerprint: 'c'.repeat(64),
+          generationContractVersion: 1,
+          blocks: [],
+          blockers: [],
+        },
+      },
+      reason: 'template_upgrade_required',
+    },
+    {
+      status: 'blocked' as const,
+      result: {
+        status: 'blocked' as const,
+        matrixId: 'matrix-1',
+        templateId: 'template-1',
+        cellId: 'cell-1',
+        sourceRevision: { matrixRevision: 2, templateRevision: 3, cellRevision: 4 },
+        omittedOptionalSections: [],
+        evidenceRequirements: [],
+        blockingRequirementIds: ['requirement-1'],
+        expectedArtifactRevisions: {
+          brief: { artifactType: 'content_brief' as const, artifactId: null, generationRevision: 0 },
+          post: { artifactType: 'generated_post' as const, artifactId: null, generationRevision: 0 },
+        },
+      },
+      reason: 'generation_preconditions_unresolved',
+    },
+  ])('reports $status start preconditions truthfully without retrying', async ({ result, reason }) => {
+    const workspaceId = createWorkspace(`Matrix blocked start ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    setWorkspaceFlagOverride('content-matrix-generation', workspaceId, true);
+    mocks.previewMatrixGeneration.mockResolvedValue({
+      results: [result],
+      estimatedBatchBudget: null,
+    } as PreviewMatrixGenerationResult);
+
+    await expect(startMatrixGeneration(request(workspaceId))).rejects.toMatchObject({
+      details: { reason, retryable: false, fieldPath: 'selections.0' },
+    });
+    expect(mocks.queueMatrixGenerationJob).not.toHaveBeenCalled();
+  });
+
   it('accepts the exact preview budget atomically and replays without another job', async () => {
     const workspaceId = createWorkspace(`Matrix batch ${randomUUID()}`).id;
     cleanupWorkspaceIds.add(workspaceId);
@@ -246,6 +371,8 @@ describe('content matrix batch start', () => {
     } satisfies PreviewMatrixGenerationResult);
     const started = await startMatrixGeneration(request(workspaceId));
     cleanupJobIds.add(started.jobId);
+    expect(listMatrixGenerationItems(workspaceId, started.run.id)[0].previewTarget)
+      .toMatchObject({ outputQualityV2: true });
 
     reserveMatrixGenerationBudget({
       workspaceId,
@@ -307,6 +434,8 @@ describe('content matrix batch start', () => {
     });
     cleanupJobIds.add(retried.jobId);
     expect(retried.run.setAuditReport).toBeNull();
+    expect(listMatrixGenerationItems(workspaceId, retried.run.id)[0].previewTarget)
+      .toMatchObject({ outputQualityV2: true });
 
     expect(() => reserveMatrixGenerationBudget({
       workspaceId,
@@ -419,9 +548,51 @@ describe('content matrix batch start', () => {
     const startRequest = request(workspaceId);
     startRequest.acceptedBudget.maxEstimatedUsd = 0.97;
 
-    await expect(startMatrixGeneration(startRequest)).rejects.toBeInstanceOf(
-      MatrixGenerationBatchPreconditionError,
-    );
+    await expect(startMatrixGeneration(startRequest)).rejects.toMatchObject({
+      details: {
+        reason: 'invalid_budget',
+        retryable: false,
+        fieldPath: 'accepted_budget',
+      },
+    });
+    expect(mocks.queueMatrixGenerationJob).not.toHaveBeenCalled();
+  });
+
+  it('requires an immediate re-preview when accepted fingerprint authority is stale', async () => {
+    const workspaceId = createWorkspace(`Matrix stale preview ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    setWorkspaceFlagOverride('content-matrix-generation', workspaceId, true);
+    const target = {
+      ...previewTarget(workspaceId),
+      effectiveInputFingerprint: 'c'.repeat(64),
+    };
+    mocks.previewMatrixGeneration.mockResolvedValue({
+      results: [{
+        status: 'ready',
+        matrixId: target.matrixId,
+        templateId: target.templateId,
+        cellId: target.cellId,
+        sourceRevision: target.sourceRevision,
+        target,
+      }],
+      estimatedBatchBudget: {
+        providerCalls: 15,
+        inputTokens: 31_000,
+        outputTokens: 27_500,
+        estimatedUsd: 0.98,
+        maxConcurrency: 1,
+      },
+    } as PreviewMatrixGenerationResult);
+
+    await expect(startMatrixGeneration(request(workspaceId))).rejects.toMatchObject({
+      message: expect.stringContaining('Re-preview immediately'),
+      details: {
+        reason: 'preview_fingerprint_stale',
+        retryable: true,
+        fieldPath: 'selections.0.expected_preview_fingerprint',
+        constraint: 're-preview immediately and accept the current fingerprint before starting',
+      },
+    });
     expect(mocks.queueMatrixGenerationJob).not.toHaveBeenCalled();
   });
 });

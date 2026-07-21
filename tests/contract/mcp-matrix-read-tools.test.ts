@@ -25,9 +25,13 @@ import {
   MatrixCellRevisionConflictError,
 } from '../../server/content-matrices.js';
 import {
+  MatrixGenerationBatchPreconditionError,
+} from '../../server/domains/content/matrix-generation/batch-service.js';
+import {
   MatrixGenerationPreviewStageError,
 } from '../../server/domains/content/matrix-generation/preview.js';
 import { MATRIX_GENERATION_AUTHORITY_CONTEXT_TOKEN_BUDGET } from '../../server/domains/content/matrix-generation/budget.js';
+import { ActiveJobResourceConflict } from '../../server/jobs.js';
 
 const pseoExpectedSource = {
   entry_updated_at: '2026-07-14T00:00:00.000Z',
@@ -1471,6 +1475,7 @@ describe('MCP content matrix read tools', () => {
       code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
       retryable: false,
       details: {
+        reason: 'invalid_budget',
         field_path: 'generation_context.brief',
         stage: 'generation_context',
         cell_id: 'cell_1',
@@ -1697,12 +1702,14 @@ describe('MCP content matrix read tools', () => {
       workspace_id: 'ws_1',
       run_id: 'run_1',
       limit: 10,
+      include_evidence_values: true,
     }, { ...context, toolName: 'get_content_matrix_generation' });
     expect(deps.getMatrixGeneration).toHaveBeenCalledWith({
       workspaceId: 'ws_1',
       runId: 'run_1',
       cursor: undefined,
       limit: 10,
+      includeEvidenceValues: true,
     });
     expect(textPayload(read)).toMatchObject({ run: { id: 'run_1' }, items: { items: [] } });
 
@@ -1757,6 +1764,108 @@ describe('MCP content matrix read tools', () => {
     );
     expect(deps.addActivity).toHaveBeenCalledTimes(2);
     expect(deps.broadcastToWorkspace).toHaveBeenCalledTimes(2);
+  });
+
+  it('projects truthful stable preconditions without leaking internal details', async () => {
+    const deps = dependencies();
+    deps.startMatrixGeneration.mockRejectedValue(new MatrixGenerationBatchPreconditionError(
+      'Current generation authority no longer matches the accepted preview. Re-preview immediately.',
+      {
+        reason: 'preview_fingerprint_stale',
+        retryable: true,
+        fieldPath: 'selections.0.expected_preview_fingerprint',
+        constraint: 're-preview immediately and accept the current fingerprint before starting',
+      },
+    ));
+    const result = await createContentMatrixActionHandler(deps)(
+      'start_content_matrix_generation',
+      {
+        workspace_id: 'ws_1',
+        matrix_id: 'mtx_1',
+        selections: [{
+          cell_id: 'cell_1',
+          expected_source_revision: {
+            matrix_revision: 2,
+            template_revision: 4,
+            cell_revision: 1,
+          },
+          expected_preview_fingerprint: 'b'.repeat(64),
+        }],
+        accepted_budget: {
+          max_provider_calls: 15,
+          max_input_tokens: 31_000,
+          max_output_tokens: 27_500,
+          max_estimated_usd: 0.98,
+          max_concurrency: 1,
+        },
+        idempotency_key: 'matrix-start-stale',
+      },
+      { ...context, toolName: 'start_content_matrix_generation' },
+    );
+
+    expect(textPayload(result)).toEqual({
+      code: MCP_TOOL_ERROR_CODES.PRECONDITION_FAILED,
+      message: 'Current generation authority no longer matches the accepted preview. Re-preview immediately.',
+      retryable: true,
+      details: {
+        reason: 'preview_fingerprint_stale',
+        field_path: 'selections.0.expected_preview_fingerprint',
+        constraint: 're-preview immediately and accept the current fingerprint before starting',
+      },
+    });
+  });
+
+  it('projects active resource conflicts with a stable retry reason and only the job id', async () => {
+    const deps = dependencies();
+    deps.retryMatrixGeneration.mockImplementation(() => {
+      throw new ActiveJobResourceConflict([{
+        jobId: 'job_active_1',
+        resource: { resourceType: 'content_matrix', resourceId: 'mtx_1' },
+      }]);
+    });
+    const result = await createContentMatrixActionHandler(deps)(
+      'retry_content_matrix_generation',
+      {
+        workspace_id: 'ws_1',
+        run_id: 'run_1',
+        expected_run_revision: 0,
+        items: [{
+          item_id: 'item_1',
+          expected_item_revision: 3,
+          source_revision: {
+            matrix_revision: 2,
+            template_revision: 4,
+            cell_revision: 1,
+          },
+          expected_artifact_revisions: {
+            brief: {
+              artifact_type: 'content_brief',
+              artifact_id: 'brief_1',
+              generation_revision: 1,
+            },
+            post: {
+              artifact_type: 'generated_post',
+              artifact_id: 'post_1',
+              generation_revision: 2,
+            },
+          },
+          reusable_checkpoint_fingerprint: 'd'.repeat(64),
+        }],
+        idempotency_key: 'matrix-retry-conflict',
+      },
+      { ...context, toolName: 'retry_content_matrix_generation' },
+    );
+
+    expect(textPayload(result)).toEqual({
+      code: MCP_TOOL_ERROR_CODES.CONFLICT,
+      message: 'A job is already active for this resource',
+      retryable: true,
+      details: {
+        reason: 'active_job_conflict',
+        active_job_id: 'job_active_1',
+      },
+    });
+    expect(JSON.stringify(textPayload(result))).not.toContain('content_matrix');
   });
 
   it('writes an accepted exact upgrade through the domain action and emits one MCP audit/event', async () => {

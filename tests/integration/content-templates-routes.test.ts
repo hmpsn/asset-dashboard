@@ -72,6 +72,10 @@ describe('Content Templates — CRUD', () => {
     const contradictory = await postJson(`/api/content-templates/${testWsId}`, {
       name: 'Contradictory generation template',
       generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
+      urlPattern: '/faq',
+      keywordPattern: 'frequently asked questions',
+      titlePattern: 'Frequently Asked Questions',
+      metaDescPattern: 'Answers to frequently asked questions.',
       sections: [{
         id: 'faq',
         name: 'FAQ',
@@ -148,6 +152,8 @@ describe('Content Templates — CRUD', () => {
       generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
       titlePattern: '{provider}',
       metaDescPattern: 'Learn about {provider}.',
+      urlPattern: '/providers/{provider}',
+      keywordPattern: '{provider}',
       variables: [{ name: 'provider', label: 'Provider' }],
       sections: [{
         id: 'body',
@@ -163,6 +169,47 @@ describe('Content Templates — CRUD', () => {
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain('unsupported_page_type');
+  });
+
+  it('returns exact field paths for malformed direct-v1 patterns', async () => {
+    const valid = {
+      name: 'Pattern validation template',
+      pageType: 'service',
+      variables: [{ name: 'service', label: 'Service' }],
+      sections: [{
+        id: 'body',
+        name: 'Body',
+        headingTemplate: '{service}',
+        guidance: 'Describe the service.',
+        wordCountTarget: 300,
+        order: 0,
+        generationRole: 'body',
+        aeoContract: { modes: [], required: false },
+        ctaContract: { role: 'none', required: false },
+      }],
+      urlPattern: '/services/{service}',
+      keywordPattern: '{service}',
+      titlePattern: '{service}',
+      metaDescPattern: 'Learn about {service}.',
+      generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
+    };
+    const cases = [
+      ['urlPattern', 'https://example.com/{service}'],
+      ['keywordPattern', '{unknown}'],
+      ['titlePattern', '{service'],
+      ['metaDescPattern', '{{service}}'],
+    ] as const;
+
+    for (const [fieldPath, value] of cases) {
+      const res = await postJson(`/api/content-templates/${testWsId}`, {
+        ...valid,
+        [fieldPath]: value,
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toContain(`${fieldPath}:`);
+      expect(body.errors[0].path).toBe(fieldPath);
+    }
   });
 
   it('GET returns the created template in list', async () => {

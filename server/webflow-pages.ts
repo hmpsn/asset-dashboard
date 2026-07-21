@@ -41,7 +41,14 @@ export async function listPages(siteId: string, tokenOverride?: string): Promise
 export interface CompleteWebflowPageList {
   pages: WebflowPage[];
   complete: boolean;
+  /** Content-free failure metadata for fail-closed generation preflight. */
+  failure?: CompleteWebflowPageListFailure;
 }
+
+export type CompleteWebflowPageListFailure =
+  | { code: 'provider_error'; httpStatus?: number }
+  | { code: 'invalid_response' }
+  | { code: 'limit_exceeded'; actual: number; limit: number };
 
 export interface CompleteWebflowPageListOptions {
   /** Fail incomplete before retaining more than this many fresh pages. */
@@ -74,8 +81,15 @@ export async function listPagesWithCompleteness(
         pages?: WebflowPage[];
         pagination?: { total?: number };
       }>(`/sites/${siteId}/pages?limit=${limit}&offset=${offset}`, {}, tokenOverride);
-      if (!result.ok || !Array.isArray(result.data.pages)) {
-        return { pages, complete: false };
+      if (!result.ok) {
+        return {
+          pages,
+          complete: false,
+          failure: { code: 'provider_error', httpStatus: result.status },
+        };
+      }
+      if (!Array.isArray(result.data.pages)) {
+        return { pages, complete: false, failure: { code: 'invalid_response' } };
       }
 
       const batch = result.data.pages;
@@ -84,14 +98,14 @@ export async function listPagesWithCompleteness(
         reportedTotal !== undefined
         && (!Number.isInteger(reportedTotal) || reportedTotal < 0)
       ) {
-        return { pages, complete: false };
+        return { pages, complete: false, failure: { code: 'invalid_response' } };
       }
       if (
         expectedTotal !== undefined
         && reportedTotal !== undefined
         && reportedTotal !== expectedTotal
       ) {
-        return { pages, complete: false };
+        return { pages, complete: false, failure: { code: 'invalid_response' } };
       }
       if (expectedTotal === undefined && reportedTotal !== undefined) {
         expectedTotal = reportedTotal;
@@ -100,12 +114,20 @@ export async function listPagesWithCompleteness(
         (expectedTotal !== undefined && expectedTotal > maxPages)
         || pages.length + batch.length > maxPages
       ) {
-        return { pages, complete: false };
+        return {
+          pages,
+          complete: false,
+          failure: {
+            code: 'limit_exceeded',
+            actual: Math.max(expectedTotal ?? 0, pages.length + batch.length),
+            limit: maxPages,
+          },
+        };
       }
 
       for (const page of batch) {
         if (!page || typeof page.id !== 'string' || !page.id || seenPageIds.has(page.id)) {
-          return { pages, complete: false };
+          return { pages, complete: false, failure: { code: 'invalid_response' } };
         }
         seenPageIds.add(page.id);
         pages.push(page);
@@ -114,7 +136,7 @@ export async function listPagesWithCompleteness(
       if (expectedTotal !== undefined) {
         if (pages.length === expectedTotal) return { pages, complete: true };
         if (pages.length > expectedTotal || batch.length === 0) {
-          return { pages, complete: false };
+          return { pages, complete: false, failure: { code: 'invalid_response' } };
         }
       } else if (batch.length < limit) {
         return { pages, complete: true };
@@ -123,7 +145,7 @@ export async function listPagesWithCompleteness(
       offset += batch.length;
     }
   } catch { // catch-ok: callers need an explicit incomplete result on auth/network failure.
-    return { pages, complete: false };
+    return { pages, complete: false, failure: { code: 'provider_error' } };
   }
 }
 

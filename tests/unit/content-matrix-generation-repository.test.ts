@@ -12,11 +12,15 @@ import {
   computeBlockManifestFingerprint,
   computeStructuralTargetFingerprint,
 } from '../../server/domains/content/matrix-generation/fingerprint.js';
+import { getMatrixGeneration } from '../../server/domains/content/matrix-generation/batch-service.js';
+import { MatrixGenerationEvidenceError } from '../../server/domains/content/matrix-generation/evidence.js';
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
-import type {
-  CreateMatrixGenerationRunRequest,
-  MatrixGenerationItem,
-  PersistedMatrixGenerationRun,
+import {
+  MATRIX_GENERATION_SOURCE_LIMITS,
+  matrixGenerationSerializedBytes,
+  type CreateMatrixGenerationRunRequest,
+  type MatrixGenerationItem,
+  type PersistedMatrixGenerationRun,
 } from '../../shared/types/matrix-generation.js';
 
 const cleanup: string[] = [];
@@ -175,6 +179,7 @@ function previewTargetFor(
   workspaceId: string,
   run: PersistedMatrixGenerationRun,
   item: MatrixGenerationItem,
+  frozenEvidenceResolutionIds: string[] = [],
 ): StoredPreviewTarget {
   const capturedAt = '2026-07-13T00:00:00.000Z';
   return {
@@ -219,6 +224,7 @@ function previewTargetFor(
     },
     effectiveInputFingerprint: item.previewFingerprint,
     blockingRequirementIds: [],
+    frozenEvidenceResolutionIds,
     estimatedPaidBudget: {
       providerCalls: 2,
       inputTokens: 1_000,
@@ -557,6 +563,36 @@ describe('content matrix generation repository', () => {
     expect(hydratedCanonicalItem.previewTarget?.effectiveInputFingerprint).toBe(
       item.previewFingerprint,
     );
+    const legacyPreviewTarget = structuredClone(canonicalPreviewTarget) as Omit<
+      StoredPreviewTarget,
+      'frozenEvidenceResolutionIds'
+    > & { frozenEvidenceResolutionIds?: string[] };
+    delete legacyPreviewTarget.frozenEvidenceResolutionIds;
+    legacyPreviewTarget.evidenceRequirements = [{
+      id: `matrix-cell:${item.cellId}:service-details`,
+      fieldPath: 'service.details',
+      claim: 'Verified service details are available.',
+      reason: 'Service pages require grounded details.',
+      requirementStage: 'preflight',
+      claimKind: 'factual',
+      status: 'verified',
+      sourceRefs: [{
+        sourceType: 'content_matrix_cell_evidence',
+        sourceId: 'legacy-frozen-evidence-id',
+        capturedAt: '2026-07-13T00:00:00.000Z',
+      }],
+      resolvable: true,
+      resolutionAuthority: 'evidence_submission',
+    }];
+    storePreviewTarget(workspaceId, item.id, legacyPreviewTarget);
+    const [hydratedLegacyItem] = listMatrixGenerationItems(workspaceId, created.run.id);
+    expect(hydratedLegacyItem.previewTarget?.frozenEvidenceResolutionIds)
+      .toEqual(['legacy-frozen-evidence-id']);
+    expect(hydratedLegacyItem.previewTarget?.evidenceRequirements[0]).toMatchObject({
+      resolvable: true,
+      resolutionAuthority: 'evidence_submission',
+    });
+    storePreviewTarget(workspaceId, item.id, canonicalPreviewTarget);
     const previewCorruptions: Array<{
       label: string;
       mutate: (target: StoredPreviewTarget) => void;
@@ -990,6 +1026,167 @@ describe('content matrix generation repository', () => {
       SELECT COUNT(*) AS count FROM content_matrix_generation_runs WHERE workspace_id = ?
     `).get(workspaceId) as { count: number };
     expect(rows.count).toBe(0);
+  });
+
+  it('returns at most ten exact frozen evidence rows with truthful truncation metadata', () => {
+    const workspaceId = createWorkspace(`matrix frozen evidence read ${Date.now()}`).id;
+    cleanup.push(workspaceId);
+    const created = createMatrixGenerationRun(requestFor(workspaceId));
+    const item = listMatrixGenerationItems(workspaceId, created.run.id)[0];
+    const evidenceIds = Array.from({ length: 12 }, (_, index) => `evidence-${index}`);
+    const createdAt = '2026-07-20T12:00:00.000Z';
+
+    for (const [index, evidenceId] of evidenceIds.entries()) {
+      db.prepare(`
+        INSERT INTO content_matrix_cell_evidence (
+          id, workspace_id, matrix_id, cell_id, requirement_id,
+          matrix_revision, template_revision, cell_revision,
+          value, source_ref, resolved_by, expected_artifact_revisions,
+          idempotency_key, supersedes_id, is_current, created_at, superseded_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        evidenceId,
+        workspaceId,
+        created.run.matrixId,
+        item.cellId,
+        `matrix-cell:${item.cellId}:requirement-${index}`,
+        item.sourceRevision.matrixRevision,
+        item.sourceRevision.templateRevision,
+        item.sourceRevision.cellRevision,
+        JSON.stringify({ kind: 'text', value: `Verified value ${index}` }),
+        JSON.stringify({
+          sourceType: 'operator_attestation',
+          sourceId: `source-${index}`,
+          capturedAt: createdAt,
+        }),
+        JSON.stringify({ actorType: 'operator', actorId: 'operator-1' }),
+        JSON.stringify({
+          brief: { artifactType: 'content_brief', artifactId: null, generationRevision: 0 },
+          post: { artifactType: 'generated_post', artifactId: null, generationRevision: 0 },
+        }),
+        `evidence-read-${index}`,
+        null,
+        index === 0 ? 0 : 1,
+        createdAt,
+        index === 0 ? '2026-07-20T13:00:00.000Z' : null,
+      );
+    }
+    storePreviewTarget(
+      workspaceId,
+      item.id,
+      previewTargetFor(workspaceId, created.run, item, evidenceIds),
+    );
+
+    const withoutValues = getMatrixGeneration({ workspaceId, runId: created.run.id });
+    expect(withoutValues).not.toHaveProperty('evidenceValuesSummary');
+    expect(withoutValues.items.items[0]).not.toHaveProperty('evidenceValues');
+
+    const withValues = getMatrixGeneration({
+      workspaceId,
+      runId: created.run.id,
+      includeEvidenceValues: true,
+    });
+    expect(withValues.evidenceValuesSummary).toEqual({ includedCount: 10, truncated: true });
+    expect(withValues.items.nextCursor).toBeTruthy();
+    expect(withValues.items.items[0]?.evidenceValues).toHaveLength(10);
+    expect(withValues.items.items[0]?.evidenceValues?.map(read => read.resolution.id))
+      .toEqual(evidenceIds.slice(0, 10));
+    expect(withValues.items.items[0]?.evidenceValues?.[0]).toMatchObject({
+      status: 'superseded',
+      supersededAt: '2026-07-20T13:00:00.000Z',
+    });
+
+    const remainingValues = getMatrixGeneration({
+      workspaceId,
+      runId: created.run.id,
+      cursor: withValues.items.nextCursor!,
+      includeEvidenceValues: true,
+    });
+    expect(remainingValues.evidenceValuesSummary).toEqual({ includedCount: 2, truncated: false });
+    expect(remainingValues.items.nextCursor).toBeNull();
+    expect(remainingValues.items.items).toHaveLength(1);
+    expect(remainingValues.items.items[0]?.id).toBe(item.id);
+    expect(remainingValues.items.items[0]?.evidenceValues?.map(read => read.resolution.id))
+      .toEqual(evidenceIds.slice(10));
+    expect(() => getMatrixGeneration({
+      workspaceId,
+      runId: created.run.id,
+      cursor: withValues.items.nextCursor!,
+    })).toThrow(expect.objectContaining({
+      details: expect.objectContaining({ reason: 'invalid_cursor', fieldPath: 'cursor' }),
+    }));
+    const legacyCursorInEvidenceMode = Buffer.from(JSON.stringify({
+      version: 1,
+      runId: created.run.id,
+      runRevision: getPersistedMatrixGenerationRun(workspaceId, created.run.id)!.revision,
+      offset: 0,
+    }), 'utf8').toString('base64url');
+    expect(() => getMatrixGeneration({
+      workspaceId,
+      runId: created.run.id,
+      cursor: legacyCursorInEvidenceMode,
+      includeEvidenceValues: true,
+    })).toThrow(expect.objectContaining({
+      details: expect.objectContaining({ reason: 'invalid_cursor', fieldPath: 'cursor' }),
+    }));
+    const pastEndCursor = Buffer.from(JSON.stringify({
+      version: 1,
+      runId: created.run.id,
+      runRevision: getPersistedMatrixGenerationRun(workspaceId, created.run.id)!.revision,
+      offset: 1,
+    }), 'utf8').toString('base64url');
+    expect(() => getMatrixGeneration({
+      workspaceId,
+      runId: created.run.id,
+      cursor: pastEndCursor,
+    })).toThrow(expect.objectContaining({
+      details: expect.objectContaining({ reason: 'invalid_cursor', fieldPath: 'cursor' }),
+    }));
+
+    // Each row remains inside the MCP text_list contract (100 items, 2,000
+    // characters each), while ten rows cannot fit the bounded read envelope.
+    const largeValidValue = JSON.stringify({
+      kind: 'text_list',
+      value: Array.from({ length: 100 }, (_, index) => (
+        `${index}:`.padEnd(2_000, 'x').slice(0, 2_000)
+      )),
+    });
+    db.prepare(`
+      UPDATE content_matrix_cell_evidence SET value = ?
+      WHERE workspace_id = ? AND matrix_id = ? AND cell_id = ?
+    `).run(largeValidValue, workspaceId, created.run.matrixId, item.cellId);
+
+    const pagedEvidenceIds: string[] = [];
+    let largeValueCursor: string | undefined;
+    let largeValuePages = 0;
+    do {
+      const page = getMatrixGeneration({
+        workspaceId,
+        runId: created.run.id,
+        cursor: largeValueCursor,
+        includeEvidenceValues: true,
+      });
+      expect(matrixGenerationSerializedBytes(page))
+        .toBeLessThanOrEqual(MATRIX_GENERATION_SOURCE_LIMITS.read.maxResponseBytes);
+      pagedEvidenceIds.push(...(
+        page.items.items[0]?.evidenceValues?.map(read => read.resolution.id) ?? []
+      ));
+      largeValueCursor = page.items.nextCursor ?? undefined;
+      largeValuePages += 1;
+    } while (largeValueCursor);
+    expect(largeValuePages).toBeGreaterThan(1);
+    expect(pagedEvidenceIds).toEqual(evidenceIds);
+
+    db.prepare(`
+      UPDATE content_matrix_cell_evidence SET matrix_id = ? WHERE id = ? AND workspace_id = ?
+    `).run('matrix-out-of-scope', evidenceIds[0], workspaceId);
+    expect(() => getMatrixGeneration({
+      workspaceId,
+      runId: created.run.id,
+      includeEvidenceValues: true,
+    })).toThrow(expect.objectContaining<Partial<MatrixGenerationEvidenceError>>({
+      code: 'not_found',
+    }));
   });
 
 });

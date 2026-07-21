@@ -42,6 +42,11 @@ export interface MatrixGenerationSetAuditResult {
   proseRevisionItemIds: string[];
 }
 
+/** Cross-page review is meaningful only when the run contains multiple candidates. */
+export function isMatrixGenerationSetAuditRequired(candidateCount: number): boolean {
+  return candidateCount >= 2;
+}
+
 /** A partial census blocks run approval without invalidating pages that already passed item audit. */
 export function isItemBlockingMatrixGenerationSetAuditFinding(
   item: MatrixGenerationSetAuditFinding,

@@ -743,7 +743,7 @@
     {
       "id": 75,
       "title": "Reusable Template-to-Page-Set Generation",
-      "oneLiner": "Authors a locked page structure once through MCP chat, then reuses it across explicit service, location, or other dimensions to create review-gated page sets without requiring a Page Strategy blueprint",
+      "oneLiner": "Authors a page structure once through MCP chat, then generates review-gated page sets with role-aware headings, verified internal links, semantic tables, exact output checks, and approved brand authority",
       "category": "content",
       "painPoints": ["content-production", "scale", "local-seo", "content-quality"],
       "tier": "premium",

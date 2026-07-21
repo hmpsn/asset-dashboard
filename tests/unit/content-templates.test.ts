@@ -207,6 +207,48 @@ describe('content-templates store', () => {
     })).toThrow(ContentTemplateGenerationContractError);
   });
 
+  it('validates every direct-v1 pattern with exact service field paths', () => {
+    const sections = [{
+      id: 'section-body',
+      name: 'Body',
+      headingTemplate: '{service} in {city}',
+      guidance: 'Explain the service.',
+      wordCountTarget: 300,
+      order: 0,
+      generationRole: 'body' as const,
+      aeoContract: { modes: [] as [], required: false },
+      ctaContract: { role: 'none' as const, required: false },
+    }];
+    const cases = [
+      { fieldPath: 'urlPattern', overrides: { urlPattern: 'https://example.com/{service}' } },
+      { fieldPath: 'keywordPattern', overrides: { keywordPattern: '{unknown}' } },
+      { fieldPath: 'titlePattern', overrides: { titlePattern: '{service' } },
+      { fieldPath: 'metaDescPattern', overrides: { metaDescPattern: '{{service}}' } },
+    ] as const;
+
+    for (const testCase of cases) {
+      try {
+        createServiceTemplate({
+          generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
+          sections,
+          ...testCase.overrides,
+        });
+        throw new Error(`Expected ${testCase.fieldPath} to fail`);
+      } catch (error) {
+        expect(error).toBeInstanceOf(ContentTemplateGenerationContractError);
+        expect((error as ContentTemplateGenerationContractError).issues[0]?.fieldPath)
+          .toBe(testCase.fieldPath);
+        expect((error as Error).message).toContain(`${testCase.fieldPath}:`);
+      }
+    }
+
+    expect(() => createServiceTemplate({
+      generationContractVersion: MATRIX_GENERATION_CONTRACT_VERSION,
+      sections,
+      keywordPattern: '',
+    })).toThrow(ContentTemplateGenerationContractError);
+  });
+
   it('keeps v1 additions valid and rejects contractless or contradictory updates', () => {
     const bodySection = {
       id: 'section-body',

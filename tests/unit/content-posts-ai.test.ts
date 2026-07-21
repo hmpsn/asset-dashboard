@@ -48,7 +48,9 @@ vi.mock('../../server/workspace-intelligence.js', () => ({
 import {
   callCreativeAI,
   callCreativeAIWithMetadata,
+  generateIntroduction,
   generateSeoMeta,
+  generateSection,
   scoreVoiceMatch,
   unifyPost,
   renderCreativeProviderCallInput,
@@ -101,6 +103,13 @@ function makePost(): GeneratedPost {
   };
 }
 
+function aiUserPrompt(callIndex = 0): string {
+  const call = callAIMock.mock.calls[callIndex]?.[0] as {
+    messages?: Array<{ content?: string }>;
+  } | undefined;
+  return call?.messages?.[0]?.content ?? '';
+}
+
 beforeEach(() => {
   callAIMock.mockReset();
   isAnthropicConfiguredMock.mockReset();
@@ -108,6 +117,43 @@ beforeEach(() => {
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(false);
   buildContentGenerationContextV2Mock.mockReset();
+});
+
+describe('initial prose keyword policy', () => {
+  const section = {
+    heading: 'Technical SEO priorities',
+    notes: 'Explain the priorities.',
+    wordCount: 300,
+    keywords: ['technical seo'],
+  };
+
+  it('preserves legacy intro and section prompts when output quality v2 is off', async () => {
+    callAIMock.mockResolvedValue({ text: '<p>Draft</p>' });
+    const brief = makeBrief();
+
+    await generateIntroduction(brief, 'VOICE CONTEXT', 'ws_test');
+    await generateIntroduction(brief, 'VOICE CONTEXT', 'ws_test', undefined, { outputQualityV2: false });
+    await generateSection(brief, section, 0, [], 'VOICE CONTEXT', 'ws_test');
+    await generateSection(brief, section, 0, [], 'VOICE CONTEXT', 'ws_test', undefined, { outputQualityV2: false });
+
+    expect(aiUserPrompt(0)).toBe(aiUserPrompt(1));
+    expect(aiUserPrompt(0)).toContain('SECONDARY KEYWORDS: technical seo');
+    expect(aiUserPrompt(2)).toBe(aiUserPrompt(3));
+    expect(aiUserPrompt(2)).toContain('Keywords to include naturally: technical seo');
+  });
+
+  it('treats secondary phrases as optional topical concepts in initial v2 prose', async () => {
+    callAIMock.mockResolvedValue({ text: '<p>Draft</p>' });
+    const brief = makeBrief();
+
+    await generateIntroduction(brief, 'VOICE CONTEXT', 'ws_test', undefined, { outputQualityV2: true });
+    await generateSection(brief, section, 0, [], 'VOICE CONTEXT', 'ws_test', undefined, { outputQualityV2: true });
+
+    expect(aiUserPrompt(0)).toContain('SECONDARY KEYWORD TOPICS');
+    expect(aiUserPrompt(0)).toContain('never force exact phrases');
+    expect(aiUserPrompt(1)).toContain('exact strings are optional');
+    expect(aiUserPrompt(1)).not.toContain('Keywords to include naturally');
+  });
 });
 
 describe('callCreativeAI fallback correlation', () => {
@@ -352,6 +398,13 @@ describe('generateSeoMeta', () => {
 });
 
 describe('unifyPost', () => {
+  it('returns a typed short-input skip without spending a provider call', async () => {
+    const result = await unifyPost(makePost(), makeBrief(), 'VOICE CONTEXT', 'ws_test');
+
+    expect(result).toEqual({ status: 'skipped', reason: 'short_input' });
+    expect(callAIMock).not.toHaveBeenCalled();
+  });
+
   it('returns unified content when valid structured output is returned', async () => {
     const longPost = {
       ...makePost(),
@@ -370,9 +423,12 @@ describe('unifyPost', () => {
 
     const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
     expect(result).toEqual({
-      introduction: '<p>Unified intro</p>',
-      sections: ['<h2>Section</h2><p>Unified body</p>'],
-      conclusion: '<h2>Next Steps</h2><p>Unified outro</p>',
+      status: 'candidate',
+      candidate: {
+        introduction: '<p>Unified intro</p>',
+        sections: ['<h2>Section</h2><p>Unified body</p>'],
+        conclusion: '<h2>Next Steps</h2><p>Unified outro</p>',
+      },
     });
     expect(callAIMock).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'content-post-unify',
@@ -396,7 +452,7 @@ describe('unifyPost', () => {
     });
 
     await unifyPost(longPost, { ...makeBrief(), pageType: 'location' }, 'VOICE CONTEXT', 'ws_test');
-    const prompt = JSON.stringify(callAIMock.mock.calls[0]?.[0] ?? {});
+    const prompt = aiUserPrompt();
     expect(prompt).toContain('PAGE-TYPE DENSITY REVIEW REQUIRED');
     expect(prompt).toContain('PAGE-TYPE COPY CONTRACT (location)');
     expect(prompt).toContain('remove reader-facing SEO mechanics');
@@ -420,14 +476,140 @@ describe('unifyPost', () => {
     });
 
     await unifyPost(longPost, { ...makeBrief(), pageType: 'service', generationStyle: 'concise' }, 'VOICE CONTEXT', 'ws_test');
-    const prompt = JSON.stringify(callAIMock.mock.calls[0]?.[0] ?? {});
+    const prompt = aiUserPrompt();
     expect(prompt).toContain('CONTENT GENERATION STYLE (concise)');
     expect(prompt).toContain('GENERATION STYLE PRIORITY');
     expect(prompt).toContain('PAGE-TYPE COPY CONTRACT (service)');
     expect(prompt).toContain('factual safety');
   });
 
-  it('returns null when structured output has the wrong shape', async () => {
+  it('preserves the legacy exact keyword prompt when output quality v2 is off', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockResolvedValue({
+      text: '{"introduction":"<p>Unified intro</p>","sections":["<h2>Section</h2><p>Unified body</p>"],"conclusion":"<h2>Next Steps</h2><p>Unified outro</p>"}',
+    });
+
+    await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
+    await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test', {
+      outputQualityV2: false,
+    });
+
+    const prompt = aiUserPrompt();
+    expect(prompt).toContain('The following keywords from the brief MUST each appear at least once');
+    expect(prompt).toContain('"seo audit", "technical seo"');
+    expect(prompt).not.toContain('SECONDARY KEYWORD TOPICS');
+    expect(aiUserPrompt(1)).toBe(prompt);
+  });
+
+  it('treats secondary keywords as topical targets under output quality v2', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: '{"introduction":"<p>Unified intro</p>","sections":["<h2>Section</h2><p>Unified body</p>"],"conclusion":"<h2>Next Steps</h2><p>Unified outro</p>"}',
+    });
+
+    await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test', {
+      outputQualityV2: true,
+    });
+
+    const prompt = aiUserPrompt();
+    expect(prompt).toContain('PRIMARY KEYWORD COVERAGE');
+    expect(prompt).toContain('"seo audit"');
+    expect(prompt).toContain('SECONDARY KEYWORD TOPICS');
+    expect(prompt).toContain('"technical seo"');
+    expect(prompt).toContain('synonyms');
+    expect(prompt).toContain('do not force exact-string matches');
+    expect(prompt).not.toContain('keywords from the brief MUST each appear at least once');
+  });
+
+  it('adds grounded symmetric word-count correction only outside the v2 target band', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    const validResult = {
+      text: '{"introduction":"<p>Unified intro</p>","sections":["<h2>Section</h2><p>Unified body</p>"],"conclusion":"<h2>Next Steps</h2><p>Unified outro</p>"}',
+    };
+    callAIMock.mockResolvedValue(validResult);
+
+    await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test', {
+      outputQualityV2: true,
+    });
+    const underPrompt = aiUserPrompt(0);
+    expect(underPrompt).toContain('WORD COUNT EXPANSION REQUIRED');
+    expect(underPrompt).toContain('Do not invent facts, examples, proof, offers, or claims');
+    expect(underPrompt).not.toContain('WORD COUNT TRIM REQUIRED');
+
+    await unifyPost(longPost, { ...makeBrief(), wordCountTarget: 200 }, 'VOICE CONTEXT', 'ws_test', {
+      outputQualityV2: true,
+    });
+    const overPrompt = aiUserPrompt(1);
+    expect(overPrompt).toContain('WORD COUNT TRIM REQUIRED');
+    expect(overPrompt).not.toContain('WORD COUNT EXPANSION REQUIRED');
+
+    await unifyPost(longPost, { ...makeBrief(), wordCountTarget: 280 }, 'VOICE CONTEXT', 'ws_test', {
+      outputQualityV2: true,
+    });
+    const inBandPrompt = aiUserPrompt(2);
+    expect(inBandPrompt).not.toContain('WORD COUNT EXPANSION REQUIRED');
+    expect(inBandPrompt).not.toContain('WORD COUNT TRIM REQUIRED');
+    expect(inBandPrompt).not.toContain('WORD COUNT CORRECTION REQUIRED');
+  });
+
+  it('uses template-section body words for v2 correction despite a large introduction and conclusion', async () => {
+    const longFramingPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(500)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 1_200,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(500)}</p>`,
+    };
+    callAIMock.mockResolvedValueOnce({
+      text: '{"introduction":"<p>Unified intro</p>","sections":["<h2>Section</h2><p>Unified body</p>"],"conclusion":"<h2>Next Steps</h2><p>Unified outro</p>"}',
+    });
+
+    await unifyPost(longFramingPost, makeBrief(), 'VOICE CONTEXT', 'ws_test', {
+      outputQualityV2: true,
+    });
+
+    const prompt = aiUserPrompt();
+    expect(prompt).toContain('WORD COUNT EXPANSION REQUIRED');
+    expect(prompt).toContain('Current template-section body: ~261 words');
+    expect(prompt).toContain('body-only target');
+    expect(prompt).not.toContain('WORD COUNT TRIM REQUIRED');
+  });
+
+  it('returns a typed invalid outcome when structured output has the wrong shape', async () => {
     const longPost = {
       ...makePost(),
       introduction: `<p>${'intro '.repeat(120)}</p>`,
@@ -444,10 +626,10 @@ describe('unifyPost', () => {
     });
 
     const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
-    expect(result).toBeNull();
+    expect(result).toEqual({ status: 'invalid', reason: 'schema_validation_failed' });
   });
 
-  it('returns an explicit invalid candidate when the section census is wrong', async () => {
+  it('returns a typed invalid outcome when the section census is wrong', async () => {
     const longPost = {
       ...makePost(),
       introduction: `<p>${'intro '.repeat(120)}</p>`,
@@ -465,12 +647,30 @@ describe('unifyPost', () => {
 
     const result = await unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test');
 
-    expect(result).toEqual({
-      introduction: '<p>New intro</p>',
-      sections: ['<p>One</p>', '<p>Extra</p>'],
-      conclusion: '<p>New conclusion</p>',
-      invalidReason: 'section_census_mismatch',
-    });
+    expect(result).toEqual({ status: 'invalid', reason: 'section_census_mismatch' });
+  });
+
+  it('lets provider and bounded-dispatch failures escape the typed output boundary', async () => {
+    const longPost = {
+      ...makePost(),
+      introduction: `<p>${'intro '.repeat(120)}</p>`,
+      sections: [{
+        ...makePost().sections[0],
+        content: `<h2>Section</h2><p>${'body '.repeat(260)}</p>`,
+        wordCount: 260,
+        targetWordCount: 280,
+      }],
+      conclusion: `<h2>Next Steps</h2><p>${'outro '.repeat(80)}</p>`,
+    };
+    callAIMock.mockRejectedValueOnce(new Error('provider unavailable'));
+
+    await expect(unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test'))
+      .rejects.toThrow('provider unavailable');
+    await expect(unifyPost(longPost, makeBrief(), 'VOICE CONTEXT', 'ws_test', {
+      beforeBoundedProviderDispatch: () => {
+        throw new Error('authority changed');
+      },
+    })).rejects.toThrow('authority changed');
   });
 });
 

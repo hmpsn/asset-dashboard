@@ -58,6 +58,7 @@ const cleanupWorkspaceIds = new Set<string>();
 afterEach(() => {
   for (const workspaceId of cleanupWorkspaceIds) {
     setWorkspaceFlagOverride('content-matrix-generation', workspaceId, null);
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', workspaceId, null);
     deleteWorkspace(workspaceId);
   }
   cleanupWorkspaceIds.clear();
@@ -70,6 +71,7 @@ function createFixture(
 ): Fixture {
   const workspaceId = createWorkspace(`M1 matrix generation ${randomUUID()}`).id;
   cleanupWorkspaceIds.add(workspaceId);
+  setWorkspaceFlagOverride('content-matrix-generation', workspaceId, true);
   const template = createTemplate(workspaceId, {
     name: 'Generation-ready service template',
     pageType: 'service',
@@ -379,6 +381,7 @@ async function readyTarget(fixture: Fixture, cellId: string): Promise<MatrixGene
 
 function structuralTarget(target: MatrixGenerationPreviewTarget): ResolvedMatrixStructuralTarget {
   const {
+    outputQualityV2: _outputQualityV2,
     voiceSnapshot: _voiceSnapshot,
     identitySnapshot: _identitySnapshot,
     evidenceRequirements: _evidenceRequirements,
@@ -447,13 +450,13 @@ function candidates(
     sections: [{
       index: 0,
       heading: target.renderedHeadings[0] ?? target.title,
-      content: '<p>Verified service details for this page.</p>',
+      content: `<h2>${target.renderedHeadings[0] ?? target.title}</h2><p>Verified service details for this page.</p>`,
       wordCount: 7,
       targetWordCount: 300,
       keywords: [target.targetKeyword.value],
       status: 'done',
     }],
-    conclusion: '<p>Contact the team when you are ready.</p>',
+    conclusion: '<h2>Next</h2><p>Contact the team when you are ready.</p>',
     totalWordCount: 20,
     targetWordCount: 500,
     status: 'draft',
@@ -523,6 +526,150 @@ function runAtGeneratingPost(
 }
 
 describe('content matrix generation M1', () => {
+  it('rejects a disabled workspace before reading matrix sources or running a census', async () => {
+    const workspaceId = createWorkspace(`M1 disabled preview ${randomUUID()}`).id;
+    cleanupWorkspaceIds.add(workspaceId);
+    setWorkspaceFlagOverride('content-matrix-generation', workspaceId, false);
+
+    await expect(previewMatrixGeneration({
+      workspaceId,
+      matrixId: 'matrix-that-must-not-be-read',
+      selections: [{
+        cellId: 'cell-that-must-not-be-read',
+        expectedSourceRevision: { matrixRevision: 1, templateRevision: 1, cellRevision: 1 },
+      }],
+    })).rejects.toMatchObject({
+      code: 'precondition_failed',
+      details: {
+        reason: 'feature_disabled',
+        retryable: false,
+        fieldPath: 'workspace_id',
+      },
+    });
+  });
+
+  it('freezes output-quality policy in preview authority and invalidates the fingerprint on change', async () => {
+    const fixture = createFixture(['Austin']);
+    const cell = fixture.matrix.cells[0];
+    seedBrandAuthority(fixture.workspaceId);
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', fixture.workspaceId, false);
+    const legacyPolicy = await readyTarget(fixture, cell.id);
+    expect(legacyPolicy.outputQualityV2).toBe(false);
+
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', fixture.workspaceId, true);
+    const qualityPolicy = await readyTarget(fixture, cell.id);
+    expect(qualityPolicy.outputQualityV2).toBe(true);
+    expect(qualityPolicy.effectiveInputFingerprint).not.toBe(
+      legacyPolicy.effectiveInputFingerprint,
+    );
+
+    const execution = runAtGeneratingPost(
+      fixture,
+      qualityPolicy,
+      `matrix-policy-${randomUUID()}`,
+    );
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', fixture.workspaceId, false);
+    expect(getMatrixGenerationItem(fixture.workspaceId, execution.item.id)?.previewTarget)
+      .toMatchObject({ outputQualityV2: true });
+  });
+
+  it('rehydrates a legacy queued target and preserves its default-policy preflight fingerprint', async () => {
+    const fixture = createFixture(['Austin']);
+    const cell = fixture.matrix.cells[0];
+    seedBrandAuthority(fixture.workspaceId);
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', fixture.workspaceId, false);
+    const target = await readyTarget(fixture, cell.id);
+    const { outputQualityV2: _legacyMissingPolicy, ...legacyStoredTarget } = target;
+    const selection = {
+      matrixId: target.matrixId,
+      cellId: target.cellId,
+      sourceRevision: target.sourceRevision,
+      structuralFingerprint: target.structuralFingerprint,
+      previewFingerprint: target.effectiveInputFingerprint,
+    };
+    const run = createMatrixGenerationRun({
+      workspaceId: fixture.workspaceId,
+      matrixId: target.matrixId,
+      templateId: target.templateId,
+      idempotencyKey: `matrix-legacy-policy-${randomUUID()}`,
+      selectionFingerprint: target.effectiveInputFingerprint,
+      selections: [selection],
+      createdBy: { actorType: 'operator', actorId: 'matrix-generation-test-operator' },
+      mcpExecutionContext: null,
+    }).run;
+    const queuedItem = listMatrixGenerationItems(fixture.workspaceId, run.id)[0];
+    db.prepare(`
+      UPDATE content_matrix_generation_items
+      SET preview_target = ?
+      WHERE id = ? AND workspace_id = ?
+    `).run(JSON.stringify(legacyStoredTarget), queuedItem.id, fixture.workspaceId);
+
+    const rehydrated = getMatrixGenerationItem(fixture.workspaceId, queuedItem.id);
+    expect(rehydrated?.status).toBe('queued');
+    expect(rehydrated?.previewTarget).toMatchObject({
+      outputQualityV2: false,
+      effectiveInputFingerprint: target.effectiveInputFingerprint,
+    });
+    const repreflight = await readyTarget(fixture, cell.id);
+    expect(repreflight.outputQualityV2).toBe(false);
+    expect(repreflight.effectiveInputFingerprint).toBe(rehydrated?.previewFingerprint);
+  });
+
+  it('marks approved-artifact replacement as human-only while normal evidence stays resolvable', async () => {
+    const fixture = createFixture(['Austin']);
+    const cell = fixture.matrix.cells[0];
+    seedBrandAuthority(fixture.workspaceId);
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+    updateMatrixCell(fixture.workspaceId, fixture.matrix.id, cell.id, { status: 'approved' });
+
+    const preview = await previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: sourceRevision(fixture, cell.id) }],
+    });
+    const result = preview.results[0];
+    expect(result?.status).toBe('blocked');
+    if (!result || result.status !== 'blocked') return;
+
+    expect(result.diagnostics.requirementsComplete).toBe(true);
+    expect(result.evidenceRequirements.find(requirement => (
+      requirement.id.endsWith(':replacement-authorization')
+    ))).toMatchObject({
+      status: 'missing',
+      resolvable: false,
+      resolutionAuthority: 'human_authorization',
+    });
+    expect(result.evidenceRequirements.find(requirement => (
+      requirement.id.endsWith(':service-details')
+    ))).toMatchObject({
+      status: 'verified',
+      resolvable: true,
+      resolutionAuthority: 'evidence_submission',
+    });
+  });
+
+  it('marks structural early-return requirements as explicitly incomplete', async () => {
+    const fixture = createFixture(['Austin']);
+    const cell = fixture.matrix.cells[0];
+    seedKnownPagePath(fixture.workspaceId, cell.plannedUrl);
+
+    const preview = await previewMatrixGeneration({
+      workspaceId: fixture.workspaceId,
+      matrixId: fixture.matrix.id,
+      selections: [{ cellId: cell.id, expectedSourceRevision: sourceRevision(fixture, cell.id) }],
+    });
+
+    expect(preview.results[0]).toMatchObject({
+      status: 'blocked',
+      diagnostics: { requirementsComplete: false },
+      blockingRequirementIds: expect.arrayContaining(['workspace_url_collision']),
+    });
+    expect(preview.estimatedBatchBudget).toBeNull();
+  });
+
   it('previews production-shaped single and multi-cell authority deterministically without paid side effects', async () => {
     const fixture = createFixture(['Austin', 'Dallas']);
     const [firstCell, secondCell] = fixture.matrix.cells;
@@ -545,6 +692,15 @@ describe('content matrix generation M1', () => {
     expect(single.results[0]?.status).toBe('ready');
     if (single.results[0]?.status === 'ready') {
       expect(single.results[0].target).not.toHaveProperty('verifiedInternalLinks');
+      expect(single.results[0].diagnostics).toEqual({
+        requirementsComplete: true,
+        sourceLimitIssues: [],
+        sourceLimitIssuesTruncated: false,
+        censusFailures: [],
+      });
+      expect(single.results[0].target.frozenEvidenceResolutionIds).toHaveLength(2);
+      expect(single.results[0].target.frozenEvidenceResolutionIds)
+        .toEqual([...single.results[0].target.frozenEvidenceResolutionIds].sort());
     }
     expect(singleRepeat).toEqual(single);
     expect(single.estimatedBatchBudget).toMatchObject({ maxConcurrency: 1 });
@@ -633,6 +789,7 @@ describe('content matrix generation M1', () => {
     const initialResult = initial.results[0];
     expect(initialResult?.status).toBe('blocked');
     if (!initialResult || initialResult.status !== 'blocked') return;
+    expect(initialResult.diagnostics.requirementsComplete).toBe(true);
 
     const requirementId = `matrix-cell:${cell.id}:section:service-proof`;
     expect(initialResult.omittedOptionalSections).toEqual([
@@ -645,6 +802,8 @@ describe('content matrix generation M1', () => {
     expect(initialResult.evidenceRequirements.find(item => item.id === requirementId)).toMatchObject({
       requirementStage: 'optional_omit',
       status: 'missing',
+      resolvable: true,
+      resolutionAuthority: 'evidence_submission',
     });
     expect(initialResult.blockingRequirementIds).not.toContain(requirementId);
 
@@ -1038,6 +1197,35 @@ describe('content matrix generation M1', () => {
     expect(ready.estimatedPaidBudget).toMatchObject({ maxConcurrency: 1 });
   });
 
+  it('rejects invalid headings before any draft artifact or matrix state is committed', async () => {
+    const fixture = createFixture(['Austin']);
+    seedBrandAuthority(fixture.workspaceId);
+    const cell = fixture.matrix.cells[0];
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+    const targetValue = await readyTarget(fixture, cell.id);
+    const execution = runAtGeneratingPost(fixture, targetValue, `matrix-run-${randomUUID()}`);
+    const generated = candidates(fixture.workspaceId, targetValue);
+    generated.post.sections[0].content += '<h2>Duplicate model heading</h2>';
+
+    expect(() => commitMatrixGenerationDraft({
+      workspaceId: fixture.workspaceId,
+      itemId: execution.item.id,
+      expectedItemRevision: execution.item.revision,
+      target: targetValue,
+      ...generated,
+    })).toThrow(/headings do not match the accepted block manifest/i);
+    expect(getBrief(fixture.workspaceId, generated.brief.id)).toBeUndefined();
+    expect(getPost(fixture.workspaceId, generated.post.id)).toBeUndefined();
+    expect(getMatrixGenerationItem(fixture.workspaceId, execution.item.id)).toMatchObject({
+      status: 'generating_post',
+      briefId: null,
+      postId: null,
+    });
+    expect(getMatrix(fixture.workspaceId, fixture.matrix.id)?.cells[0]).toMatchObject({
+      status: 'planned',
+    });
+  });
+
   it('commits a complete draft atomically, replays the exact start, and rolls back stale work', async () => {
     const fixture = createFixture();
     seedBrandAuthority(fixture.workspaceId);
@@ -1050,6 +1238,7 @@ describe('content matrix generation M1', () => {
     const firstKey = `matrix-run-${randomUUID()}`;
     const firstExecution = runAtGeneratingPost(fixture, firstTarget, firstKey);
     const firstCandidates = candidates(fixture.workspaceId, firstTarget);
+    firstCandidates.post.sections[0].heading = 'Stale pre-commit metadata';
     const committed = commitMatrixGenerationDraft({
       workspaceId: fixture.workspaceId,
       itemId: firstExecution.item.id,
@@ -1064,6 +1253,7 @@ describe('content matrix generation M1', () => {
     });
     expect(committed.brief.generationRevision).toBe(1);
     expect(committed.post.generationRevision).toBe(1);
+    expect(committed.post.sections[0].heading).toBe(firstTarget.renderedHeadings[0]);
     expect(getMatrix(fixture.workspaceId, fixture.matrix.id)?.cells.find(candidate => (
       candidate.id === firstCell.id
     ))).toMatchObject({
@@ -1115,7 +1305,13 @@ describe('content matrix generation M1', () => {
       expectedItemRevision: staleExecution.item.revision,
       target: staleTarget,
       ...staleCandidates,
-    })).toThrow(/changed after preview/i);
+    })).toThrow(expect.objectContaining({
+      details: expect.objectContaining({
+        reason: 'source_revision_changed',
+        retryable: true,
+        constraint: 're-preview immediately using current authority',
+      }),
+    }));
     expect(getBrief(fixture.workspaceId, staleCandidates.brief.id)).toBeUndefined();
     expect(getPost(fixture.workspaceId, staleCandidates.post.id)).toBeUndefined();
     expect(getMatrixGenerationItem(fixture.workspaceId, staleExecution.item.id)).toMatchObject({

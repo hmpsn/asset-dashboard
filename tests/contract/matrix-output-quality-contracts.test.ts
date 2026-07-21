@@ -64,6 +64,8 @@ describe('matrix output-quality contracts', () => {
       }],
       urlPattern: '/service',
       keywordPattern: 'service',
+      titlePattern: 'Service options',
+      metaDescPattern: 'Compare verified service options.',
       generationContractVersion: 1,
     });
     expect(template.success).toBe(true);

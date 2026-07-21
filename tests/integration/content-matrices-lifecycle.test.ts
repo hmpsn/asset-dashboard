@@ -46,6 +46,7 @@ vi.mock('../../server/email.js', () => ({
 
 import { createWorkspace, deleteWorkspace } from '../../server/workspaces.js';
 import { createTemplate } from '../../server/content-templates.js';
+import { setWorkspaceFlagOverride } from '../../server/feature-flags.js';
 import db from '../../server/db/index.js';
 
 let baseUrl = '';
@@ -443,6 +444,7 @@ describe('matrix generation preview and evidence routes', () => {
   let sourceRevision = { matrixRevision: 0, templateRevision: 0, cellRevision: 0 };
 
   beforeAll(async () => {
+    setWorkspaceFlagOverride('content-matrix-generation', wsA, true);
     const template = createTemplate(wsA, {
       name: 'Generation route template',
       pageType: 'service',
@@ -479,6 +481,42 @@ describe('matrix generation preview and evidence routes', () => {
       templateRevision: template.revision ?? 0,
       cellRevision: matrix.cells[0].revision,
     };
+  });
+
+  afterAll(() => {
+    setWorkspaceFlagOverride('content-matrix-generation', wsA, null);
+  });
+
+  it('returns a stable disabled-feature reason before reading matrix sources', async () => {
+    const disabledWorkspaceId = createWorkspace('Disabled matrix generation route').id;
+    setWorkspaceFlagOverride('content-matrix-generation', disabledWorkspaceId, false);
+    try {
+      const response = await postJson(
+        `/api/content-matrices/${disabledWorkspaceId}/matrix-must-not-be-read/generation-preview`,
+        {
+          selections: [{
+            cellId: 'cell-must-not-be-read',
+            expectedSourceRevision: {
+              matrixRevision: 1,
+              templateRevision: 1,
+              cellRevision: 1,
+            },
+          }],
+        },
+      );
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        code: 'precondition_failed',
+        retryable: false,
+        details: {
+          reason: 'feature_disabled',
+          fieldPath: 'workspace_id',
+        },
+      });
+    } finally {
+      setWorkspaceFlagOverride('content-matrix-generation', disabledWorkspaceId, null);
+      deleteWorkspace(disabledWorkspaceId);
+    }
   });
 
   it('previews without paid work and resolves a pre-run evidence requirement idempotently', async () => {
@@ -526,6 +564,44 @@ describe('matrix generation preview and evidence routes', () => {
       (call.payload as { action?: string })?.action === 'matrix_generation_evidence_resolved'
     )).length;
     expect(afterEvents).toBe(beforeEvents + 1);
+  });
+
+  it('returns current-authority retry guidance from both preview and paid-start preflight', async () => {
+    const previewResponse = await postJson(
+      `/api/content-matrices/${wsA}/${matrixId}/generation-preview`,
+      { selections: [{ cellId, expectedSourceRevision: sourceRevision }] },
+    );
+    expect(previewResponse.status).toBe(409);
+    expect(await previewResponse.json()).toMatchObject({
+      code: 'conflict',
+      retryable: true,
+      details: { reason: 'source_revision_changed' },
+    });
+
+    const startResponse = await postJson(
+      `/api/content-matrices/${wsA}/${matrixId}/generation-runs`,
+      {
+        selections: [{
+          cellId,
+          expectedSourceRevision: sourceRevision,
+          expectedPreviewFingerprint: 'a'.repeat(64),
+        }],
+        acceptedBudget: {
+          maxProviderCalls: 1,
+          maxInputTokens: 1,
+          maxOutputTokens: 1,
+          maxEstimatedUsd: 0.01,
+          maxConcurrency: 1,
+        },
+        idempotencyKey: 'stale-route-start',
+      },
+    );
+    expect(startResponse.status).toBe(409);
+    expect(await startResponse.json()).toMatchObject({
+      code: 'conflict',
+      retryable: true,
+      details: { reason: 'source_revision_changed' },
+    });
   });
 });
 
