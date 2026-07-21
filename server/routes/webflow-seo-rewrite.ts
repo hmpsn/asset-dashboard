@@ -7,18 +7,20 @@
 import { Router } from 'express';
 import { requireWorkspaceAccessFromBody } from '../auth.js';
 
-import { generateSeoMetadataVariations } from '../domains/seo-health/seo-copy-generation.js';
+import {
+  generateSeoMetadataVariations,
+  isCreativeSeoProviderConfigured,
+} from '../domains/seo-health/seo-copy-generation.js';
 import { getLatestSnapshot } from '../reports.js';
 import { getQueryPageData } from '../search-console.js';
 import { isProgrammingError } from '../errors.js';
 import { matchGscUrlToPath, normalizePageUrl } from '../utils/page-address.js';
-import { sanitizeQueryForPrompt, stripHtmlToText } from '../utils/text.js';
+import { stripHtmlToText } from '../utils/text.js';
 import { createLogger } from '../logger.js';
 import { getPageKeyword } from '../page-keywords.js';
 import { resolveBaseUrl } from '../url-helpers.js';
 import { getBrandName, getTokenForSite, getWorkspace } from '../workspaces.js';
 import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
-import { ctrUnderperformanceFlag } from '../webflow-seo-rewrite-utils.js';
 
 const router = Router();
 const log = createLogger('webflow-seo');
@@ -27,6 +29,7 @@ const log = createLogger('webflow-seo');
 router.post('/api/webflow/seo-rewrite', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { pageTitle, currentSeoTitle, currentDescription, pageContent, siteContext, field, workspaceId, pagePath } = req.body;
   if (!pageTitle) return res.status(400).json({ error: 'pageTitle required' });
+  if (!isCreativeSeoProviderConfigured()) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
   const normalizedPagePath = typeof pagePath === 'string' && pagePath ? normalizePageUrl(pagePath) : undefined;
   const metadataField = field === 'both' || field === 'description' ? field : 'title';
 
@@ -43,23 +46,16 @@ router.post('/api/webflow/seo-rewrite', requireWorkspaceAccessFromBody(), async 
   }
 
   // Fetch GSC search queries for this specific page (best-effort)
-  let gscBlock = '';
-  const searchQueries: string[] = [];
+  let searchPerformance: Awaited<ReturnType<typeof getQueryPageData>> = [];
   if (workspaceId && normalizedPagePath) {
     try {
       const ws = getWorkspace(workspaceId);
       if (ws?.gscPropertyUrl && ws?.webflowSiteId) {
         const queryPageData = await getQueryPageData(ws.webflowSiteId, ws.gscPropertyUrl, 28);
-        const pageQueries = queryPageData
+        searchPerformance = queryPageData
           .filter(r => matchGscUrlToPath(r.page, normalizedPagePath))
           .sort((a, b) => b.impressions - a.impressions)
           .slice(0, 15);
-        if (pageQueries.length > 0) {
-          searchQueries.push(...pageQueries.map(query => query.query));
-          gscBlock = `\n\nREAL SEARCH QUERIES people use to find this page (from Google Search Console — use these exact phrases for relevance):\n${pageQueries.map(q => `- "${sanitizeQueryForPrompt(q.query)}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position}, CTR ${q.ctr}%)`).join('\n')}`;
-
-          gscBlock += ctrUnderperformanceFlag(pageQueries, { field: metadataField, includeOutperformer: true });
-        }
       }
     } catch (err) { if (isProgrammingError(err)) log.warn({ err }, 'webflow-seo: programming error'); /* non-critical — continue without GSC data */ }
   }
@@ -130,7 +126,6 @@ router.post('/api/webflow/seo-rewrite', requireWorkspaceAccessFromBody(), async 
     const contextBlocks = [
       pageAssist.blocks.keywordBlock,
       pageAssist.blocks.personasBlock,
-      gscBlock,
       auditBlock,
       pageAssist.blocks.pageProfileBlock,
       pageAssist.blocks.pageMapBlock,
@@ -147,7 +142,7 @@ router.post('/api/webflow/seo-rewrite', requireWorkspaceAccessFromBody(), async 
         currentDescription,
         pageContent: resolvedPageContent,
         headings,
-        searchQueries,
+        searchPerformance,
         contextBlocks,
       },
       authority: {

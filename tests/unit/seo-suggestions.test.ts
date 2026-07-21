@@ -32,6 +32,7 @@ vi.mock('../../server/db/json-validation.js', () => ({
 
 import {
   saveSuggestion,
+  saveSuggestionPair,
   listSuggestions,
   getPendingSuggestion,
   listPendingSuggestionsByIds,
@@ -380,5 +381,31 @@ describe('saveSuggestion', () => {
     const runArgs = mockRun.mock.calls[0];
     const variationsArg = runArgs.find((a: unknown) => typeof a === 'string' && a.startsWith('['));
     expect(variationsArg).toBe('["Desc A","Desc B","Desc C"]');
+  });
+});
+
+describe('saveSuggestionPair', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrepare.mockReturnValue({ all: mockAll, get: mockGet, run: mockRun });
+  });
+
+  it('runs both aligned suggestion saves inside one transaction', () => {
+    mockGet
+      .mockReturnValueOnce(makeRow({ field: 'title' }))
+      .mockReturnValueOnce(makeRow({ id: 'sugg-2', field: 'description' }));
+
+    const result = saveSuggestionPair({
+      workspaceId: 'ws-1',
+      siteId: 'site-1',
+      pageId: 'page-1',
+      pageTitle: 'Home',
+      pageSlug: '/',
+      title: { currentValue: 'Old title', variations: ['T1', 'T2', 'T3'] },
+      description: { currentValue: 'Old description', variations: ['D1', 'D2', 'D3'] },
+    });
+
+    expect(result.map(suggestion => suggestion.field)).toEqual(['title', 'description']);
+    expect(mockRun).toHaveBeenCalledTimes(2);
   });
 });

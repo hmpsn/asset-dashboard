@@ -19,7 +19,13 @@ describe('SEO copy generation service contracts', () => {
   it('renders the same canonical metadata task for sync, bulk, and background adapters', () => {
     const shared = {
       field: 'both' as const,
-      evidence: metadataEvidence,
+      evidence: {
+        ...metadataEvidence,
+        searchPerformance: [{
+          query: 'family dentist near me', clicks: 2, impressions: 200, position: 4, ctr: 1,
+        }],
+        siblingMetadata: ['Cosmetic Dentistry | Example Dental'],
+      },
       authority: {
         primaryKeyword: 'family dentist',
         searchIntent: 'commercial' as const,
@@ -35,6 +41,9 @@ describe('SEO copy generation service contracts', () => {
     expect(sync).toEqual(background);
     expect(sync.userPrompt).toContain('family dentist');
     expect(sync.userPrompt).toContain('Example Dental');
+    expect(sync.userPrompt.match(/family dentist near me/g)).toHaveLength(1);
+    expect(sync.userPrompt).toContain('CTR UNDERPERFORMANCE');
+    expect(sync.userPrompt).toContain('Cosmetic Dentistry | Example Dental');
   });
 
   it('makes factual specificity conditional on supplied authority', () => {
@@ -83,9 +92,9 @@ describe('SEO copy generation service contracts', () => {
     const description = 'A long description with enough words to exceed the one hundred and sixty character maximum while still providing a deterministic word boundary for truncation and preserving valid plain text output for callers.';
     const parsed = parseSeoMetadataOutput(JSON.stringify({
       pairs: [
-        { title, description },
-        { title: `${title} two`, description: `${description} two` },
-        { title: `${title} three`, description: `${description} three` },
+        { title: `First ${title}`, description: `First ${description}` },
+        { title: `Second ${title}`, description: `Second ${description}` },
+        { title: `Third ${title}`, description: `Third ${description}` },
       ],
     }), { field: 'both' });
 
@@ -93,6 +102,41 @@ describe('SEO copy generation service contracts', () => {
     expect(parsed?.pairs).toHaveLength(3);
     expect(parsed?.pairs.every(pair => pair.title.length <= 60)).toBe(true);
     expect(parsed?.pairs.every(pair => pair.description.length <= 160)).toBe(true);
+  });
+
+  it('rejects duplicate metadata choices after deterministic limits are applied', () => {
+    expect(parseSeoMetadataOutput(JSON.stringify({
+      variations: ['Same title', ' same   title ', 'SAME TITLE'],
+    }), { field: 'title' })).toBeNull();
+
+    const sharedPrefix = 'A'.repeat(65);
+    expect(parseSeoMetadataOutput(JSON.stringify({
+      variations: [`${sharedPrefix} one`, `${sharedPrefix} two`, `${sharedPrefix} three`],
+    }), { field: 'title' })).toBeNull();
+
+    expect(parseSeoMetadataOutput(JSON.stringify({
+      pairs: [
+        { title: 'Same title', description: 'Same description' },
+        { title: ' same title ', description: 'same  description' },
+        { title: 'SAME TITLE', description: 'SAME DESCRIPTION' },
+      ],
+    }), { field: 'both' })).toBeNull();
+
+    expect(parseSeoMetadataOutput(JSON.stringify({
+      pairs: [
+        { title: 'Same title', description: 'First description' },
+        { title: 'Same title', description: 'Second description' },
+        { title: 'Same title', description: 'Third description' },
+      ],
+    }), { field: 'both' })).toBeNull();
+
+    expect(parseSeoMetadataOutput(JSON.stringify({
+      pairs: [
+        { title: 'First title', description: 'Same description' },
+        { title: 'Second title', description: 'Same description' },
+        { title: 'Third title', description: 'Same description' },
+      ],
+    }), { field: 'both' })).toBeNull();
   });
 
   it('renders a bounded page-copy task and rejects malformed structured output', () => {
@@ -143,6 +187,19 @@ describe('SEO copy generation service contracts', () => {
       new Set(['/services/emergency-dentistry']),
     )).toEqual([
       { targetPath: '/services/emergency-dentistry', anchorText: 'emergency care', context: 'Relevant care.' },
+    ]);
+  });
+
+  it('rejects a self reference when the current page is supplied as an absolute URL', () => {
+    expect(filterVerifiedInternalLinks(
+      [
+        { targetPath: '/about', anchorText: 'about', context: 'Self reference.' },
+        { targetPath: '/contact', anchorText: 'contact', context: 'Related page.' },
+      ],
+      'https://example.com/about',
+      new Set(['/about', '/contact']),
+    )).toEqual([
+      { targetPath: '/contact', anchorText: 'contact', context: 'Related page.' },
     ]);
   });
 });

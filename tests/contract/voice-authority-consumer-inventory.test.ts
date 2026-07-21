@@ -40,6 +40,7 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/domains/brand/generation/operations.ts', classification: 'correct' },
   { file: 'server/domains/content/matrix-generation/operations.ts', classification: 'correct' },
   { file: 'server/domains/content/matrix-generation/set-audit.ts', classification: 'documented-exception' },
+  { file: 'server/domains/seo-health/seo-copy-generation.ts', classification: 'correct' },
   { file: 'server/google-business-profile-review-response-ai.ts', classification: 'correct' },
   { file: 'server/internal-links.ts', classification: 'correct' },
   { file: 'server/keyword-recommendations.ts', classification: 'builder-backed' },
@@ -56,7 +57,6 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/voice-calibration.ts', classification: 'correct' },
   { file: 'server/webflow-bulk-seo-fix-background-job.ts', classification: 'correct' },
   { file: 'server/webflow-seo-bulk-analyze-job.ts', classification: 'documented-exception' },
-  { file: 'server/webflow-seo-bulk-rewrite-job.ts', classification: 'correct' },
   { file: 'server/workspace-context-generation-job.ts', classification: 'documented-exception' },
   { file: 'server/routes/ai.ts', classification: 'documented-exception' },
   { file: 'server/routes/content-publish.ts', classification: 'documented-exception' },
@@ -64,9 +64,6 @@ const VOICE_AUTHORITY_INVENTORY: Array<{
   { file: 'server/routes/public-analytics.ts', classification: 'documented-exception' },
   { file: 'server/routes/rewrite-chat.ts', classification: 'builder-backed' },
   { file: 'server/routes/webflow-keywords.ts', classification: 'builder-backed' },
-  { file: 'server/routes/webflow-seo-bulk-rewrite.ts', classification: 'correct' },
-  { file: 'server/routes/webflow-seo-page-tools.ts', classification: 'correct' },
-  { file: 'server/routes/webflow-seo-rewrite.ts', classification: 'correct' },
   { file: 'server/routes/workspaces.ts', classification: 'documented-exception' },
 ];
 
@@ -149,7 +146,7 @@ describe('voice authority consumer inventory', () => {
     for (const file of [
       'server/anomaly-detection.ts',
       'server/diagnostic-orchestrator.ts',
-      'server/routes/webflow-seo-page-tools.ts',
+      'server/domains/seo-health/seo-copy-generation.ts',
     ]) {
       const source = readFileSync(resolve(ROOT_DIR, file), 'utf-8'); // readFile-ok - PR2 guard: migrated voice-authority consumers must stay on buildSystemPrompt.
       expect(source).toContain('buildSystemPrompt');

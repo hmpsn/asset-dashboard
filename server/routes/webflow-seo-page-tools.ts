@@ -6,7 +6,11 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccessFromBody, requireWorkspaceSiteAccessFromQuery } from '../auth.js';
-import { generateSeoPageCopySet } from '../domains/seo-health/seo-copy-generation.js';
+import {
+  generateSeoPageCopySet,
+  isCreativeSeoProviderConfigured,
+  SeoCopyMalformedOutputError,
+} from '../domains/seo-health/seo-copy-generation.js';
 import { normalizePageUrl } from '../utils/page-address.js';
 import { stripHtmlToText } from '../utils/text.js';
 import { createLogger } from '../logger.js';
@@ -66,6 +70,7 @@ router.get('/api/webflow/page-html/:siteId', requireWorkspaceSiteAccessFromQuery
 router.post('/api/webflow/seo-copy', requireWorkspaceAccessFromBody(), async (req, res) => {
   const { pagePath, pageTitle, currentSeoTitle, currentDescription, currentH1, pageContent, workspaceId } = req.body;
   if (!pagePath || !workspaceId) return res.status(400).json({ error: 'pagePath and workspaceId required' });
+  if (!isCreativeSeoProviderConfigured()) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   const pageAssist = await buildPageAssistContext(workspaceId, { pagePath });
   const pageMapEntries = pageAssist.seoContext?.strategy?.pageMap?.length
@@ -134,15 +139,14 @@ router.post('/api/webflow/seo-copy', requireWorkspaceAccessFromBody(), async (re
       },
       verifiedInternalLinks,
     });
-    if (!copy) {
-      log.warn({ workspaceId, pagePath }, 'SEO copy returned malformed structured output');
-      return res.status(500).json({ error: 'SEO copy generation failed' });
-    }
-
     return res.json(copy);
   } catch (err) {
+    if (err instanceof SeoCopyMalformedOutputError) {
+      log.warn({ workspaceId, pagePath }, 'SEO copy returned malformed structured output');
+      return res.status(500).json({ error: 'AI returned invalid JSON', raw: err.rawPreview });
+    }
     log.error({ err: err }, 'SEO copy generator error');
-    res.status(500).json({ error: 'SEO copy generation failed' });
+    return res.status(500).json({ error: 'SEO copy generation failed' });
   }
 });
 

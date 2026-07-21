@@ -55,6 +55,9 @@ setupWebflowMocks();
 setupOpenAIMocks();
 setupAnthropicMocks();
 
+const originalOpenAiKey = process.env.OPENAI_API_KEY;
+const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+
 vi.mock('../../server/broadcast.js', () => ({
   setBroadcast: vi.fn(),
   broadcast: vi.fn(),
@@ -120,6 +123,8 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
     resetWebflowMocks();
     resetOpenAIMocks();
     resetAnthropicMocks();
+    process.env.OPENAI_API_KEY = 'test-openai-key';
+    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
     ws = seedWorkspace();
     const server = await startTestServer();
     baseUrl = server.baseUrl;
@@ -129,6 +134,10 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
   afterEach(async () => {
     stopServer();
     ws.cleanup();
+    if (originalOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalOpenAiKey;
+    if (originalAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -139,8 +148,8 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
     // Both Anthropic and OpenAI throw. callCreativeAI tries Anthropic first
     // (isAnthropicConfigured returns true in mock), falls back to OpenAI.
     // When both fail, the route must return 500.
-    mockAnthropicError('seo-metadata-variations', 'Anthropic upstream error');
-    mockOpenAIError('seo-metadata-variations', 'OpenAI upstream error');
+    mockAnthropicError('seo-rewrite', 'Anthropic upstream error');
+    mockOpenAIError('seo-rewrite', 'OpenAI upstream error');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-rewrite', {
       pageTitle: 'Our Services',
@@ -159,8 +168,8 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
   });
 
   it('AI failure for "both" field returns 500 — not a 200 with empty pairs', async () => {
-    mockAnthropicError('seo-metadata-variations', 'Anthropic timeout');
-    mockOpenAIError('seo-metadata-variations', 'OpenAI timeout');
+    mockAnthropicError('seo-rewrite', 'Anthropic timeout');
+    mockOpenAIError('seo-rewrite', 'OpenAI timeout');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-rewrite', {
       pageTitle: 'Homepage',
@@ -285,7 +294,7 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
 
   it('AI returning malformed JSON returns an error, not a padded variation', async () => {
     // Return non-JSON text from the AI
-    mockAnthropicResponse('seo-metadata-variations', 'not json at all — just some text the AI returned');
+    mockAnthropicResponse('seo-rewrite', 'not json at all — just some text the AI returned');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-rewrite', {
       pageTitle: 'Contact Us',
@@ -300,7 +309,7 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
   });
 
   it('AI returning malformed JSON for "both" field returns an error, not empty pairs', async () => {
-    mockAnthropicResponse('seo-metadata-variations', '{ bad json {{{ not parseable');
+    mockAnthropicResponse('seo-rewrite', '{ bad json {{{ not parseable');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-rewrite', {
       pageTitle: 'About Us',

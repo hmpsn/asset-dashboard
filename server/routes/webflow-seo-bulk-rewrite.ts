@@ -11,6 +11,7 @@ import { generateSeoMetadataVariations } from '../domains/seo-health/seo-copy-ge
 import {
   type SeoSuggestion,
   saveSuggestion,
+  saveSuggestionPair,
 } from '../seo-suggestions.js';
 import { buildPageAssistContext } from '../intelligence/page-assist-context-builder.js';
 import { getQueryPageData } from '../search-console.js';
@@ -20,7 +21,6 @@ import { isProgrammingError } from '../errors.js';
 import { stripHtmlToText } from '../utils/text.js';
 import { tryResolvePagePath, matchGscUrlToPath, findPageMapEntryForPage } from '../utils/page-address.js';
 import { resolveBaseUrl } from '../url-helpers.js';
-import { ctrUnderperformanceFlag } from '../webflow-seo-rewrite-utils.js';
 
 const router = Router();
 const log = createLogger('webflow-seo-bulk-rewrite');
@@ -109,33 +109,18 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
 
       // Match GSC queries to this page by slug (top 15 by impressions)
       let pageQueries: typeof allGscData = [];
-      let gscBlock = '';
-      let ctrFlag = '';
       if (allGscData.length > 0 && rwPagePath) {
         pageQueries = allGscData
           .filter(r => matchGscUrlToPath(r.page, rwPagePath))
           .sort((a, b) => b.impressions - a.impressions)
           .slice(0, 15);
-        if (pageQueries.length > 0) {
-          gscBlock = `REAL SEARCH QUERIES people use to find this page (from Google Search Console):\n${pageQueries.map(q => `- "${q.query}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%)`).join('\n')}`;
-
-          ctrFlag = ctrUnderperformanceFlag(pageQueries, { field, includeOutperformer: true });
-        }
       }
 
-      // Sibling titles — so Claude can differentiate from other pages on the same site
-      let siblingBlock = '';
       const siblings = siblingTitles[page.pageId];
-      if (siblings && siblings.length > 0) {
-        siblingBlock = `OTHER TITLES/DESCRIPTIONS ON THIS SITE (differentiate this page):\n${JSON.stringify(siblings)}`;
-      }
 
       const contextBlocks = [
         pageAssist.blocks.keywordBlock,
         pageAssist.blocks.personasBlock,
-        gscBlock,
-        ctrFlag,
-        siblingBlock,
         pageAssist.blocks.pageProfileBlock,
       ].filter(Boolean);
       const authorityKeywords = pageKeywords ?? pageAssist.seoContext?.pageKeywords;
@@ -148,7 +133,8 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
           currentSeoTitle: page.currentSeoTitle,
           currentDescription: page.currentDescription,
           pageContent: contentExcerpt,
-          searchQueries: pageQueries.map(query => query.query),
+          searchPerformance: pageQueries,
+          siblingMetadata: siblings,
           contextBlocks,
         },
         authority: {
@@ -169,18 +155,18 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
         const generated = await generateSeoMetadataVariations(generationInput);
         if (!generated || !('pairs' in generated)) return { savedSuggestions: [] as SeoSuggestion[], pageId: page.pageId, error: 'Empty AI response' };
 
-        // Save two aligned rows: one for title, one for description
-        const titleSugg = saveSuggestion({
+        // The aligned rows are one logical result and must never persist partially.
+        const [titleSugg, descSugg] = saveSuggestionPair({
           workspaceId: resolvedWsId, siteId, pageId: page.pageId,
           pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
-          field: 'title', currentValue: oldTitle,
-          variations: generated.pairs.map(pair => pair.title),
-        });
-        const descSugg = saveSuggestion({
-          workspaceId: resolvedWsId, siteId, pageId: page.pageId,
-          pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
-          field: 'description', currentValue: oldDesc,
-          variations: generated.pairs.map(pair => pair.description),
+          title: {
+            currentValue: oldTitle,
+            variations: generated.pairs.map(pair => pair.title),
+          },
+          description: {
+            currentValue: oldDesc,
+            variations: generated.pairs.map(pair => pair.description),
+          },
         });
         return { savedSuggestions: [titleSugg, descSugg], pageId: page.pageId, error: '' };
       }

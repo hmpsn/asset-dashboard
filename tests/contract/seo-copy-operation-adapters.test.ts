@@ -25,6 +25,9 @@ describe('canonical SEO copy operation adapters', () => {
       expect(source, file).not.toContain('normalizeSeoRewriteVariations');
       expect(source, file).not.toContain('normalizeSeoRewritePairs');
       expect(source, file).not.toContain('parseJsonFallback');
+      expect(source, file).not.toContain('gscBlock');
+      expect(source, file).not.toContain('ctrUnderperformanceFlag');
+      expect(source, file).toContain('searchPerformance');
     }
   });
 

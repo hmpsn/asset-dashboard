@@ -57,6 +57,8 @@ describe('AI operation registry', () => {
     }
     expect(getAIOperationPolicyMetadata('seo-metadata-variations').executionMode).toBe('sync-or-background');
     expect(getAIOperationPolicyMetadata('seo-page-copy-set').executionMode).toBe('sync-only');
+    expect(getAIOperationRuntimeDefaults('seo-metadata-variations').feature).toBe('seo-rewrite');
+    expect(getAIOperationRuntimeDefaults('seo-page-copy-set').feature).toBe('content-score');
   });
 
   it('defaults generation to inflight-only and requires explicit TTL opt-in', () => {

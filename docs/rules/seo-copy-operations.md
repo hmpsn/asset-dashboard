@@ -15,6 +15,7 @@ The shared server service owns task rendering, creative dispatch, strict output 
 - Internal-link targets must be normalized members of the caller's workspace-census-backed allowlist. External, unknown, malformed, and self-referential targets are removed.
 - Structured output must pass the operation's Zod schema. Malformed output produces no suggestion; prose or partial objects are not padded into plausible results.
 - Title and description limits are deterministic server contracts. Model instructions do not replace enforcement.
+- A `both` result is one logical suggestion: title and description rows persist in one transaction or neither row persists.
 - Human selection remains the only adoption gate. Generation never applies, approves, sends, or publishes copy.
 
 ## Compatibility

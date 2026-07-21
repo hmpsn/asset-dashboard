@@ -151,7 +151,7 @@ export const AI_OPERATION_REGISTRY = {
   'seo-metadata-variations': {
     id: 'seo-metadata-variations',
     domain: 'seo-health',
-    feature: 'seo-metadata-variations',
+    feature: 'seo-rewrite',
     providerIntent: 'either',
     modelIntent: 'evidence-grounded creative SEO title and meta-description variations',
     outputMode: 'json',
@@ -170,7 +170,7 @@ export const AI_OPERATION_REGISTRY = {
   'seo-page-copy-set': {
     id: 'seo-page-copy-set',
     domain: 'seo-health',
-    feature: 'seo-page-copy-set',
+    feature: 'content-score',
     providerIntent: 'either',
     modelIntent: 'evidence-grounded creative SEO title, description, H1, introduction, and internal-link suggestions',
     outputMode: 'json',

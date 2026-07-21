@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   },
   getQueryPageData: vi.fn(),
   saveSuggestion: vi.fn(),
+  saveSuggestionPair: vi.fn(),
   resolveBaseUrl: vi.fn(),
   buildPageAssistContext: vi.fn(),
   getBrandName: vi.fn(() => 'Studio Brand'),
@@ -35,7 +36,10 @@ vi.mock('../../server/jobs.js', () => ({
 }));
 vi.mock('../../server/logger.js', () => ({ createLogger: vi.fn(() => mocks.logger) }));
 vi.mock('../../server/search-console.js', () => ({ getQueryPageData: mocks.getQueryPageData }));
-vi.mock('../../server/seo-suggestions.js', () => ({ saveSuggestion: mocks.saveSuggestion }));
+vi.mock('../../server/seo-suggestions.js', () => ({
+  saveSuggestion: mocks.saveSuggestion,
+  saveSuggestionPair: mocks.saveSuggestionPair,
+}));
 vi.mock('../../server/url-helpers.js', () => ({ resolveBaseUrl: mocks.resolveBaseUrl }));
 vi.mock('../../server/intelligence/page-assist-context-builder.js', () => ({
   buildPageAssistContext: mocks.buildPageAssistContext,
@@ -84,6 +88,10 @@ describe('webflow SEO bulk rewrite job', () => {
       },
     });
     mocks.saveSuggestion.mockImplementation((opts) => ({ id: `suggestion_${opts.pageId}_${opts.field}`, ...opts }));
+    mocks.saveSuggestionPair.mockImplementation((opts) => [
+      mocks.saveSuggestion({ ...opts, field: 'title', ...opts.title }),
+      mocks.saveSuggestion({ ...opts, field: 'description', ...opts.description }),
+    ]);
   });
 
   it('generates single-field suggestions and records terminal success', async () => {
@@ -168,6 +176,7 @@ describe('webflow SEO bulk rewrite job', () => {
       workspaceId: 'ws_1',
       field: 'both',
     }));
+    expect(mocks.saveSuggestionPair).toHaveBeenCalledTimes(1);
     expect(mocks.saveSuggestion).toHaveBeenCalledTimes(2);
     expect(mocks.saveSuggestion).toHaveBeenNthCalledWith(1, expect.objectContaining({
       field: 'title',
@@ -189,6 +198,47 @@ describe('webflow SEO bulk rewrite job', () => {
       generated: 2,
       generatedPages: 1,
       suggestions: 2,
+      total: 1,
+      field: 'both',
+    }));
+  });
+
+  it('reports a both-mode page as failed when atomic pair persistence rejects', async () => {
+    const ac = new AbortController();
+    mocks.generateSeoMetadataVariations.mockResolvedValueOnce({
+      pairs: [
+        { title: 'First title', description: 'First description' },
+        { title: 'Second title', description: 'Second description' },
+        { title: 'Third title', description: 'Third description' },
+      ],
+    });
+    mocks.saveSuggestionPair.mockImplementationOnce(() => {
+      throw new Error('description insert failed');
+    });
+
+    await runSeoBulkRewriteJob({
+      jobId: 'job_pair_persistence_failed',
+      workspaceId: 'ws_1',
+      siteId: 'site_1',
+      pages: [{ pageId: 'page_1', title: 'Services', slug: 'services' }],
+      field: 'both',
+      workspace,
+      signal: ac.signal,
+    });
+
+    expect(mocks.saveSuggestion).not.toHaveBeenCalled();
+    expect(mocks.updateJob).toHaveBeenCalledWith('job_pair_persistence_failed', expect.objectContaining({
+      status: 'error',
+      result: expect.objectContaining({
+        suggestions: 0,
+        generatedPages: 0,
+        failed: 1,
+        total: 1,
+        field: 'both',
+      }),
+    }));
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:failed', expect.objectContaining({
+      failed: 1,
       total: 1,
       field: 'both',
     }));

@@ -8,9 +8,8 @@ import { buildPageAssistContext } from './intelligence/page-assist-context-build
 import { updateJob, unregisterAbort, isJobCancelled } from './jobs.js';
 import { createLogger } from './logger.js';
 import { getQueryPageData } from './search-console.js';
-import { saveSuggestion, type SeoSuggestion } from './seo-suggestions.js';
+import { saveSuggestion, saveSuggestionPair, type SeoSuggestion } from './seo-suggestions.js';
 import { resolveBaseUrl } from './url-helpers.js';
-import { ctrUnderperformanceFlag } from './webflow-seo-rewrite-utils.js';
 import { getBrandName, getTokenForSite, type Workspace } from './workspaces.js';
 import { WS_EVENTS } from './ws-events.js';
 import type { SeoBulkRewriteField, SeoBulkRewritePage } from './schemas/seo-bulk-jobs.js';
@@ -106,31 +105,18 @@ export async function runSeoBulkRewriteJob({
         }
 
         let pageQueries: typeof allGscData = [];
-        let gscBlock = '';
-        let ctrFlag = '';
         if (allGscData.length > 0 && rwPagePath) {
           pageQueries = allGscData
             .filter(r => matchGscUrlToPath(r.page, rwPagePath))
             .sort((a, b) => b.impressions - a.impressions)
             .slice(0, 15);
-          if (pageQueries.length > 0) {
-            gscBlock = `REAL SEARCH QUERIES:\n${pageQueries.map(q => `- "${q.query}" (${q.impressions} impr, ${q.clicks} clicks, pos ${q.position.toFixed(1)}, CTR ${q.ctr}%)`).join('\n')}`;
-            ctrFlag = ctrUnderperformanceFlag(pageQueries, { compact: true });
-          }
         }
 
-        let siblingBlock = '';
         const siblings = siblingTitles[page.pageId];
-        if (siblings && siblings.length > 0) {
-          siblingBlock = `OTHER TITLES ON THIS SITE (differentiate):\n${JSON.stringify(siblings)}`;
-        }
 
         const contextBlocks = [
           pageAssist.blocks.keywordBlock,
           pageAssist.blocks.personasBlock,
-          gscBlock,
-          ctrFlag,
-          siblingBlock,
           pageAssist.blocks.pageProfileBlock,
         ].filter(Boolean);
         const authorityKeywords = pageKeywords ?? pageAssist.seoContext?.pageKeywords;
@@ -144,7 +130,8 @@ export async function runSeoBulkRewriteJob({
             currentSeoTitle: page.currentSeoTitle,
             currentDescription: page.currentDescription,
             pageContent: contentExcerpt,
-            searchQueries: pageQueries.map(query => query.query),
+            searchPerformance: pageQueries,
+            siblingMetadata: siblings,
             contextBlocks,
           },
           authority: {
@@ -163,15 +150,17 @@ export async function runSeoBulkRewriteJob({
           const oldDesc = page.currentDescription || '';
           const generated = await generateSeoMetadataVariations(generationInput);
           if (!generated || !('pairs' in generated)) return null;
-          const titleSugg = saveSuggestion({
+          const [titleSugg, descSugg] = saveSuggestionPair({
             workspaceId, siteId, pageId: page.pageId,
             pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
-            field: 'title', currentValue: oldTitle, variations: generated.pairs.map(pair => pair.title),
-          });
-          const descSugg = saveSuggestion({
-            workspaceId, siteId, pageId: page.pageId,
-            pageTitle: page.title, pageSlug: rwPagePath || page.slug || '',
-            field: 'description', currentValue: oldDesc, variations: generated.pairs.map(pair => pair.description),
+            title: {
+              currentValue: oldTitle,
+              variations: generated.pairs.map(pair => pair.title),
+            },
+            description: {
+              currentValue: oldDesc,
+              variations: generated.pairs.map(pair => pair.description),
+            },
           });
           return [titleSugg, descSugg];
         }
