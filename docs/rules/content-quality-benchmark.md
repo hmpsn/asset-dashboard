@@ -55,3 +55,5 @@ All recommendations remain advisory until the owner accepts the blinded comparis
 - **Q1:** benchmark the prompt/voice-context candidate against the frozen baseline; stop adding architecture if the recommendation gate passes.
 - **Q2:** allowed only when Q1 failures specifically identify page-level coherence, positioning, or brand-specificity gaps in more than 20% of rated cases.
 - **Q3:** desktop workflow changes remain additive to existing MCP tools and preserve default full-response compatibility.
+
+Q1's deterministic implementation gate is the registered content prompt fixture: short conversion sections cannot be forced into article-style H3 quotas, deep educational sections keep optional hierarchy, and factual specifics stay tied to human-approved facts or explicitly labeled verified evidence. Passing that gate does not substitute for the private blinded comparison. If no qualified private corpus is present, the comparison remains `not_run` and cannot be interpreted as evidence for Q2.

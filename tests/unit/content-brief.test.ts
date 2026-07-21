@@ -437,6 +437,37 @@ describe('getPageTypeConfig coverage', () => {
     expect(cfg.prompt).not.toContain('Google Business Profile');
     expect(cfg.prompt).toContain('public-facing copy');
   });
+
+  it.each(['blog', 'service', 'location', 'landing', 'product'])(
+    'makes factual specifics evidence-conditional in the %s brief contract',
+    pageType => {
+      const cfg = getPageTypeConfig(pageType);
+      expect(cfg.prompt).toContain('FACTUAL SPECIFICS AUTHORITY');
+      expect(cfg.prompt).toContain('explicitly labeled verified provider, analytics, or source evidence');
+      expect(cfg.prompt).toContain('omit unsupported specifics');
+    },
+  );
+
+  it.each(['provider-profile', 'procedure-guide', 'pricing-page'])(
+    'keeps healthcare facts and citations tied to supplied approved evidence in %s',
+    pageType => {
+      const cfg = getPageTypeConfig(pageType);
+      expect(cfg.prompt).toContain('FACTUAL SPECIFICS AUTHORITY');
+      expect(cfg.prompt).toContain('Do not invent credentials, affiliations, medical results, risks, prices, statistics, or citations');
+    },
+  );
+
+  it('allows verified source evidence for medical and pricing facts while keeping first-party proof human-approved', () => {
+    const provider = getPageTypeConfig('provider-profile').prompt;
+    const procedure = getPageTypeConfig('procedure-guide').prompt;
+    const pricing = getPageTypeConfig('pricing-page').prompt;
+
+    expect(provider).toContain('Credentials, affiliations, patient results, and testimonials require human-approved first-party context');
+    expect(procedure).toContain('Risks, prices, statistics, and citations require authoritative source evidence');
+    expect(procedure).toContain('comparison table only when authoritative evidence supports');
+    expect(pricing).toContain('authoritative price data');
+    expect(pricing).toContain('comparison table only when authoritative evidence supports');
+  });
 });
 
 // ── outline compression contracts ──

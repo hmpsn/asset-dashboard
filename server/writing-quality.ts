@@ -90,15 +90,23 @@ AEO (ANSWER ENGINE OPTIMIZATION) — CITATION-WORTHY WRITING:
 
 // ── Lean creative ruleset ───────────────────────────────────────────────────
 
+export const FACTUAL_SPECIFICS_AUTHORITY_CONTRACT = `FACTUAL SPECIFICS AUTHORITY:
+- Treat experience counts, customer or patient counts, results, testimonials, credentials, affiliations, awards, locations, landmarks, regulations, partnerships, specifications, measurements, performance claims, prices, offers, guarantees, citations, and named sources as provenance-sensitive facts.
+- Use a specific fact only when it is present in human-approved business, brand, or evidence context, or in explicitly labeled verified provider, analytics, or source evidence with source identity and freshness metadata where relevant. Stay within what that evidence actually establishes.
+- A brief or outline request, user feedback, raw SERP or competitor copy, an unlabeled claim, and model inference are not factual authority. If authoritative evidence does not contain a specific, omit it rather than inventing or implying it.
+- Never turn an outline request for proof, local detail, authority, or comparison data into permission to fabricate it. Use a truthful general explanation or omit the unsupported detail.`;
+
 export const CREATIVE_WRITING_RULES = `
 CREATIVE WRITING RULES (apply to generated copy without over-constraining voice):
 
 FACTUAL SAFETY:
 - NEVER invent statistics, case study results, percentages, quotes, testimonials, awards, certifications, or named source claims.
-- Use specific numbers only when they were provided in the brief, knowledge base, source pack, or live SERP context.
-- Never write "studies show", "research suggests", "experts agree", or "industry data shows" unless the specific source is named in the provided context.
+- Use specific numbers and named claims only from the authoritative evidence classes defined below; a raw brief request or live SERP result is not authority.
+- Never write "studies show", "research suggests", "experts agree", or "industry data shows" unless the specific source is identified in authoritative evidence.
 - If source evidence is thin, say what can be said responsibly and teach with practical steps, tradeoffs, or examples instead of making claims sound verified.
-- For health, finance, legal, or other provenance-sensitive topics, keep factual claims neutral and cite or reference only provided sources.
+- For health, finance, legal, or other provenance-sensitive topics, keep factual claims neutral and cite or reference only authoritative source evidence.
+
+${FACTUAL_SPECIFICS_AUTHORITY_CONTRACT}
 
 VOICE AND STYLE:
 - Write like a knowledgeable colleague with a point of view, not a brochure being assembled from SEO notes.

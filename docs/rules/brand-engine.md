@@ -99,6 +99,8 @@ Use the smallest ruleset that protects the output contract:
 
 Callers that inject either `CREATIVE_WRITING_RULES` or `WRITING_QUALITY_RULES` into their own task prompt must call `buildSystemPrompt(..., { skipProseRules: true })`. This avoids double-weighting anti-generic-writing instructions and preserves room for brand voice, page-type guidance, and approved samples to shape the final copy.
 
+`FACTUAL_SPECIFICS_AUTHORITY_CONTRACT` is the canonical creative-copy boundary for provenance-sensitive details. Experience and customer counts, results, testimonials, credentials, affiliations, local landmarks or regulations, partnerships, specifications, measured performance, prices, offers, guarantees, and citations may appear only when supported by human-approved business/brand/evidence context or explicitly labeled verified provider, analytics, or source evidence with source identity and freshness metadata where relevant. A brief request, user feedback, raw SERP or competitor copy, unlabeled claim, and model inference are not authority to fabricate specifics; omit them or state the evidence need.
+
 ## Page-Type and Brand Context Priority
 
 **File:** `server/page-type-copy-contract.ts`
@@ -115,6 +117,8 @@ Priority order for content posts and copy pipeline generation:
 Brand context should choose vocabulary, proof, positioning, and rhythm. It must not add extra sections, repeated CTAs, duplicated proof blocks, or longer copy simply because more brand context is present. Service, location, landing, homepage, and product pages are density-reviewed during unification; blogs, pillars, and resources retain permission for deeper educational structure.
 
 Content brief and outline generation must apply the same priority before prose generation starts. Fresh briefs and outline regeneration should create right-sized skeletons for the page type: conversion pages get compact section counts, capped subheading density, one closing CTA path, and deterministic trimming of duplicate close/contact sections. Brand identity and voice can shape the outline's proof and positioning, but page architecture and word budget outrank any temptation to expand because richer brand context is available.
+
+Section structure is semantic, not quota-driven. Short conversion sections stay cohesive under their H2 unless the supplied brief names a genuinely distinct subtopic. Longer educational sections may use H3s when they materially improve scanning, but H3s are optional and must never be manufactured merely to divide a word count. Suggested brief subheadings are the upper-bound authority; generation does not add extras by default.
 
 ## Content Generation Style Selector
 

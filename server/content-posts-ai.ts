@@ -23,6 +23,7 @@ import {
   BRAND_CONTEXT_HIERARCHY,
   getContentGenerationStyleContract,
   getPageTypeCopyContract,
+  getSectionStructureGuidance,
   requiresPageTypeDensityReview,
 } from './page-type-copy-contract.js';
 import {
@@ -330,25 +331,25 @@ const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
 - Preview what the reader will learn (without giving everything away)
 - End with a smooth transition into the first section
 - CRITICAL: Do NOT end the intro with "Let's" followed by any verb (e.g., "Let's start by exploring...", "Let's begin with..."). Use a direct transition instead`,
-  landing: `- Lead with the primary value proposition — what transformation does the reader get?
+  landing: `- Lead with the primary value proposition and a supportable benefit; do not promise an outcome absent from approved context
 - Identify the reader's core pain point or desire in 1-2 sentences
 - Create urgency or curiosity that compels scrolling
 - Do NOT include a heading — this is the hero body copy`,
   service: `- Open with the problem this service solves, not what the service is
-- Establish credibility in 1-2 sentences (years of experience, clients served, results)
+- Establish credibility only with proof supplied by approved context; otherwise focus on a clear, supportable process or benefit
 - Preview the key outcomes the reader can expect
 - End with a clear transition to the service details`,
-  location: `- Open with a local reference (neighborhood, city landmark, or regional context)
+  location: `- Use a local reference only when supported by authoritative evidence; otherwise open with the reader's location-specific need
 - Connect the service/product to the specific community
 - Mention the location name naturally within the first 50 words
 - Preview what local readers will find in this page`,
-  product: `- Lead with the #1 benefit the product delivers (not a feature)
+  product: `- Lead with the strongest supportable benefit in approved context (not merely a feature)
 - Address the key buying question or hesitation immediately
-- Create desire through specific outcomes or transformations
+- Create desire through supported benefits; use specific outcomes or transformations only when supplied by approved context
 - End with curiosity about product details below`,
-  pillar: `- Establish this as the definitive resource on the topic
+  pillar: `- Establish this as a useful, comprehensive resource on the topic
 - Communicate the breadth of what this guide covers
-- Signal authority (original data, expert insights, comprehensive coverage)
+- Signal authority through authoritative evidence or through the guide's clear, comprehensive coverage
 - Preview the major subtopics to set expectations`,
   resource: `- State who this resource is for and what they'll be able to do after reading
 - Highlight what makes this guide different from others
@@ -357,25 +358,25 @@ const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
 };
 
 const PAGE_TYPE_SECTION_INSTRUCTIONS: Record<string, string> = {
-  blog: `- Use subheadings (### H3) for sections 300+ words
+  blog: `- Use H3 subheadings only when they improve scanning across distinct subtopics
 - Mix paragraphs with bullet points and lists for scannability
 - Include specific, actionable advice — not generic filler
-- Weave in relevant examples, data points, or expert perspectives`,
+- Weave in relevant examples; use data points or expert perspectives only when supported by authoritative evidence`,
   landing: `- Keep paragraphs short (2-3 sentences max) for scannability
 - Use benefit-driven subheadings if needed
-- Include social proof elements (stats, testimonials, trust signals) where relevant
+- Include social proof elements only when supplied by approved context
 - Every paragraph should support the conversion goal`,
-  service: `- Include specific deliverables, processes, or outcomes
+  service: `- Include specific deliverables, processes, or outcomes only when supplied by approved context; otherwise describe the service without unsupported specifics
 - Use "you/your" language to keep focus on the client's benefits
-- Add trust signals: expertise markers, process transparency, results
+- Add trust signals only from supplied approved evidence; process transparency may be described when the process is supplied
 - Break down complex services into digestible steps`,
-  location: `- Reference local specifics: neighborhoods, landmarks, regulations, community details
+  location: `- Reference neighborhoods, landmarks, or regulations only when supported by authoritative evidence; community and service-area claims require human-approved business context
 - Include location name naturally (2-3 times per section, not forced)
-- Mention service areas, nearby communities, or local partnerships
-- Use local social proof when relevant`,
-  product: `- Lead each section with a benefit, then support with features
-- Use comparison language where appropriate (vs. alternatives)
-- Include specific specs, measurements, or performance data
+- Mention local partnerships only from human-approved business context; mention nearby communities only when supported by authoritative evidence
+- Use local social proof only when supplied by approved context`,
+  product: `- Lead each section with a supportable benefit, then support with supplied features
+- Use comparison language only when authoritative evidence supports the alternatives and comparison
+- Include specs, measurements, or performance data only when supported by authoritative evidence
 - Address common objections or questions proactively`,
   pillar: `- Cover each subtopic comprehensively but not exhaustively
 - Signal where deeper content exists (e.g., "for a deep dive on X, see our guide on...")
@@ -396,18 +397,18 @@ const PAGE_TYPE_CONCLUSION_INSTRUCTIONS: Record<string, string> = {
 - Address the final objection or hesitation
 - Include a strong, specific CTA (not "learn more" — be specific)
 - Create urgency or scarcity if genuine`,
-  service: `- Summarize the key outcomes and differentiators
-- Restate expertise and trust signals
+  service: `- Summarize outcomes and differentiators only when supplied by approved context; otherwise summarize the service's supportable value
+- Restate expertise and trust signals only when supplied by approved context
 - Include a clear next-step CTA (consultation, quote, call)
 - Make the CTA feel low-risk and high-reward`,
-  location: `- Reinforce commitment to the local community
+  location: `- Reinforce local relevance without claiming community commitments that are not supplied by approved context
 - Include location name one final time naturally
 - CTA should reference local action (visit, call, schedule at location)
-- Mention local contact information or next steps`,
+- Mention local contact information only when supplied by approved context; otherwise give a general next step`,
   product: `- Summarize the top 3 benefits (not features)
 - Address the "should I buy?" question directly
-- Include purchase CTA with any relevant offer
-- Add a reassurance (guarantee, support, returns)`,
+- Include a purchase CTA; mention an offer only when supplied by approved context
+- Mention guarantees, support, or returns only when supplied by approved context`,
   pillar: `- Summarize the topic landscape covered
 - Reinforce this page's authority on the subject
 - Link to key cluster content for next steps
@@ -581,6 +582,11 @@ export async function generateSection(
   const pageLabel = pageType === 'blog' ? 'blog post' : pageType === 'landing' ? 'landing page' : pageType === 'pillar' ? 'pillar page' : `${pageType} page`;
   const pageTypeContract = getPageTypeCopyContract(pageType);
   const generationStyleContract = getContentGenerationStyleContract(brief.generationStyle);
+  const sectionStructureGuidance = getSectionStructureGuidance(
+    pageType,
+    sectionTarget,
+    section.subheadings ?? [],
+  );
   const briefContext = buildBriefContextBlock(brief, siteDomain);
   const secondaryKeywordContext = options.outputQualityV2
     ? `SECONDARY KEYWORD TOPICS (optional concepts; synonyms and close variants are allowed—never force exact phrases): ${brief.secondaryKeywords.join(', ')}`
@@ -621,7 +627,7 @@ ${briefContext}
 
 THIS SECTION:
 - Heading: ${section.heading}
-${section.subheadings?.length ? `- Suggested H3 subheadings: ${section.subheadings.join(', ')}` : '- Create 2-3 H3 subheadings to break this section into scannable subtopics'}
+${sectionStructureGuidance}
 - Guidance: ${section.notes}
 - STRICT target word count: ${sectionTarget} words (do NOT exceed ${Math.round(sectionTarget * 1.1)} words)
 ${sectionKeywordContext}
@@ -636,7 +642,6 @@ UNIVERSAL REQUIREMENTS:
 - Write approximately ${sectionTarget} words of content under the heading — this is a STRICT budget, not a minimum
 - Follow the section guidance closely — cover every point mentioned
 - Weave in keywords naturally — never force or stuff them
-- ALWAYS use <h3> subheadings to break sections into scannable subtopics. For sections 200+ words, include at least 2 <h3> subheadings. Use the suggested subheadings from the brief if provided, or create logical ones
 - Use <ul>/<li> for bullet lists, <ol>/<li> for numbered lists, <strong> for bold emphasis
 - Use <p> tags for paragraphs — do NOT use markdown syntax (no ##, no **, no - lists)
 - Maintain continuity with previous sections (don't repeat points already covered)

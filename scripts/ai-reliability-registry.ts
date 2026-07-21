@@ -621,6 +621,28 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     notes: 'Pins target-only context, untrusted evidence, honest missing facts, and separate exact-once system voice authority for C3.',
   },
   {
+    id: 'content-prompt-natural-structure-and-factual-authority',
+    pipelineId: 'content-brief-review',
+    title: 'Content prompts keep section structure natural and factual specifics evidence-bound',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/writing-quality.ts',
+      'server/page-type-copy-contract.ts',
+      'server/content-posts-ai.ts',
+      'server/content-brief.ts',
+    ],
+    assertions: [
+      { allOf: ['FACTUAL SPECIFICS AUTHORITY', 'human-approved business, brand, or evidence context', 'explicitly labeled verified provider, analytics, or source evidence'] },
+      { allOf: ['raw SERP or competitor copy', 'are not factual authority'] },
+      { allOf: ['Credentials, affiliations, patient results, and testimonials require human-approved first-party context', 'Risks, prices, statistics, and citations require authoritative source evidence'] },
+      { noneOf: ['provided in the brief, knowledge base, source pack, or live SERP context'] },
+      { allOf: ['SHORT CONVERSION SECTION', 'Do not add H3 subheadings unless the supplied brief names a distinct subtopic'] },
+      { allOf: ['DEEP EDUCATIONAL SECTION', 'H3 subheadings are optional'] },
+    ],
+    notes: 'Pins the deterministic Q1 cleanup: compact conversion sections remain cohesive, educational hierarchy stays optional, and provenance-sensitive specifics require human-approved facts or explicitly labeled verified evidence.',
+  },
+  {
     id: 'content-matrix-audit-grounding-and-format',
     pipelineId: 'content-brief-review',
     title: 'Matrix page audit keeps structured output, evidence placeholders, and human provenance gates',

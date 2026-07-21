@@ -10244,3 +10244,17 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Contract coverage pins private-versus-safe shapes. Unit coverage exercises approval qualification, stale/cross-workspace rejection, canonical matrix audit sanitization, strict case/rating validation, preference and safety gates, unsafe CLI rejection, and scrubbed report output. The deterministic AI quality registry covers the benchmark without introducing live-model CI scoring.
 
 **Files:** shared benchmark contracts; local evaluator and source qualifiers; AI reliability registry fixture; focused unit/contract tests; benchmark rule, roadmap, and feature audit.
+
+### 721. Natural content structure and approved factual authority 2026-07-20
+
+**Status:** Complete locally. Independent review, full repository gates, CI, and staging verification are required before release. The private blinded benchmark is `not_run` because no qualified local corpus is present; that absence is not evidence for the conditional context-expansion phase.
+
+**What changed:** Content-post section generation no longer converts an intentionally compact outline into a mandatory two-or-three-H3 article structure. Short landing, service, location, and product sections remain cohesive under their H2 unless the supplied brief names a distinct subtopic. Deep blog and other educational sections may use H3s when they improve scanning, but hierarchy is optional rather than quota-driven. Supplied brief subheadings remain authoritative and generation does not add extras merely to divide the word count.
+
+**Factual authority:** One canonical factual-specifics authority contract now reaches fresh briefs, brief regeneration, outline regeneration, and writer prompts. Experience and customer counts, results, testimonials, credentials, affiliations, medical claims, local landmarks and regulations, partnerships, specifications, comparisons, pricing, offers, guarantees, citations, and similar proof may appear only when supported by human-approved business/brand/evidence context or explicitly labeled verified provider, analytics, or source evidence. Raw SERP/competitor copy, brief requests, user feedback, unlabeled claims, and model inference are explicitly non-authoritative. Page-type instructions that previously demanded unsupported details now omit them or identify the evidence need.
+
+**Compatibility and safety:** Existing HTML, H2, keyword, page-type density, word-budget, model, voice, output-format, placeholder, evidence, human-review, approval, send, and publication contracts are unchanged. No database, migration, API, UI, MCP surface, model selection, feature flag, provider call, or paid generation was added.
+
+**Verification:** Focused prompt and brief tests cover blog, landing, service, location, product, provider-profile, procedure-guide, and pricing-page behavior. A hard deterministic AI-quality fixture pins natural section hierarchy and approved factual authority without turning subjective prose judgment into CI scoring.
+
+**Files:** content writing rules; page-type copy contracts; content-post and brief prompt assembly; focused unit and AI-quality contract tests; brand-engine and benchmark rules; roadmap; feature audit.
