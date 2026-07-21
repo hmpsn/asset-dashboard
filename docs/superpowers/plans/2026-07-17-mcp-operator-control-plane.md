@@ -138,6 +138,37 @@ token visibility.
 Add portfolio triage, client-view review, and safely confirmed matrix-generation
 prompts after Claude Desktop and ChatGPT Desktop compatibility smoke.
 
+P7 is dependency-relaxed from parked P3–P6 because it changes no tools, schemas,
+aliases, credentials, telemetry, storage, or authorization. Implement the three
+immutable names from `shared/types/mcp-prompts.ts` through additive
+`prompts/list` and `prompts/get` handlers on `/mcp/operator` only; preserve the
+full `/mcp` initialize capability set unchanged. Add equivalent
+copyable starters to `server/mcp/README.md` for clients without native prompt
+discovery. The generation workflow must invalidate stale confirmation after any
+new preview, require fresh human confirmation immediately before paid start or
+retry, and stop at human review.
+
+P7 execution:
+
+```text
+shared prompt vocabulary + guardrail/spec commit
+  → red unit/integration contract tests
+  → immutable prompt registry/rendering
+  → additive transport handlers
+  → copyable compatibility starters
+  → focused verification
+  → two independent GPT-5.5 reviews
+  → full verification + staging PR/CI/read-only smoke
+```
+
+Exclusive ownership after the contracts commit:
+
+- Test agent: only the two new P7 test files.
+- Prompt implementation agent: `server/mcp/prompts.ts` only.
+- Transport integration remains sequential and orchestrator-owned in
+  `server/mcp/server.ts`.
+- Compatibility documentation and closeout records remain orchestrator-owned.
+
 ## File ownership — P1
 
 Orchestrator owns shared/coordination files:
