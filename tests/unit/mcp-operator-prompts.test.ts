@@ -86,6 +86,17 @@ describe('MCP operator prompt contracts', () => {
       'review_workspace_as_client',
       JSON.parse('{"workspace_id":"ws_safe","__proto__":"secret"}') as unknown,
     )).toThrow('Invalid prompt arguments.');
+
+    const trapped = new Proxy({}, {
+      ownKeys: () => { throw new Error('secret-reflected-from-proxy'); },
+    });
+    expect(() => getMcpOperatorPrompt('triage_studio_portfolio', trapped))
+      .toThrow('Invalid prompt arguments.');
+    try {
+      getMcpOperatorPrompt('triage_studio_portfolio', trapped);
+    } catch (error) {
+      expect((error as Error).message).not.toContain('secret-reflected-from-proxy');
+    }
   });
 
   it('renders deterministic read-only triage and exact client-safe review workflows', () => {

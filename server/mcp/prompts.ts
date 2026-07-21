@@ -80,7 +80,7 @@ function ownDataRecord(value: unknown): Record<string, unknown> {
       record[key] = descriptor.value;
     }
     return record;
-  } catch {
+  } catch { // catch-ok: caller-owned Proxy traps are normalized to the generic MCP input error
     invalidPromptArguments();
   }
 }
