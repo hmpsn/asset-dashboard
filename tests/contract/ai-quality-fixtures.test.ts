@@ -132,7 +132,9 @@ describe('AI quality fixture registry', () => {
       ...(assertion.noneOf ?? []),
     ]) ?? [];
     expect(tokens).toEqual(expect.arrayContaining([
-      'APPROVED FACTUAL SPECIFICS ONLY',
+      'FACTUAL SPECIFICS AUTHORITY',
+      'explicitly labeled verified provider, analytics, or source evidence',
+      'provided in the brief, knowledge base, source pack, or live SERP context',
       'SHORT CONVERSION SECTION',
       'DEEP EDUCATIONAL SECTION',
     ]));

@@ -58,7 +58,7 @@ import {
 import { canonicalGenerationProvenanceSchema } from './schemas/generation-provenance.js';
 import { throwIfSignalAborted } from './abort-helpers.js';
 import type { BoundedProviderDispatch } from './content-posts-ai.js';
-import { APPROVED_FACTUAL_SPECIFICS_CONTRACT } from './writing-quality.js';
+import { FACTUAL_SPECIFICS_AUTHORITY_CONTRACT } from './writing-quality.js';
 
 const log = createLogger('content-brief');
 const BRIEF_GENERATION_CANCELLED_MESSAGE = 'Content brief generation cancelled';
@@ -867,7 +867,7 @@ export function getPageTypeConfig(pageType?: string): PageTypeConfig {
   // All external access to PAGE_TYPE_CONFIGS should go through this function.
   return {
     ...base,
-    prompt: `${base.prompt}\n\n${APPROVED_FACTUAL_SPECIFICS_CONTRACT}\n- When approved context does not support a requested fact, omit unsupported specifics.${healthcareContract}`,
+    prompt: `${base.prompt}\n\n${FACTUAL_SPECIFICS_AUTHORITY_CONTRACT}\n- When authoritative context does not support a requested fact, omit unsupported specifics.${healthcareContract}`,
   };
 }
 
@@ -1151,6 +1151,8 @@ ${outlineGuidance}
 
 ${generationStyleContract}
 
+${FACTUAL_SPECIFICS_AUTHORITY_CONTRACT}
+
 For conversion pages, page type and word budget outrank brand/context expansion. Use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.
 
 Return the complete brief as valid JSON with these fields:
@@ -1338,6 +1340,8 @@ Generate a new outline that ${feedback ? 'addresses the feedback above' : 'takes
 ${outlineGuidance}
 
 ${generationStyleContract}
+
+${FACTUAL_SPECIFICS_AUTHORITY_CONTRACT}
 
 For conversion pages, page type and word budget outrank brand/context expansion. Use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.
 
@@ -1786,7 +1790,7 @@ The outline sections MUST match the following template sections in order. You ma
   const generationStyleContract = getContentGenerationStyleContract(generationStyle);
   const pageTypeBlock = isKnownPageType(context.pageType)
     ? `\n\n${ptConfig.prompt}\n\nCONTENT STYLE: ${ptConfig.contentStyle}\n\n${outlineGuidance}\n\nTailor ALL aspects of the brief (outline structure, word count, CTA, schema, content format) to this page type. The wordCountTarget MUST be approximately ${ptConfig.wordCountTarget} (range: ${ptConfig.wordCountRange} words). Do NOT default to 1800 words unless this is a blog post. For conversion pages, use brand context to choose wording, proof, and positioning; do not add extra sections because more brand context is available.`
-    : `\n\n${APPROVED_FACTUAL_SPECIFICS_CONTRACT}`;
+    : `\n\n${FACTUAL_SPECIFICS_AUTHORITY_CONTRACT}`;
 
   let intelligenceBlock = '';
   if (!contextV2) {

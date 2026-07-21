@@ -442,7 +442,8 @@ describe('getPageTypeConfig coverage', () => {
     'makes factual specifics evidence-conditional in the %s brief contract',
     pageType => {
       const cfg = getPageTypeConfig(pageType);
-      expect(cfg.prompt).toContain('APPROVED FACTUAL SPECIFICS ONLY');
+      expect(cfg.prompt).toContain('FACTUAL SPECIFICS AUTHORITY');
+      expect(cfg.prompt).toContain('explicitly labeled verified provider, analytics, or source evidence');
       expect(cfg.prompt).toContain('omit unsupported specifics');
     },
   );
@@ -451,7 +452,7 @@ describe('getPageTypeConfig coverage', () => {
     'keeps healthcare facts and citations tied to supplied approved evidence in %s',
     pageType => {
       const cfg = getPageTypeConfig(pageType);
-      expect(cfg.prompt).toContain('APPROVED FACTUAL SPECIFICS ONLY');
+      expect(cfg.prompt).toContain('FACTUAL SPECIFICS AUTHORITY');
       expect(cfg.prompt).toContain('Do not invent credentials, affiliations, medical results, risks, prices, statistics, or citations');
     },
   );

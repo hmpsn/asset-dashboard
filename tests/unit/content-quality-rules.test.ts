@@ -446,14 +446,17 @@ describe('page-type-specific prompt variation', () => {
   });
 
   it.each(['blog', 'landing', 'service', 'location', 'product'] as const)(
-    'conditions factual specifics on supplied approved evidence for %s copy',
+    'conditions factual specifics on supplied authoritative evidence for %s copy',
     async pageType => {
       const brief = makeBrief({ pageType });
       await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
       const prompt = lastPrompt();
 
-      expect(prompt).toContain('APPROVED FACTUAL SPECIFICS ONLY');
-      expect(prompt).toContain('If a specific fact is not present in supplied context, omit it rather than inventing or implying it');
+      expect(prompt).toContain('FACTUAL SPECIFICS AUTHORITY');
+      expect(prompt).toContain('human-approved business, brand, or evidence context');
+      expect(prompt).toContain('explicitly labeled verified provider, analytics, or source evidence');
+      expect(prompt).toContain('raw SERP or competitor copy');
+      expect(prompt).not.toContain('provided in the brief, knowledge base, source pack, or live SERP context');
     },
   );
 

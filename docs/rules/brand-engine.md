@@ -99,7 +99,7 @@ Use the smallest ruleset that protects the output contract:
 
 Callers that inject either `CREATIVE_WRITING_RULES` or `WRITING_QUALITY_RULES` into their own task prompt must call `buildSystemPrompt(..., { skipProseRules: true })`. This avoids double-weighting anti-generic-writing instructions and preserves room for brand voice, page-type guidance, and approved samples to shape the final copy.
 
-`APPROVED_FACTUAL_SPECIFICS_CONTRACT` is the canonical creative-copy boundary for provenance-sensitive details. Experience and customer counts, results, testimonials, credentials, affiliations, local landmarks or regulations, partnerships, specifications, measured performance, prices, offers, guarantees, and citations may appear only when supplied approved context supports them. A requested proof or comparison section is not authority to fabricate its contents; omit unsupported specifics or state the evidence need.
+`FACTUAL_SPECIFICS_AUTHORITY_CONTRACT` is the canonical creative-copy boundary for provenance-sensitive details. Experience and customer counts, results, testimonials, credentials, affiliations, local landmarks or regulations, partnerships, specifications, measured performance, prices, offers, guarantees, and citations may appear only when supported by human-approved business/brand/evidence context or explicitly labeled verified provider, analytics, or source evidence with source identity and freshness metadata where relevant. A brief request, user feedback, raw SERP or competitor copy, unlabeled claim, and model inference are not authority to fabricate specifics; omit them or state the evidence need.
 
 ## Page-Type and Brand Context Priority
 
