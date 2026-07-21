@@ -40,8 +40,10 @@ The three prompts are:
 
 The generation workflow must stop on blockers, show the current selected cells,
 fingerprints, accepted limits, and maximum estimate, then wait for a fresh human
-confirmation before paid start or retry. Any new preview invalidates prior
-confirmation. It stops at human review and never approves, sends, or publishes.
+confirmation before paid start. Same-authority retry requires a separate
+exact-item/available-budget confirmation and stops when no bounded retry estimate
+exists; changed authority returns to preview/start instead of retry. It stops at
+human review and never approves, sends, or publishes.
 
 ## 4. Query Cache + Real-Time Contract
 

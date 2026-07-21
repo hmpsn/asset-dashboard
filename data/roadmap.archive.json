@@ -90,7 +90,7 @@
           "status": "done",
           "createdAt": "2026-07-17",
           "owner": "platform-foundation",
-          "notes": "Completed locally 2026-07-21. /mcp/operator now exposes immutable portfolio-triage, exact client-view, and safely confirmed matrix-generation prompts plus copyable desktop fallbacks. Prompt retrieval is side-effect free; generation stops on blockers, requires fresh preview-specific confirmation before paid start/retry, never invents a missing retry estimate, and stops at human review. Full /mcp remains unchanged. Two independent reviews approved exact head; staging read-only prompts/list/get smoke remains required after merge. Resources remain deferred."
+          "notes": "Completed locally 2026-07-21. /mcp/operator now exposes immutable portfolio-triage, exact client-view, and safely confirmed matrix-generation prompts plus copyable desktop fallbacks. Prompt retrieval is side-effect free; generation stops on blockers, requires fresh preview-specific confirmation before paid start and separate exact-item/available-budget confirmation before same-authority retry, never invents a missing retry estimate, and stops at human review. Changed authority returns to preview/start instead of retry. Full /mcp remains unchanged. Two independent reviews approved exact head; staging read-only prompts/list/get smoke remains required after merge. Resources remain deferred."
         }
       ],
       "shippedAt": "2026-07-21"

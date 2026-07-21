@@ -72,9 +72,11 @@ user-selected starters through `prompts/list` and `prompts/get`:
 
 Fetching a prompt only returns deterministic instructions. It performs no database read, tool
 call, mutation, job, provider request, or paid operation. The matrix workflow stops on blockers,
-shows the exact current fingerprints, limits, and maximum estimate, and requires fresh human
-confirmation immediately before paid start or retry. Any changed preview invalidates earlier
-confirmation; the workflow stops at human review and never approves, sends, or publishes.
+shows the exact current fingerprints, limits, and maximum estimate, and requires fresh
+preview-specific confirmation immediately before paid start. Same-authority retry requires a
+separate exact-item/available-budget confirmation and stops when no bounded retry estimate exists;
+changed authority returns to preview/start instead of retry. The workflow stops at human review
+and never approves, sends, or publishes.
 
 The full `/mcp` profile remains unchanged and does not advertise these operator prompts. Desktop
 clients without native MCP prompt discovery can use the equivalent copyable starters in

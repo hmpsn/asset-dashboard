@@ -145,8 +145,10 @@ immutable names from `shared/types/mcp-prompts.ts` through additive
 full `/mcp` initialize capability set unchanged. Add equivalent
 copyable starters to `server/mcp/README.md` for clients without native prompt
 discovery. The generation workflow must invalidate stale confirmation after any
-new preview, require fresh human confirmation immediately before paid start or
-retry, and stop at human review.
+new preview, require fresh preview-specific confirmation immediately before paid
+start, require separate exact-item/available-budget confirmation before a
+same-authority retry, and stop at human review. Changed authority returns to
+preview/start instead of retry.
 
 P7 execution:
 

@@ -117,8 +117,10 @@ does not authorize any other phase reordering.
   projection and never substitutes admin intelligence.
 - `run_content_matrix_generation_safely` stops on blockers, presents the exact
   current targets, fingerprints, accepted limits, and maximum estimate, and
-  requires a fresh explicit human confirmation before paid start or retry. A new
-  preview invalidates the prior confirmation. The workflow stops at human review
+  requires fresh preview-specific human confirmation before paid start.
+  Same-authority retry requires a separate exact-item/available-budget
+  confirmation and stops when no bounded retry estimate exists; changed authority
+  returns to preview/start instead of retry. The workflow stops at human review
   and never approves, sends, or publishes.
 - Clients without native prompt discovery receive equivalent copyable starters;
   this fallback adds no server capability and does not weaken the workflow.
