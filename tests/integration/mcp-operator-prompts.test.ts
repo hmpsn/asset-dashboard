@@ -98,6 +98,7 @@ describe('MCP operator prompt HTTP boundary', () => {
       params: { name: 'secret_unknown_name', arguments: {} },
     });
     expect(unknown.result).toBeUndefined();
+    expect(unknown.error?.code).toBe(-32602);
     expect(unknown.error?.message).toContain('Unknown prompt.');
     expect(unknown.error?.message).not.toContain('secret_unknown_name');
 
@@ -109,9 +110,9 @@ describe('MCP operator prompt HTTP boundary', () => {
       },
     });
     expect(invalid.result).toBeUndefined();
+    expect(invalid.error?.code).toBe(-32602);
     expect(invalid.error?.message).toContain('Invalid prompt arguments.');
     expect(invalid.error?.message).not.toContain('secret-invalid-value');
     expect(invalid.error?.message).not.toContain('secret-extra');
   });
 });
-

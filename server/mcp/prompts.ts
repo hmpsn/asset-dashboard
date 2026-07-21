@@ -1,4 +1,9 @@
-import type { GetPromptResult, Prompt } from '@modelcontextprotocol/sdk/types';
+import {
+  ErrorCode,
+  McpError,
+  type GetPromptResult,
+  type Prompt,
+} from '@modelcontextprotocol/sdk/types';
 import {
   MCP_OPERATOR_PROMPT_NAMES,
   type McpOperatorPromptName,
@@ -51,21 +56,44 @@ const PROMPTS = deepFreeze<Prompt[]>([
   },
 ]);
 
-function isPlainOwnRecord(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
+function invalidPromptArguments(): never {
+  throw new McpError(ErrorCode.InvalidParams, 'Invalid prompt arguments.');
+}
+
+function ownDataRecord(value: unknown): Record<string, unknown> {
+  try {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      invalidPromptArguments();
+    }
+    const prototype = Reflect.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      invalidPromptArguments();
+    }
+
+    const record: Record<string, unknown> = {};
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== 'string') invalidPromptArguments();
+      const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable || !('value' in descriptor)) {
+        invalidPromptArguments();
+      }
+      record[key] = descriptor.value;
+    }
+    return record;
+  } catch {
+    invalidPromptArguments();
+  }
 }
 
 function parseArguments(
   name: McpOperatorPromptName,
   value: unknown,
 ): Record<string, string> {
-  if (!isPlainOwnRecord(value)) throw new Error('Invalid prompt arguments.');
-  const keys = Object.keys(value).sort();
+  const record = ownDataRecord(value);
+  const keys = Object.keys(record).sort();
 
   if (name === 'triage_studio_portfolio') {
-    if (keys.length !== 0) throw new Error('Invalid prompt arguments.');
+    if (keys.length !== 0) invalidPromptArguments();
     return {};
   }
 
@@ -76,19 +104,19 @@ function parseArguments(
     keys.length !== expectedKeys.length
     || keys.some((key, index) => key !== expectedKeys[index])
   ) {
-    throw new Error('Invalid prompt arguments.');
+    invalidPromptArguments();
   }
 
-  const workspaceId = value.workspace_id;
+  const workspaceId = record.workspace_id;
   if (typeof workspaceId !== 'string' || !WORKSPACE_ID_PATTERN.test(workspaceId)) {
-    throw new Error('Invalid prompt arguments.');
+    invalidPromptArguments();
   }
 
   if (name === 'review_workspace_as_client') return { workspace_id: workspaceId };
 
-  const matrixId = value.matrix_id;
+  const matrixId = record.matrix_id;
   if (typeof matrixId !== 'string' || !MATRIX_ID_PATTERN.test(matrixId)) {
-    throw new Error('Invalid prompt arguments.');
+    invalidPromptArguments();
   }
   return { workspace_id: workspaceId, matrix_id: matrixId };
 }
@@ -112,7 +140,9 @@ export function getMcpOperatorPrompt(
   name: string,
   args: unknown,
 ): GetPromptResult {
-  if (!isOperatorPromptName(name)) throw new Error('Unknown prompt.');
+  if (!isOperatorPromptName(name)) {
+    throw new McpError(ErrorCode.InvalidParams, 'Unknown prompt.');
+  }
   const parsed = parseArguments(name, args);
 
   if (name === 'triage_studio_portfolio') {
@@ -148,9 +178,8 @@ export function getMcpOperatorPrompt(
 4. Present the exact selected cell IDs, each current fingerprint, the accepted limits, and the maximum estimated cost. Ask for fresh explicit human confirmation of that exact preview immediately before any paid start.
 5. Any new preview, cell or template revision, authority drift, changed fingerprint, changed limits, or changed estimate invalidates any prior confirmation. Re-display the new preview and ask again.
 6. Only after the fresh confirmation, call start_content_matrix_generation once with the exact preview authority and a caller-stable idempotency key. Poll get_job_status, then read durable outcomes with get_content_matrix_generation.
-7. Never retry automatically. retry_content_matrix_generation requires a new read, a new preview when authority changed, a displayed incremental estimate/limits, and a separate fresh explicit human confirmation.
+7. Never retry automatically. Before considering retry_content_matrix_generation, re-read the exact run, failed items, revisions, and checkpoints with get_content_matrix_generation. Show only budget fields the durable run actually returns. If it returns no bounded retry estimate, stop and state that retry cost cannot be estimated; never invent an estimate. If authority changed, do not retry: return to resolution and preview, then request confirmation for a fresh start. A same-authority retry still requires separate fresh explicit human confirmation of the exact selected failed items and available budget fields.
 8. Stop at human review. Never approve, send, or publish generated work. Report failed or needs-attention cells truthfully and wait for direction.`,
     'Resolve and preview a matrix, then require fresh confirmation before paid work.',
   );
 }
-

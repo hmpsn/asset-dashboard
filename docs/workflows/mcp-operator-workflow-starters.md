@@ -46,8 +46,10 @@ estimate invalidates prior confirmation and requires a new one.
 
 After fresh confirmation, start once with the exact preview and a stable
 idempotency key. Poll the job and read durable outcomes. Never retry
-automatically; retry needs a new read, a displayed incremental estimate and
-limits, and separate fresh confirmation. Stop at human review. Never approve,
-send, or publish.
+automatically. Before retry, re-read the exact run, failed items, revisions, and
+checkpoints. Show only budget fields the run actually returns; if it provides no
+bounded retry estimate, stop and say the cost cannot be estimated. Never invent
+one. If authority changed, return to resolution and preview for a fresh start
+instead of retrying. A same-authority retry still needs separate fresh
+confirmation. Stop at human review. Never approve, send, or publish.
 ```
-

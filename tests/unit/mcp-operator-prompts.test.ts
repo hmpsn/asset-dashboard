@@ -55,6 +55,28 @@ describe('MCP operator prompt contracts', () => {
     const inherited = Object.create({ workspace_id: 'ws_inherited' }) as Record<string, unknown>;
     expect(() => getMcpOperatorPrompt('review_workspace_as_client', inherited))
       .toThrow('Invalid prompt arguments.');
+
+    const hiddenExtra = {};
+    Object.defineProperty(hiddenExtra, 'extra', { value: 'secret', enumerable: false });
+    expect(() => getMcpOperatorPrompt('triage_studio_portfolio', hiddenExtra))
+      .toThrow('Invalid prompt arguments.');
+
+    const accessor = {};
+    Object.defineProperty(accessor, 'workspace_id', {
+      enumerable: true,
+      get: () => { throw new Error('secret-reflected-from-getter'); },
+    });
+    expect(() => getMcpOperatorPrompt('review_workspace_as_client', accessor))
+      .toThrow('Invalid prompt arguments.');
+    try {
+      getMcpOperatorPrompt('review_workspace_as_client', accessor);
+    } catch (error) {
+      expect((error as Error).message).not.toContain('secret-reflected-from-getter');
+    }
+
+    expect(() => getMcpOperatorPrompt('triage_studio_portfolio', {
+      [Symbol('secret')]: 'value',
+    })).toThrow('Invalid prompt arguments.');
   });
 
   it('renders deterministic read-only triage and exact client-safe review workflows', () => {
@@ -100,6 +122,9 @@ describe('MCP operator prompt contracts', () => {
     expect(text).toContain('fresh explicit human confirmation');
     expect(text).toContain('invalidates any prior confirmation');
     expect(text).toContain('Never retry automatically');
+    expect(text).toContain('retry cost cannot be estimated');
+    expect(text).toContain('never invent an estimate');
+    expect(text).toContain('If authority changed, do not retry');
     expect(text).toContain('Stop at human review');
     expect(text).toContain('Never approve, send, or publish');
   });
@@ -121,6 +146,9 @@ describe('MCP operator prompt contracts', () => {
       'fresh explicit human confirmation',
       'invalidates prior confirmation',
       'Never retry automatically',
+      'if it provides no bounded retry estimate, stop',
+      'Never invent one',
+      'If authority changed',
       'Stop at human review',
       'Never approve, send, or publish',
     ]) expect(normalized).toContain(safetyClause);
