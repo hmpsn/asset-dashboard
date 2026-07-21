@@ -134,6 +134,7 @@ describe('AI quality fixture registry', () => {
     expect(tokens).toEqual(expect.arrayContaining([
       'FACTUAL SPECIFICS AUTHORITY',
       'explicitly labeled verified provider, analytics, or source evidence',
+      'Risks, prices, statistics, and citations require authoritative source evidence',
       'provided in the brief, knowledge base, source pack, or live SERP context',
       'SHORT CONVERSION SECTION',
       'DEEP EDUCATIONAL SECTION',

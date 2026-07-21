@@ -456,6 +456,18 @@ describe('getPageTypeConfig coverage', () => {
       expect(cfg.prompt).toContain('Do not invent credentials, affiliations, medical results, risks, prices, statistics, or citations');
     },
   );
+
+  it('allows verified source evidence for medical and pricing facts while keeping first-party proof human-approved', () => {
+    const provider = getPageTypeConfig('provider-profile').prompt;
+    const procedure = getPageTypeConfig('procedure-guide').prompt;
+    const pricing = getPageTypeConfig('pricing-page').prompt;
+
+    expect(provider).toContain('Credentials, affiliations, patient results, and testimonials require human-approved first-party context');
+    expect(procedure).toContain('Risks, prices, statistics, and citations require authoritative source evidence');
+    expect(procedure).toContain('comparison table only when authoritative evidence supports');
+    expect(pricing).toContain('authoritative price data');
+    expect(pricing).toContain('comparison table only when authoritative evidence supports');
+  });
 });
 
 // ── outline compression contracts ──

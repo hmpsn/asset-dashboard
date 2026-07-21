@@ -469,7 +469,7 @@ describe('page-type-specific prompt variation', () => {
     await generateIntroduction(makeBrief({ pageType: 'location' }), '', 'ws_test');
     const locationPrompt = lastPrompt();
     expect(locationPrompt).not.toContain('Open with a local reference (neighborhood, city landmark, or regional context)');
-    expect(locationPrompt).toContain('Use a local reference only when supplied by approved context');
+    expect(locationPrompt).toContain('Use a local reference only when supported by authoritative evidence');
   });
 
   it('does not request an unsupported product guarantee in the conclusion', async () => {
@@ -477,6 +477,15 @@ describe('page-type-specific prompt variation', () => {
     const prompt = lastPrompt();
     expect(prompt).not.toContain('Add a reassurance (guarantee, support, returns)');
     expect(prompt).toContain('Mention guarantees, support, or returns only when supplied by approved context');
+  });
+
+  it('allows verified source evidence for product specifications and comparisons', async () => {
+    const brief = makeBrief({ pageType: 'product' });
+    await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
+    const prompt = lastPrompt();
+
+    expect(prompt).toContain('comparison language only when authoritative evidence supports');
+    expect(prompt).toContain('specs, measurements, or performance data only when supported by authoritative evidence');
   });
 });
 

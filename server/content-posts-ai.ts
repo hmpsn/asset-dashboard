@@ -339,7 +339,7 @@ const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
 - Establish credibility only with proof supplied by approved context; otherwise focus on a clear, supportable process or benefit
 - Preview the key outcomes the reader can expect
 - End with a clear transition to the service details`,
-  location: `- Use a local reference only when supplied by approved context; otherwise open with the reader's location-specific need
+  location: `- Use a local reference only when supported by authoritative evidence; otherwise open with the reader's location-specific need
 - Connect the service/product to the specific community
 - Mention the location name naturally within the first 50 words
 - Preview what local readers will find in this page`,
@@ -349,7 +349,7 @@ const PAGE_TYPE_INTRO_INSTRUCTIONS: Record<string, string> = {
 - End with curiosity about product details below`,
   pillar: `- Establish this as a useful, comprehensive resource on the topic
 - Communicate the breadth of what this guide covers
-- Signal authority through supplied approved evidence or through the guide's clear, comprehensive coverage
+- Signal authority through authoritative evidence or through the guide's clear, comprehensive coverage
 - Preview the major subtopics to set expectations`,
   resource: `- State who this resource is for and what they'll be able to do after reading
 - Highlight what makes this guide different from others
@@ -361,7 +361,7 @@ const PAGE_TYPE_SECTION_INSTRUCTIONS: Record<string, string> = {
   blog: `- Use H3 subheadings only when they improve scanning across distinct subtopics
 - Mix paragraphs with bullet points and lists for scannability
 - Include specific, actionable advice — not generic filler
-- Weave in relevant examples; use data points or expert perspectives only when supplied by approved context`,
+- Weave in relevant examples; use data points or expert perspectives only when supported by authoritative evidence`,
   landing: `- Keep paragraphs short (2-3 sentences max) for scannability
 - Use benefit-driven subheadings if needed
 - Include social proof elements only when supplied by approved context
@@ -370,13 +370,13 @@ const PAGE_TYPE_SECTION_INSTRUCTIONS: Record<string, string> = {
 - Use "you/your" language to keep focus on the client's benefits
 - Add trust signals only from supplied approved evidence; process transparency may be described when the process is supplied
 - Break down complex services into digestible steps`,
-  location: `- Reference neighborhoods, landmarks, regulations, or community details only when supplied by approved context
+  location: `- Reference neighborhoods, landmarks, or regulations only when supported by authoritative evidence; community and service-area claims require human-approved business context
 - Include location name naturally (2-3 times per section, not forced)
-- Mention service areas, nearby communities, or local partnerships only when supplied by approved context
+- Mention local partnerships only from human-approved business context; mention nearby communities only when supported by authoritative evidence
 - Use local social proof only when supplied by approved context`,
   product: `- Lead each section with a supportable benefit, then support with supplied features
-- Use comparison language only when supplied approved context supports the alternatives and comparison
-- Include specs, measurements, or performance data only when supplied by approved context
+- Use comparison language only when authoritative evidence supports the alternatives and comparison
+- Include specs, measurements, or performance data only when supported by authoritative evidence
 - Address common objections or questions proactively`,
   pillar: `- Cover each subtopic comprehensively but not exhaustively
 - Signal where deeper content exists (e.g., "for a deep dive on X, see our guide on...")

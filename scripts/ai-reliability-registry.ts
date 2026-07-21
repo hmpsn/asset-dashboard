@@ -635,6 +635,7 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     assertions: [
       { allOf: ['FACTUAL SPECIFICS AUTHORITY', 'human-approved business, brand, or evidence context', 'explicitly labeled verified provider, analytics, or source evidence'] },
       { allOf: ['raw SERP or competitor copy', 'are not factual authority'] },
+      { allOf: ['Credentials, affiliations, patient results, and testimonials require human-approved first-party context', 'Risks, prices, statistics, and citations require authoritative source evidence'] },
       { noneOf: ['provided in the brief, knowledge base, source pack, or live SERP context'] },
       { allOf: ['SHORT CONVERSION SECTION', 'Do not add H3 subheadings unless the supplied brief names a distinct subtopic'] },
       { allOf: ['DEEP EDUCATIONAL SECTION', 'H3 subheadings are optional'] },

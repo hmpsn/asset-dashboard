@@ -644,7 +644,7 @@ export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
 - Include deliverables and outcomes only when supplied by approved context; otherwise keep the outline at a supportable level
 - Use brand proof and differentiators selectively; do not add extra sections because more brand context is available
 - Avoid duplicate booking/discovery sections or multiple closing arguments
-- E-E-A-T emphasis: use expertise and authority signals only when supplied by approved context
+- E-E-A-T emphasis: use expertise and authority signals only when supported by authoritative evidence
 - Schema: Service, FAQPage`,
   },
 
@@ -668,12 +668,12 @@ export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
     wordCountRange: '600-1,000',
     sectionRange: '4-6',
     avgSectionWords: 130,
-    contentStyle: 'Concise and benefit-first. Use bullet points for scanning. Use comparison tables and social proof only when supplied approved context supports them. Answer buyer objections directly. Every word should help the purchase decision.',
+    contentStyle: 'Concise and benefit-first. Use bullet points for scanning. Use comparison tables only when authoritative evidence supports them; use social proof only from human-approved business context. Answer buyer objections directly. Every word should help the purchase decision.',
     prompt: `PAGE TYPE: Product Page
 - Format as a product description page (600-1,000 words)
 - Lead with the key benefit, not features
 - Structure: Product Overview → Benefits → Supported Features or Specifications → Use Cases → Supported Comparison or Proof → Purchase CTA
-- Include specifications, comparisons, reviews, pricing, and availability only when supplied by approved context
+- Include specifications, comparisons, pricing, or availability only when supported by authoritative evidence; include reviews only from human-approved business context
 - Schema: Product with Review, FAQPage`,
   },
 
@@ -720,7 +720,7 @@ export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
 - Structure: Provider Summary → Supported Credentials & Education → Specialties → Procedures Offered → Practice Locations → Supported Reviews or Affiliations → Disclosures
 - Include structured data hooks only for supplied facts such as credentials, medicalSpecialty, or hospitalAffiliation
 - Use neutral, encyclopedic tone — write as a reference, not an ad
-- Include citations to licensing boards, medical associations, or published research only when those sources are supplied by approved context
+- Include citations to licensing boards, medical associations, or published research only when supported by authoritative source evidence
 - Schema: Physician, MedicalBusiness, FAQPage`,
   },
 
@@ -729,14 +729,14 @@ export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
     wordCountRange: '1,500-2,500',
     sectionRange: '7-10',
     avgSectionWords: 250,
-    contentStyle: 'Evidence-aware, comprehensive, and patient-friendly. Balance medical accuracy with accessibility. Cite medical claims only from supplied approved sources; omit unsupported specifics. Use definition blocks for medical terms. Neutral and informative — not salesy.',
+    contentStyle: 'Evidence-aware, comprehensive, and patient-friendly. Balance medical accuracy with accessibility. Cite medical claims only from authoritative source evidence; omit unsupported specifics. Use definition blocks for medical terms. Neutral and informative — not salesy.',
     prompt: `PAGE TYPE: Procedure Guide (AEO-optimized)
 - Format as a comprehensive medical/dental procedure guide (1,500-2,500 words)
 - ANSWER-FIRST: Open with a 2-3 sentence direct answer to "What is [procedure]?" — this becomes the AI-cited snippet
 - Structure: What It Is (definition block) → Who It's For (indications) → Who Should Avoid It (contraindications) → How It Works (step-by-step) → Supported Cost Information → Supported Risks & Side Effects → Alternatives → Recovery & Aftercare → FAQ
-- Use only citations supplied by approved context. Do not create a citation-density target when the approved source pack cannot support it
+- Use only citations supported by authoritative source evidence. Do not create a citation-density target when the authoritative source pack cannot support it
 - Include DEFINITION BLOCKS for key medical terms: Term → 1-2 sentence definition → Common misconceptions → Related terms
-- Include a comparison table only when supplied approved evidence supports its measurable fields, units, footnotes, and data date
+- Include a comparison table only when authoritative evidence supports its measurable fields, units, footnotes, and data date
 - FAQ section must use real patient questions with 30-80 word answers
 - Schema: MedicalProcedure, FAQPage, HowTo, Article`,
   },
@@ -746,14 +746,14 @@ export const PAGE_TYPE_CONFIGS: Record<string, PageTypeConfig> = {
     wordCountRange: '1,000-2,000',
     sectionRange: '5-8',
     avgSectionWords: 220,
-    contentStyle: 'Transparent, neutral, and citeable when approved price evidence is supplied. Use specific numbers, sources, comparison tables, and methodology only when supplied approved context supports them. Otherwise explain verified cost factors without inventing ranges or research details.',
+    contentStyle: 'Transparent, neutral, and citeable when authoritative price evidence is supplied. Use specific numbers, sources, comparison tables, and methodology only when authoritative evidence supports them. Otherwise explain verified cost factors without inventing ranges or research details.',
     prompt: `PAGE TYPE: Pricing / Cost Guide (AEO-optimized)
 - Format as a comprehensive pricing/cost guide (1,000-2,000 words)
-- ANSWER-FIRST: Open with a direct cost range only when supplied approved evidence supports the location, range, and factors; otherwise state which verified factors determine cost
+- ANSWER-FIRST: Open with a direct cost range only when authoritative evidence supports the location, range, and factors; otherwise state which verified factors determine cost
 - Structure: Cost Summary (direct answer) → Cost Breakdown Table → Factors That Affect Price → Insurance & Financing → How to Compare Providers → Methodology → FAQ
-- Include a comparison table only when supplied approved evidence supports the options, cost ranges, inclusions, units, footnotes, and data date
-- Include a methodology section only for supplied approved price data; never invent collection methods, sample sizes, date ranges, or limitations
-- Use only citations supplied by approved context. Do not create a citation-density target when the approved source pack cannot support it
+- Include a comparison table only when authoritative evidence supports the options, cost ranges, inclusions, units, footnotes, and data date
+- Include a methodology section only for authoritative price data; never invent collection methods, sample sizes, date ranges, or limitations
+- Use only citations supported by authoritative source evidence. Do not create a citation-density target when the authoritative source pack cannot support it
 - Avoid vague adjectives — use measurable fields: "$2,500-$5,000" not "affordable", "3-6 months" not "quick recovery"
 - Schema: Article, Dataset, FAQPage`,
   },
@@ -850,7 +850,7 @@ export function buildStrategyCardBlock(ctx: StrategyCardContext | undefined): st
 
 const HEALTHCARE_FACTUAL_SPECIFICS_CONTRACT = `HEALTHCARE FACTUAL AUTHORITY:
 - Do not invent credentials, affiliations, medical results, risks, prices, statistics, or citations.
-- Include those details only when supplied by approved context; otherwise omit unsupported specifics.`;
+- Credentials, affiliations, patient results, and testimonials require human-approved first-party context. Risks, prices, statistics, and citations require authoritative source evidence. Otherwise omit unsupported specifics.`;
 
 function isKnownPageType(pageType?: string): boolean {
   return Boolean(pageType && Object.hasOwn(PAGE_TYPE_CONFIGS, pageType));
@@ -1886,14 +1886,14 @@ ${v2MissingSerp ? '' : `  "serpAnalysis": {
   "internalLinkSuggestions": ["/services/strategy", "/our-work/case-study", "/insights/blog-post"],
   "eeatGuidance": {
     "experience": "Approved first-hand experience signals to include, or a note that verified experience evidence is needed",
-    "expertise": "How to demonstrate subject-matter expertise using supplied approved context and sources",
+    "expertise": "How to demonstrate subject-matter expertise using authoritative context and sources",
     "authority": "Approved authority signals to use; do not request credentials or recognition absent from supplied context",
     "trust": "Supported trust signals to include, or verification steps for missing methodology, dates, author details, or sources"
   },
   "contentChecklist": [
     "Actionable item the writer should verify before publishing (8-10 items)",
-    "e.g., Verify each included data point against a supplied approved source",
-    "e.g., Add a comparison table only when supplied approved evidence supports every material field",
+    "e.g., Verify each included data point against authoritative source evidence",
+    "e.g., Add a comparison table only when authoritative evidence supports every material field",
     "e.g., Include an FAQ section using the People Also Ask questions",
     "e.g., Add alt text to all images using secondary keywords"
   ],
@@ -1921,15 +1921,15 @@ Requirements:
 - SECTION COUNT: For blog posts targeting 1,500-2,500 words, prefer 5-7 substantive sections over 8+ thin ones. Each section should have enough word budget (200-400 words) to go deep on one topic
 - LOCATION RULE: If the target keyword references a specific city/region, ALL content in this brief (title, meta description, outline, headings) must target THAT location. Do NOT substitute the business headquarters or a different city from the general business context. The target keyword is the authoritative location signal.
 - Internal link suggestions: pick 3-5 pages from the "Existing pages on the site" list that are topically related to this content. Use the EXACT paths from that list. Prefer service pages, case studies, and related blog posts over generic pages like /about or /contact
-- E-E-A-T guidance must be specific and actionable for this particular topic, use only supplied approved facts, and identify missing evidence instead of inventing signals
+- E-E-A-T guidance must be specific and actionable for this particular topic, use only authoritative facts, and identify missing evidence instead of inventing signals
 - Content checklist: 8-10 concrete, verifiable items tailored to this brief (not generic SEO advice)
 - Schema recommendations: 1-3 relevant schema types with specific implementation guidance
 
 AEO (ANSWER ENGINE OPTIMIZATION) RULES — make content citeable by AI systems:
 - ANSWER-FIRST LAYOUT: The first outline section MUST be a direct-answer summary (2-3 sentences answering the core question, then key bullets). This is what LLMs extract as the cited snippet. Do NOT open with generic intros like "Welcome to…" or "In this guide…"
-- CITATION TARGETS: Recommend citations only from supplied approved sources. Do not invent sources or mandate a density the source pack cannot support; instead identify where additional research is required
+- CITATION TARGETS: Recommend citations only from authoritative source evidence. Do not invent sources or mandate a density the source pack cannot support; instead identify where additional research is required
 - DEFINITION BLOCKS: For educational page types, recommend definition blocks for technical or specialized terms. For conversion pages, define terms briefly only when needed for buyer clarity
-- COMPARISON TABLES: Recommend a comparison table only when supplied approved evidence supports its measurable fields, units, row-level sources, and data date. Otherwise omit the table or mark the evidence need; never manufacture numbers
+- COMPARISON TABLES: Recommend a comparison table only when authoritative evidence supports its measurable fields, units, row-level sources, and data date. Otherwise omit the table or mark the evidence need; never manufacture numbers
 - FAQ QUALITY: FAQ answers should be 30-80 words each. Each answer should link to a deeper section. Write real questions patients/customers ask, not keyword-stuffed variations
 - AUTHOR & DATE: Recommend an author byline, credentials only when supplied by approved context, and a visible last-updated date based on the real publication workflow
 
