@@ -240,6 +240,50 @@ describe('CREATIVE_WRITING_RULES injection — generateSection', () => {
     const prompt = lastPrompt();
     expect(prompt).not.toContain('PREVIOUS SECTIONS WRITTEN');
   });
+
+  it.each(['landing', 'service', 'location', 'product'] as const)(
+    'does not force article-style H3s into a short %s conversion section',
+    async pageType => {
+      const brief = makeBrief({
+        pageType,
+        wordCountTarget: 900,
+        outline: [{
+          heading: 'A focused buyer answer',
+          notes: 'Answer one buyer concern directly.',
+          wordCount: 160,
+          subheadings: [],
+          keywords: [],
+        }],
+      });
+      await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
+      const prompt = lastPrompt();
+
+      expect(prompt).toContain('SHORT CONVERSION SECTION');
+      expect(prompt).toContain('Do not add H3 subheadings unless the supplied brief names a distinct subtopic');
+      expect(prompt).not.toContain('Create 2-3 H3 subheadings');
+      expect(prompt).not.toContain('ALWAYS use <h3>');
+      expect(prompt).not.toContain('include at least 2 <h3>');
+    },
+  );
+
+  it('keeps H3s optional for a deep blog section unless they improve scanning', async () => {
+    const brief = makeBrief({
+      pageType: 'blog',
+      outline: [{
+        heading: 'A deep educational answer',
+        notes: 'Teach one concept with enough depth to be useful.',
+        wordCount: 350,
+        subheadings: [],
+        keywords: [],
+      }],
+    });
+    await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
+    const prompt = lastPrompt();
+
+    expect(prompt).toContain('DEEP EDUCATIONAL SECTION');
+    expect(prompt).toContain('H3 subheadings are optional');
+    expect(prompt).not.toContain('ALWAYS use <h3>');
+  });
 });
 
 describe('CREATIVE_WRITING_RULES injection — generateConclusion', () => {
@@ -399,6 +443,37 @@ describe('page-type-specific prompt variation', () => {
     expect(sectionPrompts.length).toBeGreaterThan(0);
     const unique = new Set(sectionPrompts);
     expect(unique.size).toBe(sectionPrompts.length);
+  });
+
+  it.each(['blog', 'landing', 'service', 'location', 'product'] as const)(
+    'conditions factual specifics on supplied approved evidence for %s copy',
+    async pageType => {
+      const brief = makeBrief({ pageType });
+      await generateSection(brief, brief.outline[0], 0, [], '', 'ws_test');
+      const prompt = lastPrompt();
+
+      expect(prompt).toContain('APPROVED FACTUAL SPECIFICS ONLY');
+      expect(prompt).toContain('If a specific fact is not present in supplied context, omit it rather than inventing or implying it');
+    },
+  );
+
+  it('removes unconditional proof and local-detail requests from service and location openings', async () => {
+    await generateIntroduction(makeBrief({ pageType: 'service' }), '', 'ws_test');
+    const servicePrompt = lastPrompt();
+    expect(servicePrompt).not.toContain('years of experience, clients served, results');
+
+    capturedMessages.length = 0;
+    await generateIntroduction(makeBrief({ pageType: 'location' }), '', 'ws_test');
+    const locationPrompt = lastPrompt();
+    expect(locationPrompt).not.toContain('Open with a local reference (neighborhood, city landmark, or regional context)');
+    expect(locationPrompt).toContain('Use a local reference only when supplied by approved context');
+  });
+
+  it('does not request an unsupported product guarantee in the conclusion', async () => {
+    await generateConclusion(makeBrief({ pageType: 'product' }), '', 'ws_test');
+    const prompt = lastPrompt();
+    expect(prompt).not.toContain('Add a reassurance (guarantee, support, returns)');
+    expect(prompt).toContain('Mention guarantees, support, or returns only when supplied by approved context');
   });
 });
 

@@ -437,6 +437,24 @@ describe('getPageTypeConfig coverage', () => {
     expect(cfg.prompt).not.toContain('Google Business Profile');
     expect(cfg.prompt).toContain('public-facing copy');
   });
+
+  it.each(['blog', 'service', 'location', 'landing', 'product'])(
+    'makes factual specifics evidence-conditional in the %s brief contract',
+    pageType => {
+      const cfg = getPageTypeConfig(pageType);
+      expect(cfg.prompt).toContain('APPROVED FACTUAL SPECIFICS ONLY');
+      expect(cfg.prompt).toContain('omit unsupported specifics');
+    },
+  );
+
+  it.each(['provider-profile', 'procedure-guide'])(
+    'keeps healthcare facts and citations tied to supplied approved evidence in %s',
+    pageType => {
+      const cfg = getPageTypeConfig(pageType);
+      expect(cfg.prompt).toContain('APPROVED FACTUAL SPECIFICS ONLY');
+      expect(cfg.prompt).toContain('Do not invent credentials, affiliations, medical results, risks, prices, statistics, or citations');
+    },
+  );
 });
 
 // ── outline compression contracts ──
