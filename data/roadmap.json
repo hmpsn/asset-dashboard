@@ -119,6 +119,17 @@
       "rationale": "Close the 2026-07-16 content-generation audit without expanding raw prompts indiscriminately. Repair contradictory writing contracts and context continuity first, then project only relevant approved brand/proof/local evidence, add whole-document quality measurement, and use a human-rated golden set before changing model defaults. Source audit: 2026-07-16 content intelligence and generation audit in the Codex task; related context groundwork: genq-content-context-v2.",
       "items": [
         {
+          "id": "content-quality-benchmark-foundation",
+          "title": "Private approved-copy benchmark foundation — measure before changing generation",
+          "source": "2026-07-20 focused content quality improvement program",
+          "est": "S",
+          "priority": "P0",
+          "status": "pending",
+          "createdAt": "2026-07-20",
+          "owner": "platform-foundation",
+          "notes": "First dependency. Extend the existing AI reliability registry and read-only experiment tooling with typed private-case and safe aggregate contracts, explicit approved-source qualification, deterministic matrix checks, and blinded human ratings. Raw client copy remains in ignored local artifacts; tracked data is synthetic or aggregate only. No model, prompt, runtime, persistence, MCP, UI, or database-sync change. Q1 begins only after this foundation is merged and staging-verified."
+        },
+        {
           "id": "content-quality-prompt-contract-cleanup",
           "title": "Content prompt contract cleanup — natural structure and evidence-only specifics",
           "source": "2026-07-16 content intelligence and generation audit",
@@ -127,7 +138,7 @@
           "status": "pending",
           "createdAt": "2026-07-16",
           "owner": "content-pipeline",
-          "notes": "First dependency. Reconcile page-type outline/copy contracts with section prompts: do not force two H3s into every 200-word conversion section, and make experience counts, results, local landmarks/regulations/partnerships, social proof, product specs, guarantees, and similar facts conditional on approved supplied evidence. Preserve factual-safety, HTML, keyword, page-type density, and output-format contracts. Add deterministic prompt assertions for blog, service, location, landing, product, and healthcare fixtures. No model change."
+          "notes": "After content-quality-benchmark-foundation. Reconcile page-type outline/copy contracts with section prompts: do not force two H3s into every 200-word conversion section, and make experience counts, results, local landmarks/regulations/partnerships, social proof, product specs, guarantees, and similar facts conditional on approved supplied evidence. Preserve factual-safety, HTML, keyword, page-type density, and output-format contracts. Add deterministic prompt assertions for blog, service, location, landing, product, and healthcare fixtures. No model change."
         },
         {
           "id": "content-quality-context-continuity",
@@ -182,7 +193,7 @@
           "status": "pending",
           "createdAt": "2026-07-16",
           "owner": "platform-foundation",
-          "notes": "Final dependency after prompt/context/whole-document repairs. Build a small versioned golden set spanning blog, service, location, landing, product, and provenance-sensitive healthcare content. Human scoring covers naturalness, specificity, on-brand fidelity, structural variety, factual discipline, edit distance, cost, and latency. Then canary model candidates per named operation with rollback evidence; do not globally replace Claude Sonnet 4.6 or GPT-5.4 based on availability alone. Coordinate with genq-runtime-quality-governance."
+          "notes": "Model-canary work remains a final dependency after the private benchmark foundation and any measured prompt/context/whole-document repairs. Reuse the approved-copy corpus and blinded rubric established by content-quality-benchmark-foundation. Canary candidates per named operation with rollback evidence; do not globally replace Claude Sonnet 4.6 or GPT-5.4 based on availability alone."
         }
       ]
     },
