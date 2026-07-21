@@ -80,9 +80,20 @@
           "createdAt": "2026-07-20",
           "owner": "content-pipeline",
           "notes": "One canonical candidate-count policy now governs preview reservation, worker dispatch/demotion, restart recovery, and human-approval readiness. One-cell runs require no cross-page set report; the original selected census keeps the requirement intact for every 2+ page run. Focused execution, budget, recovery, approval, and policy tests pass without provider or paid calls. Staging smoke remains the release gate before P3 begins."
+        },
+        {
+          "id": "mcp-operator-prompts",
+          "title": "P7 — Desktop workflow prompts",
+          "source": "2026-07-17 MCP Operator Control Plane program",
+          "est": "S-M",
+          "priority": "P2",
+          "status": "done",
+          "createdAt": "2026-07-17",
+          "owner": "platform-foundation",
+          "notes": "Completed locally 2026-07-21. /mcp/operator now exposes immutable portfolio-triage, exact client-view, and safely confirmed matrix-generation prompts plus copyable desktop fallbacks. Prompt retrieval is side-effect free; generation stops on blockers, requires fresh preview-specific confirmation before paid start/retry, never invents a missing retry estimate, and stops at human review. Full /mcp remains unchanged. Two independent reviews approved exact head; staging read-only prompts/list/get smoke remains required after merge. Resources remain deferred."
         }
       ],
-      "shippedAt": "2026-07-20"
+      "shippedAt": "2026-07-21"
     },
     {
       "id": "sprint-matrix-reliability-closure-2026-07-20-terminal-history",

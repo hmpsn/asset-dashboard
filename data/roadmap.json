@@ -79,17 +79,6 @@
           "createdAt": "2026-07-17",
           "owner": "platform-foundation",
           "notes": "Persist bounded daily aggregates only and distinguish context-byte proxies, paid-trigger counts, and separately attributable provider usage. Never retain arguments, prompts, result bodies, evidence, or credentials."
-        },
-        {
-          "id": "mcp-operator-prompts",
-          "title": "P7 — Desktop workflow prompts",
-          "source": "2026-07-17 MCP Operator Control Plane program",
-          "est": "S-M",
-          "priority": "P2",
-          "status": "pending",
-          "createdAt": "2026-07-17",
-          "owner": "platform-foundation",
-          "notes": "Add portfolio triage, client-view review, and safely confirmed matrix-generation prompts after Claude Desktop and ChatGPT Desktop compatibility smoke. Resources remain deferred."
         }
       ]
     },
@@ -127,7 +116,7 @@
           "status": "pending",
           "createdAt": "2026-07-16",
           "owner": "content-pipeline",
-          "notes": "After prompt cleanup. Make full brief regeneration, outline regeneration, section regeneration, feedback fixes, checklist fixes, and full-post revisions consume the same revision-fenced brief evidence, page-type contract, brand authority, and content-generation-context-v2 fingerprint as initial generation. Remove the invented /blog or /services internal-link fallback; without a verified target, return a needs-input result. Word-count expansion must use the brief/evidence and must not manufacture filler. Preserve review-before-apply, CAS, provenance, and legacy flag-OFF parity until v2 promotion."
+          "notes": "PARKED at the 2026-07-21 quality checkpoint. The private Q1 blinded comparison is not_run because no qualified local corpus exists; deterministic prompt fixtures do not authorize this phase. Resume only when at least six fully rated cases across three page types (including one provenance-sensitive case) show page-level coherence, positioning, or brand-specificity failures in more than 20% of cases. Then make regeneration/fix/revision paths consume one revision-fenced authority, remove invented link fallbacks, and preserve review-before-apply, CAS, provenance, and flag-OFF parity."
         },
         {
           "id": "content-intelligence-approved-proof-projection",
