@@ -99,6 +99,32 @@ land together and the 64 KiB hard ceiling remains green.
 - Bounded daily usage aggregates and an all-workspace operator usage report.
 - Desktop prompts consume tools only; resources remain deferred.
 
+P7 may ship before parked P3–P6 work. Its three immutable prompts add no tools,
+output schemas, workspace aliases, credential capabilities, telemetry, storage,
+or authorization behavior. They compose only the existing 25-tool operator
+allowlist, so the earlier phases are not runtime dependencies. This exception
+does not authorize any other phase reordering.
+
+### P7 desktop workflow contract
+
+- `prompts/list` and `prompts/get` are additive on `/mcp/operator` only. The full
+  `/mcp` capability set, tool discovery, invocation, auth, and instructions
+  remain unchanged.
+- Prompt definitions and rendered messages are immutable and contain no client
+  data. Fetching a prompt performs no tool call, database read, mutation, job,
+  provider request, or paid operation.
+- `review_workspace_as_client` uses `get_client_view` as the sole client-data
+  projection and never substitutes admin intelligence.
+- `run_content_matrix_generation_safely` stops on blockers, presents the exact
+  current targets, fingerprints, accepted limits, and maximum estimate, and
+  requires fresh preview-specific human confirmation before paid start.
+  Same-authority retry requires a separate exact-item/available-budget
+  confirmation and stops when no bounded retry estimate exists; changed authority
+  returns to preview/start instead of retry. The workflow stops at human review
+  and never approves, sends, or publishes.
+- Clients without native prompt discovery receive equivalent copyable starters;
+  this fallback adds no server capability and does not weaken the workflow.
+
 ## P1 acceptance checklist
 
 - [x] `/mcp` full discovery and initialize instructions are byte-identical to the

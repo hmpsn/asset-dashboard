@@ -10258,3 +10258,17 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Verification:** Focused prompt and brief tests cover blog, landing, service, location, product, provider-profile, procedure-guide, and pricing-page behavior. A hard deterministic AI-quality fixture pins natural section hierarchy and approved factual authority without turning subjective prose judgment into CI scoring.
 
 **Files:** content writing rules; page-type copy contracts; content-post and brief prompt assembly; focused unit and AI-quality contract tests; brand-engine and benchmark rules; roadmap; feature audit.
+
+### 722. Compact MCP operator workflow starters 2026-07-21
+
+**Status:** Complete locally. Independent review, full repository gates, CI, and read-only staging protocol smoke remain required before release.
+
+**What changed:** The compact `/mcp/operator` endpoint now advertises MCP prompt discovery and exposes three immutable, user-selected workflows: studio portfolio triage, exact client-view review, and safely confirmed content-matrix generation. The full `/mcp` capability set, instructions, 105-tool discovery, and invocation behavior remain unchanged. Clients without native MCP prompt discovery receive equivalent copyable starters instead of a second tool or storage surface.
+
+**Safety:** Prompt retrieval is deterministic and performs no database read, tool invocation, mutation, job creation, provider request, or paid operation. Arguments are strict and non-reflecting. Portfolio triage remains read-only; client review uses `get_client_view` as the sole client-safe projection. The matrix workflow stops on blockers, never fabricates evidence, shows exact targets, fingerprints, accepted limits, and maximum estimate, and requires fresh preview-specific confirmation immediately before paid start. Same-authority retry requires a separate exact-item/available-budget confirmation and stops when no bounded retry estimate exists; changed authority returns to preview/start instead of retry. It never retries automatically and stops at human review without approval, send, or publication.
+
+**Scope decision:** This small P7 phase is intentionally independent of parked MCP P3–P6 work because it adds no tools, output schemas, aliases, credentials, telemetry, storage, or authorization. The benchmark-gated content context-continuity phase remains parked because no qualifying private corpus exists; deterministic prompt tests are not treated as evidence for that architecture.
+
+**Tests:** Unit coverage pins the frozen prompt census, strict own-property argument validation, deterministic rendering, operator-tool references, safety clauses, and copyable fallback parity. Real HTTP integration coverage pins operator-only capability negotiation, all three `prompts/list`/`prompts/get` flows, generic failures, unchanged full-profile capabilities, and the existing 25-tool operator catalog.
+
+**Files:** shared MCP prompt vocabulary; operator prompt registry and transport handlers; focused unit/integration tests; copyable workflow guide and MCP README; operator-control-plane spec, plan, and rule; roadmap and feature audit.
