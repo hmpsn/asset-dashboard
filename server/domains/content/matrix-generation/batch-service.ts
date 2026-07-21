@@ -315,6 +315,7 @@ export async function startMatrixGeneration(
           acceptedBudget,
           createdBy: request.createdBy,
           mcpExecutionContext: request.mcpExecutionContext,
+          previewTargets: readyTargets,
         });
       },
     });
@@ -486,9 +487,11 @@ function projectRunItem(
       plannedUrl: previewTarget.plannedUrl,
       pageType: previewTarget.pageType,
     } : null,
-    setAuditFindings: run.setAuditReport?.findings.filter(
-      finding => finding.affectedItemIds.includes(item.id),
-    ) ?? [],
+    setAuditFindings: run.selections.length >= 2
+      ? run.setAuditReport?.findings.filter(
+          finding => finding.affectedItemIds.includes(item.id),
+        ) ?? []
+      : [],
     currentArtifactRevisions: artifactRevisions,
     reusableCheckpointFingerprint: previewTarget && artifactRevisions.post.artifactId
       ? artifactCheckpointFingerprint(item, artifactRevisions.post.generationRevision)

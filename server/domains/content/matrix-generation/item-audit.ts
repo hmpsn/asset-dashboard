@@ -20,7 +20,6 @@ import {
   getPost,
 } from '../../../content-posts-db.js';
 import { GenerationRevisionConflictError } from '../../../generation-provenance.js';
-import { isFeatureEnabled } from '../../../feature-flags.js';
 import { createLogger } from '../../../logger.js';
 import { getFinalizedVoiceSnapshotForGeneration } from '../../brand/voice-finalization.js';
 import {
@@ -424,10 +423,7 @@ export async function auditMatrixGenerationItem(
       executionChainId,
       signal: request.signal,
       beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
-      outputQualityV2: isFeatureEnabled(
-        'content-matrix-output-quality-v2',
-        request.workspaceId,
-      ),
+      outputQualityV2: loaded.target.outputQualityV2,
     };
     const preparedAudit = prepareMatrixGenerationAuditOperation(auditInput);
     const modelAttempt = startMatrixGenerationAttempt({

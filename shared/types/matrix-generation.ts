@@ -1185,6 +1185,8 @@ export interface MatrixArtifactRevisionExpectations {
 
 /** M1-ready target; this is the first shape allowed to claim generation readiness. */
 export interface MatrixGenerationPreviewTarget extends ResolvedMatrixStructuralTarget {
+  /** Output-policy authority frozen by preview; legacy stored targets resolve to false. */
+  outputQualityV2: boolean;
   voiceSnapshot: FinalizedVoiceSnapshotRef;
   identitySnapshot: ApprovedBrandDeliverableRef[];
   evidenceRequirements: GenerationEvidenceRequirement[];
