@@ -90,6 +90,11 @@ AEO (ANSWER ENGINE OPTIMIZATION) — CITATION-WORTHY WRITING:
 
 // ── Lean creative ruleset ───────────────────────────────────────────────────
 
+export const APPROVED_FACTUAL_SPECIFICS_CONTRACT = `APPROVED FACTUAL SPECIFICS ONLY:
+- Treat experience counts, customer or patient counts, results, testimonials, credentials, affiliations, awards, locations, landmarks, regulations, partnerships, specifications, measurements, performance claims, prices, offers, guarantees, citations, and named sources as provenance-sensitive facts.
+- Use a specific fact only when it is present in supplied approved context. If a specific fact is not present in supplied context, omit it rather than inventing or implying it.
+- Never turn an outline request for proof, local detail, authority, or comparison data into permission to fabricate it. Use a truthful general explanation or omit the unsupported detail.`;
+
 export const CREATIVE_WRITING_RULES = `
 CREATIVE WRITING RULES (apply to generated copy without over-constraining voice):
 
@@ -99,6 +104,8 @@ FACTUAL SAFETY:
 - Never write "studies show", "research suggests", "experts agree", or "industry data shows" unless the specific source is named in the provided context.
 - If source evidence is thin, say what can be said responsibly and teach with practical steps, tradeoffs, or examples instead of making claims sound verified.
 - For health, finance, legal, or other provenance-sensitive topics, keep factual claims neutral and cite or reference only provided sources.
+
+${APPROVED_FACTUAL_SPECIFICS_CONTRACT}
 
 VOICE AND STYLE:
 - Write like a knowledgeable colleague with a point of view, not a brochure being assembled from SEO notes.

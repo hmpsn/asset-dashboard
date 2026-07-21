@@ -109,6 +109,35 @@ describe('AI quality fixture registry', () => {
     expect(fixture?.dimension).not.toBe('prose_quality');
   });
 
+  it('pins natural section structure and approved factual authority in content prompts', () => {
+    const fixture = AI_QUALITY_FIXTURES.find(candidate => (
+      candidate.id === 'content-prompt-natural-structure-and-factual-authority'
+    ));
+
+    expect(fixture).toMatchObject({
+      pipelineId: 'content-brief-review',
+      dimension: 'evidence_grounding',
+      severity: 'hard',
+    });
+    expect(fixture?.evidenceFiles).toEqual(expect.arrayContaining([
+      'server/writing-quality.ts',
+      'server/page-type-copy-contract.ts',
+      'server/content-posts-ai.ts',
+      'server/content-brief.ts',
+    ]));
+
+    const tokens = fixture?.assertions.flatMap(assertion => [
+      ...(assertion.allOf ?? []),
+      ...(assertion.anyOf ?? []),
+      ...(assertion.noneOf ?? []),
+    ]) ?? [];
+    expect(tokens).toEqual(expect.arrayContaining([
+      'APPROVED FACTUAL SPECIFICS ONLY',
+      'SHORT CONVERSION SECTION',
+      'DEEP EDUCATIONAL SECTION',
+    ]));
+  });
+
   it('reports fixture registry gaps for missing coverage and malformed fixtures', () => {
     const gaps = findAiQualityFixtureGaps([
       {

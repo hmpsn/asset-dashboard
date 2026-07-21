@@ -27,6 +27,17 @@
           "createdAt": "2026-07-20",
           "owner": "platform-foundation",
           "notes": "Completed 2026-07-20. Added typed private-case/safe-aggregate contracts, strict local evaluator, exact approved-source qualification, sanitized canonical matrix-audit ingestion, blinded ratings, deterministic registry coverage, and a no-recommendation floor below six complete cases. Raw client copy remains ignored and local. The tool rejects generation, persistence, approval, send, publish, retry, and DB-sync flags; no production runtime or MCP surface changed. Q1 begins only after merge and staging verification."
+        },
+        {
+          "id": "content-quality-prompt-contract-cleanup",
+          "title": "Content prompt contract cleanup — natural structure and evidence-only specifics",
+          "source": "2026-07-16 content intelligence and generation audit",
+          "est": "S",
+          "priority": "P0",
+          "status": "done",
+          "createdAt": "2026-07-16",
+          "owner": "content-pipeline",
+          "notes": "Completed locally 2026-07-20 after content-quality-benchmark-foundation. One canonical approved-factual-specifics contract now governs brief and writer prompts; contradictory proof, healthcare, location, product, pricing, citation, and guarantee imperatives are evidence-conditional. Short conversion sections no longer receive forced article-style H3 quotas, while deep educational H3s remain optional. Deterministic blog, service, location, landing, product, and healthcare fixtures plus the AI quality registry pin the behavior. HTML, H2, keyword, word-budget, model, evidence, and output contracts are unchanged. The private blinded benchmark remains not_run because no qualified local corpus is present; this does not authorize Q2."
         }
       ],
       "shippedAt": "2026-07-21"

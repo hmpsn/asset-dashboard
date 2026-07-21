@@ -621,6 +621,27 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     notes: 'Pins target-only context, untrusted evidence, honest missing facts, and separate exact-once system voice authority for C3.',
   },
   {
+    id: 'content-prompt-natural-structure-and-factual-authority',
+    pipelineId: 'content-brief-review',
+    title: 'Content prompts keep section structure natural and factual specifics evidence-bound',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'server/writing-quality.ts',
+      'server/page-type-copy-contract.ts',
+      'server/content-posts-ai.ts',
+      'server/content-brief.ts',
+      'tests/unit/content-quality-rules.test.ts',
+      'tests/unit/content-brief.test.ts',
+    ],
+    assertions: [
+      { allOf: ['APPROVED FACTUAL SPECIFICS ONLY', 'omit it rather than inventing or implying it'] },
+      { allOf: ['SHORT CONVERSION SECTION', 'Do not add H3 subheadings unless the supplied brief names a distinct subtopic'] },
+      { allOf: ['DEEP EDUCATIONAL SECTION', 'H3 subheadings are optional'] },
+    ],
+    notes: 'Pins the deterministic Q1 cleanup: compact conversion sections remain cohesive, educational hierarchy stays optional, and provenance-sensitive specifics require supplied approved context.',
+  },
+  {
     id: 'content-matrix-audit-grounding-and-format',
     pipelineId: 'content-brief-review',
     title: 'Matrix page audit keeps structured output, evidence placeholders, and human provenance gates',
