@@ -7,7 +7,10 @@
 import { Router } from 'express';
 
 import { requireWorkspaceSiteAccess } from '../auth.js';
-import { generateSeoMetadataVariations } from '../domains/seo-health/seo-copy-generation.js';
+import {
+  generateSeoMetadataVariations,
+  isCreativeSeoProviderConfigured,
+} from '../domains/seo-health/seo-copy-generation.js';
 import {
   type SeoSuggestion,
   saveSuggestion,
@@ -36,6 +39,7 @@ router.post('/api/webflow/seo-bulk-rewrite/:siteId', requireWorkspaceSiteAccess(
     workspaceId?: string;
   };
   if (!pages?.length || !field) return res.status(400).json({ error: 'pages, field required' });
+  if (!isCreativeSeoProviderConfigured()) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   const siteId = req.params.siteId;
   const token = getTokenForSite(siteId) || undefined;
