@@ -690,6 +690,7 @@ export async function prepareMatrixGenerationCell(
     { status: 'resolved' }
   >,
   pageCensus: WorkspaceKnownPageCensus,
+  outputQualityV2: boolean,
 ): Promise<PreparedMatrixGenerationCell> {
   const target = structural.target;
   const matrix = getMatrix(workspaceId, target.matrixId);
@@ -817,6 +818,10 @@ export async function prepareMatrixGenerationCell(
     ...acceptedResolutions.map(resolution => resolution.sourceRef.capturedAt),
   ], context.evidence.capturedAt));
   const previewCore = {
+    // False is the legacy/default policy. Omitting it preserves the accepted
+    // fingerprint of pre-authority runs while true remains an explicit,
+    // fingerprinted opt-in that cannot change after preview.
+    ...(outputQualityV2 ? { outputQualityV2: true } : {}),
     structuralFingerprint: target.structuralFingerprint,
     blockManifestFingerprint: target.blockManifest.fingerprint,
     voiceSnapshot: {
@@ -842,6 +847,7 @@ export async function prepareMatrixGenerationCell(
   );
   const previewTarget: MatrixGenerationPreviewTarget = {
     ...target,
+    outputQualityV2,
     voiceSnapshot: previewCore.voiceSnapshot,
     identitySnapshot: identity.refs,
     evidenceRequirements: requirements,
@@ -883,6 +889,10 @@ export async function previewMatrixGeneration(
       },
     );
   }
+  const outputQualityV2 = isFeatureEnabled(
+    'content-matrix-output-quality-v2',
+    request.workspaceId,
+  );
   const structuralWithCensus = await resolveMatrixStructuresWithCensus(request);
   const structural = structuralWithCensus.result;
   const results: MatrixGenerationPreviewResult[] = [];
@@ -925,6 +935,7 @@ export async function previewMatrixGeneration(
       request.workspaceId,
       item,
       structuralWithCensus.pageCensus,
+      outputQualityV2,
     )).result);
   }
   const readyResults = results.filter(

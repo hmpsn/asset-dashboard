@@ -29,6 +29,7 @@ import {
 import {
   auditMatrixGenerationItem,
 } from '../../server/domains/content/matrix-generation/item-audit.js';
+import { getMatrixGeneration } from '../../server/domains/content/matrix-generation/batch-service.js';
 import type {
   MatrixGenerationItemAuditDependencies,
 } from '../../server/domains/content/matrix-generation/item-audit.js';
@@ -683,6 +684,13 @@ describe('auditMatrixGenerationItem', () => {
         auditedAt: new Date().toISOString(),
       },
     });
+    const legacyRead = getMatrixGeneration({
+      workspaceId: committed.fixture.workspaceId,
+      runId: runWithLegacyReport.id,
+      limit: 1,
+    });
+    expect(legacyRead.run.setAuditReport).toBeNull();
+    expect(legacyRead.items.items[0]?.setAuditFindings).toEqual([]);
 
     const approved = approveMatrixPageForPublishReadiness({
       workspaceId: committed.fixture.workspaceId,
@@ -753,6 +761,15 @@ describe('auditMatrixGenerationItem', () => {
         auditedAt: new Date().toISOString(),
       },
     });
+    const setAuditRead = getMatrixGeneration({
+      workspaceId: committed.fixture.workspaceId,
+      runId: run.id,
+      limit: 2,
+    });
+    expect(setAuditRead.run.setAuditReport).toMatchObject({ verdict: 'passed' });
+    expect(setAuditRead.items.items[0]?.setAuditFindings).toEqual([
+      expect.objectContaining({ id: 'mgsf-human-review' }),
+    ]);
     const publishJobsBefore = listJobs(committed.fixture.workspaceId)
       .filter(job => job.type === 'content-publish').length;
     const approved = approveMatrixPageForPublishReadiness({

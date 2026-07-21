@@ -36,6 +36,11 @@ export function approveMatrixPageForPublishReadiness(
       throw new MatrixPageApprovalPreconditionError('The matrix generation run changed since review');
     }
     const setAuditRequired = isMatrixGenerationSetAuditRequired(run.selections.length);
+    const hasBlockingSetFinding = setAuditRequired
+      && run.setAuditReport?.findings.some(finding => (
+        isBlockingMatrixGenerationSetAuditFinding(finding)
+        && finding.affectedItemIds.includes(request.itemId)
+      )) === true;
     if (
       !item
       || item.runId !== run.id
@@ -47,10 +52,7 @@ export function approveMatrixPageForPublishReadiness(
       || !item.previewTarget
       || !item.postId
       || (setAuditRequired && !run.setAuditReport)
-      || run.setAuditReport?.findings.some(finding => (
-        isBlockingMatrixGenerationSetAuditFinding(finding)
-        && finding.affectedItemIds.includes(item.id)
-      )) === true
+      || hasBlockingSetFinding
     ) {
       throw new MatrixPageApprovalPreconditionError('This page is not ready for human approval');
     }

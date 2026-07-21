@@ -486,6 +486,7 @@ const resolvedStructuralTargetSchema = z.object({
 });
 
 const previewTargetSchema = resolvedStructuralTargetSchema.extend({
+  outputQualityV2: z.boolean().optional(),
   voiceSnapshot: finalizedVoiceSnapshotRefSchema,
   identitySnapshot: z.array(z.object({
     deliverableId: z.string().min(1),
@@ -532,6 +533,7 @@ const previewTargetSchema = resolvedStructuralTargetSchema.extend({
   }).strict()).optional(),
 }).transform(target => ({
   ...target,
+  outputQualityV2: target.outputQualityV2 ?? false,
   // Runs accepted before the frozen-ID field shipped already persisted the
   // exact accepted row IDs in verified requirement source refs. Derive them
   // for read/retry compatibility instead of dropping evidence or substituting
@@ -852,7 +854,7 @@ const stmts = createStmtCache(() => ({
       @id, @run_id, @workspace_id, @matrix_id, @cell_id,
       @matrix_revision, @template_revision, @cell_revision,
       @structural_fingerprint, @preview_fingerprint, 'queued', 0,
-      NULL, NULL, NULL, NULL, NULL, NULL,
+      NULL, @preview_target, NULL, NULL, NULL, NULL,
       0, 0, NULL,
       @created_at, @updated_at, NULL
     )
@@ -1156,6 +1158,7 @@ export function projectMatrixGenerationRun(
   } = run;
   return {
     ...publicFields,
+    setAuditReport: run.selections.length >= 2 ? publicFields.setAuditReport : null,
     createdBy: projectPublicCreator(createdBy),
   };
 }
@@ -1996,7 +1999,9 @@ export function commitMatrixGenerationRevision(input: {
  * callers must already hold a non-empty previewed selection.
  */
 export function createMatrixGenerationRun(
-  request: CreateMatrixGenerationRunRequest,
+  request: CreateMatrixGenerationRunRequest & {
+    previewTargets?: readonly MatrixGenerationPreviewTarget[];
+  },
 ): CreateMatrixGenerationRunResult {
   const validated = assertCreateRequest(request);
   const create = (): CreateMatrixGenerationRunResult => {
@@ -2043,6 +2048,30 @@ export function createMatrixGenerationRun(
       updated_at: now,
     });
 
+    const previewTargets = request.previewTargets;
+    if (previewTargets !== undefined) {
+      if (previewTargets.length !== validated.selections.length) {
+        throw new MatrixGenerationPersistenceContractError(
+          'Every accepted selection must have one frozen preview target',
+        );
+      }
+      previewTargets.forEach((target, index) => {
+        const parsed = previewTargetSchema.safeParse(target);
+        const selection = validated.selections[index];
+        if (!parsed.success || !selection
+          || parsed.data.workspaceId !== request.workspaceId
+          || parsed.data.matrixId !== request.matrixId
+          || parsed.data.templateId !== request.templateId
+          || parsed.data.cellId !== selection.cellId
+          || parsed.data.structuralFingerprint !== selection.structuralFingerprint
+          || parsed.data.effectiveInputFingerprint !== selection.previewFingerprint) {
+          throw new MatrixGenerationPersistenceContractError(
+            'Frozen preview target does not match its accepted selection',
+          );
+        }
+      });
+    }
+
     validated.selections.forEach((selection, index) => {
       stmts().insertItem.run({
         id: `mgi_${runId.slice(4)}_${String(index).padStart(5, '0')}`,
@@ -2055,6 +2084,9 @@ export function createMatrixGenerationRun(
         cell_revision: selection.sourceRevision.cellRevision,
         structural_fingerprint: selection.structuralFingerprint,
         preview_fingerprint: selection.previewFingerprint,
+        preview_target: previewTargets?.[index]
+          ? JSON.stringify(previewTargets[index])
+          : null,
         created_at: now,
         updated_at: now,
       });

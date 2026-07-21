@@ -257,6 +257,7 @@ function review(
 
 function previewTarget(workspaceId: string): MatrixGenerationPreviewTarget {
   return {
+    outputQualityV2: false,
     workspaceId,
     matrixId: 'matrix-1',
     templateId: 'template-1',

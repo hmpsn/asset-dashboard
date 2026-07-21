@@ -575,6 +575,49 @@ describe('content matrix generation M1', () => {
       .toMatchObject({ outputQualityV2: true });
   });
 
+  it('rehydrates a legacy queued target and preserves its default-policy preflight fingerprint', async () => {
+    const fixture = createFixture(['Austin']);
+    const cell = fixture.matrix.cells[0];
+    seedBrandAuthority(fixture.workspaceId);
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', fixture.workspaceId, false);
+    const target = await readyTarget(fixture, cell.id);
+    const { outputQualityV2: _legacyMissingPolicy, ...legacyStoredTarget } = target;
+    const selection = {
+      matrixId: target.matrixId,
+      cellId: target.cellId,
+      sourceRevision: target.sourceRevision,
+      structuralFingerprint: target.structuralFingerprint,
+      previewFingerprint: target.effectiveInputFingerprint,
+    };
+    const run = createMatrixGenerationRun({
+      workspaceId: fixture.workspaceId,
+      matrixId: target.matrixId,
+      templateId: target.templateId,
+      idempotencyKey: `matrix-legacy-policy-${randomUUID()}`,
+      selectionFingerprint: target.effectiveInputFingerprint,
+      selections: [selection],
+      createdBy: { actorType: 'operator', actorId: 'matrix-generation-test-operator' },
+      mcpExecutionContext: null,
+    }).run;
+    const queuedItem = listMatrixGenerationItems(fixture.workspaceId, run.id)[0];
+    db.prepare(`
+      UPDATE content_matrix_generation_items
+      SET preview_target = ?
+      WHERE id = ? AND workspace_id = ?
+    `).run(JSON.stringify(legacyStoredTarget), queuedItem.id, fixture.workspaceId);
+
+    const rehydrated = getMatrixGenerationItem(fixture.workspaceId, queuedItem.id);
+    expect(rehydrated?.status).toBe('queued');
+    expect(rehydrated?.previewTarget).toMatchObject({
+      outputQualityV2: false,
+      effectiveInputFingerprint: target.effectiveInputFingerprint,
+    });
+    const repreflight = await readyTarget(fixture, cell.id);
+    expect(repreflight.outputQualityV2).toBe(false);
+    expect(repreflight.effectiveInputFingerprint).toBe(rehydrated?.previewFingerprint);
+  });
+
   it('marks approved-artifact replacement as human-only while normal evidence stays resolvable', async () => {
     const fixture = createFixture(['Austin']);
     const cell = fixture.matrix.cells[0];

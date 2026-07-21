@@ -15,7 +15,11 @@ import { getPost } from '../../../content-posts-db.js';
 import { isFeatureEnabled } from '../../../feature-flags.js';
 import { GenerationRevisionConflictError } from '../../../generation-provenance.js';
 import { canonicalGenerationFingerprint } from './fingerprint.js';
-import { assertPreviewIdentityCurrent, prepareMatrixGenerationCell } from './preview.js';
+import {
+  assertPreviewIdentityCurrent,
+  prepareMatrixGenerationCell,
+  previewMatrixGeneration,
+} from './preview.js';
 import { resolveMatrixStructuresWithCensus } from './read-service.js';
 import {
   commitMatrixGenerationDraft,
@@ -221,6 +225,7 @@ export async function generateMatrixRunItem(
       request.workspaceId,
       structuralResult,
       structuralWithCensus.pageCensus,
+      item.previewTarget?.outputQualityV2 ?? false,
     );
     if (
       prepared.result.status !== 'ready'
@@ -317,10 +322,7 @@ export async function generateMatrixRunItem(
       signal: request.signal,
       assertAuthority,
       beforeBoundedProviderDispatch: request.beforeBoundedProviderDispatch,
-      outputQualityV2: isFeatureEnabled(
-        'content-matrix-output-quality-v2',
-        request.workspaceId,
-      ),
+      outputQualityV2: target.outputQualityV2,
     });
     if (post.status !== 'draft' || !post.generationProvenance) {
       throw new Error('Post generation did not produce a complete draft with provenance');
@@ -388,7 +390,7 @@ export async function generateMatrixCell(
       replayed: true,
     };
   }
-  const structuralWithCensus = await resolveMatrixStructuresWithCensus({
+  const preview = await previewMatrixGeneration({
     workspaceId: request.workspaceId,
     matrixId: request.matrixId,
     selections: [{
@@ -396,23 +398,13 @@ export async function generateMatrixCell(
       expectedSourceRevision: request.expectedSourceRevision,
     }],
   });
-  const structuralResult = structuralWithCensus.result.results[0];
-  if (!structuralResult || structuralResult.status !== 'resolved') {
-    throw new MatrixGenerationCellPreconditionError(
-      'The matrix cell does not satisfy structural generation preflight',
-    );
-  }
-  const prepared = await prepareMatrixGenerationCell(
-    request.workspaceId,
-    structuralResult,
-    structuralWithCensus.pageCensus,
-  );
-  if (prepared.result.status !== 'ready' || !prepared.context) {
+  const previewResult = preview.results[0];
+  if (!previewResult || previewResult.status !== 'ready') {
     throw new MatrixGenerationCellPreconditionError(
       'The matrix cell has unresolved preflight requirements',
     );
   }
-  const target = prepared.result.target;
+  const target = previewResult.target;
   if (target.effectiveInputFingerprint !== request.expectedPreviewFingerprint) {
     throw new MatrixGenerationCellPreconditionError(
       'The generation preview changed; preview the cell again before starting paid work',
@@ -432,6 +424,7 @@ export async function generateMatrixCell(
     idempotencyKey: request.idempotencyKey,
     selectionFingerprint: canonicalGenerationFingerprint([selection]),
     selections: [selection],
+    previewTargets: [target],
     createdBy: request.createdBy,
     mcpExecutionContext: request.mcpExecutionContext,
   });
