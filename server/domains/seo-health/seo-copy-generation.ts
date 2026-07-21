@@ -34,6 +34,8 @@ export interface SeoCopyAuthority {
   differentiators?: readonly string[];
   proofPoints?: readonly string[];
   locations?: readonly string[];
+  /** Human-maintained/approved knowledge blocks that may support concrete copy. */
+  approvedEvidence?: readonly string[];
 }
 
 export interface VerifiedInternalLink {
@@ -174,6 +176,7 @@ function boundedAuthority(authority: SeoCopyAuthority): SeoCopyAuthority {
     differentiators: boundedList(authority.differentiators, 20, 500),
     proofPoints: boundedList(authority.proofPoints, 20, 500),
     locations: boundedList(authority.locations, 20, 300),
+    approvedEvidence: boundedList(authority.approvedEvidence, 10, 2_000),
   };
 }
 
@@ -181,7 +184,8 @@ function hasSpecificityAuthority(authority: SeoCopyAuthority): boolean {
   return Boolean(
     authority.differentiators?.length
     || authority.proofPoints?.length
-    || authority.locations?.length,
+    || authority.locations?.length
+    || authority.approvedEvidence?.length,
   );
 }
 

@@ -62,6 +62,16 @@ describe('SEO copy generation service contracts', () => {
     expect(withAuthority).toContain('Serving the community since 1998');
     expect(withAuthority).toContain('Sarasota, Florida');
     expect(withAuthority).toMatch(/only when supported by supplied authority/i);
+
+    const withApprovedKnowledge = renderSeoMetadataTask({
+      field: 'description',
+      evidence: metadataEvidence,
+      authority: {
+        approvedEvidence: ['APPROVED KNOWLEDGE: Same-day emergency appointments are available.'],
+      },
+    }).userPrompt;
+    expect(withApprovedKnowledge).toContain('Same-day emergency appointments are available.');
+    expect(withApprovedKnowledge).toMatch(/only when supported by supplied authority/i);
   });
 
   it('strictly rejects malformed metadata output and enforces exact field limits', () => {
