@@ -10228,3 +10228,19 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Verification:** Focused policy, budget, real worker, recovery, and item-approval suites cover one- and two-candidate behavior. The worker test proves a one-cell run neither dispatches nor persists a set audit and still terminalizes truthfully, while the two-cell control continues to dispatch and persist one. All focused tests and project typecheck pass without provider access or database synchronization.
 
 **Files:** matrix-generation set-audit policy, preview estimator, worker, restart recovery, human-approval readiness, focused unit tests, runtime/control-plane guardrails, roadmap, and feature audit.
+
+### 720. Private approved-copy content quality benchmark foundation 2026-07-20
+
+**Status:** Complete locally. This PR is behavior-neutral for production generation and requires normal staging verification before prompt-quality work begins.
+
+**What changed:** Added a typed, read-only benchmark for comparing blinded content candidates against explicitly approved copy. Private cases carry raw reference/candidate HTML and provider provenance only under gitignored local artifacts. Safe aggregate reports contain opaque case/candidate labels, content hashes, page types, ratings, deterministic failure counts, preference rates, prompt/completion token means, estimated cost, and latency—never client copy, prompts, evidence, workspace identity, URLs, reviewer notes, or provider/model identity.
+
+**Approved-source boundary:** Matrix references require exact human approval evidence tied to the current approved post revision. Matrix candidates require a current review-ready item, accepted preview fingerprint, durable post provenance, a canonical ready audit, and a post timestamp no newer than that audit; only sanitized audit check IDs/results cross into the private case. Copy-pipeline references include only explicitly addressed approved sections. Operator-curated pages require an exact local attestation and expose no URL-fetch path. All readers are dependency-injected and perform no DB writes or logging.
+
+**Recommendation contract:** Reports remain advisory and return `no_recommendation` below six completely rated cases. A candidate needs at least 70% blinded preference, mean brand-fidelity and intent-satisfaction ratings of 4/5, zero factual and deterministic failures, and cost/prompt use no higher than baseline. An unsafe baseline is never recommended. Subjective quality remains human-rated; CI only pins privacy, authority, evidence, and deterministic-output contracts through the existing AI reliability registry.
+
+**Safety:** The CLI rejects generation, persistence, approval, send, publication, retry, and database-sync flags. It does not call MCP, providers, staging, or production; live candidate creation remains a separate owner-authorized action. No migration, UI, MCP tool, runtime prompt, model, feature flag, or production generation behavior changed.
+
+**Tests:** Contract coverage pins private-versus-safe shapes. Unit coverage exercises approval qualification, stale/cross-workspace rejection, canonical matrix audit sanitization, strict case/rating validation, preference and safety gates, unsafe CLI rejection, and scrubbed report output. The deterministic AI quality registry covers the benchmark without introducing live-model CI scoring.
+
+**Files:** shared benchmark contracts; local evaluator and source qualifiers; AI reliability registry fixture; focused unit/contract tests; benchmark rule, roadmap, and feature audit.

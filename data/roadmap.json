@@ -119,17 +119,6 @@
       "rationale": "Close the 2026-07-16 content-generation audit without expanding raw prompts indiscriminately. Repair contradictory writing contracts and context continuity first, then project only relevant approved brand/proof/local evidence, add whole-document quality measurement, and use a human-rated golden set before changing model defaults. Source audit: 2026-07-16 content intelligence and generation audit in the Codex task; related context groundwork: genq-content-context-v2.",
       "items": [
         {
-          "id": "content-quality-benchmark-foundation",
-          "title": "Private approved-copy benchmark foundation — measure before changing generation",
-          "source": "2026-07-20 focused content quality improvement program",
-          "est": "S",
-          "priority": "P0",
-          "status": "pending",
-          "createdAt": "2026-07-20",
-          "owner": "platform-foundation",
-          "notes": "First dependency. Extend the existing AI reliability registry and read-only experiment tooling with typed private-case and safe aggregate contracts, explicit approved-source qualification, deterministic matrix checks, and blinded human ratings. Raw client copy remains in ignored local artifacts; tracked data is synthetic or aggregate only. No model, prompt, runtime, persistence, MCP, UI, or database-sync change. Q1 begins only after this foundation is merged and staging-verified."
-        },
-        {
           "id": "content-quality-prompt-contract-cleanup",
           "title": "Content prompt contract cleanup — natural structure and evidence-only specifics",
           "source": "2026-07-16 content intelligence and generation audit",

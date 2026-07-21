@@ -19,6 +19,22 @@ The content-quality benchmark measures whether generation changes improve approv
 - Subjective ratings are blinded. Candidate labels must not expose provider, model, or variant identity to the reviewer.
 - A factual-discipline failure cannot be hidden by a composite prose score.
 
+### Local workflow
+
+1. Build private cases under `artifacts/content-quality-benchmark/`. Use the pure qualification helpers in `scripts/content-quality-benchmark-sources.ts` so matrix references prove exact human approval, copy-section references include only explicitly selected approved rows, and matrix candidates carry the sanitized canonical audit and durable fingerprint.
+2. Assign opaque labels such as `candidate_a` before presenting copy to a reviewer. Provider, model, and variant identity remain inside the private case file.
+3. Record ratings in a separate private ratings file.
+4. Produce a scrubbed aggregate:
+
+```bash
+npm run benchmark:content-quality -- \
+  --cases artifacts/content-quality-benchmark/cases.json \
+  --ratings artifacts/content-quality-benchmark/ratings.json \
+  --baseline-label candidate_a
+```
+
+The default output is `artifacts/content-quality-benchmark/report.json`. An explicit output path is allowed because the report schema excludes raw copy, prompts, evidence, workspace identity, URLs, reviewer notes, and provider/model identity.
+
 ## Recommendation gate
 
 A report returns `no_recommendation` unless it includes at least six rated cases and complete ratings for every compared candidate. A candidate may be recommended only when:

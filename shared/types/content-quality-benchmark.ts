@@ -2,6 +2,10 @@ import type {
   BriefPageType,
   TemplateSectionGenerationRole,
 } from './content.js';
+import type {
+  GenerationAuditCheckResult,
+  GenerationAuditVerdict,
+} from './generation-evidence.js';
 
 export const CONTENT_QUALITY_BENCHMARK_SCHEMA_VERSION = 1 as const;
 
@@ -72,6 +76,15 @@ export interface ContentQualityBenchmarkCandidate {
   anonymousLabel: string;
   html: string;
   provenance: ContentQualityBenchmarkCandidateProvenance;
+  /** Sanitized result from the canonical matrix audit when this is an exact matrix candidate. */
+  runtimeAudit?: {
+    authorityFingerprint: string;
+    verdict: GenerationAuditVerdict;
+    deterministicChecks: Array<{
+      id: string;
+      result: GenerationAuditCheckResult;
+    }>;
+  };
 }
 
 /**
@@ -132,6 +145,8 @@ export interface ContentQualityBenchmarkCandidateAggregate {
   deterministicFailures: number;
   meanEstimatedCostUsd: number;
   meanDurationMs: number;
+  meanPromptTokens: number;
+  meanCompletionTokens: number;
 }
 
 /** Safe-to-commit aggregate: contains no raw copy, prompts, evidence, or client identity. */
