@@ -19,7 +19,7 @@ plans.
 
 ## Findings Summary
 
-- `native`: 32
+- `native`: 28
 - `hybrid`: 0
 - `legacy`: 0
 - `documented-exception`: 1
@@ -59,9 +59,6 @@ Root pattern confirmed:
 | `server/routes/public-analytics.ts` | `client-portal` | `native` | slice-backed intelligence for client advisor context | keep low-level | later only if client-story builder is added |
 | `server/routes/rewrite-chat.ts` | `seo-health` | `native` | page-assist builder supplies canonical keyword/voice/page context; route owns conversation and page evidence | page-assist builder | completed in follow-up builder PR |
 | `server/routes/webflow-keywords.ts` | `seo-health` | `native` | page-assist builder supplies canonical keyword/learnings/page context; route owns provider metric evidence | page-assist builder | completed in follow-up builder PR |
-| `server/routes/webflow-seo-bulk-rewrite.ts` | `seo-health` | `native` | page-assist builder supplies per-page keyword/voice/profile context; route owns bulk GSC/sibling/content evidence | page-assist builder | completed in follow-up builder PR |
-| `server/routes/webflow-seo-page-tools.ts` | `seo-health` | `native` | page-assist builder supplies canonical keyword/voice/page-map context; route owns copy-generation payload evidence | page-assist builder | completed in follow-up builder PR |
-| `server/routes/webflow-seo-rewrite.ts` | `seo-health` | `native` | page-assist builder supplies canonical keyword/voice/profile/page-insight context; route owns GSC/audit/content evidence | page-assist builder | completed in follow-up builder PR |
 | `server/routes/webflow-alt-text.ts` | `seo-health` | `native` | `buildIntelPrompt(['seoContext'])` for compact alt-text context plus caller-owned page/image placement snippets | keep low-level | completed in PR5 |
 | `server/routes/workspaces.ts` | `workspace-command-center` | `native` | seoContext-backed AI helper path | keep low-level | revisit only if it needs multi-slice context |
 | `server/seo-audit-ai-recs.ts` | `seo-health` | `native` | slice-backed workspace + page prompt assembly | recommendation builder optional later | wave 2 |
@@ -70,7 +67,6 @@ Root pattern confirmed:
 | `server/webflow-bulk-alt-background-job.ts` | `seo-health` | `native` | slice-backed SEO context inside extracted bulk alt background job | keep low-level for job-specific prompts | completed in simplification sprint phase 4 |
 | `server/webflow-bulk-seo-fix-background-job.ts` | `seo-health` | `native` | slice-backed SEO context inside extracted bulk SEO fix background job | keep low-level for job-specific prompts | completed in simplification sprint phase 6 |
 | `server/webflow-seo-bulk-analyze-job.ts` | `seo-health` | `native` | aligned slices + `formatForPrompt()` | keep low-level | wave 4 |
-| `server/webflow-seo-bulk-rewrite-job.ts` | `seo-health` | `native` | page-assist builder supplies per-page keyword/voice/profile context inside the background job | page-assist builder | completed in follow-up builder PR |
 
 ## Immediate Migration Queue
 

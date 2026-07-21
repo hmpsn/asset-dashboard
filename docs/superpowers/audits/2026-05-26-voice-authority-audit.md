@@ -9,7 +9,7 @@ Secondary integrations: `analytics-intelligence`, `seo-health`, `content-pipelin
 
 This audit is the control artifact for the voice authority sprint. It classifies server-side AI consumers by how they receive workspace voice instructions.
 
-- `correct`: 23
+- `correct`: 20
 - `builder-backed`: 5
 - `drift`: 0
 - `documented-exception`: 19
@@ -77,7 +77,7 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/seo-audit-ai-recs.ts` | correct | Uses `buildSystemPrompt()`. |
 | `server/voice-calibration.ts` | correct | Canonical voice context helper and calibration calls. |
 | `server/webflow-seo-bulk-analyze-job.ts` | documented-exception | Bulk keyword analysis JSON classifier. |
-| `server/webflow-seo-bulk-rewrite-job.ts` | correct | Uses page-assist context and `buildSystemPrompt()`. |
+| `server/domains/seo-health/seo-copy-generation.ts` | correct | Canonical SEO copy operation receives approved page-assist authority and uses `buildSystemPrompt()`. |
 | `server/workspace-context-generation-job.ts` | documented-exception | Generates source workspace context; brand voice generation is circular by design. |
 | `server/routes/ai.ts` | documented-exception | Admin chat uses admin-chat persona/context, not client writing voice. |
 | `server/routes/content-posts.ts` | correct | Uses `buildSystemPrompt()` for AI fix/rewrite paths. |
@@ -87,9 +87,6 @@ These consumers intentionally do not use client brand voice as writing authority
 | `server/routes/public-analytics.ts` | documented-exception | Client advisor persona is agency-support voice, not the client's website brand voice. |
 | `server/routes/rewrite-chat.ts` | builder-backed | Uses page-assist builder and `buildSystemPrompt()`. |
 | `server/routes/webflow-keywords.ts` | builder-backed | Uses page-assist context for keyword analysis; no voice imitation needed. |
-| `server/routes/webflow-seo-bulk-rewrite.ts` | correct | Uses page-assist context and `buildSystemPrompt()`. |
-| `server/routes/webflow-seo-page-tools.ts` | correct | Uses page-assist context and `buildSystemPrompt()`. |
-| `server/routes/webflow-seo-rewrite.ts` | correct | Uses page-assist context and `buildSystemPrompt()`. |
 | `server/routes/workspaces.ts` | documented-exception | Intelligence profile autofill is structured business inference. |
 
 ## PR 3 Rule

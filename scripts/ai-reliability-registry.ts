@@ -125,25 +125,33 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
     entryRoutes: [
       'server/routes/rewrite-chat.ts',
       'server/routes/webflow-seo-page-tools.ts',
+      'server/routes/webflow-seo-rewrite.ts',
+      'server/routes/webflow-seo-bulk-rewrite.ts',
+      'server/routes/webflow-seo-jobs.ts',
       'server/routes/webflow-seo-apply.ts',
     ],
     promptAssemblyModules: [
       'server/prompt-assembly.ts',
+      'server/domains/seo-health/seo-copy-generation.ts',
+      'server/intelligence/page-assist-context-builder.ts',
       'server/workspace-intelligence.ts',
       'server/internal-links.ts',
     ],
     dispatcherModules: [
       'server/ai.ts',
+      'server/content-posts-ai.ts',
+      'server/domains/seo-health/seo-copy-generation.ts',
       'server/routes/rewrite-chat.ts',
-      'server/routes/webflow-seo-page-tools.ts',
+      'server/webflow-seo-bulk-rewrite-job.ts',
     ],
     parserOrValidationSignals: [
-      'parseJsonSafe',
+      'parseStructuredAIOutput',
       'sanitizeForPromptInjection',
-      'responseFormat',
+      'filterVerifiedInternalLinks',
     ],
     writeSideEffects: [
       'updatePageSeo',
+      'saveSuggestion',
       'addActivity',
       'broadcastToWorkspace',
     ],
@@ -158,6 +166,9 @@ export const AI_CRITICAL_PIPELINE_TRACES: AiPipelineTraceDefinition[] = [
     ],
     existingTestSignals: [
       'tests/integration/rewrite-chat-pages.test.ts',
+      'tests/unit/seo-copy-generation-service.test.ts',
+      'tests/unit/webflow-seo-bulk-rewrite-job.test.ts',
+      'tests/contract/seo-copy-operation-adapters.test.ts',
       'tests/integration/bulk-accept-webflow-failure.test.ts',
       'tests/contract/external-provider-write-failure-contract.test.ts',
     ],
@@ -425,6 +436,7 @@ export const AI_RELIABILITY_SCENARIOS: AiReliabilityScenario[] = [
     severity: 'hard',
     evidenceFiles: [
       'tests/integration/bulk-accept-webflow-failure.test.ts',
+      'tests/unit/webflow-seo-bulk-rewrite-job.test.ts',
       'tests/contract/external-provider-write-failure-contract.test.ts',
     ],
     assertions: [
@@ -693,18 +705,21 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
   {
     id: 'seo-editor-assist-format-sanitization',
     pipelineId: 'seo-editor-assist',
-    title: 'SEO editor assist preserves insertion-safe rewrite and JSON contracts',
+    title: 'SEO editor assist preserves insertion-safe rewrite and canonical structured copy contracts',
     dimension: 'output_format',
     severity: 'hard',
     evidenceFiles: [
       'server/routes/rewrite-chat.ts',
-      'server/routes/webflow-seo-page-tools.ts',
+      'server/domains/seo-health/seo-copy-generation.ts',
+      'docs/rules/seo-copy-operations.md',
+      'tests/contract/seo-copy-operation-adapters.test.ts',
     ],
     assertions: [
       { allOf: ['BEGIN_REWRITE', 'plain prose only', 'sanitizeForPromptInjection'] },
-      { allOf: ['Return ONLY valid JSON', "responseFormat: { type: 'json_object' }", 'researchMode: true'] },
+      { allOf: ['seo-metadata-variations', 'seo-page-copy-set', 'parseStructuredAIOutput', 'filterVerifiedInternalLinks'] },
+      { allOf: ['Do not invent', 'approvedEvidence', 'Human selection remains the only adoption gate'] },
     ],
-    notes: 'Covers the prompt-rendering contract where rewrite delimiters feed a live editor and page SEO copy expects strict JSON.',
+    notes: 'Covers live-editor rewrite delimiters plus the shared strict JSON, evidence-authority, and verified-link boundary for SEO metadata and page-copy generation.',
   },
   {
     id: 'diagnostic-synthesis-json-evidence',

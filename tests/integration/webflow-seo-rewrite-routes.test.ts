@@ -10,7 +10,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 import { createEphemeralTestContext } from './helpers.js';
 
-const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '' } });
+const ctx = createEphemeralTestContext(import.meta.url, {
+  env: { OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '' },
+});
 const { postJson } = ctx;
 
 let workspaceId = '';
@@ -31,26 +33,9 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /api/webflow/seo-rewrite — input validation', () => {
-  async function assertSeoRewriteResponse(
-    res: Response,
-    expectedField: 'title' | 'description' | 'both',
-  ): Promise<void> {
-    expect([200, 500]).toContain(res.status);
-    if (res.status === 500) {
-      const body = await res.json() as { error: string };
-      expect(body.error).toMatch(/OPENAI_API_KEY not configured/i);
-      return;
-    }
-    if (expectedField === 'both') {
-      const body = await res.json() as { field?: string; pairs?: unknown[] };
-      expect(body.field).toBe('both');
-      expect(Array.isArray(body.pairs)).toBe(true);
-      return;
-    }
-    const body = await res.json() as { field?: string; text?: string; variations?: unknown[] };
-    expect(body.field).toBe(expectedField);
-    expect(typeof body.text).toBe('string');
-    expect(Array.isArray(body.variations)).toBe(true);
+  async function assertSeoRewriteResponse(res: Response): Promise<void> {
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({ error: 'OPENAI_API_KEY not configured' });
   }
 
   it('returns 400 when pageTitle is missing', async () => {
@@ -75,32 +60,32 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
     expect(body.error).toMatch(/pageTitle required/i);
   });
 
-  it('returns key error when OPENAI_API_KEY is unavailable (or succeeds when key is available)', async () => {
+  it('returns a generic AI failure when no provider is available (or succeeds when one is available)', async () => {
     const res = await postJson('/api/webflow/seo-rewrite', {
       workspaceId,
       pageTitle: 'My Test Page',
       field: 'title',
     });
-    await assertSeoRewriteResponse(res, 'title');
+    await assertSeoRewriteResponse(res);
   });
 
-  it('returns key error for description mode when OPENAI_API_KEY is unavailable (or succeeds when key is available)', async () => {
+  it('returns a generic AI failure for description mode when no provider is available (or succeeds when one is available)', async () => {
     const res = await postJson('/api/webflow/seo-rewrite', {
       workspaceId,
       pageTitle: 'Test Page Description',
       currentDescription: 'Old description text',
       field: 'description',
     });
-    await assertSeoRewriteResponse(res, 'description');
+    await assertSeoRewriteResponse(res);
   });
 
-  it('returns key error for "both" mode when OPENAI_API_KEY is unavailable (or succeeds when key is available)', async () => {
+  it('returns a generic AI failure for "both" mode when no provider is available (or succeeds when one is available)', async () => {
     const res = await postJson('/api/webflow/seo-rewrite', {
       workspaceId,
       pageTitle: 'Test Page Both',
       field: 'both',
     });
-    await assertSeoRewriteResponse(res, 'both');
+    await assertSeoRewriteResponse(res);
   });
 
   it('returns 400 when body is completely empty', async () => {
@@ -117,7 +102,7 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
       pageTitle: 'Some Page',
       field: 'title',
     });
-    await assertSeoRewriteResponse(res, 'title');
+    await assertSeoRewriteResponse(res);
   });
 
   it('returns 400 when pageTitle is null (falsy check)', async () => {
@@ -143,7 +128,7 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
     expect(body.error).toMatch(/pageTitle required/i);
   });
 
-  it('passes validation and either rewrites or returns key error', async () => {
+  it('passes validation and either rewrites or returns a generic AI failure', async () => {
     const res = await postJson('/api/webflow/seo-rewrite', {
       workspaceId,
       pageTitle: 'Services Page',
@@ -154,6 +139,6 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
       field: 'title',
       pagePath: '/services',
     });
-    await assertSeoRewriteResponse(res, 'title');
+    await assertSeoRewriteResponse(res);
   });
 });

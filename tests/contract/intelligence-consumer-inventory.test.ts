@@ -42,9 +42,6 @@ const INVENTORY: Array<{
   { file: 'server/routes/public-analytics.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/rewrite-chat.ts', classification: 'native', targetPath: 'page-assist-builder' },
   { file: 'server/routes/webflow-keywords.ts', classification: 'native', targetPath: 'page-assist-builder' },
-  { file: 'server/routes/webflow-seo-bulk-rewrite.ts', classification: 'native', targetPath: 'page-assist-builder' },
-  { file: 'server/routes/webflow-seo-page-tools.ts', classification: 'native', targetPath: 'page-assist-builder' },
-  { file: 'server/routes/webflow-seo-rewrite.ts', classification: 'native', targetPath: 'page-assist-builder' },
   { file: 'server/routes/webflow-alt-text.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/routes/workspaces.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/seo-audit-ai-recs.ts', classification: 'native', targetPath: 'low-level' },
@@ -52,7 +49,6 @@ const INVENTORY: Array<{
   { file: 'server/webflow-bulk-alt-background-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-bulk-seo-fix-background-job.ts', classification: 'native', targetPath: 'low-level' },
   { file: 'server/webflow-seo-bulk-analyze-job.ts', classification: 'native', targetPath: 'low-level' },
-  { file: 'server/webflow-seo-bulk-rewrite-job.ts', classification: 'native', targetPath: 'page-assist-builder' },
 ];
 
 function listTypeScriptFiles(dir: string): string[] {

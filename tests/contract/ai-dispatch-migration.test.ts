@@ -17,7 +17,6 @@ const migratedGeneralGenerationFiles: Array<{ path: string; aiImport: string }> 
   { path: 'server/routes/google.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/public-analytics.ts', aiImport: "from '../ai.js'" },
   { path: 'server/routes/webflow-keywords.ts', aiImport: "from '../ai.js'" },
-  { path: 'server/routes/webflow-seo-page-tools.ts', aiImport: "from '../ai.js'" },
 ];
 
 const migratedJsonGenerationFiles: Array<{ path: string; aiImport: string }> = [
@@ -43,6 +42,12 @@ const migratedOperationBackedStructuredFiles: Array<{
   { path: 'server/content-posts-ai.ts', aiImport: "from './ai.js'", operations: ['content-post-seo-meta', 'content-post-unify', 'voice-scoring'] },
   { path: 'server/strategy-pov-generator.ts', aiImport: "from './narrative-ai.js'", operations: ['strategy-pov'], callPattern: 'callNarrativeAI({' },
   { path: 'server/routes/workspaces.ts', aiImport: "from '../ai.js'", operations: ['intelligence-profile-autofill'] },
+  {
+    path: 'server/domains/seo-health/seo-copy-generation.ts',
+    aiImport: "from '../../content-posts-ai.js'",
+    operations: ['seo-metadata-variations', 'seo-page-copy-set'],
+    callPattern: 'callCreativeAI({',
+  },
 ];
 
 const migratedParsedJsonTextFiles: Array<{ path: string; aiImport: string }> = [

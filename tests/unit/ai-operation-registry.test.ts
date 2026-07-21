@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getAIOperationPolicyMetadata, getAIOperationRuntimeDefaults, isAIOperationId } from '../../server/ai-operation-registry.js';
+import { MODEL_ROLES } from '../../server/model-manifest.js';
 
 const structuredOperationIds = [
   'brandscript-import',
@@ -19,6 +20,8 @@ const structuredOperationIds = [
   'copy-generation',
   'copy-regeneration',
   'content-publish-field-mapping',
+  'seo-metadata-variations',
+  'seo-page-copy-set',
 ] as const;
 
 describe('AI operation registry', () => {
@@ -37,6 +40,25 @@ describe('AI operation registry', () => {
   it('marks research-required operations explicitly', () => {
     expect(getAIOperationPolicyMetadata('content-post-unify').researchMode).toBe('required');
     expect(getAIOperationPolicyMetadata('content-post-seo-meta').researchMode).toBe('forbidden');
+  });
+
+  it('routes structured SEO copy operations through the canonical creative writer', () => {
+    for (const id of ['seo-metadata-variations', 'seo-page-copy-set'] as const) {
+      expect(isAIOperationId(id)).toBe(true);
+      expect(getAIOperationPolicyMetadata(id)).toMatchObject({
+        domain: 'seo-health',
+        providerIntent: 'either',
+        outputMode: 'json',
+      });
+      expect(getAIOperationRuntimeDefaults(id)).toMatchObject({
+        defaultProvider: 'anthropic',
+        defaultModel: MODEL_ROLES.creativeWriter,
+      });
+    }
+    expect(getAIOperationPolicyMetadata('seo-metadata-variations').executionMode).toBe('sync-or-background');
+    expect(getAIOperationPolicyMetadata('seo-page-copy-set').executionMode).toBe('sync-only');
+    expect(getAIOperationRuntimeDefaults('seo-metadata-variations').feature).toBe('seo-rewrite');
+    expect(getAIOperationRuntimeDefaults('seo-page-copy-set').feature).toBe('content-score');
   });
 
   it('defaults generation to inflight-only and requires explicit TTL opt-in', () => {
