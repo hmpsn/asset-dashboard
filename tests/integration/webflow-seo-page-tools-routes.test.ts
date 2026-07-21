@@ -50,6 +50,7 @@ vi.mock('../../server/content-posts-ai.js', async (importOriginal) => {
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '../../server/workspaces.js';
 
 const originalOpenAIKey = process.env.OPENAI_API_KEY;
+const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
 const originalAppPassword = process.env.APP_PASSWORD;
 
 let server: http.Server | undefined;
@@ -113,6 +114,8 @@ afterAll(async () => {
   // Restore env vars.
   if (originalOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
   else process.env.OPENAI_API_KEY = originalOpenAIKey;
+  if (originalAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+  else process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
 
   if (originalAppPassword === undefined) delete process.env.APP_PASSWORD;
   else process.env.APP_PASSWORD = originalAppPassword;
@@ -219,6 +222,7 @@ describe('POST /api/webflow/seo-copy', () => {
 
   it('returns a generic AI failure when no creative provider is configured', async () => {
     delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
 
     const ws = createWorkspace('SEO Copy No Key WS');
     workspaceIds.push(ws.id);
@@ -230,7 +234,7 @@ describe('POST /api/webflow/seo-copy', () => {
 
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toEqual({ error: 'SEO copy generation failed' });
+    expect(body).toEqual({ error: 'OPENAI_API_KEY not configured' });
   });
 
   it('calls the canonical creative operation and returns parsed SEO copy fields', async () => {
@@ -322,7 +326,7 @@ describe('POST /api/webflow/seo-copy', () => {
     expect(body.metaDescription.length).toBeLessThanOrEqual(160);
   });
 
-  it('returns a generic error without a padded response when AI returns invalid JSON', async () => {
+  it('preserves the bounded invalid-JSON diagnostic without a padded response', async () => {
     process.env.OPENAI_API_KEY = 'test-key-configured';
 
     const ws = createWorkspace('SEO Copy Bad JSON WS');
@@ -336,8 +340,8 @@ describe('POST /api/webflow/seo-copy', () => {
     });
 
     expect(res.status).toBe(500);
-    const body = await res.json() as { error: string };
-    expect(body).toEqual({ error: 'SEO copy generation failed' });
+    const body = await res.json() as { error: string; raw: string };
+    expect(body).toEqual({ error: 'AI returned invalid JSON', raw: 'this is not json at all' });
   });
 
   it('filters out internal link suggestions that reference the current page path', async () => {
