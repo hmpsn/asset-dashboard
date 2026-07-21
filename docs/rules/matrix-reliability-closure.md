@@ -69,7 +69,9 @@ No lane may edit an unowned file without stopping for reassignment.
   and a provider failure. Under-target guidance may expand only from existing frozen authority or
   typed placeholders; no repeated paid correction loop is added.
 - Prompt-policy changes are gated by `content-matrix-output-quality-v2`. Heading/count truth and
-  typed outcome correctness are unflagged. Mixed-model automatic revision remains prohibited.
+  typed outcome correctness are unflagged. Preview freezes the resolved policy value into the
+  accepted target and fingerprint; generation, audit, recovery, and retry must never re-read the
+  live flag for an accepted run. Mixed-model automatic revision remains prohibited.
 - A welded geo/service phrase is a revision-driving model-audit warning when it can be repaired
   without changing facts, evidence, locked headings, or keyword authority.
 
