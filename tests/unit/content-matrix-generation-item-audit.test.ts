@@ -61,6 +61,7 @@ const cleanupWorkspaceIds = new Set<string>();
 afterEach(() => {
   for (const workspaceId of cleanupWorkspaceIds) {
     setWorkspaceFlagOverride('content-matrix-generation', workspaceId, null);
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', workspaceId, null);
     deleteWorkspace(workspaceId);
   }
   cleanupWorkspaceIds.clear();
@@ -637,6 +638,63 @@ describe('auditMatrixGenerationItem', () => {
     });
     expect(listJobs(committed.fixture.workspaceId)
       .filter(job => job.type === 'content-publish')).toHaveLength(publishJobsBefore);
+  });
+
+  it('ignores a legacy blocking set report when a one-cell run reaches human approval', async () => {
+    const committed = await committedFixture(true);
+    const audited = await auditMatrixGenerationItem({
+      workspaceId: committed.fixture.workspaceId,
+      itemId: committed.item.id,
+      expectedItemRevision: committed.item.revision,
+      expectedPostRevision: committed.post.generationRevision,
+      executionChainId: 'matrix-legacy-single-set-audit-chain',
+    }, {
+      buildKnownPageCensus: async () => ({ paths: [], complete: true }),
+      auditCandidate: async input => operationResult(
+        input,
+        'content-matrix-item-audit',
+        { revisionRecommended: false, findings: [] },
+      ),
+    });
+    const currentRun = getPersistedMatrixGenerationRun(
+      committed.fixture.workspaceId,
+      audited.item.runId,
+    )!;
+    expect(currentRun.selections).toHaveLength(1);
+    const runWithLegacyReport = saveMatrixGenerationSetAuditReport({
+      workspaceId: committed.fixture.workspaceId,
+      runId: currentRun.id,
+      expectedRunRevision: currentRun.revision,
+      report: {
+        verdict: 'source_correction_required',
+        findings: [{
+          id: 'mgsf-legacy-single-blocker',
+          source: 'model',
+          kind: 'provenance',
+          code: 'legacy_single_cell_blocker',
+          severity: 'error',
+          message: 'A pre-M0 set report that is no longer authoritative.',
+          affectedItemIds: [audited.item.id],
+          affectedTargetIds: [],
+          requiresHumanReview: false,
+        }],
+        passCount: 1,
+        modelProvenance: provenance('content-matrix-set-audit'),
+        auditedAt: new Date().toISOString(),
+      },
+    });
+
+    const approved = approveMatrixPageForPublishReadiness({
+      workspaceId: committed.fixture.workspaceId,
+      runId: runWithLegacyReport.id,
+      itemId: audited.item.id,
+      expectedRunRevision: runWithLegacyReport.revision,
+      expectedItemRevision: audited.item.revision,
+      expectedPostRevision: audited.post.generationRevision,
+      approvedBy: { actorType: 'operator', actorId: 'matrix-approver' },
+    });
+
+    expect(approved.item.approvalEvidence).toMatchObject({ postId: audited.post.id });
   });
 
   it('requires a nonblocking set audit before human approval for a multi-cell run', async () => {

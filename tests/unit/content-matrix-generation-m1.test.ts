@@ -58,6 +58,7 @@ const cleanupWorkspaceIds = new Set<string>();
 afterEach(() => {
   for (const workspaceId of cleanupWorkspaceIds) {
     setWorkspaceFlagOverride('content-matrix-generation', workspaceId, null);
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', workspaceId, null);
     deleteWorkspace(workspaceId);
   }
   cleanupWorkspaceIds.clear();
@@ -380,6 +381,7 @@ async function readyTarget(fixture: Fixture, cellId: string): Promise<MatrixGene
 
 function structuralTarget(target: MatrixGenerationPreviewTarget): ResolvedMatrixStructuralTarget {
   const {
+    outputQualityV2: _outputQualityV2,
     voiceSnapshot: _voiceSnapshot,
     identitySnapshot: _identitySnapshot,
     evidenceRequirements: _evidenceRequirements,
@@ -544,6 +546,33 @@ describe('content matrix generation M1', () => {
         fieldPath: 'workspace_id',
       },
     });
+  });
+
+  it('freezes output-quality policy in preview authority and invalidates the fingerprint on change', async () => {
+    const fixture = createFixture(['Austin']);
+    const cell = fixture.matrix.cells[0];
+    seedBrandAuthority(fixture.workspaceId);
+    await resolveRequiredServiceEvidence(fixture, cell.id);
+
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', fixture.workspaceId, false);
+    const legacyPolicy = await readyTarget(fixture, cell.id);
+    expect(legacyPolicy.outputQualityV2).toBe(false);
+
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', fixture.workspaceId, true);
+    const qualityPolicy = await readyTarget(fixture, cell.id);
+    expect(qualityPolicy.outputQualityV2).toBe(true);
+    expect(qualityPolicy.effectiveInputFingerprint).not.toBe(
+      legacyPolicy.effectiveInputFingerprint,
+    );
+
+    const execution = runAtGeneratingPost(
+      fixture,
+      qualityPolicy,
+      `matrix-policy-${randomUUID()}`,
+    );
+    setWorkspaceFlagOverride('content-matrix-output-quality-v2', fixture.workspaceId, false);
+    expect(getMatrixGenerationItem(fixture.workspaceId, execution.item.id)?.previewTarget)
+      .toMatchObject({ outputQualityV2: true });
   });
 
   it('marks approved-artifact replacement as human-only while normal evidence stays resolvable', async () => {
