@@ -89,9 +89,11 @@ function requireSha256(value: string, field: string): string {
 
 function requireIsoTimestamp(value: string, field: string): string {
   const parsed = Date.parse(value);
+  const canonicalInput = value.replace(/(?<!\.\d{3})Z$/, '.000Z');
   if (value.trim() !== value
     || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)
-    || !Number.isFinite(parsed)) {
+    || !Number.isFinite(parsed)
+    || new Date(parsed).toISOString() !== canonicalInput) {
     throw new ContentQualityBenchmarkSourceError(`${field} must be a valid ISO timestamp`);
   }
   return value;

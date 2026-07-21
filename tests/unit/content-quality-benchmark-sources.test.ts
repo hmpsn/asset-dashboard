@@ -311,6 +311,7 @@ describe('content quality benchmark source qualification', () => {
 
   it.each([
     { label: 'invalid post timestamp', postOverrides: { updatedAt: 'not-a-date' } },
+    { label: 'impossible calendar timestamp', postOverrides: { updatedAt: '2026-02-30T12:00:00.000Z' } },
     {
       label: 'invalid audit timestamp',
       itemOverrides: {
