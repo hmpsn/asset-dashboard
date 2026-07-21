@@ -20,7 +20,7 @@ describe('factual AI output contracts', () => {
     }
   });
 
-  it('keeps SEO audit and page copy generation grounded, sanitized, and JSON-validated', () => {
+  it('keeps SEO audit grounded and routes page copy through its validated named operation', () => {
     const audit = source('server/seo-audit-ai-recs.ts');
     expect(audit).toContain('buildSystemPrompt');
     expect(audit).toContain('sanitizeForPromptInjection');
@@ -30,27 +30,24 @@ describe('factual AI output contracts', () => {
     expect(audit).toContain('researchMode: true');
 
     const pageTools = source('server/routes/webflow-seo-page-tools.ts');
-    expect(pageTools).toContain('sanitizeForPromptInjection');
-    expect(pageTools).toContain('seoCopyResponseSchema');
-    expect(pageTools).toContain('filterSeoCopyInternalLinks');
-    expect(pageTools).toContain("responseFormat: { type: 'json_object' }");
-    expect(pageTools).toContain('researchMode: true');
+    expect(pageTools).toContain('generateSeoPageCopySet');
+    expect(pageTools).toContain('approvedEvidence');
+    expect(pageTools).not.toContain('callAI');
+    expect(pageTools).not.toContain('seoCopyResponseSchema');
   });
 
-  it('keeps rewrite paths on JSON mode and validated normalization instead of prose fallback padding', () => {
+  it('routes bulk rewrite generation through the named validated metadata operation', () => {
     for (const path of [
-      'server/routes/webflow-seo-rewrite.ts',
       'server/routes/webflow-seo-bulk-rewrite.ts',
       'server/webflow-seo-bulk-rewrite-job.ts',
     ]) {
       const text = source(path);
-      expect(text, path).toContain('normalizeSeoRewriteVariations');
-      expect(text, path).toContain('normalizeSeoRewritePairs');
-      expect(text, path).toContain('sanitizeForPromptInjection');
-      expect(text, path).toContain('sanitizeQueryForPrompt');
-      expect(text, path).toContain('json: true');
-      expect(text, path).toContain('researchMode: true');
-      expect(text, path).not.toContain('json: false');
+      expect(text, path).toContain('generateSeoMetadataVariations');
+      expect(text, path).toContain('approvedEvidence');
+      expect(text, path).not.toContain('callCreativeAI');
+      expect(text, path).not.toContain('parseJsonFallback');
+      expect(text, path).not.toContain('normalizeSeoRewriteVariations');
+      expect(text, path).not.toContain('normalizeSeoRewritePairs');
     }
   });
 

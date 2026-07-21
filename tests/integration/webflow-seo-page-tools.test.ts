@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 
-const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '' } });
+const ctx = createEphemeralTestContext(import.meta.url, { env: { OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '' } });
 const { api, postJson } = ctx;
 
 let workspace: SeededFullWorkspace;
@@ -103,9 +103,8 @@ describe('POST /api/webflow/seo-copy — validation', () => {
   });
 });
 
-describe('POST /api/webflow/seo-copy — with valid workspace, no OPENAI key', () => {
-  it('returns 500 when OPENAI_API_KEY is not configured in test env', async () => {
-    // In test env OPENAI_API_KEY is absent → route returns 500 before making AI call
+describe('POST /api/webflow/seo-copy — with valid workspace and no AI provider', () => {
+  it('preserves the immediate failure contract when no creative provider is configured', async () => {
     const res = await postJson('/api/webflow/seo-copy', {
       workspaceId: workspace.workspaceId,
       pagePath: '/about',
@@ -115,7 +114,7 @@ describe('POST /api/webflow/seo-copy — with valid workspace, no OPENAI key', (
     });
     expect(res.status).toBe(500);
     const body = await res.json() as { error: string };
-    expect(body.error).toContain('OPENAI_API_KEY');
+    expect(body).toEqual({ error: 'OPENAI_API_KEY not configured' });
   });
 
   it('does not return 404 for an existing workspace', async () => {

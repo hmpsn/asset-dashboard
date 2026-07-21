@@ -43,7 +43,7 @@
     {
       "id": 5,
       "title": "SEO Editor + Bulk AI Rewrite",
-      "oneLiner": "Edit titles/descriptions via Webflow API with AI suggestions, 3-variation bulk rewrites, and per-page client approval",
+      "oneLiner": "Edit titles/descriptions via Webflow API with grounded, brand-aware creative suggestions, consistent 3-variation bulk rewrites, and per-page client approval",
       "category": "seo",
       "painPoints": ["technical-seo", "scale"],
       "tier": "free",

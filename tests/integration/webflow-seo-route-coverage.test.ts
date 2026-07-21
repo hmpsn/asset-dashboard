@@ -1,7 +1,7 @@
 // tests/integration/webflow-seo-route-coverage.test.ts
 //
 // Low-risk route coverage for Webflow SEO routes extracted in PR #458.
-// Uses createApp() in-process so OpenAI helper mocks apply to the SEO copy route.
+// Uses createApp() in-process so provider-helper mocks apply to the SEO copy route.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import http from 'http';
@@ -15,6 +15,7 @@ import type { SeededFullWorkspace } from '../fixtures/workspace-seed.js';
 import { createUser, deleteUser } from '../../server/users.js';
 import {
   setupOpenAIMocks,
+  mockOpenAIResponse,
   mockOpenAIJsonResponse,
   mockOpenAIError,
   getCapturedOpenAICalls,
@@ -335,11 +336,11 @@ describe('Webflow SEO copy route coverage', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
       feature: 'content-score',
-      model: 'gpt-5.6-luna',
+      model: 'gpt-5.6-terra',
     });
-    expect(calls[0].messages[1]?.content).toContain('PAGE METADATA EVIDENCE');
+    expect(calls[0].messages[1]?.content).toContain('CURRENT PAGE PATH');
     expect(calls[0].messages[1]?.content).toContain('<untrusted_user_content>');
-    expect(calls[0].messages[1]?.content).toContain('"pagePath": "/services/local-seo"');
+    expect(calls[0].messages[1]?.content).toContain('"path": "/services/local-seo"');
   });
 
   it('returns an error instead of success when SEO copy AI generation fails', async () => {
@@ -358,5 +359,19 @@ describe('Webflow SEO copy route coverage', () => {
     expect(status).toBe(500);
     expect(body).toEqual({ error: 'SEO copy generation failed' });
     expect(getCapturedOpenAICalls()).toHaveLength(1);
+  });
+
+  it('preserves the malformed-output response contract', async () => {
+    mockOpenAIResponse('content-score', 'not-json-from-provider');
+
+    const { status, body } = await postJson(baseUrl, '/api/webflow/seo-copy', {
+      workspaceId: ws.workspaceId,
+      pagePath: '/services/local-seo',
+      pageTitle: 'Local SEO',
+      pageContent: 'Local SEO services for growing regional businesses.',
+    });
+
+    expect(status).toBe(500);
+    expect(body).toEqual({ error: 'AI returned invalid JSON', raw: 'not-json-from-provider' });
   });
 });

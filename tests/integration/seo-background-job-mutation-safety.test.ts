@@ -65,7 +65,9 @@ vi.mock('../../server/content-posts-ai.js', async importOriginal => {
       if (rewriteAiState.mode === 'error') {
         throw new Error('Bulk rewrite provider failure');
       }
-      return JSON.stringify(['First improved title', 'Second improved title', 'Third improved title']);
+      return JSON.stringify({
+        variations: ['First improved title', 'Second improved title', 'Third improved title'],
+      });
     }),
   };
 });

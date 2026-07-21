@@ -61,6 +61,27 @@ export interface SeoSuggestion {
   updatedAt: string;
 }
 
+export interface SaveSeoSuggestionOptions {
+  workspaceId: string;
+  siteId: string;
+  pageId: string;
+  pageTitle: string;
+  pageSlug: string;
+  field: 'title' | 'description';
+  currentValue: string;
+  variations: string[];
+}
+
+export interface SaveSeoSuggestionPairOptions {
+  workspaceId: string;
+  siteId: string;
+  pageId: string;
+  pageTitle: string;
+  pageSlug: string;
+  title: Pick<SaveSeoSuggestionOptions, 'currentValue' | 'variations'>;
+  description: Pick<SaveSeoSuggestionOptions, 'currentValue' | 'variations'>;
+}
+
 interface SuggestionRow {
   id: string;
   workspace_id: string;
@@ -96,16 +117,7 @@ function rowToSuggestion(row: SuggestionRow): SeoSuggestion {
 }
 
 /** Upsert a suggestion (replaces any existing suggestion for the same page + field). */
-export function saveSuggestion(opts: {
-  workspaceId: string;
-  siteId: string;
-  pageId: string;
-  pageTitle: string;
-  pageSlug: string;
-  field: 'title' | 'description';
-  currentValue: string;
-  variations: string[];
-}): SeoSuggestion {
+export function saveSuggestion(opts: SaveSeoSuggestionOptions): SeoSuggestion {
   const id = randomUUID();
   const now = new Date().toISOString();
   const variationsJson = JSON.stringify(opts.variations);
@@ -128,6 +140,33 @@ export function saveSuggestion(opts: {
   const row = db.prepare(`SELECT * FROM seo_suggestions WHERE workspace_id = ? AND page_id = ? AND field = ?`)
     .get(opts.workspaceId, opts.pageId, opts.field) as SuggestionRow;
   return rowToSuggestion(row);
+}
+
+/** Save the aligned title + description result from a single `both` generation atomically. */
+export function saveSuggestionPair(opts: SaveSeoSuggestionPairOptions): [SeoSuggestion, SeoSuggestion] {
+  const savePair = db.transaction((): [SeoSuggestion, SeoSuggestion] => [
+    saveSuggestion({
+      workspaceId: opts.workspaceId,
+      siteId: opts.siteId,
+      pageId: opts.pageId,
+      pageTitle: opts.pageTitle,
+      pageSlug: opts.pageSlug,
+      field: 'title',
+      currentValue: opts.title.currentValue,
+      variations: opts.title.variations,
+    }),
+    saveSuggestion({
+      workspaceId: opts.workspaceId,
+      siteId: opts.siteId,
+      pageId: opts.pageId,
+      pageTitle: opts.pageTitle,
+      pageSlug: opts.pageSlug,
+      field: 'description',
+      currentValue: opts.description.currentValue,
+      variations: opts.description.variations,
+    }),
+  ]);
+  return savePair();
 }
 
 /** List all pending suggestions for a workspace, optionally filtered by field. */

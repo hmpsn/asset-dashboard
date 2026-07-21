@@ -7,6 +7,7 @@
 import { Router } from 'express';
 
 import { requireWorkspaceAccess } from '../auth.js';
+import { isCreativeSeoProviderConfigured } from '../domains/seo-health/seo-copy-generation.js';
 import { createJob, hasActiveJob, registerAbort } from '../jobs.js';
 import { validate, z } from '../middleware/validate.js';
 import { seoBulkAcceptFixSchema, seoBulkAnalyzePageSchema, seoBulkRewritePageSchema } from '../schemas/seo-bulk-jobs.js';
@@ -65,9 +66,7 @@ router.post('/api/seo/:workspaceId/bulk-rewrite', requireWorkspaceAccess('worksp
   const ws = getWorkspace(workspaceId);
   if (!ws) return res.status(404).json({ error: 'Workspace not found' });
   if (ws.webflowSiteId && siteId !== ws.webflowSiteId) return res.status(400).json({ error: 'siteId does not belong to this workspace' });
-
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!isCreativeSeoProviderConfigured()) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
   const existingJob = hasActiveJob('seo-bulk-rewrite', workspaceId);
   if (existingJob) return res.status(409).json({ error: 'A bulk rewrite job is already running', jobId: existingJob.id });

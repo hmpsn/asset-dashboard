@@ -13,6 +13,7 @@ import { randomUUID } from 'crypto';
 import db from '../../server/db/index.js';
 import {
   saveSuggestion,
+  saveSuggestionPair,
   listSuggestions,
   getPendingSuggestion,
   listPendingSuggestionsByIds,
@@ -144,6 +145,61 @@ describe('saveSuggestion', () => {
     expect(titleSug.field).toBe('title');
     expect(descSug.field).toBe('description');
     expect(titleSug.id).not.toBe(descSug.id);
+  });
+});
+
+describe('saveSuggestionPair', () => {
+  const wsId = makeWs('save-pair');
+
+  it('rolls back the title upsert when the description insert fails', () => {
+    const pageId = `/page-pair-rollback-${randomUUID().slice(0, 6)}`;
+    const existingTitle = saveSuggestion(makeSuggestionOpts(wsId, {
+      pageId,
+      field: 'title',
+      currentValue: 'Original title',
+      variations: ['Original A', 'Original B', 'Original C'],
+    }));
+    const triggerName = `test_seo_pair_abort_${randomUUID().replaceAll('-', '')}`;
+
+    db.exec(`
+      CREATE TRIGGER ${triggerName}
+      BEFORE INSERT ON seo_suggestions
+      WHEN NEW.workspace_id = '${wsId}'
+        AND NEW.page_id = '${pageId}'
+        AND NEW.field = 'description'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced description insert failure');
+      END;
+    `);
+
+    try {
+      expect(() => saveSuggestionPair({
+        workspaceId: wsId,
+        siteId: 'site_123',
+        pageId,
+        pageTitle: 'Pair rollback page',
+        pageSlug: '/pair-rollback',
+        title: {
+          currentValue: 'Replacement title',
+          variations: ['Replacement A', 'Replacement B', 'Replacement C'],
+        },
+        description: {
+          currentValue: 'Original description',
+          variations: ['Description A', 'Description B', 'Description C'],
+        },
+      })).toThrow(/forced description insert failure/);
+    } finally {
+      db.exec(`DROP TRIGGER IF EXISTS ${triggerName}`);
+    }
+
+    const persisted = listSuggestions(wsId).filter(suggestion => suggestion.pageId === pageId);
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({
+      id: existingTitle.id,
+      field: 'title',
+      currentValue: 'Original title',
+      variations: ['Original A', 'Original B', 'Original C'],
+    });
   });
 });
 

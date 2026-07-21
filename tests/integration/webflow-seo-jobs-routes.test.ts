@@ -35,6 +35,7 @@ import db from '../../server/db/index.js';
 
 // ── Saved env state ───────────────────────────────────────────────────────────
 const savedOpenAIKey = process.env.OPENAI_API_KEY;
+const savedAnthropicKey = process.env.ANTHROPIC_API_KEY;
 const savedWebflowToken = process.env.WEBFLOW_API_TOKEN;
 
 // ── In-process test server ────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ async function startTestServer(): Promise<void> {
   // OPENAI_API_KEY starts absent so guard tests can verify the 500 path.
   // Individual tests that need it set will set it themselves.
   delete process.env.OPENAI_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
   delete process.env.WEBFLOW_API_TOKEN;
 
   const { createApp } = await import('../../server/app.js');
@@ -110,6 +112,7 @@ beforeAll(async () => {
 afterEach(() => {
   // Reset env to the neutral "key absent" state after each test.
   delete process.env.OPENAI_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
   delete process.env.WEBFLOW_API_TOKEN;
   // Clear any jobs created by happy-path tests so duplicate-guard tests are isolated.
   clearJobsForWorkspace(wsId);
@@ -124,6 +127,8 @@ afterAll(async () => {
   // Restore env
   if (savedOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
   else process.env.OPENAI_API_KEY = savedOpenAIKey;
+  if (savedAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+  else process.env.ANTHROPIC_API_KEY = savedAnthropicKey;
   if (savedWebflowToken === undefined) delete process.env.WEBFLOW_API_TOKEN;
   else process.env.WEBFLOW_API_TOKEN = savedWebflowToken;
 });
@@ -263,19 +268,32 @@ describe('POST /api/seo/:workspaceId/bulk-rewrite', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 500 when OPENAI_API_KEY is not set', async () => {
+  it('starts with Anthropic only because the canonical creative operation selects its provider', async () => {
+    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+    const res = await postJson(`/api/seo/${wsId}/bulk-rewrite`, {
+      siteId: KNOWN_SITE_ID,
+      pages: [VALID_REWRITE_PAGE],
+      field: 'title',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { jobId: string };
+    expect(typeof body.jobId).toBe('string');
+    expect(body.jobId.length).toBeGreaterThan(0);
+  });
+
+  it('preserves immediate failure when no creative provider is configured', async () => {
     const res = await postJson(`/api/seo/${wsId}/bulk-rewrite`, {
       siteId: KNOWN_SITE_ID,
       pages: [VALID_REWRITE_PAGE],
       field: 'title',
     });
     expect(res.status).toBe(500);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/OPENAI_API_KEY not configured/i);
+    await expect(res.json()).resolves.toEqual({ error: 'OPENAI_API_KEY not configured' });
+    expect(listJobs(wsId)).toHaveLength(0);
   });
 
-  it('returns 200 with { jobId } when workspace exists and OPENAI_API_KEY is set', async () => {
-    process.env.OPENAI_API_KEY = 'test-openai-key-rewrite';
+  it('returns 200 with { jobId } when workspace exists', async () => {
+    process.env.OPENAI_API_KEY = 'test-openai-key';
     // wsId has no webflowSiteId set, so the siteId mismatch guard is skipped.
     const res = await postJson(`/api/seo/${wsId}/bulk-rewrite`, {
       siteId: KNOWN_SITE_ID,
@@ -289,8 +307,7 @@ describe('POST /api/seo/:workspaceId/bulk-rewrite', () => {
   });
 
   it('returns 409 when a bulk-rewrite job is already active for the workspace', async () => {
-    process.env.OPENAI_API_KEY = 'test-openai-key-rewrite-dup';
-
+    process.env.OPENAI_API_KEY = 'test-openai-key';
     const first = await postJson(`/api/seo/${wsId}/bulk-rewrite`, {
       siteId: KNOWN_SITE_ID,
       pages: [VALID_REWRITE_PAGE],
