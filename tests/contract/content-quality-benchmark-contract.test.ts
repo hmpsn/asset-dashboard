@@ -33,7 +33,7 @@ describe('content quality benchmark shared contract', () => {
   it('keeps raw HTML in private cases and out of aggregate reports', () => {
     const privateCase: ContentQualityBenchmarkCase = {
       schemaVersion: 1,
-      caseId: 'case_service_01',
+      caseId: 'case_001',
       pageType: 'service',
       generationRoleCoverage: ['proof', 'faq', 'cta'],
       verticalSensitivity: 'provenance_sensitive',

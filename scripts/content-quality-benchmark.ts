@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -34,7 +34,7 @@ import {
 
 const DEFAULT_OUTPUT = 'artifacts/content-quality-benchmark/report.json';
 const BLINDED_LABEL = /^candidate_[a-z0-9]{1,4}$/;
-const SAFE_CASE_ID = /^case_[a-z0-9]+(?:_[a-z0-9]+)*$/;
+const SAFE_CASE_ID = /^case_[0-9]{3}$/;
 const FORBIDDEN_FLAGS = new Set([
   '--approve', '--db-sync', '--generate', '--generation', '--persist', '--publish',
   '--retry', '--save', '--send', '--send-to-client', '--start-generation', '--sync-staging',
@@ -46,8 +46,7 @@ const blindedLabelSchema = z.string().regex(
   'Candidate labels must be opaque values such as candidate_a.',
 );
 const safeCaseIdSchema = z.string()
-  .regex(SAFE_CASE_ID, 'Use a non-identifying case_* ID.')
-  .refine(value => !/(?:^|_)(?:ws|workspace)(?:_|$)/.test(value), 'Case IDs must not contain workspace identity.');
+  .regex(SAFE_CASE_ID, 'Use an opaque case ID from case_001 through case_999.');
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/, 'Expected a lowercase SHA-256 digest.');
 const referenceSchema = z.object({
   kind: z.enum(CONTENT_QUALITY_BENCHMARK_REFERENCE_KINDS),
@@ -371,14 +370,25 @@ async function readJson(filePath: string): Promise<unknown> {
 
 export async function runBenchmarkCli(argv: string[]): Promise<string> {
   const options = parseBenchmarkCli(argv);
+  const casesPath = path.resolve(options.casesPath);
+  const ratingsPath = path.resolve(options.ratingsPath);
+  const outputPath = path.resolve(options.outputPath);
+  if (outputPath === casesPath || outputPath === ratingsPath) {
+    throw new Error('Benchmark output must not overwrite either private input file.');
+  }
   const report = buildBenchmarkReport(
-    await readJson(options.casesPath),
-    await readJson(options.ratingsPath),
+    await readJson(casesPath),
+    await readJson(ratingsPath),
     options.baselineLabel,
   );
-  const outputPath = path.resolve(options.outputPath);
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  const temporaryPath = `${outputPath}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+    await rename(temporaryPath, outputPath);
+  } finally {
+    await rm(temporaryPath, { force: true });
+  }
   return outputPath;
 }
 

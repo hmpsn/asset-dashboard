@@ -6,7 +6,7 @@ The content-quality benchmark measures whether generation changes improve approv
 
 - The benchmark extends the existing AI reliability registry and matrix runtime audits. It is not a second scoring platform.
 - Raw approved HTML, prompts, evidence, URLs, workspace IDs, client identity, and reviewer identity stay under gitignored `artifacts/content-quality-benchmark/` or an explicitly supplied local path.
-- Committed data is limited to typed schemas, synthetic fixtures, content hashes, rubric versions, and owner-approved aggregate reports with no recoverable client text.
+- Committed data is limited to typed schemas, synthetic fixtures, content hashes, rubric versions, and owner-approved aggregate reports with no recoverable client text. Case IDs use opaque `case_NNN` values; descriptive client, location, service, or workspace labels are invalid.
 - Approved matrix posts qualify only through exact human approval evidence tied to the current post revision. Approved copy sections and operator-curated external pages require explicit source selection. A merely generated or review-ready artifact is not approved copy.
 - Benchmark reads never modify voice authority, copy samples, content artifacts, approvals, or evidence rows.
 
@@ -33,7 +33,7 @@ npm run benchmark:content-quality -- \
   --baseline-label candidate_a
 ```
 
-The default output is `artifacts/content-quality-benchmark/report.json`. An explicit output path is allowed because the report schema excludes raw copy, prompts, evidence, workspace identity, URLs, reviewer notes, and provider/model identity.
+The default output is `artifacts/content-quality-benchmark/report.json`. An explicit output path is allowed because the report schema excludes raw copy, prompts, evidence, workspace identity, URLs, reviewer notes, and provider/model identity. The evaluator refuses to overwrite either private input and publishes the report through an atomic temporary-file rename.
 
 ## Recommendation gate
 

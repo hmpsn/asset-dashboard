@@ -45,7 +45,7 @@ function candidate(anonymousLabel: string, options: {
 function benchmarkCase(index: number, candidateB: Parameters<typeof candidate>[1] = {}) {
   return {
     schemaVersion: 1,
-    caseId: `case_service_${index}`,
+    caseId: `case_${String(index).padStart(3, '0')}`,
     pageType: 'service',
     generationRoleCoverage: ['proof', 'faq', 'cta'],
     verticalSensitivity: 'provenance_sensitive',
@@ -194,7 +194,7 @@ describe('content quality benchmark evaluator', () => {
 
     const withWorkspaceIdentity = { ...benchmarkCase(1), workspaceId: 'ws_private' };
     expect(benchmarkCaseSchema.safeParse(withWorkspaceIdentity).success).toBe(false);
-    expect(benchmarkCaseSchema.safeParse({ ...benchmarkCase(1), caseId: 'case_ws_private' }).success).toBe(false);
+    expect(benchmarkCaseSchema.safeParse({ ...benchmarkCase(1), caseId: 'case_rinse_whitening_sarasota' }).success).toBe(false);
     const unblinded = benchmarkCase(1);
     unblinded.candidateVariants[0].anonymousLabel = 'candidate_baseline';
     expect(benchmarkCaseSchema.safeParse(unblinded).success).toBe(false);
@@ -235,6 +235,30 @@ describe('content quality benchmark evaluator', () => {
       expect(output).not.toContain(SECRET_REFERENCE);
       expect(output).not.toContain(SECRET_MODEL);
       expect(output).not.toContain(SECRET_PROVIDER);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to overwrite either private input and preserves both files', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'content-quality-benchmark-collision-'));
+    try {
+      const input = comparison();
+      const casesPath = path.join(directory, 'cases.json');
+      const ratingsPath = path.join(directory, 'ratings.json');
+      const privateCases = JSON.stringify(input.cases);
+      const privateRatings = JSON.stringify(input.ratings);
+      await writeFile(casesPath, privateCases, 'utf8');
+      await writeFile(ratingsPath, privateRatings, 'utf8');
+
+      await expect(runBenchmarkCli([
+        '--cases', casesPath,
+        '--ratings', ratingsPath,
+        '--baseline-label', 'candidate_a',
+        '--output', casesPath,
+      ])).rejects.toThrow(/must not overwrite/i);
+      await expect(readFile(casesPath, 'utf8')).resolves.toBe(privateCases);
+      await expect(readFile(ratingsPath, 'utf8')).resolves.toBe(privateRatings);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
