@@ -545,6 +545,8 @@ describe('generateBrief — prompt construction', () => {
     expect(promptContent).toContain('RELATED KEYWORDS');
     expect(promptContent).toContain('best seo tools');
     expect(promptContent).toContain('free seo tools');
+    expect(promptContent).toContain('FACTUAL SPECIFICS AUTHORITY');
+    expect(promptContent).toContain('explicitly labeled verified provider, analytics, or source evidence');
   });
 
   it('includes GA4 page performance data in the prompt', async () => {
@@ -919,6 +921,8 @@ describe('regenerateBrief — refinement with feedback', () => {
     expect(promptContent).toContain('USER FEEDBACK');
     expect(promptContent).toContain('Add more technical depth and case studies.');
     expect(promptContent).toContain(originalBrief.suggestedTitle);
+    expect(promptContent).toContain('FACTUAL SPECIFICS AUTHORITY');
+    expect(promptContent).toContain('raw SERP or competitor copy');
   });
 
   it('preserves inherited fields from the original brief', async () => {
@@ -1083,6 +1087,8 @@ describe('regenerateOutline — outline-only regeneration', () => {
     const promptContent = (outlineCall!.messages.find(m => m.role === 'user') ?? outlineCall!.messages[0]).content;
     expect(promptContent).toContain('Add more how-to sections.');
     expect(promptContent).toContain('addresses the feedback');
+    expect(promptContent).toContain('FACTUAL SPECIFICS AUTHORITY');
+    expect(promptContent).toContain('raw SERP or competitor copy');
   });
 
   it('rejects { outline: [...] } wrapper — prompt must return a bare array', async () => {

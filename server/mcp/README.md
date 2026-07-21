@@ -61,6 +61,27 @@ Preview remains side-effect free; paid generation still requires an exact accept
 explicit human confirmation; generated work still stops for human review; and no tool gains an
 automatic approval, client-send, or publication path.
 
+### Desktop workflow prompts
+
+`/mcp/operator` advertises the MCP `prompts` capability and exposes three immutable,
+user-selected starters through `prompts/list` and `prompts/get`:
+
+- `triage_studio_portfolio`
+- `review_workspace_as_client`
+- `run_content_matrix_generation_safely`
+
+Fetching a prompt only returns deterministic instructions. It performs no database read, tool
+call, mutation, job, provider request, or paid operation. The matrix workflow stops on blockers,
+shows the exact current fingerprints, limits, and maximum estimate, and requires fresh
+preview-specific confirmation immediately before paid start. Same-authority retry requires a
+separate exact-item/available-budget confirmation and stops when no bounded retry estimate exists;
+changed authority returns to preview/start instead of retry. The workflow stops at human review
+and never approves, sends, or publishes.
+
+The full `/mcp` profile remains unchanged and does not advertise these operator prompts. Desktop
+clients without native MCP prompt discovery can use the equivalent copyable starters in
+`docs/workflows/mcp-operator-workflow-starters.md`.
+
 ### Workspace scope and parameter casing (gotcha)
 
 Most tools operate on **one** client workspace. Seven tools are explicitly global and therefore

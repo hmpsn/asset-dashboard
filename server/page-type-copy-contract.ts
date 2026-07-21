@@ -214,3 +214,31 @@ export function getPageTypeOutlineContract(pageType?: string): PageTypeOutlineCo
 export function getPageTypeOutlineGuidance(pageType?: string): string {
   return PAGE_TYPE_OUTLINE_CONTRACTS[pageType ?? '']?.guidance ?? DEFAULT_OUTLINE_CONTRACT;
 }
+
+export function getSectionStructureGuidance(
+  pageType: string | undefined,
+  sectionTarget: number,
+  suppliedSubheadings: readonly string[] = [],
+): string {
+  if (suppliedSubheadings.length > 0) {
+    return `SUPPLIED SECTION STRUCTURE:
+- Use only these suggested H3 subheadings when they represent distinct subtopics: ${suppliedSubheadings.join(', ')}.
+- Do not add extra H3 subheadings merely to divide the word count.`;
+  }
+
+  if (CONVERSION_DENSE_PAGE_TYPES.has(pageType ?? '') && sectionTarget <= 200) {
+    return `SHORT CONVERSION SECTION:
+- Do not add H3 subheadings unless the supplied brief names a distinct subtopic.
+- Keep this focused buyer answer cohesive under its H2.`;
+  }
+
+  if (!CONVERSION_DENSE_PAGE_TYPES.has(pageType ?? '') && sectionTarget >= 300) {
+    return `DEEP EDUCATIONAL SECTION:
+- H3 subheadings are optional. Use them only when they improve scanning across genuinely distinct subtopics.
+- Do not manufacture subtopics merely to create visual structure.`;
+  }
+
+  return `SECTION STRUCTURE:
+- H3 subheadings are optional. Use them only for genuinely distinct subtopics that improve scanning.
+- Do not add subheadings merely to divide the word count.`;
+}

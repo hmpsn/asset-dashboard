@@ -10228,3 +10228,47 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Verification:** Focused policy, budget, real worker, recovery, and item-approval suites cover one- and two-candidate behavior. The worker test proves a one-cell run neither dispatches nor persists a set audit and still terminalizes truthfully, while the two-cell control continues to dispatch and persist one. All focused tests and project typecheck pass without provider access or database synchronization.
 
 **Files:** matrix-generation set-audit policy, preview estimator, worker, restart recovery, human-approval readiness, focused unit tests, runtime/control-plane guardrails, roadmap, and feature audit.
+
+### 720. Private approved-copy content quality benchmark foundation 2026-07-20
+
+**Status:** Complete locally. This PR is behavior-neutral for production generation and requires normal staging verification before prompt-quality work begins.
+
+**What changed:** Added a typed, read-only benchmark for comparing blinded content candidates against explicitly approved copy. Private cases carry raw reference/candidate HTML and provider provenance only under gitignored local artifacts. Safe aggregate reports contain opaque case/candidate labels, content hashes, page types, ratings, deterministic failure counts, preference rates, prompt/completion token means, estimated cost, and latency—never client copy, prompts, evidence, workspace identity, URLs, reviewer notes, or provider/model identity.
+
+**Approved-source boundary:** Matrix references require exact human approval evidence tied to the current approved post revision. Matrix candidates require a current review-ready item, accepted preview fingerprint, durable post provenance, a canonical ready audit, and a post timestamp no newer than that audit; only sanitized audit check IDs/results cross into the private case. Copy-pipeline references include only explicitly addressed approved sections. Operator-curated pages require an exact local attestation and expose no URL-fetch path. All readers are dependency-injected and perform no DB writes or logging.
+
+**Recommendation contract:** Reports remain advisory and return `no_recommendation` below six completely rated cases spanning at least three page types and one provenance-sensitive case. A candidate needs at least 70% blinded preference, mean brand-fidelity and intent-satisfaction ratings of 4/5, only passing factual verdicts, zero deterministic failures, and unrounded cost, prompt use, and latency no higher than baseline. Non-ready canonical runtime verdicts fail closed even when their individual check list is empty. An unsafe baseline is never recommended. Subjective quality remains human-rated; CI only pins privacy, authority, evidence, and deterministic-output contracts through the existing AI reliability registry.
+
+**Safety:** The CLI rejects generation, persistence, approval, send, publication, retry, and database-sync flags. It does not call MCP, providers, staging, or production; live candidate creation remains a separate owner-authorized action. No migration, UI, MCP tool, runtime prompt, model, feature flag, or production generation behavior changed.
+
+**Tests:** Contract coverage pins private-versus-safe shapes. Unit coverage exercises approval qualification, stale/cross-workspace rejection, canonical matrix audit sanitization, strict case/rating validation, preference and safety gates, unsafe CLI rejection, and scrubbed report output. The deterministic AI quality registry covers the benchmark without introducing live-model CI scoring.
+
+**Files:** shared benchmark contracts; local evaluator and source qualifiers; AI reliability registry fixture; focused unit/contract tests; benchmark rule, roadmap, and feature audit.
+
+### 721. Natural content structure and approved factual authority 2026-07-20
+
+**Status:** Complete locally. Independent review, full repository gates, CI, and staging verification are required before release. The private blinded benchmark is `not_run` because no qualified local corpus is present; that absence is not evidence for the conditional context-expansion phase.
+
+**What changed:** Content-post section generation no longer converts an intentionally compact outline into a mandatory two-or-three-H3 article structure. Short landing, service, location, and product sections remain cohesive under their H2 unless the supplied brief names a distinct subtopic. Deep blog and other educational sections may use H3s when they improve scanning, but hierarchy is optional rather than quota-driven. Supplied brief subheadings remain authoritative and generation does not add extras merely to divide the word count.
+
+**Factual authority:** One canonical factual-specifics authority contract now reaches fresh briefs, brief regeneration, outline regeneration, and writer prompts. Experience and customer counts, results, testimonials, credentials, affiliations, medical claims, local landmarks and regulations, partnerships, specifications, comparisons, pricing, offers, guarantees, citations, and similar proof may appear only when supported by human-approved business/brand/evidence context or explicitly labeled verified provider, analytics, or source evidence. Raw SERP/competitor copy, brief requests, user feedback, unlabeled claims, and model inference are explicitly non-authoritative. Page-type instructions that previously demanded unsupported details now omit them or identify the evidence need.
+
+**Compatibility and safety:** Existing HTML, H2, keyword, page-type density, word-budget, model, voice, output-format, placeholder, evidence, human-review, approval, send, and publication contracts are unchanged. No database, migration, API, UI, MCP surface, model selection, feature flag, provider call, or paid generation was added.
+
+**Verification:** Focused prompt and brief tests cover blog, landing, service, location, product, provider-profile, procedure-guide, and pricing-page behavior. A hard deterministic AI-quality fixture pins natural section hierarchy and approved factual authority without turning subjective prose judgment into CI scoring.
+
+**Files:** content writing rules; page-type copy contracts; content-post and brief prompt assembly; focused unit and AI-quality contract tests; brand-engine and benchmark rules; roadmap; feature audit.
+
+### 722. Compact MCP operator workflow starters 2026-07-21
+
+**Status:** Complete locally. Independent review, full repository gates, CI, and read-only staging protocol smoke remain required before release.
+
+**What changed:** The compact `/mcp/operator` endpoint now advertises MCP prompt discovery and exposes three immutable, user-selected workflows: studio portfolio triage, exact client-view review, and safely confirmed content-matrix generation. The full `/mcp` capability set, instructions, 105-tool discovery, and invocation behavior remain unchanged. Clients without native MCP prompt discovery receive equivalent copyable starters instead of a second tool or storage surface.
+
+**Safety:** Prompt retrieval is deterministic and performs no database read, tool invocation, mutation, job creation, provider request, or paid operation. Arguments are strict and non-reflecting. Portfolio triage remains read-only; client review uses `get_client_view` as the sole client-safe projection. The matrix workflow stops on blockers, never fabricates evidence, shows exact targets, fingerprints, accepted limits, and maximum estimate, and requires fresh preview-specific confirmation immediately before paid start. Same-authority retry requires a separate exact-item/available-budget confirmation and stops when no bounded retry estimate exists; changed authority returns to preview/start instead of retry. It never retries automatically and stops at human review without approval, send, or publication.
+
+**Scope decision:** This small P7 phase is intentionally independent of parked MCP P3–P6 work because it adds no tools, output schemas, aliases, credentials, telemetry, storage, or authorization. The benchmark-gated content context-continuity phase remains parked because no qualifying private corpus exists; deterministic prompt tests are not treated as evidence for that architecture.
+
+**Tests:** Unit coverage pins the frozen prompt census, strict own-property argument validation, deterministic rendering, operator-tool references, safety clauses, and copyable fallback parity. Real HTTP integration coverage pins operator-only capability negotiation, all three `prompts/list`/`prompts/get` flows, generic failures, unchanged full-profile capabilities, and the existing 25-tool operator catalog.
+
+**Files:** shared MCP prompt vocabulary; operator prompt registry and transport handlers; focused unit/integration tests; copyable workflow guide and MCP README; operator-control-plane spec, plan, and rule; roadmap and feature audit.

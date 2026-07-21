@@ -3,6 +3,8 @@ import { Server } from '@modelcontextprotocol/sdk/server';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp';
 import {
   CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types';
 import type { Request, Response } from 'express';
@@ -12,6 +14,10 @@ import { createLogger } from '../logger.js';
 import { isServerRequestId } from '../request-correlation.js';
 import { MCP_SERVER_INSTRUCTIONS } from './instructions.js';
 import { MCP_OPERATOR_PROFILE_INSTRUCTIONS } from './profiles.js';
+import {
+  getMcpOperatorPrompt,
+  listMcpOperatorPrompts,
+} from './prompts.js';
 import { isMcpMasterKeyAuth, type McpAuthContext } from './auth.js';
 import {
   executeMcpTool,
@@ -50,7 +56,12 @@ function createMcpServer(
     : executeMcpTool;
   const mcpServer = new Server(
     { name: 'hmpsn-studio', version: '1.0.0' },
-    { capabilities: { tools: {} }, instructions },
+    {
+      capabilities: isOperator
+        ? { tools: {}, prompts: {} }
+        : { tools: {} },
+      instructions,
+    },
   );
 
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -72,6 +83,19 @@ function createMcpServer(
       requestId,
     });
   });
+
+  if (isOperator) {
+    mcpServer.setRequestHandler(ListPromptsRequestSchema, async () => ({
+      prompts: listMcpOperatorPrompts(),
+    }));
+
+    mcpServer.setRequestHandler(GetPromptRequestSchema, async (request) => (
+      getMcpOperatorPrompt(
+        request.params.name,
+        request.params.arguments ?? {},
+      )
+    ));
+  }
 
   return mcpServer;
 }
