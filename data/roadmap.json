@@ -127,7 +127,7 @@
           "status": "pending",
           "createdAt": "2026-07-16",
           "owner": "content-pipeline",
-          "notes": "First dependency. Reconcile page-type outline/copy contracts with section prompts: do not force two H3s into every 200-word conversion section, and make experience counts, results, local landmarks/regulations/partnerships, social proof, product specs, guarantees, and similar facts conditional on approved supplied evidence. Preserve factual-safety, HTML, keyword, page-type density, and output-format contracts. Add deterministic prompt assertions for blog, service, location, landing, product, and healthcare fixtures. No model change."
+          "notes": "After content-quality-benchmark-foundation. Reconcile page-type outline/copy contracts with section prompts: do not force two H3s into every 200-word conversion section, and make experience counts, results, local landmarks/regulations/partnerships, social proof, product specs, guarantees, and similar facts conditional on approved supplied evidence. Preserve factual-safety, HTML, keyword, page-type density, and output-format contracts. Add deterministic prompt assertions for blog, service, location, landing, product, and healthcare fixtures. No model change."
         },
         {
           "id": "content-quality-context-continuity",
@@ -182,7 +182,7 @@
           "status": "pending",
           "createdAt": "2026-07-16",
           "owner": "platform-foundation",
-          "notes": "Final dependency after prompt/context/whole-document repairs. Build a small versioned golden set spanning blog, service, location, landing, product, and provenance-sensitive healthcare content. Human scoring covers naturalness, specificity, on-brand fidelity, structural variety, factual discipline, edit distance, cost, and latency. Then canary model candidates per named operation with rollback evidence; do not globally replace Claude Sonnet 4.6 or GPT-5.4 based on availability alone. Coordinate with genq-runtime-quality-governance."
+          "notes": "Model-canary work remains a final dependency after the private benchmark foundation and any measured prompt/context/whole-document repairs. Reuse the approved-copy corpus and blinded rubric established by content-quality-benchmark-foundation. Canary candidates per named operation with rollback evidence; do not globally replace Claude Sonnet 4.6 or GPT-5.4 based on availability alone."
         }
       ]
     },

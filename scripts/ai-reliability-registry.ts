@@ -638,6 +638,37 @@ export const AI_QUALITY_FIXTURES: AiQualityFixture[] = [
     notes: 'Pins M2 audit/revision authority and output contracts without a live-model quality score.',
   },
   {
+    id: 'approved-copy-benchmark-private-deterministic-contracts',
+    pipelineId: 'content-brief-review',
+    title: 'Approved-copy benchmarks remain private, read-only, blinded, and deterministic-first',
+    dimension: 'evidence_grounding',
+    severity: 'hard',
+    evidenceFiles: [
+      'docs/rules/content-quality-benchmark.md',
+      'docs/rules/ai-quality-evals.md',
+      'shared/types/content-quality-benchmark.ts',
+      'tests/contract/content-quality-benchmark-contract.test.ts',
+      'server/domains/content/matrix-generation/audit.ts',
+    ],
+    assertions: [
+      { allOf: ['Raw approved HTML', 'referenceHtml', "not.toContain('referenceHtml')"] },
+      { allOf: ['Benchmark reads never modify', 'candidateVariants', "not.toContain('candidateVariants')"] },
+      { allOf: ['Subjective ratings are blinded', 'anonymousLabel', 'must not run in default CI'] },
+      {
+        allOf: [
+          'reuse canonical matrix contracts',
+          'runMatrixGenerationDeterministicAudit',
+          'template-block-census',
+          'internal-paths',
+          'semantic-tables',
+          'placeholder-completeness',
+          'word-count-integrity',
+        ],
+      },
+    ],
+    notes: 'Hard-fails only privacy, read-only authority, evidence, and deterministic output boundaries; subjective prose preference remains blinded, human-reviewed, and advisory.',
+  },
+  {
     id: 'seo-editor-assist-format-sanitization',
     pipelineId: 'seo-editor-assist',
     title: 'SEO editor assist preserves insertion-safe rewrite and JSON contracts',
