@@ -6,7 +6,7 @@
  *   POST /api/webflow/seo-copy
  *
  * Strategy: inline Express server (vi.mock hoisted before imports) so that
- * mocks for `callAI` and `getSiteSubdomain` take effect at load time.
+ * mocks for the creative dispatcher and `getSiteSubdomain` take effect at load time.
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -17,7 +17,7 @@ import type { AddressInfo } from 'net';
 // Hoisted before any server imports so the route module sees the mock.
 const state = vi.hoisted(() => ({
   siteSubdomain: null as string | null,
-  aiResult: null as { text: string; tokens: { prompt: number; completion: number; total: number } } | null,
+  aiText: null as string | null,
 }));
 
 // The route imports getSiteSubdomain from the `server/webflow.js` BARREL (which re-exports it
@@ -34,13 +34,13 @@ vi.mock('../../server/webflow.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../server/ai.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/ai.js')>();
+vi.mock('../../server/content-posts-ai.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../server/content-posts-ai.js')>();
   return {
     ...actual,
-    callAI: vi.fn(async () => {
-      if (!state.aiResult) throw new Error('callAI: no mock result configured');
-      return state.aiResult;
+    callCreativeAI: vi.fn(async () => {
+      if (!state.aiText) throw new Error('creative AI: no provider configured');
+      return state.aiText;
     }),
   };
 });
@@ -98,7 +98,7 @@ beforeAll(async () => {
 afterEach(() => {
   // Reset per-test mutable state.
   state.siteSubdomain = null;
-  state.aiResult = null;
+  state.aiText = null;
 });
 
 afterAll(async () => {
@@ -217,7 +217,7 @@ describe('POST /api/webflow/seo-copy', () => {
     expect(body).toEqual({ error: 'pagePath and workspaceId required' });
   });
 
-  it('returns 500 when OPENAI_API_KEY is not configured', async () => {
+  it('returns a generic AI failure when no creative provider is configured', async () => {
     delete process.env.OPENAI_API_KEY;
 
     const ws = createWorkspace('SEO Copy No Key WS');
@@ -230,10 +230,10 @@ describe('POST /api/webflow/seo-copy', () => {
 
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toEqual({ error: 'OPENAI_API_KEY not configured' });
+    expect(body).toEqual({ error: 'SEO copy generation failed' });
   });
 
-  it('calls AI and returns parsed SEO copy fields when OPENAI_API_KEY is set', async () => {
+  it('calls the canonical creative operation and returns parsed SEO copy fields', async () => {
     process.env.OPENAI_API_KEY = 'test-key-configured';
 
     const ws = createWorkspace('SEO Copy Valid WS');
@@ -248,10 +248,7 @@ describe('POST /api/webflow/seo-copy', () => {
       changes: ['Added primary keyword to title', 'Improved meta description CTA'],
     };
 
-    state.aiResult = {
-      text: JSON.stringify(mockAIPayload),
-      tokens: { prompt: 100, completion: 50, total: 150 },
-    };
+    state.aiText = JSON.stringify(mockAIPayload);
 
     const res = await postJson('/api/webflow/seo-copy', {
       workspaceId: ws.id,
@@ -279,10 +276,14 @@ describe('POST /api/webflow/seo-copy', () => {
 
     // 72-char title: route should trim to ≤60 at last word boundary after char 36.
     const longTitle = 'Extremely Long SEO Title That Exceeds The Sixty Character Limit Here';
-    state.aiResult = {
-      text: JSON.stringify({ seoTitle: longTitle, metaDescription: 'Short desc.', h1: 'H1' }),
-      tokens: { prompt: 50, completion: 20, total: 70 },
-    };
+    state.aiText = JSON.stringify({
+      seoTitle: longTitle,
+      metaDescription: 'Short desc.',
+      h1: 'H1',
+      introParagraph: 'A clear page introduction with useful detail.',
+      internalLinkSuggestions: [],
+      changes: [],
+    });
 
     const res = await postJson('/api/webflow/seo-copy', {
       workspaceId: ws.id,
@@ -302,10 +303,14 @@ describe('POST /api/webflow/seo-copy', () => {
 
     // Build a 180-char description.
     const longMeta = 'A very long meta description that goes well beyond the one hundred and sixty character limit and must be trimmed to fit within the required boundaries correctly.';
-    state.aiResult = {
-      text: JSON.stringify({ seoTitle: 'Title', metaDescription: longMeta, h1: 'H1' }),
-      tokens: { prompt: 50, completion: 20, total: 70 },
-    };
+    state.aiText = JSON.stringify({
+      seoTitle: 'Title',
+      metaDescription: longMeta,
+      h1: 'H1',
+      introParagraph: 'A clear page introduction with useful detail.',
+      internalLinkSuggestions: [],
+      changes: [],
+    });
 
     const res = await postJson('/api/webflow/seo-copy', {
       workspaceId: ws.id,
@@ -317,16 +322,13 @@ describe('POST /api/webflow/seo-copy', () => {
     expect(body.metaDescription.length).toBeLessThanOrEqual(160);
   });
 
-  it('returns 500 with raw AI output when AI returns invalid JSON', async () => {
+  it('returns a generic error without a padded response when AI returns invalid JSON', async () => {
     process.env.OPENAI_API_KEY = 'test-key-configured';
 
     const ws = createWorkspace('SEO Copy Bad JSON WS');
     workspaceIds.push(ws.id);
 
-    state.aiResult = {
-      text: 'this is not json at all',
-      tokens: { prompt: 10, completion: 5, total: 15 },
-    };
+    state.aiText = 'this is not json at all';
 
     const res = await postJson('/api/webflow/seo-copy', {
       workspaceId: ws.id,
@@ -334,9 +336,8 @@ describe('POST /api/webflow/seo-copy', () => {
     });
 
     expect(res.status).toBe(500);
-    const body = await res.json() as { error: string; raw: string };
-    expect(body.error).toBe('AI returned invalid JSON');
-    expect(typeof body.raw).toBe('string');
+    const body = await res.json() as { error: string };
+    expect(body).toEqual({ error: 'SEO copy generation failed' });
   });
 
   it('filters out internal link suggestions that reference the current page path', async () => {
@@ -345,19 +346,17 @@ describe('POST /api/webflow/seo-copy', () => {
     const ws = createWorkspace('SEO Copy Self-Link Filter WS');
     workspaceIds.push(ws.id);
 
-    state.aiResult = {
-      text: JSON.stringify({
-        seoTitle: 'Title',
-        metaDescription: 'Meta',
-        h1: 'H1',
-        internalLinkSuggestions: [
-          { targetPath: '/services', anchorText: 'Self Link', context: 'Links to itself' },
-          { targetPath: '/about', anchorText: 'About Us', context: 'Links to about page — not in pageMap, filtered' },
-        ],
-        changes: [],
-      }),
-      tokens: { prompt: 50, completion: 30, total: 80 },
-    };
+    state.aiText = JSON.stringify({
+      seoTitle: 'Title',
+      metaDescription: 'Meta',
+      h1: 'H1',
+      introParagraph: 'A clear page introduction with useful detail.',
+      internalLinkSuggestions: [
+        { targetPath: '/services', anchorText: 'Self Link', context: 'Links to itself' },
+        { targetPath: '/about', anchorText: 'About Us', context: 'Links to about page — not in pageMap, filtered' },
+      ],
+      changes: [],
+    });
 
     const res = await postJson('/api/webflow/seo-copy', {
       workspaceId: ws.id,
@@ -366,7 +365,7 @@ describe('POST /api/webflow/seo-copy', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json() as { internalLinkSuggestions: Array<{ targetPath: string }> };
-    // /services is filtered (self-reference); /about is filtered (not in allowedPaths with empty pageMap).
+    // /services is filtered as a self-reference; /about is not in the verified page-map census.
     expect(body.internalLinkSuggestions).toEqual([]);
   });
 });

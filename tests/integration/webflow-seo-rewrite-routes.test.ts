@@ -38,7 +38,7 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
     expect([200, 500]).toContain(res.status);
     if (res.status === 500) {
       const body = await res.json() as { error: string };
-      expect(body.error).toMatch(/OPENAI_API_KEY not configured/i);
+      expect(body.error).toBe('AI rewrite failed');
       return;
     }
     if (expectedField === 'both') {
@@ -75,7 +75,7 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
     expect(body.error).toMatch(/pageTitle required/i);
   });
 
-  it('returns key error when OPENAI_API_KEY is unavailable (or succeeds when key is available)', async () => {
+  it('returns a generic AI failure when no provider is available (or succeeds when one is available)', async () => {
     const res = await postJson('/api/webflow/seo-rewrite', {
       workspaceId,
       pageTitle: 'My Test Page',
@@ -84,7 +84,7 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
     await assertSeoRewriteResponse(res, 'title');
   });
 
-  it('returns key error for description mode when OPENAI_API_KEY is unavailable (or succeeds when key is available)', async () => {
+  it('returns a generic AI failure for description mode when no provider is available (or succeeds when one is available)', async () => {
     const res = await postJson('/api/webflow/seo-rewrite', {
       workspaceId,
       pageTitle: 'Test Page Description',
@@ -94,7 +94,7 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
     await assertSeoRewriteResponse(res, 'description');
   });
 
-  it('returns key error for "both" mode when OPENAI_API_KEY is unavailable (or succeeds when key is available)', async () => {
+  it('returns a generic AI failure for "both" mode when no provider is available (or succeeds when one is available)', async () => {
     const res = await postJson('/api/webflow/seo-rewrite', {
       workspaceId,
       pageTitle: 'Test Page Both',
@@ -143,7 +143,7 @@ describe('POST /api/webflow/seo-rewrite — input validation', () => {
     expect(body.error).toMatch(/pageTitle required/i);
   });
 
-  it('passes validation and either rewrites or returns key error', async () => {
+  it('passes validation and either rewrites or returns a generic AI failure', async () => {
     const res = await postJson('/api/webflow/seo-rewrite', {
       workspaceId,
       pageTitle: 'Services Page',

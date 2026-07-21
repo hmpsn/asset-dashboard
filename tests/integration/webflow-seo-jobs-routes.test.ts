@@ -263,19 +263,19 @@ describe('POST /api/seo/:workspaceId/bulk-rewrite', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 500 when OPENAI_API_KEY is not set', async () => {
+  it('starts without OPENAI_API_KEY because the canonical creative operation selects its provider', async () => {
     const res = await postJson(`/api/seo/${wsId}/bulk-rewrite`, {
       siteId: KNOWN_SITE_ID,
       pages: [VALID_REWRITE_PAGE],
       field: 'title',
     });
-    expect(res.status).toBe(500);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/OPENAI_API_KEY not configured/i);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { jobId: string };
+    expect(typeof body.jobId).toBe('string');
+    expect(body.jobId.length).toBeGreaterThan(0);
   });
 
-  it('returns 200 with { jobId } when workspace exists and OPENAI_API_KEY is set', async () => {
-    process.env.OPENAI_API_KEY = 'test-openai-key-rewrite';
+  it('returns 200 with { jobId } when workspace exists', async () => {
     // wsId has no webflowSiteId set, so the siteId mismatch guard is skipped.
     const res = await postJson(`/api/seo/${wsId}/bulk-rewrite`, {
       siteId: KNOWN_SITE_ID,
@@ -289,8 +289,6 @@ describe('POST /api/seo/:workspaceId/bulk-rewrite', () => {
   });
 
   it('returns 409 when a bulk-rewrite job is already active for the workspace', async () => {
-    process.env.OPENAI_API_KEY = 'test-openai-key-rewrite-dup';
-
     const first = await postJson(`/api/seo/${wsId}/bulk-rewrite`, {
       siteId: KNOWN_SITE_ID,
       pages: [VALID_REWRITE_PAGE],

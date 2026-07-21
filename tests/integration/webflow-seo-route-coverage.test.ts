@@ -1,7 +1,7 @@
 // tests/integration/webflow-seo-route-coverage.test.ts
 //
 // Low-risk route coverage for Webflow SEO routes extracted in PR #458.
-// Uses createApp() in-process so OpenAI helper mocks apply to the SEO copy route.
+// Uses createApp() in-process so provider-helper mocks apply to the SEO copy route.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import http from 'http';
@@ -316,7 +316,7 @@ describe('Webflow SEO copy route coverage', () => {
         'Front-loaded the primary topic and clarified the business outcome.',
       ],
     };
-    mockOpenAIJsonResponse('content-score', mockedCopy);
+    mockOpenAIJsonResponse('seo-page-copy-set', mockedCopy);
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-copy', {
       workspaceId: ws.workspaceId,
@@ -334,16 +334,16 @@ describe('Webflow SEO copy route coverage', () => {
     const calls = getCapturedOpenAICalls();
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
-      feature: 'content-score',
-      model: 'gpt-5.6-luna',
+      feature: 'seo-page-copy-set',
+      model: 'gpt-5.6-terra',
     });
-    expect(calls[0].messages[1]?.content).toContain('PAGE METADATA EVIDENCE');
+    expect(calls[0].messages[1]?.content).toContain('CURRENT PAGE PATH');
     expect(calls[0].messages[1]?.content).toContain('<untrusted_user_content>');
-    expect(calls[0].messages[1]?.content).toContain('"pagePath": "/services/local-seo"');
+    expect(calls[0].messages[1]?.content).toContain('"path": "/services/local-seo"');
   });
 
   it('returns an error instead of success when SEO copy AI generation fails', async () => {
-    mockOpenAIError('content-score', 'API rate limited');
+    mockOpenAIError('seo-page-copy-set', 'API rate limited');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-copy', {
       workspaceId: ws.workspaceId,

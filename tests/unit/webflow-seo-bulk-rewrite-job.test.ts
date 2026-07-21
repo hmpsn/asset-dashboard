@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   addActivity: vi.fn(),
   broadcastToWorkspace: vi.fn(),
-  callCreativeAI: vi.fn(),
+  generateSeoMetadataVariations: vi.fn(),
   isProgrammingError: vi.fn(() => false),
   updateJob: vi.fn(),
   unregisterAbort: vi.fn(),
@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
     info: vi.fn(),
     warn: vi.fn(),
   },
-  buildSystemPrompt: vi.fn((_workspaceId: string, prompt: string) => prompt),
   getQueryPageData: vi.fn(),
   saveSuggestion: vi.fn(),
   resolveBaseUrl: vi.fn(),
@@ -25,29 +24,16 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../server/activity-log.js', () => ({ addActivity: mocks.addActivity }));
 vi.mock('../../server/broadcast.js', () => ({ broadcastToWorkspace: mocks.broadcastToWorkspace }));
-vi.mock('../../server/content-posts-ai.js', () => ({ callCreativeAI: mocks.callCreativeAI }));
-vi.mock('../../server/errors.js', () => ({ isProgrammingError: mocks.isProgrammingError }));
-vi.mock('../../server/helpers.js', () => ({
-  findPageMapEntryForPage: vi.fn(() => ({
-    pagePath: '/seo',
-    pageTitle: 'SEO Services',
-    primaryKeyword: 'seo services',
-    secondaryKeywords: [],
-  })),
-  matchGscUrlToPath: vi.fn(() => false),
-  sanitizeForPromptInjection: vi.fn((value: string) => `<untrusted_user_content>\n${value}\n</untrusted_user_content>`),
-  sanitizeQueryForPrompt: vi.fn((value: string) => value),
-  stripCodeFences: vi.fn((value: string) => value),
-  stripHtmlToText: vi.fn(() => 'Clean page copy'),
-  tryResolvePagePath: vi.fn((page: { publishedPath?: string | null; slug?: string }) => page.publishedPath ?? (page.slug ? `/${page.slug}` : null)),
+vi.mock('../../server/domains/seo-health/seo-copy-generation.js', () => ({
+  generateSeoMetadataVariations: mocks.generateSeoMetadataVariations,
 }));
+vi.mock('../../server/errors.js', () => ({ isProgrammingError: mocks.isProgrammingError }));
 vi.mock('../../server/jobs.js', () => ({
   isJobCancelled: mocks.isJobCancelled,
   unregisterAbort: mocks.unregisterAbort,
   updateJob: mocks.updateJob,
 }));
 vi.mock('../../server/logger.js', () => ({ createLogger: vi.fn(() => mocks.logger) }));
-vi.mock('../../server/prompt-assembly.js', () => ({ buildSystemPrompt: mocks.buildSystemPrompt }));
 vi.mock('../../server/search-console.js', () => ({ getQueryPageData: mocks.getQueryPageData }));
 vi.mock('../../server/seo-suggestions.js', () => ({ saveSuggestion: mocks.saveSuggestion }));
 vi.mock('../../server/url-helpers.js', () => ({ resolveBaseUrl: mocks.resolveBaseUrl }));
@@ -79,12 +65,15 @@ describe('webflow SEO bulk rewrite job', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isJobCancelled.mockReturnValue(false);
-    mocks.callCreativeAI.mockResolvedValue(JSON.stringify(['One improved title', 'Two improved title', 'Three improved title']));
+    mocks.generateSeoMetadataVariations.mockResolvedValue({
+      variations: ['One improved title', 'Two improved title', 'Three improved title'],
+    });
     mocks.getQueryPageData.mockResolvedValue([]);
     mocks.resolveBaseUrl.mockResolvedValue('');
     mocks.buildPageAssistContext.mockResolvedValue({
       seoContext: {
         strategy: { pageMap: [{ pagePath: '/seo', pageTitle: 'SEO Services', primaryKeyword: 'seo services', secondaryKeywords: [] }] },
+        effectiveBrandVoiceBlock: '\nVOICE',
       },
       blocks: {
         keywordBlock: '\nKEYWORDS',
@@ -110,11 +99,14 @@ describe('webflow SEO bulk rewrite job', () => {
       signal: ac.signal,
     });
 
-    expect(mocks.callCreativeAI).toHaveBeenCalledWith(expect.objectContaining({
-      feature: 'seo-bulk-rewrite',
-      json: true,
-      researchMode: true,
+    expect(mocks.generateSeoMetadataVariations).toHaveBeenCalledWith(expect.objectContaining({
+      adapterHint: 'background',
       workspaceId: 'ws_1',
+      field: 'title',
+      authority: expect.objectContaining({
+        brandVoice: '\nVOICE',
+        approvedEvidence: ['\nKNOWLEDGE'],
+      }),
     }));
     expect(mocks.saveSuggestion).toHaveBeenCalledWith(expect.objectContaining({
       workspaceId: 'ws_1',
@@ -146,11 +138,13 @@ describe('webflow SEO bulk rewrite job', () => {
 
   it('generates paired title and description suggestions in both mode', async () => {
     const ac = new AbortController();
-    mocks.callCreativeAI.mockResolvedValueOnce(JSON.stringify([
-      { title: 'First services title', description: 'First services description' },
-      { title: 'Second services title', description: 'Second services description' },
-      { title: 'Third services title', description: 'Third services description' },
-    ]));
+    mocks.generateSeoMetadataVariations.mockResolvedValueOnce({
+      pairs: [
+        { title: 'First services title', description: 'First services description' },
+        { title: 'Second services title', description: 'Second services description' },
+        { title: 'Third services title', description: 'Third services description' },
+      ],
+    });
 
     await runSeoBulkRewriteJob({
       jobId: 'job_both',
@@ -169,11 +163,10 @@ describe('webflow SEO bulk rewrite job', () => {
       signal: ac.signal,
     });
 
-    expect(mocks.callCreativeAI).toHaveBeenCalledWith(expect.objectContaining({
-      feature: 'seo-bulk-rewrite-both',
-      json: true,
-      researchMode: true,
+    expect(mocks.generateSeoMetadataVariations).toHaveBeenCalledWith(expect.objectContaining({
+      adapterHint: 'background',
       workspaceId: 'ws_1',
+      field: 'both',
     }));
     expect(mocks.saveSuggestion).toHaveBeenCalledTimes(2);
     expect(mocks.saveSuggestion).toHaveBeenNthCalledWith(1, expect.objectContaining({
@@ -203,8 +196,8 @@ describe('webflow SEO bulk rewrite job', () => {
 
   it('counts per-page AI failures and still completes the job', async () => {
     const ac = new AbortController();
-    mocks.callCreativeAI
-      .mockResolvedValueOnce(JSON.stringify(['Good one', 'Good two', 'Good three']))
+    mocks.generateSeoMetadataVariations
+      .mockResolvedValueOnce({ variations: ['Good one', 'Good two', 'Good three'] })
       .mockRejectedValueOnce(new Error('AI unavailable'));
 
     await runSeoBulkRewriteJob({
@@ -232,6 +225,58 @@ describe('webflow SEO bulk rewrite job', () => {
     }));
   });
 
+  it('treats malformed canonical output as a failed page without saving a suggestion', async () => {
+    const ac = new AbortController();
+    mocks.generateSeoMetadataVariations.mockResolvedValueOnce(null);
+
+    await runSeoBulkRewriteJob({
+      jobId: 'job_malformed',
+      workspaceId: 'ws_1',
+      siteId: 'site_1',
+      pages: [{ pageId: 'page_1', title: 'Services', slug: 'services', currentSeoTitle: 'Old title' }],
+      field: 'title',
+      workspace,
+      signal: ac.signal,
+    });
+
+    expect(mocks.saveSuggestion).not.toHaveBeenCalled();
+    expect(mocks.updateJob).toHaveBeenCalledWith('job_malformed', expect.objectContaining({
+      status: 'error',
+      result: expect.objectContaining({ suggestions: 0, generatedPages: 0, failed: 1, total: 1 }),
+    }));
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:failed', expect.objectContaining({
+      jobId: 'job_malformed',
+      failed: 1,
+      total: 1,
+    }));
+  });
+
+  it('never reports terminal success when every provider call fails', async () => {
+    const ac = new AbortController();
+    mocks.generateSeoMetadataVariations.mockRejectedValueOnce(new Error('provider unavailable'));
+
+    await runSeoBulkRewriteJob({
+      jobId: 'job_provider_failed',
+      workspaceId: 'ws_1',
+      siteId: 'site_1',
+      pages: [{ pageId: 'page_1', title: 'Services', slug: 'services', currentSeoTitle: 'Old title' }],
+      field: 'title',
+      workspace,
+      signal: ac.signal,
+    });
+
+    expect(mocks.saveSuggestion).not.toHaveBeenCalled();
+    expect(mocks.updateJob).toHaveBeenCalledWith('job_provider_failed', expect.objectContaining({
+      status: 'error',
+      result: expect.objectContaining({ suggestions: 0, generatedPages: 0, failed: 1, total: 1 }),
+    }));
+    expect(mocks.broadcastToWorkspace).toHaveBeenCalledWith('ws_1', 'bulk:failed', expect.objectContaining({
+      jobId: 'job_provider_failed',
+      failed: 1,
+      total: 1,
+    }));
+  });
+
   it('reports cancellation before processing pages', async () => {
     const ac = new AbortController();
     ac.abort();
@@ -246,7 +291,7 @@ describe('webflow SEO bulk rewrite job', () => {
       signal: ac.signal,
     });
 
-    expect(mocks.callCreativeAI).not.toHaveBeenCalled();
+    expect(mocks.generateSeoMetadataVariations).not.toHaveBeenCalled();
     expect(mocks.saveSuggestion).not.toHaveBeenCalled();
     expect(mocks.updateJob).toHaveBeenCalledWith('job_cancel', expect.objectContaining({
       status: 'cancelled',

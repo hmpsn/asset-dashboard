@@ -139,8 +139,8 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
     // Both Anthropic and OpenAI throw. callCreativeAI tries Anthropic first
     // (isAnthropicConfigured returns true in mock), falls back to OpenAI.
     // When both fail, the route must return 500.
-    mockAnthropicError('seo-rewrite', 'Anthropic upstream error');
-    mockOpenAIError('seo-rewrite', 'OpenAI upstream error');
+    mockAnthropicError('seo-metadata-variations', 'Anthropic upstream error');
+    mockOpenAIError('seo-metadata-variations', 'OpenAI upstream error');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-rewrite', {
       pageTitle: 'Our Services',
@@ -159,8 +159,8 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
   });
 
   it('AI failure for "both" field returns 500 — not a 200 with empty pairs', async () => {
-    mockAnthropicError('seo-rewrite-both', 'Anthropic timeout');
-    mockOpenAIError('seo-rewrite-both', 'OpenAI timeout');
+    mockAnthropicError('seo-metadata-variations', 'Anthropic timeout');
+    mockOpenAIError('seo-metadata-variations', 'OpenAI timeout');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-rewrite', {
       pageTitle: 'Homepage',
@@ -283,9 +283,9 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
   // Test 6: SEO Rewrite — AI returns malformed JSON handled gracefully
   // ─────────────────────────────────────────────────────────────────────────
 
-  it('AI returning malformed JSON produces fallback variations, not a crash', async () => {
+  it('AI returning malformed JSON returns an error, not a padded variation', async () => {
     // Return non-JSON text from the AI
-    mockAnthropicResponse('seo-rewrite', 'not json at all — just some text the AI returned');
+    mockAnthropicResponse('seo-metadata-variations', 'not json at all — just some text the AI returned');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-rewrite', {
       pageTitle: 'Contact Us',
@@ -295,32 +295,12 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
       workspaceId: ws.workspaceId,
     });
 
-    // Route catches JSON parse errors and falls back to the raw text as a variation.
-    // Acceptable outcomes:
-    //   a) 200 with variations containing the raw text (graceful fallback)
-    //   b) 500 if the route decides raw text is not a usable title
-    //
-    // Critical check: must NOT crash (no unhandled exception → no empty 500 body)
-    expect([200, 500]).toContain(status);
-
-    if (status === 200) {
-      const b = body as { variations?: unknown[]; text?: string; error?: string };
-      // Variations array must exist and be a real array (not undefined)
-      expect(Array.isArray(b.variations)).toBe(true);
-      // Must not be entirely empty — at least the raw text should appear as fallback
-      expect(b.variations!.length).toBeGreaterThan(0);
-    } else {
-      // 500 path: must still have a non-empty error string (not a silent crash)
-      const b = body as { error?: string };
-      expect(typeof b.error).toBe('string');
-      expect(b.error!.length).toBeGreaterThan(0);
-    }
+    expect(status).toBe(500);
+    expect(body).toEqual({ error: 'AI rewrite failed' });
   });
 
-  it('AI returning malformed JSON for "both" field produces empty pairs, not a crash', async () => {
-    // For the "both" field, the route parses JSON into pairs.
-    // On parse failure it sets pairs = [], which is valid graceful degradation.
-    mockAnthropicResponse('seo-rewrite-both', '{ bad json {{{ not parseable');
+  it('AI returning malformed JSON for "both" field returns an error, not empty pairs', async () => {
+    mockAnthropicResponse('seo-metadata-variations', '{ bad json {{{ not parseable');
 
     const { status, body } = await postJson(baseUrl, '/api/webflow/seo-rewrite', {
       pageTitle: 'About Us',
@@ -330,15 +310,8 @@ describe('Webflow SEO Writes — FM-2 Phantom Success', () => {
       workspaceId: ws.workspaceId,
     });
 
-    // Must not crash. 200 with empty pairs OR 500 are both acceptable.
-    expect([200, 500]).toContain(status);
-
-    if (status === 200) {
-      const b = body as { field?: string; pairs?: unknown[]; titleVariations?: unknown[]; descriptionVariations?: unknown[] };
-      expect(b.field).toBe('both');
-      // pairs can be empty (JSON parse failed) — that's the documented fallback
-      expect(Array.isArray(b.pairs)).toBe(true);
-    }
+    expect(status).toBe(500);
+    expect(body).toEqual({ error: 'AI rewrite failed' });
   });
 
   // NOTE: Happy-path tests (successful rewrite, character truncation, OpenAI fallback)

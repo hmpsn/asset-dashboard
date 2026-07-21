@@ -186,6 +186,17 @@ describe('webflow SEO route N+1 prevention contracts', () => {
     expect(afterLoop).toContain('buildPageAssistContext');
     expect(afterLoop).toContain('pagePath: rwPagePath');
   });
+
+  it('bulk rewrite adapters preserve evidence while delegating copy generation to the canonical operation', () => {
+    for (const source of [rewriteSrc, rewriteJobSrc]) {
+      expect(source).toContain('generateSeoMetadataVariations');
+      expect(source).toContain('contextBlocks');
+      expect(source).toContain('approvedEvidence');
+      expect(source).toContain('effectiveBrandVoiceBlock');
+      expect(source).not.toContain('callCreativeAI');
+      expect(source).not.toContain('normalizeSeoRewriteVariations');
+    }
+  });
 });
 
 // ── seo-audit-ai-recs.ts ──────────────────────────────────────────────────────
