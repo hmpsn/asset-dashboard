@@ -447,7 +447,7 @@ describe('getPageTypeConfig coverage', () => {
     },
   );
 
-  it.each(['provider-profile', 'procedure-guide'])(
+  it.each(['provider-profile', 'procedure-guide', 'pricing-page'])(
     'keeps healthcare facts and citations tied to supplied approved evidence in %s',
     pageType => {
       const cfg = getPageTypeConfig(pageType);
