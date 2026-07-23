@@ -91,6 +91,7 @@ function providerReport<T>(
   rows: T[],
   options: {
     rowCount?: number;
+    sourceReturnedRowCount?: number;
     requestedRanges?: Array<{ startDate: string; endDate: string }>;
     metadata?: typeof PROVIDER_METADATA;
   } = {},
@@ -98,6 +99,9 @@ function providerReport<T>(
   return {
     rows,
     rowCount: options.rowCount ?? rows.length,
+    ...(options.sourceReturnedRowCount === undefined
+      ? {}
+      : { sourceReturnedRowCount: options.sourceReturnedRowCount }),
     requestedRanges: options.requestedRanges ?? [PROVIDER_RANGE],
     metadata: options.metadata ?? PROVIDER_METADATA,
   };
@@ -441,6 +445,59 @@ describe('mcp analytics read action tools', () => {
       },
     });
   });
+
+  it.each([
+    { sourceReturnedRowCount: 0, expectedReturnedRows: 0 },
+    { sourceReturnedRowCount: 1, expectedReturnedRows: 1 },
+  ])(
+    'accepts projected zero comparison periods when GA4 returned $sourceReturnedRowCount source rows',
+    async ({ sourceReturnedRowCount, expectedReturnedRows }) => {
+      (runClientGa4ComparisonReport as Mock).mockResolvedValue(providerReport([
+        {
+          range: 'current',
+          users: 0,
+          sessions: 0,
+          pageViews: 0,
+          newUsers: 0,
+          avgSessionDurationSeconds: 0,
+          bounceRate: 0,
+        },
+        {
+          range: 'comparison',
+          users: 0,
+          sessions: 0,
+          pageViews: 0,
+          newUsers: 0,
+          avgSessionDurationSeconds: 0,
+          bounceRate: 0,
+        },
+      ], {
+        rowCount: sourceReturnedRowCount,
+        sourceReturnedRowCount,
+        requestedRanges: [PROVIDER_RANGE, PREVIOUS_PROVIDER_RANGE],
+        metadata: {
+          subjectToThresholding: false,
+          dataLossFromOtherRow: false,
+          samplingMetadatas: [],
+        },
+      }));
+
+      const result = await handleClientAnalyticsReadActionTool(
+        'get_ga4_period_comparison',
+        { workspace_id: 'ws-1', ...DATE_ARGS },
+      );
+      const data = dataOf(result);
+
+      expect(data).toMatchObject({
+        current: { users: 0, sessions: 0, page_views: 0 },
+        comparison: { users: 0, sessions: 0, page_views: 0 },
+        data_quality: {
+          returned_rows: expectedReturnedRows,
+          results_truncated: false,
+        },
+      });
+    },
+  );
 
   it('uses only exact unique pinned labels and keeps generic click ambiguous', async () => {
     const result = await handleClientAnalyticsReadActionTool(

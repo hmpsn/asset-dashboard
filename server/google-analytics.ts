@@ -225,6 +225,8 @@ export interface ClientGa4ProviderSafeMetadata {
 export interface ClientGa4ProviderReport<TRow> {
   rows: TRow[];
   rowCount: number;
+  /** Rows actually returned by GA4 before deterministic aggregate-row projection. */
+  sourceReturnedRowCount?: number;
   requestedRanges: ClientGa4ProviderDateRange[];
   metadata: ClientGa4ProviderSafeMetadata;
 }
@@ -735,6 +737,7 @@ export async function runClientGa4ComparisonReport(
   const comparisonRow = report.rows.find(row => row.range === 'comparison');
   return {
     ...report,
+    sourceReturnedRowCount: report.rows.length,
     rows: [
       currentRow ?? zeroMetrics('current'),
       comparisonRow ?? zeroMetrics('comparison'),

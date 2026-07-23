@@ -332,7 +332,7 @@ function projectReportQuality(
   }
   return projectClientGa4DataQuality({
     requestedRanges: ranges,
-    returnedRowCount: report.rows.length,
+    returnedRowCount: report.sourceReturnedRowCount ?? report.rows.length,
     providerRowCount: report.rowCount,
     requestedLimit,
     reportMetadata: report.metadata,
