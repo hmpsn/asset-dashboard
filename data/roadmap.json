@@ -15,7 +15,7 @@
           "status": "pending",
           "createdAt": "2026-07-23",
           "owner": "platform-foundation",
-          "notes": "Add one /mcp/client endpoint, profile-bound workspace credentials, workspace-free client schemas, canonical read-only discovery/dispatch allowlisting, and structured GSC output. Preserve /mcp and /mcp/operator compatibility; no UI or database synchronization."
+          "notes": "Implementation complete locally 2026-07-23: one /mcp/client endpoint, profile-bound workspace credentials, workspace-free client schemas, canonical read-only discovery/dispatch allowlisting, and bounded structured GSC output. Existing keys default to full; client keys are rejected at broader transports, and full/master credentials are rejected at the client transport. Keep pending until independent reviews, CI, and staging credential/handshake smoke pass. No UI or database synchronization."
         },
         {
           "id": "mcp-client-ga4-analytics",

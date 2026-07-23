@@ -10,7 +10,9 @@ import type {
   McpApiKeySummary,
   McpApiKeyListResponse,
   CreateMcpApiKeyResult,
+  McpApiKeyProfile,
 } from '../../shared/types/mcp-api-keys.js';
+import { MCP_API_KEY_PROFILES } from '../../shared/types/mcp-api-keys.js';
 
 const router = Router();
 const log = createLogger('mcp-api-keys-route');
@@ -20,6 +22,7 @@ function toSummary(meta: McpApiKeyMetadata, workspaceName: string): McpApiKeySum
     id: meta.id,
     workspaceId: meta.workspaceId,
     workspaceName,
+    profile: meta.profile,
     label: meta.label,
     createdAt: meta.createdAt,
     lastUsedAt: meta.lastUsedAt,
@@ -57,6 +60,10 @@ router.post(
     z.object({
       workspaceId: z.string().min(1),
       label: z.string().trim().min(1).max(120),
+      profile: z.enum([
+        MCP_API_KEY_PROFILES.FULL,
+        MCP_API_KEY_PROFILES.CLIENT,
+      ]).optional(),
     }),
   ),
   (req, res) => {
@@ -64,14 +71,23 @@ router.post(
     // client users, so no workspace-scoped member can reach this admin-infra route at all —
     // strictly tighter than requireWorkspaceAccessFromBody, which would WRONGLY admit a
     // client JWT scoped to `workspaceId` to mint MCP keys.
-    const { workspaceId, label } = req.body as { workspaceId: string; label: string };
+    const {
+      workspaceId,
+      label,
+      profile = MCP_API_KEY_PROFILES.FULL,
+    } = req.body as {
+      workspaceId: string;
+      label: string;
+      profile?: McpApiKeyProfile;
+    };
     const ws = getWorkspace(workspaceId);
     if (!ws) return res.status(404).json({ error: 'Workspace not found' });
 
-    const created = createMcpApiKey(workspaceId, label);
+    const created = createMcpApiKey(workspaceId, label, profile);
     addActivity(workspaceId, 'mcp_key_created', `MCP API key created: ${label}`, undefined, {
       keyId: created.id,
       label,
+      profile,
     });
 
     // Re-read to surface the persisted created_at (createMcpApiKey returns only id + plaintext).

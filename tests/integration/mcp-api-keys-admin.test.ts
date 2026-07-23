@@ -114,11 +114,19 @@ describe('Admin MCP API key routes', () => {
     const createRes = await adminPost({ workspaceId: ws.workspaceId, label: 'integration-test-key' });
     expect(createRes.status).toBe(200);
     const created = (await createRes.json()) as {
-      key: { id: string; workspaceId: string; workspaceName: string; label: string; revoked: boolean };
+      key: {
+        id: string;
+        workspaceId: string;
+        workspaceName: string;
+        profile: 'full' | 'client';
+        label: string;
+        revoked: boolean;
+      };
       plaintextKeyOnceShown: string;
     };
     expect(created.plaintextKeyOnceShown).toMatch(/^mcp_/);
     expect(created.key.workspaceId).toBe(ws.workspaceId);
+    expect(created.key.profile).toBe('full');
     expect(created.key.label).toBe('integration-test-key');
     expect(created.key.revoked).toBe(false);
 
@@ -279,6 +287,52 @@ describe('Admin MCP API key routes', () => {
   it('rejects creation for an unknown workspace with 404', async () => {
     const res = await adminPost({ workspaceId: 'ws_does_not_exist', label: 'nope' });
     expect(res.status).toBe(404);
+  });
+
+  it('defaults an omitted profile to full, persists an explicit client profile, and never lists key material', async () => {
+    const legacyRes = await adminPost({ workspaceId: ws.workspaceId, label: 'legacy-profile-default' });
+    expect(legacyRes.status).toBe(200);
+    const legacy = await legacyRes.json() as {
+      key: { id: string; profile: string };
+      plaintextKeyOnceShown: string;
+    };
+    expect(legacy.key.profile).toBe('full');
+
+    const clientRes = await adminPost({
+      workspaceId: ws.workspaceId,
+      label: 'client-profile',
+      profile: 'client',
+    });
+    expect(clientRes.status).toBe(200);
+    const client = await clientRes.json() as {
+      key: { id: string; workspaceId: string; profile: string; label: string };
+      plaintextKeyOnceShown: string;
+    };
+    expect(client.key).toMatchObject({
+      workspaceId: ws.workspaceId,
+      profile: 'client',
+      label: 'client-profile',
+    });
+
+    const listed = await (await ctx.api('/api/admin/mcp-api-keys')).json() as {
+      keys: Array<Record<string, unknown>>;
+    };
+    expect(listed.keys.find(key => key.id === legacy.key.id)?.profile).toBe('full');
+    expect(listed.keys.find(key => key.id === client.key.id)?.profile).toBe('client');
+    const serialized = JSON.stringify(listed);
+    expect(serialized).not.toContain(legacy.plaintextKeyOnceShown);
+    expect(serialized).not.toContain(client.plaintextKeyOnceShown);
+    expect(serialized).not.toContain('key_hash');
+    expect(serialized).not.toContain('keyHash');
+  });
+
+  it('rejects an invalid credential profile', async () => {
+    const res = await adminPost({
+      workspaceId: ws.workspaceId,
+      label: 'invalid-profile',
+      profile: 'operator',
+    });
+    expect(res.status).toBe(400);
   });
 
   it('rejects revoking an unknown key id with 404', async () => {

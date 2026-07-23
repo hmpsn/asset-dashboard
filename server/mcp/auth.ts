@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { createLogger } from '../logger.js';
 import { findActiveKeyByHash, hashMcpApiKey, touchLastUsed } from './api-keys.js';
+import type { McpApiKeyProfile } from '../../shared/types/mcp-api-keys.js';
 
 const log = createLogger('mcp-auth');
 
@@ -22,6 +23,8 @@ export interface McpAuthContext {
   label?: string;
   /** mcp_api_keys.id for the authenticating per-workspace key; undefined for master. */
   keyId?: string;
+  /** Durable transport profile; undefined only for the environment master key. */
+  credentialProfile?: McpApiKeyProfile;
 }
 
 /**
@@ -30,11 +33,17 @@ export interface McpAuthContext {
  */
 export function isMcpMasterKeyAuth(
   auth: McpAuthContext | undefined,
-): auth is McpAuthContext & { scope: 'all'; label?: undefined; keyId?: undefined } {
+): auth is McpAuthContext & {
+  scope: 'all';
+  label?: undefined;
+  keyId?: undefined;
+  credentialProfile?: undefined;
+} {
   return (
     auth?.scope === 'all'
     && auth.keyId === undefined
     && auth.label === undefined
+    && auth.credentialProfile === undefined
   );
 }
 
@@ -101,7 +110,12 @@ export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunctio
   const presentedHash = hashMcpApiKey(token);
   const record = findActiveKeyByHash(presentedHash);
   if (record) {
-    req.mcpAuth = { scope: record.workspaceId, label: record.label, keyId: record.id };
+    req.mcpAuth = {
+      scope: record.workspaceId,
+      label: record.label,
+      keyId: record.id,
+      credentialProfile: record.profile,
+    };
     touchLastUsed(record.id);
     log.debug({ workspaceId: record.workspaceId, keyId: record.id }, 'MCP per-workspace key authenticated');
     next();

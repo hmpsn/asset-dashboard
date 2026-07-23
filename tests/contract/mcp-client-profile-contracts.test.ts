@@ -34,7 +34,8 @@ describe('MCP client read-only profile contracts', () => {
     expect(new Set(MCP_CLIENT_TOOL_NAMES).size).toBe(1);
 
     const registered = new Set(listMcpToolDefinitions().map(tool => tool.name));
-    expect(MCP_CLIENT_TOOL_NAMES.every(name => registered.has(name))).toBe(true);
+    expect(MCP_CLIENT_TOOL_NAMES.length).toBeGreaterThan(0);
+    expect(MCP_CLIENT_TOOL_NAMES.every(name => registered.has(name))).toBe(true); // every-ok — non-empty asserted above
     expect(clientDefinitions().map(tool => tool.name)).toEqual(MCP_CLIENT_TOOL_NAMES);
   });
 
