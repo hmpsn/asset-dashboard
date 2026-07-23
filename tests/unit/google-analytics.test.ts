@@ -53,9 +53,10 @@ describe('google-analytics behavior', () => {
       getGA4TopPages,
       getGA4TopSources,
       runClientGa4CampaignReport,
+      runClientGa4PageContentReport,
     } = await import('../../server/google-analytics.js');
 
-    const [overview, trend, pages, sources, devices, countries, comparison, campaigns] = await Promise.all([
+    const [overview, trend, pages, sources, devices, countries, comparison, campaigns, pageContent] = await Promise.all([
       getGA4Overview(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
       getGA4DailyTrend(LOCAL_PROVIDER_FIXTURE.ga4PropertyNumericId),
       getGA4TopPages(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
@@ -64,6 +65,11 @@ describe('google-analytics behavior', () => {
       getGA4Countries(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
       getGA4PeriodComparison(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
       runClientGa4CampaignReport(
+        LOCAL_PROVIDER_FIXTURE.ga4PropertyId,
+        { startDate: '2026-06-01', endDate: '2026-06-28' },
+        10,
+      ),
+      runClientGa4PageContentReport(
         LOCAL_PROVIDER_FIXTURE.ga4PropertyId,
         { startDate: '2026-06-01', endDate: '2026-06-28' },
         10,
@@ -81,6 +87,11 @@ describe('google-analytics behavior', () => {
       campaignName: 'Organic Search',
       sessions: 1_492,
     });
+    expect(pageContent.rows[0]).toMatchObject({
+      path: '/',
+      users: 510,
+    });
+    expect(pageContent.rows[0]?.avgEngagementTimeSeconds).toBeCloseTo(144.97, 2);
     expect(mocks.getGlobalToken).not.toHaveBeenCalled();
     expect(mocks.fetch).not.toHaveBeenCalled();
   });

@@ -248,7 +248,7 @@ interface FixedGa4ReportSpec {
   }>;
   requestedRanges: ClientGa4ProviderDateRange[];
   limit?: number;
-  exactRowCount?: number;
+  allowedRowCounts?: readonly number[];
 }
 
 const CLIENT_GA4_PROVIDER_UNAVAILABLE = 'GA4 provider report unavailable';
@@ -367,7 +367,7 @@ function validateGa4ReportResponse(raw: unknown, spec: FixedGa4ReportSpec): Vali
   if (!Number.isSafeInteger(rowCount) || (rowCount as number) < 0) {
     throw incompatibleGa4Report();
   }
-  if (spec.exactRowCount !== undefined && rowCount !== spec.exactRowCount) {
+  if (spec.allowedRowCounts !== undefined && !spec.allowedRowCounts.includes(rowCount as number)) {
     throw incompatibleGa4Report();
   }
 
@@ -642,19 +642,20 @@ export async function runClientGa4KeyEventsReport(
     {
       dateRanges: [requestedRange],
       metrics: [{ name: 'totalUsers' }],
+      keepEmptyRows: true,
     },
     {
       dimensions: [],
       metrics: [{ name: 'totalUsers', type: 'TYPE_INTEGER' }],
       requestedRanges: [requestedRange],
-      exactRowCount: 1,
+      allowedRowCounts: [0, 1],
     },
     row => ({ totalUsers: strictIntegerMetric(row, 0) }),
   );
 
   return {
     ...events,
-    periodTotalUsers: totals.rows[0]!.totalUsers,
+    periodTotalUsers: totals.rows[0]?.totalUsers ?? 0,
     metadata: mergeSafeGa4Metadata([events.metadata, totals.metadata]),
   };
 }
@@ -695,12 +696,13 @@ export async function runClientGa4ComparisonReport(
         { ...comparison, name: 'comparison' },
       ],
       metrics: CLIENT_GA4_COMPARISON_METRICS.map(({ name }) => ({ name })),
+      keepEmptyRows: true,
     },
     {
       dimensions: ['dateRange'],
       metrics: CLIENT_GA4_COMPARISON_METRICS,
       requestedRanges: [current, comparison],
-      exactRowCount: 2,
+      allowedRowCounts: [0, 1, 2],
     },
     row => {
       const rawRange = strictDimension(row, 0);
@@ -717,10 +719,27 @@ export async function runClientGa4ComparisonReport(
       };
     },
   );
+  if (new Set(report.rows.map(row => row.range)).size !== report.rows.length) {
+    throw incompatibleGa4Report();
+  }
+  const zeroMetrics = (range: ClientGa4ComparisonProviderRow['range']): ClientGa4ComparisonProviderRow => ({
+    range,
+    users: 0,
+    sessions: 0,
+    pageViews: 0,
+    newUsers: 0,
+    avgSessionDurationSeconds: 0,
+    bounceRate: 0,
+  });
   const currentRow = report.rows.find(row => row.range === 'current');
   const comparisonRow = report.rows.find(row => row.range === 'comparison');
-  if (!currentRow || !comparisonRow) throw incompatibleGa4Report();
-  return { ...report, rows: [currentRow, comparisonRow] };
+  return {
+    ...report,
+    rows: [
+      currentRow ?? zeroMetrics('current'),
+      comparisonRow ?? zeroMetrics('comparison'),
+    ],
+  };
 }
 
 function withoutQueryOrFragment(path: string): string {
@@ -734,6 +753,7 @@ function withoutQueryOrFragment(path: string): string {
 export interface ClientGa4PageContentProviderRow {
   path: string;
   views: number;
+  /** GA4 active users, matching the denominator used for average engagement time. */
   users: number;
   avgEngagementTimeSeconds: number;
 }
@@ -752,7 +772,7 @@ export async function runClientGa4PageContentReport(
       dimensions: [{ name: 'pagePath' }],
       metrics: [
         { name: 'screenPageViews' },
-        { name: 'totalUsers' },
+        { name: 'activeUsers' },
         { name: 'userEngagementDuration' },
       ],
       orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
@@ -762,7 +782,7 @@ export async function runClientGa4PageContentReport(
       dimensions: ['pagePath'],
       metrics: [
         { name: 'screenPageViews', type: 'TYPE_INTEGER' },
-        { name: 'totalUsers', type: 'TYPE_INTEGER' },
+        { name: 'activeUsers', type: 'TYPE_INTEGER' },
         { name: 'userEngagementDuration', type: 'TYPE_SECONDS' },
       ],
       requestedRanges: [requestedRange],

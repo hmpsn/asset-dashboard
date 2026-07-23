@@ -699,8 +699,7 @@ async function buildGa4KeyEvents(
         limit,
       );
       if (
-        report.periodTotalUsers === 0
-        && report.rows.some(row => row.users > 0)
+        report.rows.some(row => row.users > report.periodTotalUsers)
       ) {
         throw new ClientGa4ProjectionError(
           'invalid_data_quality',

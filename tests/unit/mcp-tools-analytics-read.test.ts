@@ -487,6 +487,27 @@ describe('mcp analytics read action tools', () => {
     });
   });
 
+  it('fails safely when a key-event row exceeds the nonzero period user total', async () => {
+    (runClientGa4KeyEventsReport as Mock).mockResolvedValue({
+      ...providerReport([{
+        eventName: 'contradictory_private_event',
+        keyEvents: 175,
+        users: 150,
+      }]),
+      periodTotalUsers: 100,
+    });
+    const result = await handleClientAnalyticsReadActionTool(
+      'get_ga4_key_events',
+      { workspace_id: 'ws-1', ...DATE_ARGS },
+    );
+    const serialized = textOf(result);
+
+    expect(errorEnvelope(result)).toMatchObject({ code: 'internal_error' });
+    expect(serialized).not.toContain('contradictory_private_event');
+    expect(serialized).not.toContain('150');
+    expect(serialized).not.toContain('100');
+  });
+
   it('keeps page-view and landing-page scopes separate and sanitizes both paths', async () => {
     const result = await handleClientAnalyticsReadActionTool(
       'get_ga4_content_performance',

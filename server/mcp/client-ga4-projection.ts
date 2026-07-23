@@ -259,12 +259,14 @@ export function resolveClientGa4ComparisonRange(
   const start = parseExactUtcDate(validatedCurrent.start, 'invalid_comparison_range');
   const end = parseExactUtcDate(validatedCurrent.end, 'invalid_comparison_range');
   if (mode === 'year_over_year') {
+    const comparisonRange = validateRange(
+      toIsoDate(shiftUtcCalendarYear(start, -1)),
+      toIsoDate(shiftUtcCalendarYear(end, -1)),
+      'invalid_comparison_range',
+    );
     return {
       comparisonMode: mode,
-      comparisonRange: {
-        start: toIsoDate(shiftUtcCalendarYear(start, -1)),
-        end: toIsoDate(shiftUtcCalendarYear(end, -1)),
-      },
+      comparisonRange,
     };
   }
 

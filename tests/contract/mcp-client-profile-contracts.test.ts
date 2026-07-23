@@ -86,5 +86,15 @@ describe('MCP client read-only profile contracts', () => {
     const serializedContentOutput = JSON.stringify(content?.outputSchema);
     expect(serializedContentOutput).toContain('pages_by_views');
     expect(serializedContentOutput).toContain('landing_pages_by_sessions');
+
+    for (const definition of clientDefinitions().filter(tool => tool.name.startsWith('get_ga4_'))) {
+      const serializedInputSchema = JSON.stringify(definition.inputSchema);
+      expect(serializedInputSchema).toContain(
+        'Do not combine with start_date or end_date.',
+      );
+      expect(serializedInputSchema).not.toContain(
+        'Ignored when an exact date range is supplied.',
+      );
+    }
   });
 });

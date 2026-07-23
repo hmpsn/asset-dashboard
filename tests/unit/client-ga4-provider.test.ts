@@ -191,6 +191,7 @@ describe('fixed client GA4 provider reports', () => {
         { name: 'averageSessionDuration' },
         { name: 'bounceRate' },
       ],
+      keepEmptyRows: true,
     }]);
     expect(result.requestedRanges).toEqual([RANGE, COMPARISON_RANGE]);
     expect(result.rows).toEqual([
@@ -213,6 +214,79 @@ describe('fixed client GA4 provider reports', () => {
         bounceRate: 40,
       },
     ]);
+  });
+
+  it('maps a structurally valid zero-row comparison aggregate to explicit zero periods', async () => {
+    mockReports(report({
+      dimensions: ['dateRange'],
+      metrics: [
+        'totalUsers',
+        'sessions',
+        'screenPageViews',
+        'newUsers',
+        'averageSessionDuration',
+        'bounceRate',
+      ],
+      rows: [],
+      rowCount: 0,
+    }));
+
+    const result = await runClientGa4ComparisonReport('prop-1', RANGE, COMPARISON_RANGE);
+
+    expect(result.rowCount).toBe(0);
+    expect(result.rows).toEqual([
+      {
+        range: 'current',
+        users: 0,
+        sessions: 0,
+        pageViews: 0,
+        newUsers: 0,
+        avgSessionDurationSeconds: 0,
+        bounceRate: 0,
+      },
+      {
+        range: 'comparison',
+        users: 0,
+        sessions: 0,
+        pageViews: 0,
+        newUsers: 0,
+        avgSessionDurationSeconds: 0,
+        bounceRate: 0,
+      },
+    ]);
+  });
+
+  it('maps only a missing comparison aggregate range to zero metrics', async () => {
+    mockReports(report({
+      dimensions: ['dateRange'],
+      metrics: [
+        'totalUsers',
+        'sessions',
+        'screenPageViews',
+        'newUsers',
+        'averageSessionDuration',
+        'bounceRate',
+      ],
+      rows: [{
+        dimensions: ['current'],
+        metrics: ['100', '130', '240', '51', '110.25', '0.3'],
+      }],
+      rowCount: 1,
+    }));
+
+    const result = await runClientGa4ComparisonReport('prop-1', RANGE, COMPARISON_RANGE);
+
+    expect(result.rowCount).toBe(1);
+    expect(result.rows[0]).toMatchObject({ range: 'current', users: 100, sessions: 130 });
+    expect(result.rows[1]).toEqual({
+      range: 'comparison',
+      users: 0,
+      sessions: 0,
+      pageViews: 0,
+      newUsers: 0,
+      avgSessionDurationSeconds: 0,
+      bounceRate: 0,
+    });
   });
 
   it('pins session-scoped source and medium traffic attribution', async () => {
@@ -283,6 +357,7 @@ describe('fixed client GA4 provider reports', () => {
       {
         dateRanges: [RANGE],
         metrics: [{ name: 'totalUsers' }],
+        keepEmptyRows: true,
       },
     ]);
     expect(result.rows).toEqual([{ eventName: 'generate_lead', keyEvents: 12.5, users: 10 }]);
@@ -294,10 +369,35 @@ describe('fixed client GA4 provider reports', () => {
     });
   });
 
+  it('treats a structurally valid zero-row period total as zero users', async () => {
+    mockReports(
+      report({
+        dimensions: ['eventName'],
+        metrics: ['keyEvents', 'totalUsers'],
+        rows: [{ dimensions: ['generate_lead'], metrics: ['2', '2'] }],
+      }),
+      report({
+        dimensions: [],
+        metrics: ['totalUsers'],
+        rows: [],
+        rowCount: 0,
+      }),
+    );
+
+    const result = await runClientGa4KeyEventsReport('prop-1', RANGE, 10);
+
+    expect(result.periodTotalUsers).toBe(0);
+    expect(requestBodies()[1]).toEqual({
+      dateRanges: [RANGE],
+      metrics: [{ name: 'totalUsers' }],
+      keepEmptyRows: true,
+    });
+  });
+
   it('keeps page-view content in its own fixed report', async () => {
     mockReports(report({
       dimensions: ['pagePath'],
-      metrics: ['screenPageViews', 'totalUsers', 'userEngagementDuration'],
+      metrics: ['screenPageViews', 'activeUsers', 'userEngagementDuration'],
       rows: [{ dimensions: ['/services?utm_source=test#form'], metrics: ['50', '10', '1234.5'] }],
     }));
 
@@ -308,7 +408,7 @@ describe('fixed client GA4 provider reports', () => {
       dimensions: [{ name: 'pagePath' }],
       metrics: [
         { name: 'screenPageViews' },
-        { name: 'totalUsers' },
+        { name: 'activeUsers' },
         { name: 'userEngagementDuration' },
       ],
       orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],

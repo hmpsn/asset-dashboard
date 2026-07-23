@@ -13,7 +13,7 @@ const isoDateSchema = z.string()
 
 const clientGa4DateFields = {
   days: z.number().int().positive().max(MCP_CLIENT_ANALYTICS_LIMITS.maxDays).optional()
-    .describe('Trailing reporting window in days. Defaults to 28 and caps at 366. Ignored when an exact date range is supplied.'),
+    .describe('Trailing reporting window in days. Defaults to 28 and caps at 366. Do not combine with start_date or end_date.'),
   start_date: isoDateSchema.optional()
     .describe('Explicit inclusive reporting start date. Must be paired with end_date.'),
   end_date: isoDateSchema.optional()
@@ -323,7 +323,7 @@ export const clientGa4KeyEventsDataSchema = z.object({
     key_events: z.number().finite().nonnegative(),
     users: z.number().int().nonnegative(),
     /** Already a percentage (e.g. 4.2 for 4.2%). Do NOT multiply by 100. */
-    user_rate: z.number().finite()
+    user_rate: z.number().finite().min(0).max(100)
       .describe('Share of period users who triggered the key event, in percentage points.'),
   }).strict()).max(MCP_CLIENT_ANALYTICS_LIMITS.maxGa4Rows),
   data_quality: clientGa4DataQualitySchema,

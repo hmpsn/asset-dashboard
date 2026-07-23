@@ -170,6 +170,7 @@ function ga4Row(dimensions: string[], metricNames: string[], values: Ga4MetricVa
 function ga4MetricSet(users: number, sessions = Math.round(users * 1.42), pageviews = Math.round(sessions * 1.72)): Ga4MetricValues {
   return {
     totalUsers: users,
+    activeUsers: users,
     sessions,
     engagedSessions: Math.round(sessions * 0.686),
     screenPageViews: pageviews,

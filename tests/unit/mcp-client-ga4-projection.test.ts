@@ -82,6 +82,13 @@ describe('resolveClientGa4ComparisonRange', () => {
     });
   });
 
+  it('rejects a derived year-over-year range that expands beyond 366 inclusive days', () => {
+    expectProjectionError(() => resolveClientGa4ComparisonRange(
+      { comparison_mode: 'year_over_year' },
+      { start: '2024-03-01', end: '2025-03-01' },
+    ), 'invalid_comparison_range');
+  });
+
   it('requires an equal-length bounded custom comparison', () => {
     expect(resolveClientGa4ComparisonRange({
       comparison_mode: 'custom',
