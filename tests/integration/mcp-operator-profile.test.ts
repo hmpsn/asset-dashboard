@@ -5,7 +5,7 @@ import { seedWorkspace, type SeededFullWorkspace } from '../fixtures/workspace-s
 
 const MCP_MASTER_KEY = 'test-mcp-operator-master-key';
 const OPERATOR_PATH = '/mcp/operator';
-const FULL_DISCOVERY_SHA256 = 'c9d10e32bdec3ca9ede0ab8a6126e4a5e66798545d8f7d76d52a9820f2e7f43f';
+const FULL_DISCOVERY_SHA256 = 'efca3d81e7b1ba45fe8f3bbf2f518aff03b1da725585c6613553c50237727eb8';
 const FULL_INSTRUCTIONS_SHA256 = '6e7f8c0c6820bf1881377f5dfbeb7fdd414e1e9ea4048196d6d146e5354ef0f0';
 const ctx = createEphemeralTestContext(import.meta.url, {
   env: { MCP_API_KEY: MCP_MASTER_KEY },
@@ -209,14 +209,14 @@ describe('MCP operator profile HTTP boundary', () => {
     expect((payload as Array<{ id?: string }>).some(item => item.id === workspace.workspaceId)).toBe(true);
   });
 
-  it('keeps the full /mcp profile additive at 105 tools and invokes a tool hidden from operator', async () => {
+  it('keeps the full /mcp profile additive at 110 tools and invokes a tool hidden from operator', async () => {
     const initialized = await initialize('/mcp', MCP_MASTER_KEY);
     expect(typeof initialized.instructions).toBe('string');
     expect(Buffer.byteLength(initialized.instructions!, 'utf8')).toBe(12_151);
     expect(sha256(initialized.instructions!)).toBe(FULL_INSTRUCTIONS_SHA256);
 
     const tools = await listTools('/mcp', MCP_MASTER_KEY);
-    expect(tools).toHaveLength(105);
+    expect(tools).toHaveLength(110);
     expect(sha256(JSON.stringify(tools))).toBe(FULL_DISCOVERY_SHA256);
     expect(tools.some(tool => tool.name === 'get_workspace_overview')).toBe(true);
 

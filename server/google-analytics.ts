@@ -117,8 +117,21 @@ export async function listGA4Properties(): Promise<GA4Property[]> {
 /**
  * Run a GA4 Data API report.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function runReport(propertyId: string, body: Record<string, unknown>): Promise<any> {
+type Ga4ReportKind =
+  | 'legacy'
+  | 'client_campaign'
+  | 'client_comparison'
+  | 'client_traffic_sources'
+  | 'client_key_events'
+  | 'client_key_event_total_users'
+  | 'client_page_content'
+  | 'client_landing_content';
+
+async function runReport(
+  propertyId: string,
+  body: Record<string, unknown>,
+  reportKind: Ga4ReportKind = 'legacy',
+): Promise<unknown> {
   if (isLocalProviderFixtureProperty(propertyId)) {
     return buildLocalGa4FixtureReport(body);
   }
@@ -133,7 +146,14 @@ async function runReport(propertyId: string, body: Record<string, unknown>): Pro
       body,
     });
   } catch (err) {
-    log.error({ err }, 'Report failed');
+    const providerError = isGoogleProviderError(err) ? err : null;
+    const status = providerError?.status;
+    log.error({
+      reportKind,
+      failureClassification: providerError?.kind ?? 'unexpected',
+      status: typeof status === 'number' && status >= 100 && status <= 599 ? status : null,
+      retryable: providerError?.retryable ?? false,
+    }, 'GA4 report failed');
     if (isGoogleProviderError(err)) {
       throw new Error(`GA4 report failed: ${err.status ?? err.kind}`);
     }
@@ -184,6 +204,648 @@ function dimensionValue(
 
 function formatGa4Date(value: string): string {
   return value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+}
+
+export interface ClientGa4ProviderDateRange {
+  startDate: string;
+  endDate: string;
+}
+
+export interface ClientGa4ProviderSamplingMetadata {
+  samplesReadCount: string;
+  samplingSpaceSize: string;
+}
+
+export interface ClientGa4ProviderSafeMetadata {
+  subjectToThresholding: boolean | null;
+  dataLossFromOtherRow: boolean | null;
+  samplingMetadatas: ClientGa4ProviderSamplingMetadata[];
+}
+
+export interface ClientGa4ProviderReport<TRow> {
+  rows: TRow[];
+  rowCount: number;
+  /** Rows actually returned by GA4 before deterministic aggregate-row projection. */
+  sourceReturnedRowCount?: number;
+  requestedRanges: ClientGa4ProviderDateRange[];
+  metadata: ClientGa4ProviderSafeMetadata;
+}
+
+interface Ga4ReportRow {
+  dimensionValues?: Array<{ value?: string }>;
+  metricValues?: Array<{ value?: string }>;
+}
+
+interface ValidatedGa4Report {
+  rows: Ga4ReportRow[];
+  rowCount: number;
+  metadata: ClientGa4ProviderSafeMetadata;
+}
+
+interface FixedGa4ReportSpec {
+  dimensions: readonly string[];
+  metrics: ReadonlyArray<{
+    name: string;
+    type: 'TYPE_FLOAT' | 'TYPE_INTEGER' | 'TYPE_SECONDS';
+  }>;
+  requestedRanges: ClientGa4ProviderDateRange[];
+  limit?: number;
+  allowedRowCounts?: readonly number[];
+}
+
+const CLIENT_GA4_PROVIDER_UNAVAILABLE = 'GA4 provider report unavailable';
+const CLIENT_GA4_PROVIDER_INCOMPATIBLE = 'GA4 provider report incompatible';
+const MAX_PROVIDER_INT64 = 9_223_372_036_854_775_807n;
+const DAY_MS = 86_400_000;
+
+function incompatibleGa4Report(): Error {
+  return new Error(CLIENT_GA4_PROVIDER_INCOMPATIBLE);
+}
+
+function isUnknownObject(value: unknown): value is { [key: string]: unknown } {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function assertClientGa4DateRange(range: ClientGa4ProviderDateRange): void {
+  const parse = (value: string): number => {
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) throw incompatibleGa4Report();
+    const timestamp = Date.parse(`${value}T00:00:00.000Z`);
+    if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== value) {
+      throw incompatibleGa4Report();
+    }
+    return timestamp;
+  };
+  const start = parse(range.startDate);
+  const end = parse(range.endDate);
+  const inclusiveDays = Math.floor((end - start) / DAY_MS) + 1;
+  if (inclusiveDays < 1 || inclusiveDays > 366) throw incompatibleGa4Report();
+}
+
+function assertClientGa4Limit(limit: number): void {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+    throw incompatibleGa4Report();
+  }
+}
+
+function exactHeaders(
+  value: unknown,
+  expected: ReadonlyArray<{ name: string; type?: string }>,
+): boolean {
+  if (value === undefined && expected.length === 0) return true;
+  if (!Array.isArray(value) || value.length !== expected.length) return false;
+  return value.every((header, index) => {
+    if (!isUnknownObject(header) || header.name !== expected[index]?.name) return false;
+    return expected[index]?.type === undefined || header.type === expected[index]?.type;
+  });
+}
+
+function safeOptionalBoolean(value: unknown): boolean | null {
+  if (value === undefined) return null;
+  if (typeof value !== 'boolean') throw incompatibleGa4Report();
+  return value;
+}
+
+function parseSamplingCount(value: unknown): string {
+  if (typeof value !== 'string' || !/^\d{1,19}$/u.test(value)) {
+    throw incompatibleGa4Report();
+  }
+  const parsed = BigInt(value);
+  if (parsed > MAX_PROVIDER_INT64) throw incompatibleGa4Report();
+  return value;
+}
+
+function safeGa4Metadata(value: unknown, rangeCount: number): ClientGa4ProviderSafeMetadata {
+  if (value === undefined) {
+    return {
+      subjectToThresholding: null,
+      dataLossFromOtherRow: null,
+      samplingMetadatas: [],
+    };
+  }
+  if (!isUnknownObject(value)) throw incompatibleGa4Report();
+
+  const restriction = value.schemaRestrictionResponse;
+  if (restriction !== undefined) {
+    if (!isUnknownObject(restriction)) throw incompatibleGa4Report();
+    const active = restriction.activeMetricRestrictions;
+    if (active !== undefined && (!Array.isArray(active) || active.length > 0)) {
+      throw incompatibleGa4Report();
+    }
+  }
+
+  const rawSampling = value.samplingMetadatas;
+  if (rawSampling !== undefined && !Array.isArray(rawSampling)) {
+    throw incompatibleGa4Report();
+  }
+  const samplingMetadatas = (rawSampling ?? []).map((entry) => {
+    if (!isUnknownObject(entry)) throw incompatibleGa4Report();
+    const samplesReadCount = parseSamplingCount(entry.samplesReadCount);
+    const samplingSpaceSize = parseSamplingCount(entry.samplingSpaceSize);
+    const read = BigInt(samplesReadCount);
+    const space = BigInt(samplingSpaceSize);
+    if (space === 0n || read > space) throw incompatibleGa4Report();
+    return { samplesReadCount, samplingSpaceSize };
+  });
+  if (samplingMetadatas.length > rangeCount) throw incompatibleGa4Report();
+
+  return {
+    subjectToThresholding: safeOptionalBoolean(value.subjectToThresholding),
+    dataLossFromOtherRow: safeOptionalBoolean(value.dataLossFromOtherRow),
+    samplingMetadatas,
+  };
+}
+
+function validateGa4ReportResponse(raw: unknown, spec: FixedGa4ReportSpec): ValidatedGa4Report {
+  if (!isUnknownObject(raw)) throw incompatibleGa4Report();
+  if (!exactHeaders(
+    raw.dimensionHeaders,
+    spec.dimensions.map(name => ({ name })),
+  )) {
+    throw incompatibleGa4Report();
+  }
+  if (!exactHeaders(raw.metricHeaders, spec.metrics)) throw incompatibleGa4Report();
+
+  const rowCount = raw.rowCount;
+  if (!Number.isSafeInteger(rowCount) || (rowCount as number) < 0) {
+    throw incompatibleGa4Report();
+  }
+  if (spec.allowedRowCounts !== undefined && !spec.allowedRowCounts.includes(rowCount as number)) {
+    throw incompatibleGa4Report();
+  }
+
+  const rawRows = raw.rows ?? [];
+  if (!Array.isArray(rawRows)) throw incompatibleGa4Report();
+  const expectedReturnedRows = spec.limit === undefined
+    ? rowCount as number
+    : Math.min(rowCount as number, spec.limit);
+  if (rawRows.length !== expectedReturnedRows) throw incompatibleGa4Report();
+
+  const rows = rawRows.map((row) => {
+    if (!isUnknownObject(row)) throw incompatibleGa4Report();
+    const dimensionValues = row.dimensionValues ?? [];
+    const metricValues = row.metricValues;
+    if (
+      !Array.isArray(dimensionValues)
+      || dimensionValues.length !== spec.dimensions.length
+      || !Array.isArray(metricValues)
+      || metricValues.length !== spec.metrics.length
+    ) {
+      throw incompatibleGa4Report();
+    }
+    for (const value of [...dimensionValues, ...metricValues]) {
+      if (!isUnknownObject(value) || typeof value.value !== 'string') {
+        throw incompatibleGa4Report();
+      }
+    }
+    return {
+      dimensionValues: dimensionValues as Array<{ value: string }>,
+      metricValues: metricValues as Array<{ value: string }>,
+    };
+  });
+
+  return {
+    rows,
+    rowCount: rowCount as number,
+    metadata: safeGa4Metadata(raw.metadata, spec.requestedRanges.length),
+  };
+}
+
+async function executeFixedGa4Report<TRow>(
+  propertyId: string,
+  reportKind: Ga4ReportKind,
+  request: Record<string, unknown>,
+  spec: FixedGa4ReportSpec,
+  mapRow: (row: Ga4ReportRow) => TRow,
+): Promise<ClientGa4ProviderReport<TRow>> {
+  for (const range of spec.requestedRanges) assertClientGa4DateRange(range);
+  if (spec.limit !== undefined) assertClientGa4Limit(spec.limit);
+
+  let raw: unknown;
+  try {
+    raw = await runReport(propertyId, request, reportKind);
+  } catch (err) {
+    void err;
+    throw new Error(CLIENT_GA4_PROVIDER_UNAVAILABLE);
+  }
+
+  try {
+    const validated = validateGa4ReportResponse(raw, spec);
+    return {
+      rows: validated.rows.map(mapRow),
+      rowCount: validated.rowCount,
+      requestedRanges: spec.requestedRanges.map(range => ({ ...range })),
+      metadata: validated.metadata,
+    };
+  } catch (err) {
+    void err;
+    log.warn({
+      reportKind,
+      failureClassification: 'incompatible_response',
+      status: null,
+      retryable: false,
+    }, 'GA4 report response incompatible');
+    throw incompatibleGa4Report();
+  }
+}
+
+function strictDimension(row: Ga4ReportRow, index: number): string {
+  const value = row.dimensionValues?.[index]?.value;
+  if (typeof value !== 'string') throw incompatibleGa4Report();
+  return value;
+}
+
+function strictMetric(row: Ga4ReportRow, index: number): number {
+  const value = row.metricValues?.[index]?.value;
+  if (typeof value !== 'string' || value.trim() === '') throw incompatibleGa4Report();
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) throw incompatibleGa4Report();
+  return parsed;
+}
+
+function strictIntegerMetric(row: Ga4ReportRow, index: number): number {
+  const value = strictMetric(row, index);
+  if (!Number.isSafeInteger(value)) throw incompatibleGa4Report();
+  return value;
+}
+
+function strictRatePercent(row: Ga4ReportRow, index: number): number {
+  const fraction = strictMetric(row, index);
+  if (fraction > 1) throw incompatibleGa4Report();
+  return fraction * 100;
+}
+
+const CLIENT_GA4_SESSION_METRICS = [
+  { name: 'sessions', type: 'TYPE_INTEGER' },
+  { name: 'totalUsers', type: 'TYPE_INTEGER' },
+  { name: 'engagedSessions', type: 'TYPE_INTEGER' },
+  { name: 'engagementRate', type: 'TYPE_FLOAT' },
+  { name: 'keyEvents', type: 'TYPE_FLOAT' },
+] as const satisfies FixedGa4ReportSpec['metrics'];
+
+export interface ClientGa4CampaignProviderRow {
+  campaignName: string;
+  sessions: number;
+  users: number;
+  engagedSessions: number;
+  /** Already a percentage (e.g. 63.2 for 63.2%). Do NOT multiply by 100. */
+  engagementRate: number;
+  keyEvents: number;
+}
+
+export async function runClientGa4CampaignReport(
+  propertyId: string,
+  range: ClientGa4ProviderDateRange,
+  limit: number,
+): Promise<ClientGa4ProviderReport<ClientGa4CampaignProviderRow>> {
+  const requestedRange = { ...range };
+  return executeFixedGa4Report(
+    propertyId,
+    'client_campaign',
+    {
+      dateRanges: [requestedRange],
+      dimensions: [{ name: 'sessionCampaignName' }],
+      metrics: CLIENT_GA4_SESSION_METRICS.map(({ name }) => ({ name })),
+      orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+      limit,
+    },
+    {
+      dimensions: ['sessionCampaignName'],
+      metrics: CLIENT_GA4_SESSION_METRICS,
+      requestedRanges: [requestedRange],
+      limit,
+    },
+    row => ({
+      campaignName: strictDimension(row, 0),
+      sessions: strictIntegerMetric(row, 0),
+      users: strictIntegerMetric(row, 1),
+      engagedSessions: strictIntegerMetric(row, 2),
+      engagementRate: strictRatePercent(row, 3),
+      keyEvents: strictMetric(row, 4),
+    }),
+  );
+}
+
+export interface ClientGa4TrafficSourceProviderRow {
+  source: string;
+  medium: string;
+  sessions: number;
+  users: number;
+  engagedSessions: number;
+  /** Already a percentage (e.g. 63.2 for 63.2%). Do NOT multiply by 100. */
+  engagementRate: number;
+  keyEvents: number;
+}
+
+export async function runClientGa4TrafficSourcesReport(
+  propertyId: string,
+  range: ClientGa4ProviderDateRange,
+  limit: number,
+): Promise<ClientGa4ProviderReport<ClientGa4TrafficSourceProviderRow>> {
+  const requestedRange = { ...range };
+  return executeFixedGa4Report(
+    propertyId,
+    'client_traffic_sources',
+    {
+      dateRanges: [requestedRange],
+      dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
+      metrics: CLIENT_GA4_SESSION_METRICS.map(({ name }) => ({ name })),
+      orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+      limit,
+    },
+    {
+      dimensions: ['sessionSource', 'sessionMedium'],
+      metrics: CLIENT_GA4_SESSION_METRICS,
+      requestedRanges: [requestedRange],
+      limit,
+    },
+    row => ({
+      source: strictDimension(row, 0),
+      medium: strictDimension(row, 1),
+      sessions: strictIntegerMetric(row, 0),
+      users: strictIntegerMetric(row, 1),
+      engagedSessions: strictIntegerMetric(row, 2),
+      engagementRate: strictRatePercent(row, 3),
+      keyEvents: strictMetric(row, 4),
+    }),
+  );
+}
+
+export interface ClientGa4KeyEventProviderRow {
+  eventName: string;
+  keyEvents: number;
+  users: number;
+}
+
+export interface ClientGa4KeyEventsProviderReport
+  extends ClientGa4ProviderReport<ClientGa4KeyEventProviderRow> {
+  periodTotalUsers: number;
+}
+
+function mergeSafeGa4Metadata(
+  reports: ReadonlyArray<ClientGa4ProviderSafeMetadata>,
+): ClientGa4ProviderSafeMetadata {
+  const mergeBoolean = (
+    select: (metadata: ClientGa4ProviderSafeMetadata) => boolean | null,
+  ): boolean | null => {
+    const values = reports.map(select);
+    if (values.some(value => value === true)) return true;
+    if (values.every(value => value === false)) return false;
+    return null;
+  };
+  const samplingMetadatas = reports.flatMap(report => report.samplingMetadatas);
+  if (samplingMetadatas.length > 2) throw incompatibleGa4Report();
+  return {
+    subjectToThresholding: mergeBoolean(metadata => metadata.subjectToThresholding),
+    dataLossFromOtherRow: mergeBoolean(metadata => metadata.dataLossFromOtherRow),
+    samplingMetadatas,
+  };
+}
+
+export async function runClientGa4KeyEventsReport(
+  propertyId: string,
+  range: ClientGa4ProviderDateRange,
+  limit: number,
+): Promise<ClientGa4KeyEventsProviderReport> {
+  const requestedRange = { ...range };
+  const events = await executeFixedGa4Report(
+    propertyId,
+    'client_key_events',
+    {
+      dateRanges: [requestedRange],
+      dimensions: [{ name: 'eventName' }],
+      metrics: [{ name: 'keyEvents' }, { name: 'totalUsers' }],
+      dimensionFilter: {
+        filter: {
+          fieldName: 'isKeyEvent',
+          stringFilter: { matchType: 'EXACT', value: 'true' },
+        },
+      },
+      orderBys: [{ metric: { metricName: 'keyEvents' }, desc: true }],
+      limit,
+    },
+    {
+      dimensions: ['eventName'],
+      metrics: [
+        { name: 'keyEvents', type: 'TYPE_FLOAT' },
+        { name: 'totalUsers', type: 'TYPE_INTEGER' },
+      ],
+      requestedRanges: [requestedRange],
+      limit,
+    },
+    row => ({
+      eventName: strictDimension(row, 0),
+      keyEvents: strictMetric(row, 0),
+      users: strictIntegerMetric(row, 1),
+    }),
+  );
+  const totals = await executeFixedGa4Report(
+    propertyId,
+    'client_key_event_total_users',
+    {
+      dateRanges: [requestedRange],
+      metrics: [{ name: 'totalUsers' }],
+      keepEmptyRows: true,
+    },
+    {
+      dimensions: [],
+      metrics: [{ name: 'totalUsers', type: 'TYPE_INTEGER' }],
+      requestedRanges: [requestedRange],
+      allowedRowCounts: [0, 1],
+    },
+    row => ({ totalUsers: strictIntegerMetric(row, 0) }),
+  );
+
+  return {
+    ...events,
+    periodTotalUsers: totals.rows[0]?.totalUsers ?? 0,
+    metadata: mergeSafeGa4Metadata([events.metadata, totals.metadata]),
+  };
+}
+
+export interface ClientGa4ComparisonProviderRow {
+  range: 'current' | 'comparison';
+  users: number;
+  sessions: number;
+  pageViews: number;
+  newUsers: number;
+  avgSessionDurationSeconds: number;
+  /** Already a percentage (e.g. 32.1 for 32.1%). Do NOT multiply by 100. */
+  bounceRate: number;
+}
+
+const CLIENT_GA4_COMPARISON_METRICS = [
+  { name: 'totalUsers', type: 'TYPE_INTEGER' },
+  { name: 'sessions', type: 'TYPE_INTEGER' },
+  { name: 'screenPageViews', type: 'TYPE_INTEGER' },
+  { name: 'newUsers', type: 'TYPE_INTEGER' },
+  { name: 'averageSessionDuration', type: 'TYPE_SECONDS' },
+  { name: 'bounceRate', type: 'TYPE_FLOAT' },
+] as const satisfies FixedGa4ReportSpec['metrics'];
+
+export async function runClientGa4ComparisonReport(
+  propertyId: string,
+  currentRange: ClientGa4ProviderDateRange,
+  comparisonRange: ClientGa4ProviderDateRange,
+): Promise<ClientGa4ProviderReport<ClientGa4ComparisonProviderRow>> {
+  const current = { ...currentRange };
+  const comparison = { ...comparisonRange };
+  const report = await executeFixedGa4Report(
+    propertyId,
+    'client_comparison',
+    {
+      dateRanges: [
+        { ...current, name: 'current' },
+        { ...comparison, name: 'comparison' },
+      ],
+      metrics: CLIENT_GA4_COMPARISON_METRICS.map(({ name }) => ({ name })),
+      keepEmptyRows: true,
+    },
+    {
+      dimensions: ['dateRange'],
+      metrics: CLIENT_GA4_COMPARISON_METRICS,
+      requestedRanges: [current, comparison],
+      allowedRowCounts: [0, 1, 2],
+    },
+    row => {
+      const rawRange = strictDimension(row, 0);
+      if (rawRange !== 'current' && rawRange !== 'comparison') throw incompatibleGa4Report();
+      const range: ClientGa4ComparisonProviderRow['range'] = rawRange;
+      return {
+        range,
+        users: strictIntegerMetric(row, 0),
+        sessions: strictIntegerMetric(row, 1),
+        pageViews: strictIntegerMetric(row, 2),
+        newUsers: strictIntegerMetric(row, 3),
+        avgSessionDurationSeconds: strictMetric(row, 4),
+        bounceRate: strictRatePercent(row, 5),
+      };
+    },
+  );
+  if (new Set(report.rows.map(row => row.range)).size !== report.rows.length) {
+    throw incompatibleGa4Report();
+  }
+  const zeroMetrics = (range: ClientGa4ComparisonProviderRow['range']): ClientGa4ComparisonProviderRow => ({
+    range,
+    users: 0,
+    sessions: 0,
+    pageViews: 0,
+    newUsers: 0,
+    avgSessionDurationSeconds: 0,
+    bounceRate: 0,
+  });
+  const currentRow = report.rows.find(row => row.range === 'current');
+  const comparisonRow = report.rows.find(row => row.range === 'comparison');
+  return {
+    ...report,
+    sourceReturnedRowCount: report.rows.length,
+    rows: [
+      currentRow ?? zeroMetrics('current'),
+      comparisonRow ?? zeroMetrics('comparison'),
+    ],
+  };
+}
+
+function withoutQueryOrFragment(path: string): string {
+  const queryIndex = path.indexOf('?');
+  const fragmentIndex = path.indexOf('#');
+  const indexes = [queryIndex, fragmentIndex].filter(index => index >= 0);
+  const end = indexes.length > 0 ? Math.min(...indexes) : path.length;
+  return path.slice(0, end);
+}
+
+export interface ClientGa4PageContentProviderRow {
+  path: string;
+  views: number;
+  /** GA4 active users, matching the denominator used for average engagement time. */
+  users: number;
+  avgEngagementTimeSeconds: number;
+}
+
+export async function runClientGa4PageContentReport(
+  propertyId: string,
+  range: ClientGa4ProviderDateRange,
+  limit: number,
+): Promise<ClientGa4ProviderReport<ClientGa4PageContentProviderRow>> {
+  const requestedRange = { ...range };
+  return executeFixedGa4Report(
+    propertyId,
+    'client_page_content',
+    {
+      dateRanges: [requestedRange],
+      dimensions: [{ name: 'pagePath' }],
+      metrics: [
+        { name: 'screenPageViews' },
+        { name: 'activeUsers' },
+        { name: 'userEngagementDuration' },
+      ],
+      orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+      limit,
+    },
+    {
+      dimensions: ['pagePath'],
+      metrics: [
+        { name: 'screenPageViews', type: 'TYPE_INTEGER' },
+        { name: 'activeUsers', type: 'TYPE_INTEGER' },
+        { name: 'userEngagementDuration', type: 'TYPE_SECONDS' },
+      ],
+      requestedRanges: [requestedRange],
+      limit,
+    },
+    row => {
+      const users = strictIntegerMetric(row, 1);
+      const engagementDuration = strictMetric(row, 2);
+      if (users === 0 && engagementDuration > 0) throw incompatibleGa4Report();
+      return {
+        path: withoutQueryOrFragment(strictDimension(row, 0)),
+        views: strictIntegerMetric(row, 0),
+        users,
+        avgEngagementTimeSeconds: users > 0 ? engagementDuration / users : 0,
+      };
+    },
+  );
+}
+
+export interface ClientGa4LandingContentProviderRow {
+  landingPage: string;
+  sessions: number;
+  users: number;
+  engagedSessions: number;
+  /** Already a percentage (e.g. 63.2 for 63.2%). Do NOT multiply by 100. */
+  engagementRate: number;
+  keyEvents: number;
+}
+
+export async function runClientGa4LandingContentReport(
+  propertyId: string,
+  range: ClientGa4ProviderDateRange,
+  limit: number,
+): Promise<ClientGa4ProviderReport<ClientGa4LandingContentProviderRow>> {
+  const requestedRange = { ...range };
+  return executeFixedGa4Report(
+    propertyId,
+    'client_landing_content',
+    {
+      dateRanges: [requestedRange],
+      dimensions: [{ name: 'landingPage' }],
+      metrics: CLIENT_GA4_SESSION_METRICS.map(({ name }) => ({ name })),
+      orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+      limit,
+    },
+    {
+      dimensions: ['landingPage'],
+      metrics: CLIENT_GA4_SESSION_METRICS,
+      requestedRanges: [requestedRange],
+      limit,
+    },
+    row => ({
+      landingPage: withoutQueryOrFragment(strictDimension(row, 0)),
+      sessions: strictIntegerMetric(row, 0),
+      users: strictIntegerMetric(row, 1),
+      engagedSessions: strictIntegerMetric(row, 2),
+      engagementRate: strictRatePercent(row, 3),
+      keyEvents: strictMetric(row, 4),
+    }),
+  );
 }
 
 /**

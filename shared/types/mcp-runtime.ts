@@ -9,6 +9,7 @@ export interface McpToolDefinition<TInputSchema = unknown, TOutputSchema = unkno
 export const MCP_SERVER_PROFILES = {
   FULL: 'full',
   OPERATOR: 'operator',
+  CLIENT: 'client',
 } as const;
 
 /**

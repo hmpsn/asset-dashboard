@@ -26,6 +26,10 @@ const h = vi.hoisted(() => {
 
   const workspaceHandler = vi.fn(async () => ({ content: [{ type: 'text', text: 'workspace' }] }));
   const jobHandler = vi.fn(async () => ({ content: [{ type: 'text', text: 'job' }] }));
+  const clientSearchHandler = vi.fn(async () => ({
+    content: [{ type: 'text', text: '{"source":"google_search_console"}' }],
+    structuredContent: { data: { source: 'google_search_console' } },
+  }));
 
   class MockServer {
     handlers = new Map<unknown, (req: unknown) => Promise<unknown>>();
@@ -43,7 +47,14 @@ const h = vi.hoisted(() => {
     constructor(public options: unknown) {}
   }
 
-  return { serverInstances, workspaceHandler, jobHandler, MockServer, MockTransport };
+  return {
+    serverInstances,
+    workspaceHandler,
+    jobHandler,
+    clientSearchHandler,
+    MockServer,
+    MockTransport,
+  };
 });
 
 vi.mock('@modelcontextprotocol/sdk/server', () => ({ Server: h.MockServer }));
@@ -101,7 +112,38 @@ vi.mock('../../server/mcp/tools/content-actions.js', () => ({ contentActionTools
 vi.mock('../../server/mcp/tools/recommendation-actions.js', () => ({ recommendationActionTools: [], handleRecommendationActionTool: vi.fn() }));
 vi.mock('../../server/mcp/tools/content-generation-actions.js', () => ({ contentGenerationActionTools: [], handleContentGenerationActionTool: vi.fn() }));
 vi.mock('../../server/mcp/tools/schema-actions.js', () => ({ schemaActionTools: [], handleSchemaActionTool: vi.fn() }));
-vi.mock('../../server/mcp/tools/analytics-read-actions.js', () => ({ analyticsReadActionTools: [], handleAnalyticsReadActionTool: vi.fn() }));
+vi.mock('../../server/mcp/tools/analytics-read-actions.js', () => ({
+  analyticsReadActionTools: [{
+    name: 'get_search_performance',
+    description: 'Full search performance.',
+    inputSchema: {
+      type: 'object',
+      properties: { workspace_id: { type: 'string' } },
+      required: ['workspace_id'],
+    },
+  }],
+  handleAnalyticsReadActionTool: vi.fn(),
+  clientAnalyticsReadTools: [
+    'get_search_performance',
+    'get_ga4_campaign_performance',
+    'get_ga4_period_comparison',
+    'get_ga4_traffic_sources',
+    'get_ga4_key_events',
+    'get_ga4_content_performance',
+  ].map(name => ({
+    name,
+    description: `Client analytics read: ${name}.`,
+    inputSchema: { type: 'object', properties: {} },
+    outputSchema: { type: 'object', required: ['data'] },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  })),
+  handleClientAnalyticsReadActionTool: h.clientSearchHandler,
+}));
 vi.mock('../../server/mcp/tools/job-actions.js', () => ({
   jobActionTools: [{
     name: 'start_keyword_strategy_generation',
@@ -115,6 +157,7 @@ vi.mock('../../server/mcp/tools/job-actions.js', () => ({
 }));
 
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types';
+import { MCP_SERVER_PROFILES } from '../../shared/types/mcp-runtime.js';
 import { mcpAuthMiddleware } from '../../server/mcp/auth.js';
 import { handleMcpRequest } from '../../server/mcp/server.js';
 import {
@@ -148,12 +191,18 @@ function createRes() {
 // Drive a tool call through the real registry scope boundary by grabbing the
 // CallToolRequestSchema handler from the per-request mock Server.
 async function callTool(
-  mcpAuth: { scope: string; label?: string; keyId?: string },
+  mcpAuth: {
+    scope: string;
+    label?: string;
+    keyId?: string;
+    credentialProfile?: 'full' | 'client';
+  },
   toolName: string,
   args: Record<string, unknown>,
+  profile = MCP_SERVER_PROFILES.FULL,
 ): Promise<{ isError?: boolean; content: Array<{ type: string; text: string }> }> {
   h.serverInstances.length = 0;
-  await handleMcpRequest({ body: {}, mcpAuth } as never, createRes() as never);
+  await handleMcpRequest({ body: {}, mcpAuth } as never, createRes() as never, profile);
   const server = h.serverInstances.at(-1);
   const callHandler = server.handlers.get(CallToolRequestSchema);
   return callHandler({ params: { name: toolName, arguments: args } } as never);
@@ -166,10 +215,16 @@ describe('mcp per-workspace api key store', () => {
 
     const { id, plaintextKeyOnceShown } = createMcpApiKey(ws.id, 'CI key');
     expect(plaintextKeyOnceShown).toMatch(/^mcp_/);
+    expect(Buffer.from(plaintextKeyOnceShown.slice('mcp_'.length), 'base64url')).toHaveLength(32);
     expect(id).toBeTruthy();
 
     const found = findActiveKeyByHash(hashMcpApiKey(plaintextKeyOnceShown));
-    expect(found).toEqual({ id, workspaceId: ws.id, label: 'CI key' });
+    expect(found).toEqual({
+      id,
+      workspaceId: ws.id,
+      label: 'CI key',
+      profile: 'full',
+    });
   });
 
   it('ignores revoked keys (rotation)', () => {
@@ -195,6 +250,19 @@ describe('mcp per-workspace api key store', () => {
     expect(findActiveKeyByHash(hashMcpApiKey(a.plaintextKeyOnceShown))?.label).toBe('key-a');
     expect(findActiveKeyByHash(hashMcpApiKey(b.plaintextKeyOnceShown))?.label).toBe('key-b');
   });
+
+  it('persists the requested client transport profile and preserves full as the creation default', () => {
+    const ws = createWorkspace(`MCP Profile Store ${Date.now()}`);
+    cleanupWorkspaceIds.push(ws.id);
+
+    const full = createMcpApiKey(ws.id, 'legacy-compatible');
+    const client = createMcpApiKey(ws.id, 'client-readonly', 'client');
+
+    expect(findActiveKeyByHash(hashMcpApiKey(full.plaintextKeyOnceShown)))
+      .toEqual(expect.objectContaining({ profile: 'full' }));
+    expect(findActiveKeyByHash(hashMcpApiKey(client.plaintextKeyOnceShown)))
+      .toEqual(expect.objectContaining({ profile: 'client' }));
+  });
 });
 
 describe('mcpAuthMiddleware — master + per-workspace keys', () => {
@@ -214,7 +282,7 @@ describe('mcpAuthMiddleware — master + per-workspace keys', () => {
     expect(req.mcpAuth.label).toBeUndefined();
   });
 
-  it('valid per-workspace key → scope = workspaceId + label', () => {
+  it('valid per-workspace key → scope = workspaceId + label + durable full profile', () => {
     const ws = createWorkspace(`MCP Auth Scoped ${Date.now()}`);
     cleanupWorkspaceIds.push(ws.id);
     const { id, plaintextKeyOnceShown } = createMcpApiKey(ws.id, 'agent-bot');
@@ -226,7 +294,12 @@ describe('mcpAuthMiddleware — master + per-workspace keys', () => {
 
     expect(next).toHaveBeenCalledOnce();
     expect(res.status).not.toHaveBeenCalled();
-    expect(req.mcpAuth).toEqual({ scope: ws.id, label: 'agent-bot', keyId: id });
+    expect(req.mcpAuth).toEqual({
+      scope: ws.id,
+      label: 'agent-bot',
+      keyId: id,
+      credentialProfile: 'full',
+    });
   });
 
   it('revoked key → rejected', () => {
@@ -271,6 +344,7 @@ describe('handleMcpRequest — workspace scope enforcement', () => {
   beforeEach(() => {
     h.workspaceHandler.mockClear();
     h.jobHandler.mockClear();
+    h.clientSearchHandler.mockClear();
   });
 
   it('master key (scope all) may call any tool with any workspace_id', async () => {
@@ -423,5 +497,53 @@ describe('handleMcpRequest — workspace scope enforcement', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('must match');
     expect(h.workspaceHandler).not.toHaveBeenCalled();
+  });
+
+  it('rejects own, cross-workspace, and inherited aliases before client dispatch', async () => {
+    const clientAuth = {
+      scope: 'ws-A',
+      label: 'client',
+      keyId: 'client-key',
+      credentialProfile: 'client' as const,
+    };
+    const inherited = Object.create({ workspace_id: 'ws-A' }) as Record<string, unknown>;
+
+    for (const args of [
+      { workspace_id: 'ws-A' },
+      { workspaceId: 'ws-B' },
+      inherited,
+    ]) {
+      const result = await callTool(
+        clientAuth,
+        'get_search_performance',
+        args,
+        MCP_SERVER_PROFILES.CLIENT,
+      );
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text)).toMatchObject({ code: 'validation_failed' });
+    }
+    expect(h.clientSearchHandler).not.toHaveBeenCalled();
+  });
+
+  it('injects authenticated workspace scope for a workspace-free client invocation', async () => {
+    const result = await callTool(
+      {
+        scope: 'ws-A',
+        label: 'client',
+        keyId: 'client-key',
+        credentialProfile: 'client',
+      },
+      'get_search_performance',
+      {},
+      MCP_SERVER_PROFILES.CLIENT,
+    );
+    expect(result.isError).toBeUndefined();
+    expect(h.clientSearchHandler).toHaveBeenCalledWith(
+      'get_search_performance',
+      { workspace_id: 'ws-A' },
+    );
+    expect(JSON.parse(result.content[0].text)).toEqual({ source: 'google_search_console' });
+    expect((result as { structuredContent?: unknown }).structuredContent)
+      .toEqual({ data: { source: 'google_search_console' } });
   });
 });

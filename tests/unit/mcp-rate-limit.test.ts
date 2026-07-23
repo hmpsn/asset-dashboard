@@ -1,5 +1,6 @@
 /**
- * mcpLimiter — the per-IP rate limit applied at the /mcp mount (app.ts).
+ * mcpLimiter — the per-IP rate limit applied to POST-only MCP transports by
+ * the pre-router boundary in app.ts.
  *
  * /mcp was previously unthrottled (the three public limiters only cover
  * /api/public/), so a runaway agent loop or a leaked Bearer key could hammer it.
@@ -66,4 +67,5 @@ describe('mcpLimiter', () => {
     mcpLimiter({ ip, path: '/mcp', socket: { remoteAddress: ip } } as any, makeRes() as any, next);
     expect(next).toHaveBeenCalledTimes(1);
   });
+
 });

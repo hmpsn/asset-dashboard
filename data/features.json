@@ -749,6 +749,16 @@
       "tier": "premium",
       "impact": "high",
       "clientFacing": false
+    },
+    {
+      "id": 76,
+      "title": "Read-Only Analytics MCP for Clients",
+      "oneLiner": "Gives each client one workspace-bound AI connection for safe aggregate GA4 and Google Search performance questions without exposing administrative actions",
+      "category": "analytics",
+      "painPoints": ["reporting", "client-collaboration", "analytics-access"],
+      "tier": "growth",
+      "impact": "high",
+      "clientFacing": true
     }
   ]
 }

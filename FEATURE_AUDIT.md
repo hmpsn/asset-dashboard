@@ -1,6 +1,6 @@
 # hmpsn.studio — Platform Feature Audit
 
-A comprehensive value assessment of every feature in the platform — **feature records numbered through 719** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
+A comprehensive value assessment of every feature in the platform — **feature records numbered through 725** across SEO tooling, content strategy, analytics intelligence, client portal, AI advisors, monetization, and infrastructure. For each feature: what it does, why it matters to the agency, why it matters to clients, and how it creates mutual value.
 
 > **How to use this document:** This serves as a single knowledge base and sales reference for the platform's complete capabilities. Features are grouped by platform area. Use Cmd+F to find specific features, or browse by section header.
 
@@ -10290,3 +10290,35 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Tests:** Focused unit, contract, and integration coverage pins adapter parity, named creative roles, strict parsing, evidence-conditional specificity, deterministic limits, verified links, provider failure, truthful background terminal state, and backward-compatible success payloads. The deterministic AI quality registry and trace map now cover the canonical service and report 100.
 
 **Files:** named-operation registry; canonical SEO copy service; single/page-copy/bulk/background adapters; focused tests; SEO copy rule; AI reliability registry/trace map; roadmap, feature inventory, and feature audit.
+
+### 724. Client-bound read-only MCP profile 2026-07-23
+
+**Status:** Shipped and verified on staging in PR #1620. Two independent reviews approved the exact tree, CI passed, and a temporary client credential completed the read-only handshake before being revoked.
+
+**What changed:** Added one permanent `/mcp/client` transport for client desktop connections. A client configures the shared endpoint and one unique workspace credential; tool schemas contain no workspace ID because the server rejects caller-supplied aliases and injects the authenticated workspace. PR1 exposes only the existing GSC performance read with bounded query/page/trend results, query-free page URLs, explicit source/date/freshness fields, a validated root `{ data }` structured result, and legacy text JSON compatibility.
+
+**Security boundary:** Durable workspace keys now carry a non-null `full | client` transport profile. Existing and omitted-profile keys retain `full` behavior. Client keys work only at `/mcp/client`; they are rejected at `/mcp` and `/mcp/operator`, while full keys and the environment master key are rejected at `/mcp/client`. One canonical allowlist governs both discovery and invocation, hidden/unknown tools share generic `not_found`, and a census requires every client tool to be read-only, idempotent, non-destructive, non-paid, and bounded.
+
+**Safety and compatibility:** Full `/mcp` discovery/instructions and the 25-tool `/mcp/operator` remain unchanged. The client surface performs no mutation, AI call, paid work, job creation, approval, send, publication, database synchronization, or staging-data replacement. Provider failures and output-contract failures return safe generic errors without logging bearer material, raw arguments, workspace mismatches, provider bodies, or report contents.
+
+**Tests:** Migration, key-store, auth, admin API, profile census, registry, and real HTTP coverage pin legacy backfill/defaults, invalid-profile rejection, one-time secret handling, endpoint binding, workspace injection, own/inherited alias rejection, hidden-tool indistinguishability, structured/text parity, URL sanitization, unsupported-method behavior, and full/operator compatibility.
+
+**Files:** MCP profile/runtime/key contracts; additive key-profile migration; key store/auth/admin API; client transport, discovery, and dispatch projection; bounded GSC client adapter; focused tests; MCP README; client-profile guardrail; roadmap and feature audit.
+
+### 725. Client GA4 analytics through the read-only MCP 2026-07-23
+
+**Status:** Shipped and verified on staging in PR #1621. Two independent reviews approved the exact tree, all local and GitHub CI gates passed, and a temporary client credential completed all six read-only analytics calls before being revoked.
+
+**What changed:** Expanded the shared `/mcp/client` connection from one GSC read to exactly six aggregate analytics tools. Five fixed GA4 tools now cover session-campaign performance, period comparisons, session source/medium, key events, and separate page-view versus landing-page rankings. Clients still configure only the shared endpoint and their workspace-bound token; workspace identity and GA4 report schemas are never caller inputs.
+
+**Truth and safety:** Server-owned report adapters pin every dimension, metric, filter, ordering, and row bound. Strict response validation distinguishes valid empty data from provider failure or an incompatible GA4 response, so a broken report cannot masquerade as zero activity. Provider logs retain only safe classifications. Exact pinned `eventConfig` names supply client language; unmatched events retain their GA4 name, duplicate authority fails closed, and generic `click` remains `needs_attention` until a verified destination filter exists.
+
+**Decision usefulness:** Responses identify session attribution, return exact comparison ranges, use deterministic previous-period/year-over-year/equal-length custom windows, expose nullable zero-baseline deltas, keep page and landing scopes separate, strip URL query/credential material, and include bounded GA4 thresholding, data-loss, sampling, truncation, and freshness metadata.
+
+**Compatibility:** Full `/mcp` gains the same five read-only tools; `/mcp/operator` remains exactly 25 tools. Existing GSC behavior and all credential/profile boundaries remain intact. This adds no UI, database table, synchronization, AI call, paid operation, job, approval, send, publication, or arbitrary GA4 report builder.
+
+**Tests:** Fixed provider-request and fixture coverage; malformed/header/metric/metadata and safe-log failure tests; pure UTC date, leap-year, URL, event-label, delta, and quality projections; six-tool discovery/dispatch, structured/text parity, workspace-alias rejection, precondition/provider failures, scope separation, full-profile compatibility, and client HTTP integration.
+
+**Staging verification:** Discovery exposed exactly the six approved GSC/GA4 tools with workspace-free schemas and read-only annotations. All six tools returned live staged data with structured/text parity. Client credentials were rejected at `/mcp` and `/mcp/operator`; caller-supplied workspace IDs and hidden write tools failed closed. Thumbtack was not present in staging, so the smoke used an existing staged workspace without copying or synchronizing any database.
+
+**Files:** client analytics shared schemas; strict GA4 provider adapters and local fixtures; client GA4 projection utilities; MCP analytics handlers/profile/registry; focused unit, contract, and integration tests; client MCP rule, README, roadmap, feature inventory, and this audit.

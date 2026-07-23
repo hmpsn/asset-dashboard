@@ -14,6 +14,10 @@ import { randomBytes, randomUUID, createHash } from 'crypto';
 import db from '../db/index.js';
 import { createStmtCache } from '../db/stmt-cache.js';
 import { createLogger } from '../logger.js';
+import {
+  MCP_API_KEY_PROFILES,
+  type McpApiKeyProfile,
+} from '../../shared/types/mcp-api-keys.js';
 
 const log = createLogger('mcp-api-keys');
 
@@ -24,6 +28,7 @@ export interface McpApiKeyRecord {
   id: string;
   workspaceId: string;
   label: string;
+  profile: McpApiKeyProfile;
 }
 
 export interface CreatedMcpApiKey {
@@ -39,6 +44,7 @@ export interface CreatedMcpApiKey {
 export interface McpApiKeyMetadata {
   id: string;
   workspaceId: string;
+  profile: McpApiKeyProfile;
   label: string;
   createdAt: string;
   lastUsedAt: string | null;
@@ -50,6 +56,7 @@ interface McpApiKeyRow {
   id: string;
   workspace_id: string;
   key_hash: string;
+  profile: McpApiKeyProfile;
   label: string;
   created_at: string;
   last_used_at: string | null;
@@ -59,9 +66,9 @@ interface McpApiKeyRow {
 const stmts = createStmtCache(() => ({
   insert: db.prepare(`
     INSERT INTO mcp_api_keys
-      (id, workspace_id, key_hash, label, created_at, last_used_at, revoked_at)
+      (id, workspace_id, key_hash, profile, label, created_at, last_used_at, revoked_at)
     VALUES
-      (@id, @workspace_id, @key_hash, @label, @created_at, NULL, NULL)
+      (@id, @workspace_id, @key_hash, @profile, @label, @created_at, NULL, NULL)
   `),
   // Only active (non-revoked) keys authenticate. The hash index serves this lookup.
   findActiveByHash: db.prepare<[keyHash: string]>(
@@ -77,17 +84,21 @@ const stmts = createStmtCache(() => ({
   // Admin listing — metadata only, never key_hash. Newest first; includes revoked
   // keys so the operator sees rotation history.
   listAll: db.prepare(
-    `SELECT id, workspace_id, label, created_at, last_used_at, revoked_at
+    `SELECT id, workspace_id, profile, label, created_at, last_used_at, revoked_at
        FROM mcp_api_keys ORDER BY created_at DESC`,
   ),
   listByWorkspace: db.prepare<[workspaceId: string]>(
-    `SELECT id, workspace_id, label, created_at, last_used_at, revoked_at
+    `SELECT id, workspace_id, profile, label, created_at, last_used_at, revoked_at
        FROM mcp_api_keys WHERE workspace_id = ? ORDER BY created_at DESC`,
   ),
 }));
 
 /** sha256 hex of the plaintext key — the only representation we persist. */
 export function hashMcpApiKey(plaintextKey: string): string {
+  // This is a deterministic lookup fingerprint for a 256-bit CSPRNG bearer
+  // token, not password derivation. Slow password hashing would add request
+  // CPU/DoS cost without improving the token's 2^256 preimage resistance.
+  // codeql[js/insufficient-password-hash]
   return createHash('sha256').update(plaintextKey).digest('hex');
 }
 
@@ -95,7 +106,11 @@ export function hashMcpApiKey(plaintextKey: string): string {
  * Create a new per-workspace MCP API key.
  * Returns the new id and the plaintext key (shown once). Only the hash is stored.
  */
-export function createMcpApiKey(workspaceId: string, label: string): CreatedMcpApiKey {
+export function createMcpApiKey(
+  workspaceId: string,
+  label: string,
+  profile: McpApiKeyProfile = MCP_API_KEY_PROFILES.FULL,
+): CreatedMcpApiKey {
   const id = randomUUID();
   // 32 bytes of CSPRNG entropy, base64url (URL/header-safe, no padding).
   const plaintextKey = `${KEY_PREFIX}${randomBytes(32).toString('base64url')}`;
@@ -105,11 +120,12 @@ export function createMcpApiKey(workspaceId: string, label: string): CreatedMcpA
     id,
     workspace_id: workspaceId,
     key_hash: keyHash,
+    profile,
     label,
     created_at: new Date().toISOString(),
   });
 
-  log.info({ workspaceId, keyId: id, label }, 'MCP API key created');
+  log.info({ workspaceId, keyId: id, profile }, 'MCP API key created');
   return { id, plaintextKeyOnceShown: plaintextKey };
 }
 
@@ -121,7 +137,12 @@ export function createMcpApiKey(workspaceId: string, label: string): CreatedMcpA
 export function findActiveKeyByHash(keyHash: string): McpApiKeyRecord | null {
   const row = stmts().findActiveByHash.get(keyHash) as McpApiKeyRow | undefined;
   if (!row) return null;
-  return { id: row.id, workspaceId: row.workspace_id, label: row.label };
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    label: row.label,
+    profile: row.profile,
+  };
 }
 
 /**
@@ -137,6 +158,7 @@ export function listMcpApiKeys(workspaceId?: string): McpApiKeyMetadata[] {
   return rows.map((row) => ({
     id: row.id,
     workspaceId: row.workspace_id,
+    profile: row.profile,
     label: row.label,
     createdAt: row.created_at,
     lastUsedAt: row.last_used_at,
