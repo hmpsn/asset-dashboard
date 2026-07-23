@@ -302,7 +302,8 @@ export function sanitizeClientGa4UrlOrPath(value: string): string {
     url.hash = '';
     if (isProtocolRelative) return `//${url.host}${url.pathname}`;
     return url.toString();
-  } catch {
+  } catch (err) {
+    void err;
     return cleaned.split(/[?#]/u, 1)[0] ?? '';
   }
 }
