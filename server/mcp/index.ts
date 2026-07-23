@@ -34,6 +34,28 @@ router.post(
   },
 );
 
+router.post(
+  '/client',
+  mcpAuthMiddleware,
+  async (req, res) => {
+    try {
+      await handleMcpRequest(req, res, MCP_SERVER_PROFILES.CLIENT);
+    } catch (err) {
+      log.error(
+        {
+          failureClass: err instanceof Error
+            ? 'unhandled_client_request_error'
+            : 'unhandled_client_request_non_error',
+        },
+        'Unhandled MCP client request error',
+      );
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+  },
+);
+
 router.post('/', mcpAuthMiddleware, async (req, res) => {
   try {
     await handleMcpRequest(req, res);
@@ -45,7 +67,7 @@ router.post('/', mcpAuthMiddleware, async (req, res) => {
   }
 });
 
-// Streamable HTTP clients open GET on `/mcp` or `/mcp/operator` to establish the
+// Streamable HTTP clients open GET on an MCP endpoint to establish the
 // OPTIONAL server→client SSE notification stream, and send DELETE to tear a
 // session down. This server runs stateless JSON mode (enableJsonResponse, no
 // sessionIdGenerator) and offers neither, so per the MCP Streamable HTTP spec it
@@ -69,5 +91,7 @@ router.get('/', methodNotAllowed);
 router.delete('/', methodNotAllowed);
 router.get('/operator', methodNotAllowed);
 router.delete('/operator', methodNotAllowed);
+router.get('/client', methodNotAllowed);
+router.delete('/client', methodNotAllowed);
 
 export default router;

@@ -33,6 +33,13 @@ export const MCP_OPERATOR_TOOL_NAMES = Object.freeze([
 
 export type McpOperatorToolName = (typeof MCP_OPERATOR_TOOL_NAMES)[number];
 
+/** Canonical discovery and invocation boundary for client credentials. */
+export const MCP_CLIENT_TOOL_NAMES = Object.freeze([
+  'get_search_performance',
+] as const);
+
+export type McpClientToolName = (typeof MCP_CLIENT_TOOL_NAMES)[number];
+
 export const MCP_OPERATOR_TOOL_DESCRIPTIONS = Object.freeze({
   list_workspaces: 'List workspaces; return IDs.',
   get_portfolio_brief: 'Read bounded priority queue.',
@@ -62,12 +69,15 @@ export const MCP_OPERATOR_TOOL_DESCRIPTIONS = Object.freeze({
 } satisfies Readonly<Record<McpOperatorToolName, string>>);
 
 const operatorToolNames = new Set<string>(MCP_OPERATOR_TOOL_NAMES);
+const clientToolNames = new Set<string>(MCP_CLIENT_TOOL_NAMES);
 
 export function isMcpToolAllowedInProfile(
   profile: McpServerProfile,
   toolName: string,
 ): boolean {
-  return profile === MCP_SERVER_PROFILES.FULL || operatorToolNames.has(toolName);
+  if (profile === MCP_SERVER_PROFILES.FULL) return true;
+  if (profile === MCP_SERVER_PROFILES.OPERATOR) return operatorToolNames.has(toolName);
+  return clientToolNames.has(toolName);
 }
 
 export function operatorToolDescription(toolName: McpOperatorToolName): string {
@@ -75,3 +85,5 @@ export function operatorToolDescription(toolName: McpOperatorToolName): string {
 }
 
 export const MCP_OPERATOR_PROFILE_INSTRUCTIONS = `${STUDIO_NAME} operator. Start list_workspaces; obey schemas. Drafts need approval; preview is free. Before paid start/retry show targets, fingerprint, estimate/limits and get human confirmation. Generation stops at human review—never approve/send/publish. Re-read conflicts; poll get_job_status.`;
+
+export const MCP_CLIENT_PROFILE_INSTRUCTIONS = `${STUDIO_NAME} client analytics. Read only the connected workspace. Use the available aggregate analytics tools and report dates, scope, and data-quality limitations exactly. Never infer business meaning for an event or claim a conversion beyond the returned authority.`;

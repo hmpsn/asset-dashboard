@@ -10,10 +10,14 @@ import {
 import type { Request, Response } from 'express';
 import type { McpServerProfile } from '../../shared/types/mcp-runtime.js';
 import { MCP_SERVER_PROFILES } from '../../shared/types/mcp-runtime.js';
+import { MCP_API_KEY_PROFILES } from '../../shared/types/mcp-api-keys.js';
 import { createLogger } from '../logger.js';
 import { isServerRequestId } from '../request-correlation.js';
 import { MCP_SERVER_INSTRUCTIONS } from './instructions.js';
-import { MCP_OPERATOR_PROFILE_INSTRUCTIONS } from './profiles.js';
+import {
+  MCP_CLIENT_PROFILE_INSTRUCTIONS,
+  MCP_OPERATOR_PROFILE_INSTRUCTIONS,
+} from './profiles.js';
 import {
   getMcpOperatorPrompt,
   listMcpOperatorPrompts,
@@ -21,6 +25,7 @@ import {
 import { isMcpMasterKeyAuth, type McpAuthContext } from './auth.js';
 import {
   executeMcpTool,
+  executeClientMcpTool,
   executeOperatorMcpTool,
   listMcpToolDefinitions,
   listMcpToolDefinitionsForProfile,
@@ -45,15 +50,20 @@ function createMcpServer(
   profile: McpServerProfile,
 ) {
   const isOperator = profile === MCP_SERVER_PROFILES.OPERATOR;
+  const isClient = profile === MCP_SERVER_PROFILES.CLIENT;
   const instructions = isOperator
     ? MCP_OPERATOR_PROFILE_INSTRUCTIONS
-    : MCP_SERVER_INSTRUCTIONS;
-  const toolDefinitions = isOperator
-    ? listMcpToolDefinitionsForProfile(profile)
-    : listMcpToolDefinitions();
+    : isClient
+      ? MCP_CLIENT_PROFILE_INSTRUCTIONS
+      : MCP_SERVER_INSTRUCTIONS;
+  const toolDefinitions = profile === MCP_SERVER_PROFILES.FULL
+    ? listMcpToolDefinitions()
+    : listMcpToolDefinitionsForProfile(profile);
   const executeTool = isOperator
     ? executeOperatorMcpTool
-    : executeMcpTool;
+    : isClient
+      ? executeClientMcpTool
+      : executeMcpTool;
   const mcpServer = new Server(
     { name: 'hmpsn-studio', version: '1.0.0' },
     {
@@ -109,11 +119,26 @@ export async function handleMcpRequest(
   // handler runs. If it is somehow absent, fail closed rather than defaulting
   // to all-workspace scope.
   const auth = req.mcpAuth;
+  const isMasterKey = isMcpMasterKeyAuth(auth);
+  const isClientCredential = (
+    !isMasterKey
+    && auth?.credentialProfile === MCP_API_KEY_PROFILES.CLIENT
+  );
+  const isLegacyOrFullCredential = (
+    !isMasterKey
+    && (
+      auth?.credentialProfile === undefined
+      || auth.credentialProfile === MCP_API_KEY_PROFILES.FULL
+    )
+  );
   if (
     !auth
+    || (profile === MCP_SERVER_PROFILES.OPERATOR && !isMasterKey)
+    || (profile === MCP_SERVER_PROFILES.CLIENT && !isClientCredential)
     || (
-      profile === MCP_SERVER_PROFILES.OPERATOR
-      && !isMcpMasterKeyAuth(auth)
+      profile === MCP_SERVER_PROFILES.FULL
+      && !isMasterKey
+      && !isLegacyOrFullCredential
     )
   ) {
     res.status(401).json({ error: 'Unauthorized' });

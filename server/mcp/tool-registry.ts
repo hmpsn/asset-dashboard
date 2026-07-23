@@ -8,7 +8,9 @@ import {
   MCP_SERVER_PROFILES,
   MCP_TOOL_ERROR_CODES,
 } from '../../shared/types/mcp-runtime.js';
+import { MCP_API_KEY_PROFILES } from '../../shared/types/mcp-api-keys.js';
 import { createLogger } from '../logger.js';
+import { isProgrammingError } from '../errors.js';
 import { isMcpMasterKeyAuth, type McpAuthContext } from './auth.js';
 import {
   MCP_TOOL_ERROR_CONTRACTS,
@@ -21,6 +23,7 @@ import { runWithMcpToolExecutionContext } from './tool-execution-context.js';
 import { compactMcpJsonSchema } from './json-schema.js';
 import {
   isMcpToolAllowedInProfile,
+  MCP_CLIENT_TOOL_NAMES,
   operatorToolDescription,
   type McpOperatorToolName,
 } from './profiles.js';
@@ -68,6 +71,8 @@ import {
 import { schemaActionTools, handleSchemaActionTool } from './tools/schema-actions.js';
 import {
   analyticsReadActionTools,
+  clientSearchPerformanceTool,
+  handleClientAnalyticsReadActionTool,
   handleAnalyticsReadActionTool,
 } from './tools/analytics-read-actions.js';
 import { jobActionTools, handleJobActionTool } from './tools/job-actions.js';
@@ -592,6 +597,22 @@ const OPERATOR_TOOL_DEFINITIONS = Object.freeze(
     .map(entry => operatorDefinition(entry.definition as Tool)),
 ) as Tool[];
 
+const clientToolDefinitionsByName = new Map<string, Tool>([
+  [clientSearchPerformanceTool.name, snapshotValue(clientSearchPerformanceTool)],
+]);
+
+function clientToolDefinitions(): Tool[] {
+  return Object.freeze(
+    MCP_CLIENT_TOOL_NAMES.map((name) => {
+      const definition = clientToolDefinitionsByName.get(name);
+      if (!definition) {
+        throw new Error(`Client MCP profile lacks a projection for tool "${name}".`);
+      }
+      return definition;
+    }),
+  ) as Tool[];
+}
+
 /**
  * Return the immutable discovery surface for one server profile.
  *
@@ -603,8 +624,8 @@ export function listMcpToolDefinitionsForProfile(
   profile: McpServerProfile,
 ): Tool[] {
   if (profile === MCP_SERVER_PROFILES.FULL) return listMcpToolDefinitions();
-
-  return OPERATOR_TOOL_DEFINITIONS;
+  if (profile === MCP_SERVER_PROFILES.OPERATOR) return OPERATOR_TOOL_DEFINITIONS;
+  return clientToolDefinitions();
 }
 
 export function getDeclaredWorkspaceField(
@@ -655,7 +676,7 @@ function forbiddenError(
   });
 }
 
-function operatorNotFoundError(): CallToolResult {
+function profileNotFoundError(): CallToolResult {
   return mcpToolError(MCP_TOOL_ERROR_CONTRACTS.JSON_V1, {
     legacyText: 'Unknown tool.',
     envelope: {
@@ -672,6 +693,12 @@ export function createMcpToolExecutor(
   profile: McpServerProfile = MCP_SERVER_PROFILES.FULL,
 ): (request: ExecuteMcpToolRequest) => Promise<CallToolResult> {
   return request => {
+    if (profile === MCP_SERVER_PROFILES.CLIENT) {
+      if (!isMcpToolAllowedInProfile(profile, request.name)) {
+        return Promise.resolve(profileNotFoundError());
+      }
+      return executeClientMcpToolRequest(registry, request);
+    }
     if (
       profile === MCP_SERVER_PROFILES.OPERATOR
       && (
@@ -679,10 +706,107 @@ export function createMcpToolExecutor(
         || !registry.has(request.name)
       )
     ) {
-      return Promise.resolve(operatorNotFoundError());
+      return Promise.resolve(profileNotFoundError());
     }
     return executeRegisteredMcpTool(registry, request);
   };
+}
+
+function hasWorkspaceAlias(value: Record<string, unknown>): boolean {
+  return 'workspace_id' in value || 'workspaceId' in value;
+}
+
+function clientWorkspaceAliasError(): CallToolResult {
+  return mcpToolError(MCP_TOOL_ERROR_CONTRACTS.JSON_V1, {
+    legacyText: 'Validation failed: workspace scope is supplied by the client credential.',
+    envelope: {
+      code: MCP_TOOL_ERROR_CODES.VALIDATION_FAILED,
+      message: 'Workspace scope is supplied by the client credential.',
+      retryable: false,
+    },
+  });
+}
+
+async function executeClientMcpToolRequest(
+  registry: McpToolRegistry,
+  request: ExecuteMcpToolRequest,
+): Promise<CallToolResult> {
+  if (
+    isMcpMasterKeyAuth(request.auth)
+    || request.auth.credentialProfile !== MCP_API_KEY_PROFILES.CLIENT
+    || typeof request.auth.keyId !== 'string'
+    || request.auth.keyId.length === 0
+    || typeof request.auth.label !== 'string'
+    || request.auth.label.length === 0
+  ) {
+    return forbiddenError(
+      MCP_TOOL_ERROR_CONTRACTS.JSON_V1,
+      'Forbidden: this credential cannot use the client MCP profile.',
+      'This credential cannot use the client MCP profile.',
+    );
+  }
+  if (hasWorkspaceAlias(request.args)) {
+    log.warn(
+      { tool: request.name, failureClass: 'client_workspace_argument' },
+      'Client MCP call supplied a forbidden workspace argument',
+    );
+    return clientWorkspaceAliasError();
+  }
+  const entry = registry.get(request.name);
+  if (!entry) return profileNotFoundError();
+  if (entry.scope !== 'workspace' || entry.workspaceField !== 'workspace_id') {
+    log.error(
+      { tool: entry.definition.name, failureClass: 'invalid_client_tool_scope' },
+      'Client MCP allowlist contains a tool without canonical workspace scope',
+    );
+    return mcpUnexpectedToolError(MCP_TOOL_ERROR_CONTRACTS.JSON_V1);
+  }
+
+  const injectedArgs = {
+    ...request.args,
+    workspace_id: request.auth.scope,
+  };
+  const context: McpToolExecutionContext = {
+    requestId: request.requestId,
+    toolName: request.name,
+    targetWorkspaceId: request.auth.scope,
+    caller: {
+      kind: 'workspace_key',
+      scope: request.auth.scope,
+      workspaceId: request.auth.scope,
+      keyId: request.auth.keyId,
+      keyLabel: request.auth.label,
+    },
+  };
+
+  try {
+    const result = await runWithMcpToolExecutionContext(
+      context,
+      () => handleClientAnalyticsReadActionTool(
+        entry.definition.name,
+        injectedArgs,
+      ),
+    );
+    if (result.isError === true && !isValidatedMcpJsonV1ErrorResult(result)) {
+      log.error(
+        { tool: entry.definition.name, failureClass: 'unvalidated_client_error_result' },
+        'Client MCP handler returned an unvalidated error result',
+      );
+      return mcpUnexpectedToolError(MCP_TOOL_ERROR_CONTRACTS.JSON_V1);
+    }
+    return result;
+  } catch (err) {
+    log.error(
+      {
+        tool: entry.definition.name,
+        failureClass: isProgrammingError(err)
+          ? 'client_handler_programming_error'
+          : 'client_handler_exception',
+      },
+      'Unexpected client MCP tool execution failure',
+    );
+    return mcpUnexpectedToolError(MCP_TOOL_ERROR_CONTRACTS.JSON_V1);
+  }
 }
 
 /** Authorize, attribute, and dispatch one tool through the supplied registry. */
@@ -828,4 +952,10 @@ export const executeMcpTool = createMcpToolExecutor(MCP_TOOL_REGISTRY);
 export const executeOperatorMcpTool = createMcpToolExecutor(
   MCP_TOOL_REGISTRY,
   MCP_SERVER_PROFILES.OPERATOR,
+);
+
+/** Client read-only executor with workspace injection and invocation allowlisting. */
+export const executeClientMcpTool = createMcpToolExecutor(
+  MCP_TOOL_REGISTRY,
+  MCP_SERVER_PROFILES.CLIENT,
 );

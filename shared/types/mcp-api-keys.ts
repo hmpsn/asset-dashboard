@@ -7,12 +7,26 @@
  * to the operator exactly once at creation and never again.
  */
 
+export const MCP_API_KEY_PROFILES = {
+  FULL: 'full',
+  CLIENT: 'client',
+} as const;
+
+/**
+ * Durable credential transport binding. This is intentionally narrower than
+ * the MCP server profile union: operator access remains master-key-only.
+ */
+export type McpApiKeyProfile =
+  (typeof MCP_API_KEY_PROFILES)[keyof typeof MCP_API_KEY_PROFILES];
+
 /** One per-workspace MCP API key as shown in the admin management table (no secret material). */
 export interface McpApiKeySummary {
   id: string;
   workspaceId: string;
   /** Resolved workspace name for display; 'Unknown workspace' if the workspace was deleted. */
   workspaceName: string;
+  /** The only MCP transport profile where this credential may authenticate. */
+  profile: McpApiKeyProfile;
   label: string;
   /** ISO timestamp of creation. */
   createdAt: string;

@@ -13,7 +13,8 @@ update this file in the same commit.
 ## Overview
 
 - **Endpoints:** `POST /mcp` exposes the backward-compatible full profile; `POST /mcp/operator`
-  exposes the compact desktop-operator profile. Both are mounted in `server/app.ts` via
+  exposes the compact desktop-operator profile; and `POST /mcp/client` exposes the single
+  read-only client analytics profile. All are mounted in `server/app.ts` via
   `server/mcp/index.ts` and carry their own Bearer-token auth rather than the admin `APP_PASSWORD`
   gate (see [Auth](#auth)).
 - **Transport:** MCP over **stateless Streamable HTTP**. `handleMcpRequest` (`server/mcp/server.ts`)
@@ -25,7 +26,8 @@ update this file in the same commit.
 - **Handshake instructions:** the full profile carries the unchanged `MCP_SERVER_INSTRUCTIONS`
   (`server/mcp/instructions.ts`). The operator profile carries the compact
   `MCP_OPERATOR_PROFILE_INSTRUCTIONS` (`server/mcp/profiles.ts`) with explicit paid-generation,
-  review, and client-send confirmation gates.
+  review, and client-send confirmation gates. The client profile carries compact read-only
+  instructions and never asks for a workspace ID: credential scope supplies it.
 - **Clients:** Claude.ai (remote MCP connector) and Claude Code connect over this endpoint with a
   Bearer token.
 - **Server identity:** `{ name: 'hmpsn-studio', version: '1.0.0' }`.
@@ -36,6 +38,35 @@ update this file in the same commit.
 |----------|------------|-----------|--------------|
 | `POST /mcp` | Master key or per-workspace key, subject to existing scope rules | All 105 canonical tools and the unchanged full instructions | Advanced and backward-compatible access |
 | `POST /mcp/operator` | Master key only | Compact registered intersection of the canonical 25-name operator allowlist | Normal desktop studio administration |
+| `POST /mcp/client` | Client-profile key for exactly one workspace | Client allowlist, currently `get_search_performance` only | Client self-service analytics and search read access |
+
+### Client setup and boundary
+
+Each client configures **one** MCP connection: the shared `POST /mcp/client` URL and the unique
+client-profile Bearer token issued for their workspace. They never supply a workspace ID, select a
+workspace, or configure individual tools. The server injects the credential's workspace scope after
+rejecting caller-supplied `workspace_id` and `workspaceId` values.
+
+PR1 intentionally activates only `get_search_performance`. PR2 adds the five bounded GA4 reads to
+this same endpoint; clients will not need to reconfigure their connection. The client profile is
+strictly aggregate and read-only: hidden, guessed, and unknown tools all return the same generic
+`not_found` result. It cannot create content, start paid work, approve, send, publish, delete, or
+access a different workspace.
+
+Client-profile keys authenticate **only** at `/mcp/client`. They are rejected by `/mcp` and
+`/mcp/operator`; full workspace keys and the environment master key are rejected by `/mcp/client`.
+This credential-to-transport binding is authorization, not merely a discovery preference.
+
+PR1 does not change the Settings UI. An authenticated administrator creates a client key through
+`POST /api/admin/mcp-api-keys` with exactly the workspace, label, and explicit client profile:
+
+```json
+{ "workspaceId": "ws_…", "label": "Client analytics", "profile": "client" }
+```
+
+The current Settings creation path, and any API request that omits `profile`, intentionally creates
+a backward-compatible `full` key. Do not give a client one of those keys. The plaintext client key
+is shown once at creation; store it in the client's MCP configuration or rotate it if lost.
 
 The operator profile exposes 25 tools: `list_workspaces`, `get_portfolio_brief`,
 `get_workspace_decision_brief`, `get_client_view`, `get_brand_identity`,
