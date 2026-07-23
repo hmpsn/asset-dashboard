@@ -16,6 +16,17 @@
           "createdAt": "2026-07-23",
           "owner": "platform-foundation",
           "notes": "Shipped to staging in PR #1620 on 2026-07-23 after two independent Sol approvals and green CI. Staging temporary-key smoke proved exact one-tool discovery, workspace-free invocation, structured/text parity, safe GSC output, client-key rejection at /mcp and /mcp/operator, hidden-write not_found behavior, caller workspace rejection, and successful revocation. No UI or database synchronization."
+        },
+        {
+          "id": "mcp-client-ga4-analytics",
+          "title": "PR2 — Aggregate GA4 client analytics tools",
+          "source": "2026-07-23 Client Read-Only Analytics MCP Rollout",
+          "est": "M",
+          "priority": "P1",
+          "status": "done",
+          "createdAt": "2026-07-23",
+          "owner": "analytics-intelligence",
+          "notes": "Shipped and verified on staging in PR #1621 on 2026-07-23: five fixed GA4 reads beside GSC, strict provider response validation, deterministic UTC comparisons, exact pinned event labels, generic-click needs_attention, separate page/landing scopes, bounded quality metadata, and exactly six client tools. Two independent Sol reviews approved the exact tree; local and GitHub CI passed; all six live staging calls passed with structured/text parity; endpoint reuse, workspace injection, and guessed writes failed closed; the temporary client key was revoked. No UI or database synchronization."
         }
       ],
       "shippedAt": "2026-07-23"
