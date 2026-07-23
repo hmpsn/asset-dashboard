@@ -48,6 +48,7 @@ import { createEphemeralTestContext } from './helpers.js';
 import { seedWorkspace } from '../fixtures/workspace-seed.js';
 import { createMcpApiKey, revokeMcpApiKey } from '../../server/mcp/api-keys.js';
 import { handleClientAnalyticsReadActionTool } from '../../server/mcp/tools/analytics-read-actions.js';
+import { fetchSearchOverview } from '../../server/analytics-data.js';
 
 const MASTER_KEY = 'mcp-client-profile-master-key';
 const ctx = createEphemeralTestContext(import.meta.url);
@@ -143,6 +144,11 @@ function errorEnvelope(body: McpRpcResponse): Record<string, unknown> {
   return JSON.parse(text!) as Record<string, unknown>;
 }
 
+function toolErrorEnvelope(result: Awaited<ReturnType<typeof handleClientAnalyticsReadActionTool>>): Record<string, unknown> {
+  expect(result.isError).toBe(true);
+  return JSON.parse(result.content[0]?.text ?? '') as Record<string, unknown>;
+}
+
 describe('client MCP profile', () => {
   it('accepts a client key only on /mcp/client and rejects every other credential/profile pairing', async () => {
     const clientAtClient = await listTools('/mcp/client', clientKey.plaintextKeyOnceShown);
@@ -227,8 +233,70 @@ describe('client MCP profile', () => {
     expect(legacy).toMatchObject({
       source: 'google_search_console',
       date_range: { start: '2026-06-01', end: '2026-06-07' },
+      totals: { ctr: 5 },
+      top_queries: [{ ctr: 5.25 }],
       top_pages: [{ page: 'https://example.test/services' }],
     });
+  });
+
+  it('rejects invalid calendar dates and exact ranges longer than 366 days before provider dispatch', async () => {
+    const providerCallsBefore = vi.mocked(fetchSearchOverview).mock.calls.length;
+    const invalidDate = await handleClientAnalyticsReadActionTool('get_search_performance', {
+      workspace_id: workspaces.wsA.workspaceId,
+      start_date: '2026-02-30',
+      end_date: '2026-03-01',
+    });
+    expect(toolErrorEnvelope(invalidDate)).toMatchObject({ code: 'validation_failed' });
+
+    const oversized = await handleClientAnalyticsReadActionTool('get_search_performance', {
+      workspace_id: workspaces.wsA.workspaceId,
+      start_date: '2025-01-01',
+      end_date: '2026-01-02',
+    });
+    expect(toolErrorEnvelope(oversized)).toMatchObject({ code: 'validation_failed' });
+    expect(fetchSearchOverview).toHaveBeenCalledTimes(providerCallsBefore);
+  });
+
+  it('truncates 51 provider rows to the client bound and labels both truncation flags', async () => {
+    const rows = Array.from({ length: 51 }, (_, index) => ({
+      clicks: index + 1,
+      impressions: 1_000 + index,
+      ctr: 4.5,
+      position: 3.2,
+    }));
+    vi.mocked(fetchSearchOverview).mockResolvedValueOnce({
+      dateRange: { start: '2026-06-01', end: '2026-06-07' },
+      totalClicks: 120,
+      totalImpressions: 2_400,
+      avgCtr: 5,
+      avgPosition: 4.2,
+      topQueries: rows.map((row, index) => ({ ...row, query: `query-${index}` })),
+      topPages: rows.map((row, index) => ({
+        ...row,
+        page: `https://example.test/page-${index}?private=query#fragment`,
+      })),
+    });
+
+    const result = await handleClientAnalyticsReadActionTool('get_search_performance', {
+      workspace_id: workspaces.wsA.workspaceId,
+      days: 7,
+    });
+    expect(result.isError).not.toBe(true);
+    const legacy = JSON.parse(result.content[0]?.text ?? '') as {
+      top_queries: unknown[];
+      top_pages: Array<{ page: string }>;
+      data_quality: Record<string, unknown>;
+    };
+    expect(legacy.top_queries).toHaveLength(50);
+    expect(legacy.top_pages).toHaveLength(50);
+    expect(legacy.top_pages[0]?.page).toBe('https://example.test/page-0');
+    expect(legacy.data_quality).toMatchObject({
+      returned_queries: 50,
+      returned_pages: 50,
+      query_results_truncated: true,
+      page_results_truncated: true,
+    });
+    expect(result.structuredContent).toEqual({ data: legacy });
   });
 
   it('returns 405 for unsupported GET and DELETE client transport requests', async () => {

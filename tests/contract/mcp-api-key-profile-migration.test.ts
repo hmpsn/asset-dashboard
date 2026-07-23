@@ -51,16 +51,18 @@ describe('196 MCP API key profile migration', () => {
       VALUES (?, 'ws-new', ?, 'Key', '2026-07-23T00:00:00.000Z')
     `);
     insert.run('default-key', 'hash-default');
-    db.prepare(`
+    const insertWithProfile = db.prepare(`
       INSERT INTO mcp_api_keys (id, workspace_id, key_hash, label, created_at, profile)
       VALUES (?, 'ws-new', ?, 'Key', '2026-07-23T00:00:00.000Z', ?)
-    `).run('client-key', 'hash-client', 'client');
+    `);
+    insertWithProfile.run('client-key', 'hash-client', 'client');
 
     expect(db.prepare(`SELECT profile FROM mcp_api_keys WHERE id = 'default-key'`).get())
       .toEqual({ profile: 'full' });
     expect(db.prepare(`SELECT profile FROM mcp_api_keys WHERE id = 'client-key'`).get())
       .toEqual({ profile: 'client' });
-    expect(() => insert.run('invalid-key', 'hash-invalid', 'operator')).toThrow();
+    expect(() => insertWithProfile.run('invalid-key', 'hash-invalid', 'operator'))
+      .toThrow(/CHECK constraint failed/);
     expect(() => db.prepare(`
       INSERT INTO mcp_api_keys (id, workspace_id, key_hash, label, created_at, profile)
       VALUES ('null-key', 'ws-new', 'hash-null', 'Key', '2026-07-23T00:00:00.000Z', NULL)

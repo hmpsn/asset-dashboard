@@ -57,6 +57,17 @@ Client-profile keys authenticate **only** at `/mcp/client`. They are rejected by
 `/mcp/operator`; full workspace keys and the environment master key are rejected by `/mcp/client`.
 This credential-to-transport binding is authorization, not merely a discovery preference.
 
+PR1 does not change the Settings UI. An authenticated administrator creates a client key through
+`POST /api/admin/mcp-api-keys` with exactly the workspace, label, and explicit client profile:
+
+```json
+{ "workspaceId": "ws_…", "label": "Client analytics", "profile": "client" }
+```
+
+The current Settings creation path, and any API request that omits `profile`, intentionally creates
+a backward-compatible `full` key. Do not give a client one of those keys. The plaintext client key
+is shown once at creation; store it in the client's MCP configuration or rotate it if lost.
+
 The operator profile exposes 25 tools: `list_workspaces`, `get_portfolio_brief`,
 `get_workspace_decision_brief`, `get_client_view`, `get_brand_identity`,
 `create_brand_deliverable`, `update_brand_deliverable`, `get_brand_voice`,

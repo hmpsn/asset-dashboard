@@ -26,11 +26,37 @@ export const getClientSearchPerformanceInputSchema = z.object({
 }).strict();
 
 const searchMetricRowSchema = z.object({
-  clicks: z.number().finite(),
-  impressions: z.number().finite(),
+  clicks: z.number().finite()
+    .describe('Google Search clicks as a count.'),
+  impressions: z.number().finite()
+    .describe('Google Search impressions as a count.'),
   /** Already a percentage (e.g. 6.3 for 6.3%). Do NOT multiply by 100. */
-  ctr: z.number().finite(),
-  position: z.number().finite(),
+  ctr: z.number().finite()
+    .describe('Click-through rate as percentage points (for example, 6.3 means 6.3%, not 0.063).'),
+  position: z.number().finite()
+    .describe('Average Google Search result position; a lower value is better.'),
+}).strict();
+
+const searchMetricAbsoluteChangeSchema = z.object({
+  clicks: z.number().finite()
+    .describe('Absolute change in click count: current minus previous.'),
+  impressions: z.number().finite()
+    .describe('Absolute change in impression count: current minus previous.'),
+  ctr: z.number().finite()
+    .describe('Absolute CTR change in percentage points: current minus previous.'),
+  position: z.number().finite()
+    .describe('Absolute average-position change: current minus previous; a negative value is improvement.'),
+}).strict();
+
+const searchMetricRelativeChangeSchema = z.object({
+  clicks: z.number().finite()
+    .describe('Relative change in clicks as a percentage (for example, 10 means 10%).'),
+  impressions: z.number().finite()
+    .describe('Relative change in impressions as a percentage (for example, 10 means 10%).'),
+  ctr: z.number().finite()
+    .describe('Relative change in CTR as a percentage, not percentage points.'),
+  position: z.number().finite()
+    .describe('Relative change in average position as a percentage; interpret with the absolute position change because lower position is better.'),
 }).strict();
 
 const searchQueryRowSchema = searchMetricRowSchema.extend({
@@ -49,8 +75,8 @@ const searchTrendRowSchema = searchMetricRowSchema.extend({
 const searchComparisonSchema = z.object({
   current: searchMetricRowSchema,
   previous: searchMetricRowSchema,
-  change: searchMetricRowSchema,
-  changePercent: searchMetricRowSchema,
+  change: searchMetricAbsoluteChangeSchema,
+  changePercent: searchMetricRelativeChangeSchema,
 }).strict();
 
 export const clientSearchPerformanceDataSchema = z.object({

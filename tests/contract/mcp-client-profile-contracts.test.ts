@@ -56,6 +56,16 @@ describe('MCP client read-only profile contracts', () => {
         type: 'object',
         required: ['data'],
       });
+      const serializedOutputSchema = JSON.stringify(definition.outputSchema);
+      expect(serializedOutputSchema).toContain(
+        'Click-through rate as percentage points (for example, 6.3 means 6.3%, not 0.063).',
+      );
+      expect(serializedOutputSchema).toContain(
+        'Absolute CTR change in percentage points: current minus previous.',
+      );
+      expect(serializedOutputSchema).toContain(
+        'Relative change in CTR as a percentage, not percentage points.',
+      );
       expect(definition.annotations).toEqual({
         readOnlyHint: true,
         destructiveHint: false,
