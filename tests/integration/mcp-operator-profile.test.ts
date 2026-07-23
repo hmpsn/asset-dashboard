@@ -209,14 +209,14 @@ describe('MCP operator profile HTTP boundary', () => {
     expect((payload as Array<{ id?: string }>).some(item => item.id === workspace.workspaceId)).toBe(true);
   });
 
-  it('keeps the full /mcp profile additive at 105 tools and invokes a tool hidden from operator', async () => {
+  it('keeps the full /mcp profile additive at 110 tools and invokes a tool hidden from operator', async () => {
     const initialized = await initialize('/mcp', MCP_MASTER_KEY);
     expect(typeof initialized.instructions).toBe('string');
     expect(Buffer.byteLength(initialized.instructions!, 'utf8')).toBe(12_151);
     expect(sha256(initialized.instructions!)).toBe(FULL_INSTRUCTIONS_SHA256);
 
     const tools = await listTools('/mcp', MCP_MASTER_KEY);
-    expect(tools).toHaveLength(105);
+    expect(tools).toHaveLength(110);
     expect(sha256(JSON.stringify(tools))).toBe(FULL_DISCOVERY_SHA256);
     expect(tools.some(tool => tool.name === 'get_workspace_overview')).toBe(true);
 

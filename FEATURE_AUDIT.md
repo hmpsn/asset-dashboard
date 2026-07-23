@@ -10293,7 +10293,7 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 
 ### 724. Client-bound read-only MCP profile 2026-07-23
 
-**Status:** Complete locally. Independent review, CI, and a temporary-key staging handshake are required before the GA4 tool phase begins.
+**Status:** Shipped and verified on staging in PR #1620. Two independent reviews approved the exact tree, CI passed, and a temporary client credential completed the read-only handshake before being revoked.
 
 **What changed:** Added one permanent `/mcp/client` transport for client desktop connections. A client configures the shared endpoint and one unique workspace credential; tool schemas contain no workspace ID because the server rejects caller-supplied aliases and injects the authenticated workspace. PR1 exposes only the existing GSC performance read with bounded query/page/trend results, query-free page URLs, explicit source/date/freshness fields, a validated root `{ data }` structured result, and legacy text JSON compatibility.
 

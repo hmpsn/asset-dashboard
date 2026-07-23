@@ -27,6 +27,10 @@ const clientGa4LimitField = z.number()
   .optional()
   .describe('Maximum rows per returned ranking. Defaults to 10 and caps at 50.');
 
+const mcpWorkspaceIdSchema = z.string()
+  .min(1, 'workspace_id is required')
+  .describe('The workspace ID this full-profile operation targets.');
+
 export const getClientGa4CampaignPerformanceInputSchema = z.object({
   ...clientGa4DateFields,
   limit: clientGa4LimitField,
@@ -62,6 +66,31 @@ export const getClientGa4PeriodComparisonInputSchema = z.object({
   comparison_end_date: isoDateSchema.optional()
     .describe('Explicit inclusive comparison end date. Required only for custom comparison mode.'),
 }).strict();
+
+export const getGa4CampaignPerformanceInputSchema =
+  getClientGa4CampaignPerformanceInputSchema.extend({
+    workspace_id: mcpWorkspaceIdSchema,
+  }).strict();
+
+export const getGa4PeriodComparisonInputSchema =
+  getClientGa4PeriodComparisonInputSchema.extend({
+    workspace_id: mcpWorkspaceIdSchema,
+  }).strict();
+
+export const getGa4TrafficSourcesInputSchema =
+  getClientGa4TrafficSourcesInputSchema.extend({
+    workspace_id: mcpWorkspaceIdSchema,
+  }).strict();
+
+export const getGa4KeyEventsInputSchema =
+  getClientGa4KeyEventsInputSchema.extend({
+    workspace_id: mcpWorkspaceIdSchema,
+  }).strict();
+
+export const getGa4ContentPerformanceInputSchema =
+  getClientGa4ContentPerformanceInputSchema.extend({
+    workspace_id: mcpWorkspaceIdSchema,
+  }).strict();
 
 /**
  * Client-profile inputs deliberately omit workspace identity. The authenticated

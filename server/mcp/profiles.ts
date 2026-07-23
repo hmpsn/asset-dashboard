@@ -36,6 +36,11 @@ export type McpOperatorToolName = (typeof MCP_OPERATOR_TOOL_NAMES)[number];
 /** Canonical discovery and invocation boundary for client credentials. */
 export const MCP_CLIENT_TOOL_NAMES = Object.freeze([
   'get_search_performance',
+  'get_ga4_campaign_performance',
+  'get_ga4_period_comparison',
+  'get_ga4_traffic_sources',
+  'get_ga4_key_events',
+  'get_ga4_content_performance',
 ] as const);
 
 export type McpClientToolName = (typeof MCP_CLIENT_TOOL_NAMES)[number];
