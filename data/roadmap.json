@@ -1,6 +1,36 @@
 {
   "sprints": [
     {
+      "id": "sprint-client-analytics-mcp-2026-07-23",
+      "name": "Client Read-Only Analytics MCP",
+      "hours": "Two sequential staging-first PRs",
+      "rationale": "Give every client one workspace-bound desktop MCP connection for aggregate GA4 and GSC questions without exposing platform mutations or proliferating per-tool endpoints.",
+      "items": [
+        {
+          "id": "mcp-client-profile-boundary",
+          "title": "PR1 — Client transport profile and read-only credential boundary",
+          "source": "2026-07-23 Client Read-Only Analytics MCP Rollout",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-23",
+          "owner": "platform-foundation",
+          "notes": "Add one /mcp/client endpoint, profile-bound workspace credentials, workspace-free client schemas, canonical read-only discovery/dispatch allowlisting, and structured GSC output. Preserve /mcp and /mcp/operator compatibility; no UI or database synchronization."
+        },
+        {
+          "id": "mcp-client-ga4-analytics",
+          "title": "PR2 — Aggregate GA4 client analytics tools",
+          "source": "2026-07-23 Client Read-Only Analytics MCP Rollout",
+          "est": "M",
+          "priority": "P1",
+          "status": "pending",
+          "createdAt": "2026-07-23",
+          "owner": "analytics-intelligence",
+          "notes": "After PR1 merges and passes staging smoke, add five bounded GA4 tools beside GSC. Preserve exact GA4 event authority, session attribution, separate page/session scopes, safe provider failures, and client-approved eventConfig labels."
+        }
+      ]
+    },
+    {
       "id": "sprint-matrix-reliability-closure-2026-07-20",
       "name": "Matrix Reliability Closure",
       "hours": "Two staging-first PRs plus one owner-confirmed paid canary",
