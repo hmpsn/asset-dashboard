@@ -37,6 +37,9 @@ router.post(
 router.post(
   '/client',
   mcpAuthMiddleware,
+  // The application boundary applies mcpLimiter to every POST /mcp/* request
+  // before this router; CodeQL does not model that outer custom middleware.
+  // codeql[js/missing-rate-limiting]
   async (req, res) => {
     try {
       await handleMcpRequest(req, res, MCP_SERVER_PROFILES.CLIENT);

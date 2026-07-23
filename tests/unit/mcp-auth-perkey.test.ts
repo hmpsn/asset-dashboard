@@ -215,6 +215,7 @@ describe('mcp per-workspace api key store', () => {
 
     const { id, plaintextKeyOnceShown } = createMcpApiKey(ws.id, 'CI key');
     expect(plaintextKeyOnceShown).toMatch(/^mcp_/);
+    expect(Buffer.from(plaintextKeyOnceShown.slice('mcp_'.length), 'base64url')).toHaveLength(32);
     expect(id).toBeTruthy();
 
     const found = findActiveKeyByHash(hashMcpApiKey(plaintextKeyOnceShown));

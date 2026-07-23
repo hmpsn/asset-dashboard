@@ -10307,7 +10307,7 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 
 ### 725. Client GA4 analytics through the read-only MCP 2026-07-23
 
-**Status:** Complete locally. Independent review, CI, and a temporary-key staging smoke are required before release.
+**Status:** Shipped and verified on staging in PR #1621. Two independent reviews approved the exact tree, all local and GitHub CI gates passed, and a temporary client credential completed all six read-only analytics calls before being revoked.
 
 **What changed:** Expanded the shared `/mcp/client` connection from one GSC read to exactly six aggregate analytics tools. Five fixed GA4 tools now cover session-campaign performance, period comparisons, session source/medium, key events, and separate page-view versus landing-page rankings. Clients still configure only the shared endpoint and their workspace-bound token; workspace identity and GA4 report schemas are never caller inputs.
 
@@ -10318,5 +10318,7 @@ Cockpit work-queue rows now route every classifier source type to its most speci
 **Compatibility:** Full `/mcp` gains the same five read-only tools; `/mcp/operator` remains exactly 25 tools. Existing GSC behavior and all credential/profile boundaries remain intact. This adds no UI, database table, synchronization, AI call, paid operation, job, approval, send, publication, or arbitrary GA4 report builder.
 
 **Tests:** Fixed provider-request and fixture coverage; malformed/header/metric/metadata and safe-log failure tests; pure UTC date, leap-year, URL, event-label, delta, and quality projections; six-tool discovery/dispatch, structured/text parity, workspace-alias rejection, precondition/provider failures, scope separation, full-profile compatibility, and client HTTP integration.
+
+**Staging verification:** Discovery exposed exactly the six approved GSC/GA4 tools with workspace-free schemas and read-only annotations. All six tools returned live staged data with structured/text parity. Client credentials were rejected at `/mcp` and `/mcp/operator`; caller-supplied workspace IDs and hidden write tools failed closed. Thumbtack was not present in staging, so the smoke used an existing staged workspace without copying or synchronizing any database.
 
 **Files:** client analytics shared schemas; strict GA4 provider adapters and local fixtures; client GA4 projection utilities; MCP analytics handlers/profile/registry; focused unit, contract, and integration tests; client MCP rule, README, roadmap, feature inventory, and this audit.
