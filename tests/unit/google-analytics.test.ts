@@ -52,9 +52,10 @@ describe('google-analytics behavior', () => {
       getGA4PeriodComparison,
       getGA4TopPages,
       getGA4TopSources,
+      runClientGa4CampaignReport,
     } = await import('../../server/google-analytics.js');
 
-    const [overview, trend, pages, sources, devices, countries, comparison] = await Promise.all([
+    const [overview, trend, pages, sources, devices, countries, comparison, campaigns] = await Promise.all([
       getGA4Overview(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
       getGA4DailyTrend(LOCAL_PROVIDER_FIXTURE.ga4PropertyNumericId),
       getGA4TopPages(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
@@ -62,6 +63,11 @@ describe('google-analytics behavior', () => {
       getGA4DeviceBreakdown(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
       getGA4Countries(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
       getGA4PeriodComparison(LOCAL_PROVIDER_FIXTURE.ga4PropertyId),
+      runClientGa4CampaignReport(
+        LOCAL_PROVIDER_FIXTURE.ga4PropertyId,
+        { startDate: '2026-06-01', endDate: '2026-06-28' },
+        10,
+      ),
     ]);
 
     expect(overview.totalUsers).toBeGreaterThan(0);
@@ -71,6 +77,10 @@ describe('google-analytics behavior', () => {
     expect(devices.map((row) => row.device)).toEqual(['desktop', 'mobile', 'tablet']);
     expect(countries[0]?.country).toBe('United States');
     expect(comparison.current.totalSessions).toBeGreaterThan(comparison.previous.totalSessions);
+    expect(campaigns.rows[0]).toMatchObject({
+      campaignName: 'Organic Search',
+      sessions: 1_492,
+    });
     expect(mocks.getGlobalToken).not.toHaveBeenCalled();
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
@@ -94,7 +104,12 @@ describe('google-analytics behavior', () => {
     const { getGA4TopPages } = await import('../../server/google-analytics.js');
 
     await expect(getGA4TopPages('prop-1')).rejects.toThrow('GA4 report failed: 403');
-    expect(mocks.loggerError).toHaveBeenCalled();
+    expect(mocks.loggerError).toHaveBeenCalledWith({
+      reportKind: 'legacy',
+      failureClassification: 'http',
+      status: 403,
+      retryable: false,
+    }, 'GA4 report failed');
   });
 
   it('falls back to default range when custom dateRange is malformed in period comparison', async () => {

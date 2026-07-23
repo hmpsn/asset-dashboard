@@ -153,7 +153,7 @@ export function buildLocalGscFixtureResponse(
 interface Ga4FixtureBody {
   dimensions?: Array<{ name?: string }>;
   metrics?: Array<{ name?: string }>;
-  dateRanges?: Array<{ startDate?: string; endDate?: string }>;
+  dateRanges?: Array<{ startDate?: string; endDate?: string; name?: string }>;
   dimensionFilter?: unknown;
   limit?: number | string;
 }
@@ -171,6 +171,7 @@ function ga4MetricSet(users: number, sessions = Math.round(users * 1.42), pagevi
   return {
     totalUsers: users,
     sessions,
+    engagedSessions: Math.round(sessions * 0.686),
     screenPageViews: pageviews,
     averageSessionDuration: 148.6,
     bounceRate: 0.314,
@@ -180,6 +181,16 @@ function ga4MetricSet(users: number, sessions = Math.round(users * 1.42), pagevi
     keyEvents: Math.round(users * 0.071),
     engagementRate: 0.686,
   };
+}
+
+function ga4MetricType(name: string): 'TYPE_FLOAT' | 'TYPE_INTEGER' | 'TYPE_SECONDS' {
+  if (name === 'engagementRate' || name === 'bounceRate' || name === 'keyEvents') {
+    return 'TYPE_FLOAT';
+  }
+  if (name === 'averageSessionDuration' || name === 'userEngagementDuration') {
+    return 'TYPE_SECONDS';
+  }
+  return 'TYPE_INTEGER';
 }
 
 export function buildLocalGa4FixtureReport(rawBody: Record<string, unknown>): unknown {
@@ -203,6 +214,10 @@ export function buildLocalGa4FixtureReport(rawBody: Record<string, unknown>): un
     rows = [
       ['google', 'organic', 1_284, 1_716], ['(direct)', '(none)', 421, 562], ['linkedin.com', 'referral', 219, 286], ['bing', 'organic', 174, 229],
     ].map(([source, medium, users, sessions]) => ga4Row([String(source), String(medium)], metricNames, ga4MetricSet(Number(users), Number(sessions))));
+  } else if (dimensionKey === 'sessionCampaignName') {
+    rows = [
+      ['Organic Search', 1_109, 1_492], ['(direct)', 421, 562], ['Q3 authority campaign', 278, 361], ['Partner referral', 193, 251],
+    ].map(([campaign, users, sessions]) => ga4Row([String(campaign)], metricNames, ga4MetricSet(Number(users), Number(sessions))));
   } else if (dimensionKey === 'deviceCategory') {
     rows = [['desktop', 1_310, 1_780], ['mobile', 861, 1_132], ['tablet', 93, 121]].map(([device, users, sessions]) => (
       ga4Row([String(device)], metricNames, ga4MetricSet(Number(users), Number(sessions)))
@@ -236,7 +251,30 @@ export function buildLocalGa4FixtureReport(rawBody: Record<string, unknown>): un
     )));
   }
 
-  return { rows: rows.slice(0, limit) };
+  const rowCount = rows.length;
+  const returnedRows = rows.slice(0, limit);
+  const multipleRanges = (body.dateRanges?.length ?? 0) > 1;
+  if (multipleRanges) {
+    returnedRows.forEach((row, index) => {
+      const rangeName = body.dateRanges?.[index]?.name;
+      row.dimensionValues.push({ value: rangeName ?? `date_range_${index}` });
+    });
+  }
+
+  return {
+    dimensionHeaders: [
+      ...dimensions.map(name => ({ name })),
+      ...(multipleRanges ? [{ name: 'dateRange' }] : []),
+    ],
+    metricHeaders: metricNames.map(name => ({ name, type: ga4MetricType(name) })),
+    rows: returnedRows,
+    rowCount,
+    metadata: {
+      subjectToThresholding: false,
+      dataLossFromOtherRow: false,
+    },
+    kind: 'analyticsData#runReport',
+  };
 }
 
 function localPageSpeedResult(
