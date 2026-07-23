@@ -29,9 +29,16 @@ describe('MCP client read-only profile contracts', () => {
     });
   });
 
-  it('activates only the existing GSC read in PR1', () => {
-    expect(MCP_CLIENT_TOOL_NAMES).toEqual(['get_search_performance']);
-    expect(new Set(MCP_CLIENT_TOOL_NAMES).size).toBe(1);
+  it('activates exactly the six approved aggregate analytics reads', () => {
+    expect(MCP_CLIENT_TOOL_NAMES).toEqual([
+      'get_search_performance',
+      'get_ga4_campaign_performance',
+      'get_ga4_period_comparison',
+      'get_ga4_traffic_sources',
+      'get_ga4_key_events',
+      'get_ga4_content_performance',
+    ]);
+    expect(new Set(MCP_CLIENT_TOOL_NAMES).size).toBe(6);
 
     const registered = new Set(listMcpToolDefinitions().map(tool => tool.name));
     expect(MCP_CLIENT_TOOL_NAMES.length).toBeGreaterThan(0);
@@ -56,16 +63,6 @@ describe('MCP client read-only profile contracts', () => {
         type: 'object',
         required: ['data'],
       });
-      const serializedOutputSchema = JSON.stringify(definition.outputSchema);
-      expect(serializedOutputSchema).toContain(
-        'Click-through rate as percentage points (for example, 6.3 means 6.3%, not 0.063).',
-      );
-      expect(serializedOutputSchema).toContain(
-        'Absolute CTR change in percentage points: current minus previous.',
-      );
-      expect(serializedOutputSchema).toContain(
-        'Relative change in CTR as a percentage, not percentage points.',
-      );
       expect(definition.annotations).toEqual({
         readOnlyHint: true,
         destructiveHint: false,
@@ -73,5 +70,21 @@ describe('MCP client read-only profile contracts', () => {
         openWorldHint: false,
       });
     }
+
+    const search = clientDefinitions().find(tool => tool.name === 'get_search_performance');
+    const serializedSearchOutput = JSON.stringify(search?.outputSchema);
+    expect(serializedSearchOutput).toContain(
+      'Click-through rate as percentage points (for example, 6.3 means 6.3%, not 0.063).',
+    );
+
+    const keyEvents = clientDefinitions().find(tool => tool.name === 'get_ga4_key_events');
+    expect(JSON.stringify(keyEvents?.outputSchema)).toContain(
+      'Share of period users who triggered the key event, in percentage points.',
+    );
+
+    const content = clientDefinitions().find(tool => tool.name === 'get_ga4_content_performance');
+    const serializedContentOutput = JSON.stringify(content?.outputSchema);
+    expect(serializedContentOutput).toContain('pages_by_views');
+    expect(serializedContentOutput).toContain('landing_pages_by_sessions');
   });
 });

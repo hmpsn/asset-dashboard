@@ -86,3 +86,37 @@ exclusive file ownership before one sequential MCP integration pass.
   never assigned inferred business meaning.
 - Outputs retain bounded data-quality and freshness metadata and fail safely on
   incompatible or failed provider reports.
+
+### PR2 fixed GA4 provider contract
+
+- Every dimension, metric, filter, ordering, and provider limit is owned by the
+  server. Client inputs never accept GA4 report schemas, property IDs, arbitrary
+  filters, or provider URLs.
+- Client GA4 adapters validate exact response headers, row widths, numeric
+  values, row counts, and safe response metadata. Missing or incompatible
+  provider fields fail with a generic MCP error; they never become plausible
+  zero-valued success results.
+- `get_ga4_campaign_performance` uses `sessionCampaignName` and labels its
+  attribution scope `session_campaign`.
+- `get_ga4_traffic_sources` uses session-scoped source and medium dimensions.
+- `get_ga4_key_events` uses metric `keyEvents` with an exact
+  `isKeyEvent == "true"` filter. The similarly named legacy all-event helper is
+  not valid authority for this client tool.
+- `get_ga4_content_performance` executes separate `pagePath`/views and
+  `landingPage`/sessions reports and never joins the two scopes.
+- A shared UTC range resolver defaults trailing reads through yesterday.
+  Exact dates are paired, inclusive, valid calendar dates, and bounded to 366
+  days. `days` cannot be mixed with an exact range.
+- Comparison modes are explicit. `previous_period` uses the immediately
+  preceding equal-length window; `year_over_year` shifts calendar boundaries
+  by one year and clamps February 29 to February 28; `custom` requires a
+  bounded equal-length comparison range. Relative change is `null` when its
+  comparison denominator is zero.
+- Only an exact pinned `eventConfig.eventName` match supplies its exact
+  `displayName`. Duplicate configured names degrade to an unmapped/attention
+  result. Generic `click` always returns `needs_attention` until destination
+  filter authority exists, even when it has a pinned display label.
+- GA4 provider logging records only a safe report kind, failure
+  classification, sanitized status, and retryability. It never records the
+  property ID, request body, exception object, endpoint, provider body, or
+  credentials.
