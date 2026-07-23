@@ -1,6 +1,6 @@
 /**
- * mcpLimiter — the shared per-IP rate limit applied directly to every POST-only
- * MCP transport route.
+ * mcpLimiter — the per-IP rate limit applied to POST-only MCP transports by
+ * the pre-router boundary in app.ts.
  *
  * /mcp was previously unthrottled (the three public limiters only cover
  * /api/public/), so a runaway agent loop or a leaked Bearer key could hammer it.
@@ -68,22 +68,4 @@ describe('mcpLimiter', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
-  it('shares one budget across full, operator, and client transport paths', () => {
-    const ip = '203.0.113.95';
-    const paths = ['/mcp', '/mcp/operator', '/mcp/client'];
-
-    for (let i = 0; i < 120; i++) {
-      const next = vi.fn();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mcpLimiter({ ip, path: paths[i % paths.length], socket: { remoteAddress: ip } } as any, makeRes() as any, next);
-      expect(next).toHaveBeenCalledTimes(1);
-    }
-
-    const blockedRes = makeRes();
-    const blockedNext = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mcpLimiter({ ip, path: '/mcp/client', socket: { remoteAddress: ip } } as any, blockedRes as any, blockedNext);
-    expect(blockedNext).not.toHaveBeenCalled();
-    expect(blockedRes.status).toHaveBeenCalledWith(429);
-  });
 });

@@ -95,6 +95,10 @@ const stmts = createStmtCache(() => ({
 
 /** sha256 hex of the plaintext key — the only representation we persist. */
 export function hashMcpApiKey(plaintextKey: string): string {
+  // This is a deterministic lookup fingerprint for a 256-bit CSPRNG bearer
+  // token, not password derivation. Slow password hashing would add request
+  // CPU/DoS cost without improving the token's 2^256 preimage resistance.
+  // codeql[js/insufficient-password-hash]
   return createHash('sha256').update(plaintextKey).digest('hex');
 }
 

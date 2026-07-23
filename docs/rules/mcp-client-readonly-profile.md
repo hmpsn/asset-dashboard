@@ -28,10 +28,10 @@ primary bounded context is `platform-foundation`; `analytics-intelligence` and
 - Client results and logs never expose credentials, provider tokens, raw
   provider errors, user identifiers, prompts, evidence, or unbounded provider
   response bodies.
-- Every POST transport (`/mcp`, `/mcp/operator`, and `/mcp/client`) applies the
-  same MCP-specific per-IP limiter before authentication. The limiter owns one
-  shared MCP bucket across profiles; GET and DELETE remain cheap 405 responses
-  and do not consume the POST budget.
+- Every POST transport (`/mcp`, `/mcp/operator`, and `/mcp/client`) passes
+  through the application-level MCP-specific per-IP limiter before the router
+  authenticates it. GET and DELETE remain cheap 405 responses and do not
+  consume a POST budget.
 - Durable MCP bearer tokens are opaque credentials generated from 32 bytes of
   cryptographically secure random entropy. SHA-256 is used only as a
   deterministic lookup fingerprint for those high-entropy tokens; it is not a
