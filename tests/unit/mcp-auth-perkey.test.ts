@@ -123,9 +123,16 @@ vi.mock('../../server/mcp/tools/analytics-read-actions.js', () => ({
     },
   }],
   handleAnalyticsReadActionTool: vi.fn(),
-  clientSearchPerformanceTool: {
-    name: 'get_search_performance',
-    description: 'Client search performance.',
+  clientAnalyticsReadTools: [
+    'get_search_performance',
+    'get_ga4_campaign_performance',
+    'get_ga4_period_comparison',
+    'get_ga4_traffic_sources',
+    'get_ga4_key_events',
+    'get_ga4_content_performance',
+  ].map(name => ({
+    name,
+    description: `Client analytics read: ${name}.`,
     inputSchema: { type: 'object', properties: {} },
     outputSchema: { type: 'object', required: ['data'] },
     annotations: {
@@ -134,7 +141,7 @@ vi.mock('../../server/mcp/tools/analytics-read-actions.js', () => ({
       idempotentHint: true,
       openWorldHint: false,
     },
-  },
+  })),
   handleClientAnalyticsReadActionTool: h.clientSearchHandler,
 }));
 vi.mock('../../server/mcp/tools/job-actions.js', () => ({

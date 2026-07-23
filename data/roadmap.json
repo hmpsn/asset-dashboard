@@ -7,17 +7,6 @@
       "rationale": "Give every client one workspace-bound desktop MCP connection for aggregate GA4 and GSC questions without exposing platform mutations or proliferating per-tool endpoints.",
       "items": [
         {
-          "id": "mcp-client-profile-boundary",
-          "title": "PR1 — Client transport profile and read-only credential boundary",
-          "source": "2026-07-23 Client Read-Only Analytics MCP Rollout",
-          "est": "M",
-          "priority": "P1",
-          "status": "pending",
-          "createdAt": "2026-07-23",
-          "owner": "platform-foundation",
-          "notes": "Implementation complete locally 2026-07-23: one /mcp/client endpoint, profile-bound workspace credentials, workspace-free client schemas, canonical read-only discovery/dispatch allowlisting, and bounded structured GSC output. Existing keys default to full; client keys are rejected at broader transports, and full/master credentials are rejected at the client transport. Keep pending until independent reviews, CI, and staging credential/handshake smoke pass. No UI or database synchronization."
-        },
-        {
           "id": "mcp-client-ga4-analytics",
           "title": "PR2 — Aggregate GA4 client analytics tools",
           "source": "2026-07-23 Client Read-Only Analytics MCP Rollout",
@@ -26,7 +15,7 @@
           "status": "pending",
           "createdAt": "2026-07-23",
           "owner": "analytics-intelligence",
-          "notes": "After PR1 merges and passes staging smoke, add five bounded GA4 tools beside GSC. Preserve exact GA4 event authority, session attribution, separate page/session scopes, safe provider failures, and client-approved eventConfig labels."
+          "notes": "Implementation complete locally 2026-07-23: five fixed GA4 reads beside GSC, strict provider response validation, deterministic UTC comparisons, exact pinned event labels, generic-click needs_attention, separate page/landing scopes, bounded quality metadata, and six-tool client discovery/dispatch. Keep pending until two independent Sol reviews, full verification, CI, and temporary-key staging smoke pass. No UI or database synchronization."
         }
       ]
     },

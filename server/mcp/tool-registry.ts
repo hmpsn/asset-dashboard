@@ -71,7 +71,7 @@ import {
 import { schemaActionTools, handleSchemaActionTool } from './tools/schema-actions.js';
 import {
   analyticsReadActionTools,
-  clientSearchPerformanceTool,
+  clientAnalyticsReadTools,
   handleClientAnalyticsReadActionTool,
   handleAnalyticsReadActionTool,
 } from './tools/analytics-read-actions.js';
@@ -597,9 +597,9 @@ const OPERATOR_TOOL_DEFINITIONS = Object.freeze(
     .map(entry => operatorDefinition(entry.definition as Tool)),
 ) as Tool[];
 
-const clientToolDefinitionsByName = new Map<string, Tool>([
-  [clientSearchPerformanceTool.name, snapshotValue(clientSearchPerformanceTool)],
-]);
+const clientToolDefinitionsByName = new Map<string, Tool>(
+  clientAnalyticsReadTools.map(tool => [tool.name, snapshotValue(tool)]),
+);
 
 function clientToolDefinitions(): Tool[] {
   return Object.freeze(

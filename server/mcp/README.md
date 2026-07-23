@@ -36,9 +36,9 @@ update this file in the same commit.
 
 | Endpoint | Credential | Discovery | Intended use |
 |----------|------------|-----------|--------------|
-| `POST /mcp` | Master key or per-workspace key, subject to existing scope rules | All 105 canonical tools and the unchanged full instructions | Advanced and backward-compatible access |
+| `POST /mcp` | Master key or per-workspace key, subject to existing scope rules | All 110 canonical tools and the unchanged full instructions | Advanced and backward-compatible access |
 | `POST /mcp/operator` | Master key only | Compact registered intersection of the canonical 25-name operator allowlist | Normal desktop studio administration |
-| `POST /mcp/client` | Client-profile key for exactly one workspace | Client allowlist, currently `get_search_performance` only | Client self-service analytics and search read access |
+| `POST /mcp/client` | Client-profile key for exactly one workspace | Six aggregate GSC/GA4 reads | Client self-service analytics and search read access |
 
 ### Client setup and boundary
 
@@ -47,9 +47,8 @@ client-profile Bearer token issued for their workspace. They never supply a work
 workspace, or configure individual tools. The server injects the credential's workspace scope after
 rejecting caller-supplied `workspace_id` and `workspaceId` values.
 
-PR1 intentionally activates only `get_search_performance`. PR2 adds the five bounded GA4 reads to
-this same endpoint; clients will not need to reconfigure their connection. The client profile is
-strictly aggregate and read-only: hidden, guessed, and unknown tools all return the same generic
+The client profile exposes `get_search_performance` plus five bounded GA4 reads through this same
+endpoint. The client profile is strictly aggregate and read-only: hidden, guessed, and unknown tools all return the same generic
 `not_found` result. It cannot create content, start paid work, approve, send, publish, delete, or
 access a different workspace.
 
@@ -209,7 +208,7 @@ failure classes; unknown names and mismatched workspace values are never logged 
 
 `MCP_TOOL_REGISTRY` (`server/mcp/tool-registry.ts`) is the single authority for discovery,
 dispatch, workspace scope, and error compatibility. It composes **19 categories** for a total of
-**105 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
+**110 tools**. Each category remains a `*Tools: Tool[]` array + a `handle*Tool(name, args, context?)`
 dispatcher in `server/mcp/tools/<category>.ts`; the registry snapshots immutable definitions and
 connects each one to its category handler. A production dispatch census calls every registered
 name with inert invalid input, asserts the exact 19 family-array→handler identities, and pins the

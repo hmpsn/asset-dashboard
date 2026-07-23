@@ -179,23 +179,31 @@ describe('client MCP profile', () => {
     expect(masterAtOperator.tools?.map(tool => tool.name)).toContain('get_portfolio_brief');
   });
 
-  it('discovers exactly one workspace-free, structured, read-only tool in PR1', async () => {
+  it('discovers exactly six workspace-free, structured, read-only analytics tools', async () => {
     const { response, tools } = await listTools('/mcp/client', clientKey.plaintextKeyOnceShown);
     expect(response.status).toBe(200);
-    expect(tools?.map(tool => tool.name)).toEqual(['get_search_performance']);
+    expect(tools?.map(tool => tool.name)).toEqual([
+      'get_search_performance',
+      'get_ga4_campaign_performance',
+      'get_ga4_period_comparison',
+      'get_ga4_traffic_sources',
+      'get_ga4_key_events',
+      'get_ga4_content_performance',
+    ]);
 
-    const search = tools?.[0];
-    expect(search?.inputSchema?.properties).not.toHaveProperty('workspace_id');
-    expect(search?.inputSchema?.properties).not.toHaveProperty('workspaceId');
-    expect(search?.inputSchema?.required ?? []).not.toContain('workspace_id');
-    expect(search?.inputSchema?.required ?? []).not.toContain('workspaceId');
-    expect(search?.outputSchema).toMatchObject({ type: 'object', required: ['data'] });
-    expect(search?.annotations).toEqual({
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    });
+    for (const tool of tools ?? []) {
+      expect(tool.inputSchema?.properties).not.toHaveProperty('workspace_id');
+      expect(tool.inputSchema?.properties).not.toHaveProperty('workspaceId');
+      expect(tool.inputSchema?.required ?? []).not.toContain('workspace_id');
+      expect(tool.inputSchema?.required ?? []).not.toContain('workspaceId');
+      expect(tool.outputSchema).toMatchObject({ type: 'object', required: ['data'] });
+      expect(tool.annotations).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      });
+    }
   });
 
   it('fails caller-supplied workspace aliases before dispatch and preserves not_found indistinguishability', async () => {
@@ -206,13 +214,22 @@ describe('client MCP profile', () => {
       { name, arguments: args },
     );
 
-    const ownSnake = await call('get_search_performance', { workspace_id: workspaces.wsA.workspaceId });
-    expect(ownSnake.response.status).toBe(200);
-    expect(errorEnvelope(ownSnake.body)).toMatchObject({ code: 'validation_failed' });
+    for (const name of [
+      'get_search_performance',
+      'get_ga4_campaign_performance',
+      'get_ga4_period_comparison',
+      'get_ga4_traffic_sources',
+      'get_ga4_key_events',
+      'get_ga4_content_performance',
+    ]) {
+      const ownSnake = await call(name, { workspace_id: workspaces.wsA.workspaceId });
+      expect(ownSnake.response.status).toBe(200);
+      expect(errorEnvelope(ownSnake.body)).toMatchObject({ code: 'validation_failed' });
 
-    const ownCamel = await call('get_search_performance', { workspaceId: workspaces.wsA.workspaceId });
-    expect(ownCamel.response.status).toBe(200);
-    expect(errorEnvelope(ownCamel.body)).toMatchObject({ code: 'validation_failed' });
+      const ownCamel = await call(name, { workspaceId: workspaces.wsA.workspaceId });
+      expect(ownCamel.response.status).toBe(200);
+      expect(errorEnvelope(ownCamel.body)).toMatchObject({ code: 'validation_failed' });
+    }
 
     const write = await call('update_workspace', {});
     const unknown = await call('not_a_registered_tool', {});
